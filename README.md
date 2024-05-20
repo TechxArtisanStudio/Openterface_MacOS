@@ -23,3 +23,5 @@ We're hard at work developing [the host applications](https://openterface.com/qu
 Admittedly, this is an early stage of development, which means the code might be a bit messy and full of bugs 😅. We're all ears for any criticism and constructive suggestions on code, software framework, current feature design flaws, and potential new features.
 
 Moreover, if you are interested in joining our dev team and [contributing](https://openterface.com/contributing/), you can drop me an email at: info@techxartisan.com
+
+We keep our community updated on all things Openterface Mini-KVM on our Reddit: [r/Openterface_miniKVM/](https://www.reddit.com/r/Openterface_miniKVM/). You can also join us on Discord [TechxArtisan](https://discord.gg/sFTJD6a3R8), especially for development-related discussions! Cheers!
