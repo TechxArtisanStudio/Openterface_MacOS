@@ -1,6 +1,6 @@
 # Welcome to Openterface Mini-KVM MacOS App
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/r3HNUflWGOY?si=Y5FfACG6iCWs6leM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Watch the video](https://img.youtube.com/vi/r3HNUflWGOY/0.jpg)](https://www.youtube.com/watch?v=r3HNUflWGOY)
 
 [Openterface Mini-KVM](https://openterface.com/quick-start/) allows you to control a headless target device, such as a mini PC, kiosk, or server, directly from your laptop or desktop without the need for an extra keyboard, mouse, and monitor.
 
