@@ -100,10 +100,10 @@ class Logger {
     // write append log
     func writeLogFile(string: String) {
         if isLogFileOpen {
-            if fileHandle != nil{
-                // set the end possition
+            if fileHandle != nil {
+                // set the end position
                 fileHandle?.seekToEndOfFile()
-                // 将字符串转化为NSData并追加到文件
+                // Convert the string to NSData and append it to the file
                 let logMessage = formattedMessage(message: string)
                 if let data = logMessage.data(using: .utf8) {
                     fileHandle?.write(data)

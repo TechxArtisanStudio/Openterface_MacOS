@@ -30,7 +30,7 @@ class SettingsScreenWC<RootView : View>: NSWindowController, NSWindowDelegate {
         window.setContentSize(NSSize(width: 500, height: 500))
 
         self.init(window: window)
-        // 设置窗口的代理为自身以便接收关闭通知
+        // Set the window's delegate to self to receive close notifications
         self.window?.delegate = self
     }
 }

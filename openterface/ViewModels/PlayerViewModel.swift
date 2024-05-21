@@ -52,7 +52,7 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func startAudioSession(){
-        // 获取输入节点（麦克风）
+        // Get the input node (microphone)
         let inputNode = engine.inputNode
         self.audioDeviceId = getAudioDeviceByName(name: "OpenterfaceA")
         if self.audioDeviceId == nil {
@@ -227,9 +227,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     func alertToEncourageCameraAccessInitially() {
         let alert = NSAlert()
-        alert.messageText = "需要摄像头访问权限"
-        alert.informativeText = "⚠️此应用没有权限访问您的摄像头，\n\n您可以在\"系统偏好设置\"->\"隐私\"->\"摄像头\"中打开。"
-        alert.addButton(withTitle: "确定")
+        alert.messageText = "Camera Access Required"
+        alert.informativeText = "⚠️This application does not have permission to access your camera.\n\nYou can enable it in \"System Preferences\" -> \"Privacy\" -> \"Camera\"."
+        alert.addButton(withTitle: "OK")
         alert.alertStyle = .warning
         alert.runModal()
     }

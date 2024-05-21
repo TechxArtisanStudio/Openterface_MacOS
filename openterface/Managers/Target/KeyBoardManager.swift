@@ -57,13 +57,13 @@ class KeyboardManager {
 //    NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
 //        let commandKey = NSEvent.ModifierFlags.command.rawValue
 //        let shiftKey = NSEvent.ModifierFlags.shift.rawValue
-//        let keyF: UInt16 = 0x03 // F键的keyCode为3
+//        let keyF: UInt16 = 0x03 // The keyCode for the F key is 3
 //
-//        // 检查事件是否是键盘按下事件
+//        // Check if the event is a key press event
 //        if event.type == .keyDown {
 //            let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue
 //
-//            // 检查是否按下了 Command + Shift + F
+//            // Check if Command + Shift + F is pressed
     
     func monitorKeyboardEvents() {
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in

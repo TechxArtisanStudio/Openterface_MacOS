@@ -66,13 +66,13 @@ class PlayerView: NSView, NSWindowDelegate {
     }
     
     func map(value: Double, inMin: Double, inMax: Double, outMin: Double, outMax: Double) -> Double {
-        // 防止除零
+        // Prevent division by zero
         guard inMax - inMin != 0 else { return outMin }
       
-        // 计算输入数值在输入范围内的比例
+        // Calculate the input value's ratio within the input range
         let inputScale = (value - inMin) / (inMax - inMin)
       
-        // 将输入比例映射到输出范围
+        // Map the input ratio to the output range
         let outputValue = outMin + (outMax - outMin) * inputScale
         return outputValue
     }
@@ -166,12 +166,12 @@ class PlayerView: NSView, NSWindowDelegate {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         
-        // 移除所有现有的跟踪区域
+        // Remove all existing tracking areas
         for trackingArea in self.trackingAreas {
             self.removeTrackingArea(trackingArea)
         }
         
-        // 创建并添加新的跟踪区域
+        // Create and add new tracking areas
         let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
         let trackingArea = NSTrackingArea(rect: self.bounds, options: options, owner: self, userInfo: nil)
         self.addTrackingArea(trackingArea)
@@ -179,7 +179,7 @@ class PlayerView: NSView, NSWindowDelegate {
     
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        // 鼠标进入视图时的处理逻辑
+        // Logic for when the mouse enters the view
         AppStatus.isMouseInView = true
         
         if let viewFrame = self.previewLayer {
@@ -192,11 +192,11 @@ class PlayerView: NSView, NSWindowDelegate {
     
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        // 鼠标退出视图时的处理逻辑
+        // Logic for when the mouse exits the view
         AppStatus.isMouseInView = false
     }
     
-    // 获取窗口长宽
+    // Get window dimensions
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         self.window?.delegate = self
@@ -207,7 +207,7 @@ class PlayerView: NSView, NSWindowDelegate {
             UserSettings.shared.viewHigh = Float(windowSize.height)
             window.center()
             
-            // 更新 playerBackgroundImage 的 frame
+            // Update the frame of playerBackgroundImage
              playerBackgroundImage.frame = self.bounds
         } else {
             Logger.shared.log(content: "The view is not in a window yet.")

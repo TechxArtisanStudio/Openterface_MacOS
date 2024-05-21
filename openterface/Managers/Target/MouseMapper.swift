@@ -49,10 +49,10 @@ class MouseMapper {
         command.append(wheelMovement) // scroll up 0x01-0x7F; scroll down: 0x81-0xFF
         spm.sendCommand(command: command)
     }
-    
+
     private func translateRelativeMovement(value: Int) -> UInt8 {
-        // 不动：dx = 0x00，则表示在X轴方向不移动; 向右移动: 0x01 <= dx <= 0x7F; 移动像素点 = dx; 向左移动: 0x80 <= dx <= 0xFF; 移动像素点 = 0x00 - dx;
-        // 不动：dy = 0x00，则表示在Y轴方向不移动；向右移动：0x01 <= dy <= 0x7F； 移动像素点 = dy；向左移动：0x80 <= dy <= 0xFF； 移动像素点 = 0x00 - dy；
+        // No movement: dx = 0x00, which means no movement along the X-axis; Move to the right: 0x01 <= dx <= 0x7F; Number of pixels moved = dx; Move to the left: 0x80 <= dx <= 0xFF; Number of pixels moved = 0x00 - dx;
+        // No movement: dy = 0x00, which means no movement along the Y-axis; Move up: 0x01 <= dy <= 0x7F; Number of pixels moved = dy; Move down: 0x80 <= dy <= 0xFF; Number of pixels moved = 0x00 - dy;
         if value >= 0 {
             return UInt8(min(value, 0x7F))
         } else {

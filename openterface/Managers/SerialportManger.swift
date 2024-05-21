@@ -58,9 +58,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     override init(){
         super.init()
         
-        // 初始化串口
+        // Initialise the serial port
         self.initializeSerialPort()
-        
+
         observerSerialPortNotifications()
     }
     
@@ -197,7 +197,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func openSerialPort(name: String, baudrate: Int) {
-        self.serialPorts = ORSSPM.availablePorts // 获取现有串口列表
+        self.serialPorts = ORSSPM.availablePorts // Get the list of available serial ports
         self.selectedSerialPort = self.serialPorts.filter{ $0.path.contains(name)}.first
         
         self.selectedSerialPort?.baudRate = NSNumber(value: baudrate)
