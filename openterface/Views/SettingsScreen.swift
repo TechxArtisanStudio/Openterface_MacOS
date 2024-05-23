@@ -19,7 +19,7 @@ struct SettingsScreen: View {
             KeyboardShortcuts.Recorder("Exit full screen mode", name: .exitFullScreenMode)
         }
         Form{
-            KeyboardShortcuts.Recorder("Exit full screen mode", name: .triggerAreaOCR)
+            KeyboardShortcuts.Recorder("Trigger Area OCR", name: .triggerAreaOCR)
         }
     }
 }
