@@ -73,7 +73,7 @@ class KeyboardManager {
             // let modifierDescription = self.modifierFlagsDescription(modifiers)
             //Logger.shared.log(content: "Modifiers: \(modifierDescription). Key pressed: \(event.characters ?? "") with keycode: \(event.keyCode). ")
             
-            Logger.shared.writeLogFile(string: "key pressed\(event.keyCode)")
+            Logger.shared.writeLogFile(string: "key pressed: \(event.keyCode)")
             
             if event.keyCode == 53 {
                 if self.escKeyDownCounts == 0 {
