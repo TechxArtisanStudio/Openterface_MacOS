@@ -33,6 +33,7 @@ struct AppStatus {
     static var isCursorHidden: Bool = false
     static var isExit: Bool = false
     static var isLogMode: Bool = false
+    static var isAreaOCRing: Bool = false
     
     static var evnHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)

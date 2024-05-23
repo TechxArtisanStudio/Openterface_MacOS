@@ -76,6 +76,11 @@ class KeyboardManager {
             Logger.shared.writeLogFile(string: "key pressed: \(event.keyCode)")
             
             if event.keyCode == 53 {
+                for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
+                    w.close()
+                    AppStatus.isAreaOCRing = false
+                }
+                
                 if self.escKeyDownCounts == 0 {
                     self.escKeyDownTimeStart = event.timestamp
                     self.escKeyDownCounts = self.escKeyDownCounts + 1
@@ -102,9 +107,7 @@ class KeyboardManager {
                     {
                         self.escKeyDownCounts = self.escKeyDownCounts + 1
                     }
-                    
                 }
-                
             }
             return nil
         }

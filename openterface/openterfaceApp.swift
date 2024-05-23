@@ -111,11 +111,15 @@ struct openterfaceApp: App {
                         Text("Open in Finder")
                     }
                 }
-                // TODO: Add Functions
                 Button(action: {
                     showSetKeyWindow()
                 }) {
                     Text("ShortKey")
+                }
+                Button(action: {
+                    takeAreaOCRing()
+                }) {
+                    Text("Area OCR")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -133,7 +137,6 @@ struct openterfaceApp: App {
                 .keyboardShortcut("v", modifiers: .command)
             }
         }
-        
     }
     
     func showSetKeyWindow(){
@@ -166,5 +169,21 @@ final class AppState: ObservableObject {
                 }
             }
         }
+        
+        KeyboardShortcuts.onKeyUp(for: .triggerAreaOCR) {
+            takeAreaOCRing()
+        }
+    }
+}
+
+
+func takeAreaOCRing() {
+    if AppStatus.isAreaOCRing == false {
+        AppStatus.isAreaOCRing = true
+        guard let screen = SCContext.getScreenWithMouse() else { return } // 获取当前鼠标对应屏幕的坐标
+        let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
+        screenshotWindow.title = "Area Selector".local
+        screenshotWindow.makeKeyAndOrderFront(nil)
+        screenshotWindow.orderFrontRegardless()
     }
 }

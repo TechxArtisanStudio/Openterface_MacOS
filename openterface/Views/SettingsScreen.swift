@@ -18,6 +18,9 @@ struct SettingsScreen: View {
         Form{
             KeyboardShortcuts.Recorder("Exit full screen mode", name: .exitFullScreenMode)
         }
+        Form{
+            KeyboardShortcuts.Recorder("Exit full screen mode", name: .triggerAreaOCR)
+        }
     }
 }
 
@@ -38,4 +41,5 @@ class SettingsScreenWC<RootView : View>: NSWindowController, NSWindowDelegate {
 extension KeyboardShortcuts.Name {
     static let exitRelativeMode = Self("exitRelativeMode")
     static let exitFullScreenMode = Self("exitFullScreenMode")
+    static let triggerAreaOCR = Self("triggerAreaOCR")
 }

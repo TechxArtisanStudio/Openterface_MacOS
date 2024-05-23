@@ -15,6 +15,8 @@
 		5351254D2B59177F0002A91E /* HostManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5351254C2B59177F0002A91E /* HostManager.swift */; };
 		53696FE62BF3700F00250B28 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 53696FE52BF3700F00250B28 /* KeyboardShortcuts */; };
 		537F65D22B4E561200825B4F /* AppStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537F65D12B4E561200825B4F /* AppStatus.swift */; };
+		538462992BFF12D2002966FE /* SCContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538462982BFF12D2002966FE /* SCContext.swift */; };
+		5384629B2BFF1778002966FE /* AreaSeletor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5384629A2BFF1778002966FE /* AreaSeletor.swift */; };
 		53955CC02BF497D000FA4493 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53955CBF2BF497D000FA4493 /* SettingsScreen.swift */; };
 		53A6E1BF2B3E943300B652A5 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A6E1BE2B3E943300B652A5 /* PlayerView.swift */; };
 		53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */; };
@@ -61,6 +63,8 @@
 		531BAC392B5E47F000950525 /* MouseMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseMapper.swift; sourceTree = "<group>"; };
 		5351254C2B59177F0002A91E /* HostManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostManager.swift; sourceTree = "<group>"; };
 		537F65D12B4E561200825B4F /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
+		538462982BFF12D2002966FE /* SCContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCContext.swift; sourceTree = "<group>"; };
+		5384629A2BFF1778002966FE /* AreaSeletor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaSeletor.swift; sourceTree = "<group>"; };
 		53955CBF2BF497D000FA4493 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
 		53A6E1BE2B3E943300B652A5 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
@@ -122,6 +126,15 @@
 			path = Settings;
 			sourceTree = "<group>";
 		};
+		538462972BFF1271002966FE /* ShotOrc */ = {
+			isa = PBXGroup;
+			children = (
+				538462982BFF12D2002966FE /* SCContext.swift */,
+				5384629A2BFF1778002966FE /* AreaSeletor.swift */,
+			);
+			path = ShotOrc;
+			sourceTree = "<group>";
+		};
 		5394F9612B57DB7D00DB44ED /* Host */ = {
 			isa = PBXGroup;
 			children = (
@@ -172,6 +185,7 @@
 				53FBE7DB2B3D6789007785B0 /* Views */,
 				53FBE7DE2B3D6B60007785B0 /* ViewModels */,
 				537F65D02B4E4C6100825B4F /* Settings */,
+				538462972BFF1271002966FE /* ShotOrc */,
 				53FBE7B12B3D66D6007785B0 /* Assets.xcassets */,
 				53FBE7B62B3D66D6007785B0 /* openterface.entitlements */,
 				53FBE7B32B3D66D6007785B0 /* Preview Content */,
@@ -374,9 +388,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5384629B2BFF1778002966FE /* AreaSeletor.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
+				538462992BFF12D2002966FE /* SCContext.swift in Sources */,
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
@@ -573,6 +589,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -607,6 +624,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
