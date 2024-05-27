@@ -17,17 +17,18 @@ func takeScreenshot(of rect: NSRect?) {
 }
 
 func captureFullScreen() -> NSImage? {
+    let _y = Int(NSScreen.main?.frame.height ?? 0) - Int(SCContext.screenArea?.minY ?? 0)-Int(SCContext.screenArea?.height ?? 500)
     let bounds = CGRect(
         x: Int(SCContext.screenArea?.minX ?? 0),
-        y: 1050 - Int(SCContext.screenArea?.minY ?? 0)-Int(SCContext.screenArea?.height ?? 500) ,
+        y: _y,
         width: Int((SCContext.screenArea?.width ?? 500) ),
         height: Int((SCContext.screenArea?.height ?? 500) )
     )
-
+    
     guard let screenShot = CGWindowListCreateImage(bounds, .optionOnScreenOnly, kCGNullWindowID, .boundsIgnoreFraming) else { return nil }
     let originalCGImage: CGImage
     originalCGImage = screenShot
-
+    
     let originalWidth = originalCGImage.width
     let originalHeight = originalCGImage.height
     let bitsPerComponent = originalCGImage.bitsPerComponent
@@ -36,11 +37,11 @@ func captureFullScreen() -> NSImage? {
     guard let context = CGContext(data: nil, width: originalWidth / 2, height: originalHeight / 2, bitsPerComponent: bitsPerComponent, bytesPerRow: 0, space: colorSpace, bitmapInfo: bitmapInfo) else {
         fatalError("Unable to create graphics context")
     }
-
+    
     context.interpolationQuality = .high
     context.setShouldAntialias(true)
     context.draw(originalCGImage, in: CGRect(x: 0, y: 0, width: CGFloat(originalWidth) / 2, height: CGFloat(originalHeight) / 2))
-
+    
     if let scaledImage = context.makeImage() {
         lazy var textDetectionRequest: VNRecognizeTextRequest = {
             let request = VNRecognizeTextRequest(completionHandler: handleDetectedText)
