@@ -34,7 +34,9 @@ struct openterfaceApp: App {
     @State private var logModeTitle = "LogMode"
     @State private var mouseHideTitle = "Hide"
     
+    
     var log = Logger.shared
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some Scene {
         WindowGroup {
@@ -42,6 +44,23 @@ struct openterfaceApp: App {
                 //.frame(width: 1920 / 2, height: 1080 / 2)
                 .aspectRatio(16/9, contentMode: .fit)
                 .navigationTitle("Openterface Mini-KVM")
+                .toolbar{
+                    ToolbarItem(placement: .automatic) {
+                        Image(systemName: "display")
+                            .foregroundColor(.gray)
+                    }
+                    ToolbarItem(placement: .automatic) {
+                        Image(systemName: "keyboard.fill")
+                            .foregroundColor(.gray)
+                    }
+                    ToolbarItem(placement: .automatic) {
+                        Image(systemName: "computermouse.fill")
+                            .foregroundColor(.gray)
+                    }
+                }
+                .onReceive(timer) { _ in
+                   
+                }
         }
         .commands { 
             // Customize menu
