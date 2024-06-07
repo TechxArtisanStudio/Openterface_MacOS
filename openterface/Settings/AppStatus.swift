@@ -35,6 +35,11 @@ struct AppStatus {
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
     
+    static var isHaveSignal: Bool = false
+    static var isKeyboardConnected: Bool = false
+    static var isMouseConnected: Bool = false
+    static var isSwitchToHost: Bool?
+    
     static var evnHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)
     static var currentWindow: NSRect = NSRect(x:0,y:0,width:0,height:0)

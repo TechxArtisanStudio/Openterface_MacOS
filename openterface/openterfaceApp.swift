@@ -34,9 +34,10 @@ struct openterfaceApp: App {
     @State private var logModeTitle = "LogMode"
     @State private var mouseHideTitle = "Hide"
     
+    @State private var isSwitchToggleOn = false
     
     var log = Logger.shared
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
     
     var body: some Scene {
         WindowGroup {
@@ -56,6 +57,15 @@ struct openterfaceApp: App {
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "computermouse.fill")
                             .foregroundColor(.gray)
+                    }
+                    ToolbarItemGroup(placement: .automatic) {
+                        Toggle(isOn: $isSwitchToggleOn) {
+                            Image(systemName: isSwitchToggleOn ? "xserve" : "pc")
+                                .foregroundColor(isSwitchToggleOn ? .gray : .orange)
+                            Text(isSwitchToggleOn ? "target" : "host")
+                                .foregroundColor(isSwitchToggleOn ? .gray : .orange)
+                        }
+                        .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
                     }
                 }
                 .onReceive(timer) { _ in
@@ -199,10 +209,39 @@ final class AppState: ObservableObject {
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {
         AppStatus.isAreaOCRing = true
-        guard let screen = SCContext.getScreenWithMouse() else { return } // 获取当前鼠标对应屏幕的坐标
+        guard let screen = SCContext.getScreenWithMouse() else { return }
         let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
         screenshotWindow.title = "Area Selector".local
         screenshotWindow.makeKeyAndOrderFront(nil)
         screenshotWindow.orderFrontRegardless()
+    }
+}
+
+
+struct SwitchToggleStyle: ToggleStyle {
+    var width: CGFloat
+    var height: CGFloat
+    
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            RoundedRectangle(cornerRadius: height / 2)
+                .fill(configuration.isOn ? Color.gray : Color.orange)
+                .frame(width: width, height: height)
+                .overlay(
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: height - 2, height: height - 2)
+                        .offset(x: configuration.isOn ? (width / 2 - height / 2) : -(width / 2 - height / 2))
+                        .animation(.linear(duration: 0.1), value: configuration.isOn)
+                    )
+                .onTapGesture {
+                withAnimation(.spring(duration: 0.1)) { // 使用withAnimation
+                    configuration.isOn.toggle()
+                }
+            }
+        }
+        .frame(width: 105, height: 24)
     }
 }
