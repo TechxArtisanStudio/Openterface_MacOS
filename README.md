@@ -1,3 +1,6 @@
+# 🚨 Last Chance Alert! 🚨 
+Back us now on [Crowd Supply](https://www.crowdsupply.com/techxartisan/openterface-mini-kvm) to get the Openterface Mini-KVM **at a wallet-friendly price** of $79 - $99 before the campaign ends on **June 13, 2024, at 4:59 PM PDT**. Post-campaign prices are likely to increase as the product matures. Don’t miss out – act now!
+
 # Welcome to Openterface Mini-KVM MacOS App
 
 [![Watch the video](https://img.youtube.com/vi/r3HNUflWGOY/0.jpg)](https://www.youtube.com/watch?v=r3HNUflWGOY)
