@@ -143,7 +143,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 } 
                 else {
                     Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")
-                    // set baudrate to 115200 and mode 1
+                    // set baudrate to 115200 and mode 2
                     var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
                     command.append(contentsOf: dataBytes[12...31])
                     // append zero to the end
@@ -172,7 +172,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                     let dateFormatter = DateFormatter()
                     dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
                     let dateString = dateFormatter.string(from: Date())
-                    Logger.shared.log(content: "[\(dateString) \(cmd == 0x84 ? "Abslote" : "Relative") mouse event sent, status: \(dataBytes[5])")
+                    Logger.shared.log(content: "[\(dateString) \(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(dataBytes[5])")
                 }
                 break
             default:
