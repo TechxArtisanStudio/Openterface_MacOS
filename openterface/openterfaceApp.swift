@@ -57,11 +57,11 @@ struct openterfaceApp: App {
                     }
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "keyboard.fill")
-                            .foregroundColor(_isKeyboardConnected ? .green :.gray)
+                            .foregroundColor(_isKeyboardConnected ? Color(red255: 124, green255: 205, blue255: 124) :.gray)
                     }
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "computermouse.fill")
-                            .foregroundColor(_isMouseConnected ? .green :.gray)
+                            .foregroundColor(_isMouseConnected ? Color(red255: 124, green255: 205, blue255: 124)  :.gray)
                     }
                     ToolbarItemGroup(placement: .automatic) {
                         Toggle(isOn: $_isSwitchToggleOn) {
@@ -249,5 +249,12 @@ struct SwitchToggleStyle: ToggleStyle {
             }
         }
         .frame(width: 105, height: 24)
+    }
+}
+
+
+extension Color {
+    init(red255: Double, green255: Double, blue255: Double, opacity: Double = 1.0) {
+        self.init(red: red255 / 255.0, green: green255 / 255.0, blue: blue255 / 255.0, opacity: opacity)
     }
 }
