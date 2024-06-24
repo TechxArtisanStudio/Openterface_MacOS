@@ -33,7 +33,13 @@ struct openterfaceApp: App {
     @State private var logModeTitle = "LogMode"
     @State private var mouseHideTitle = "Hide"
     
-    @State private var isSwitchToggleOn = false
+    @State private var _isSwitchToggleOn = false
+    
+    
+    @State private var  _hasHdmiSignal: Bool = false
+    @State private var  _isKeyboardConnected: Bool = false
+    @State private var  _isMouseConnected: Bool = false
+    @State private var  _isSwitchToHost: Bool?
     
     var log = Logger.shared
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
@@ -51,24 +57,25 @@ struct openterfaceApp: App {
                     }
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "keyboard.fill")
-                            .foregroundColor(.gray)
+                            .foregroundColor(_isKeyboardConnected ? .green :.gray)
                     }
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "computermouse.fill")
-                            .foregroundColor(.gray)
+                            .foregroundColor(_isMouseConnected ? .green :.gray)
                     }
                     ToolbarItemGroup(placement: .automatic) {
-                        Toggle(isOn: $isSwitchToggleOn) {
-                            Image(systemName: isSwitchToggleOn ? "xserve" : "pc")
-                                .foregroundColor(isSwitchToggleOn ? .gray : .orange)
-                            Text(isSwitchToggleOn ? "target" : "host")
-                                .foregroundColor(isSwitchToggleOn ? .gray : .orange)
+                        Toggle(isOn: $_isSwitchToggleOn) {
+                            Image(systemName: _isSwitchToggleOn ? "xserve" : "pc")
+                                .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
+                            Text(_isSwitchToggleOn ? "target" : "host")
+                                .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
                         }
                         .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
                     }
                 }
                 .onReceive(timer) { _ in
-                   
+                    _isKeyboardConnected = AppStatus.isKeyboardConnected
+                    _isMouseConnected = AppStatus.isMouseConnected
                 }
         }
         .commands { 

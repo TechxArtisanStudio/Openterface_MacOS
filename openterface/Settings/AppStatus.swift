@@ -35,7 +35,7 @@ struct AppStatus {
     static var isAreaOCRing: Bool = false
     
 
-    static var hasHdmiSignal: Bool = false
+    static var hasHdmiSignal: Bool? = false
     static var isKeyboardConnected: Bool = false
     static var isMouseConnected: Bool = false
     static var isSwitchToHost: Bool?
