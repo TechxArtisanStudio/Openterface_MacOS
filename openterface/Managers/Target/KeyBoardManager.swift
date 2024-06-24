@@ -94,7 +94,7 @@ class KeyboardManager {
                             AppStatus.isCursorHidden = false
                             NSCursor.unhide()
 
-                            if let handler = AppStatus.evnHandler {
+                            if let handler = AppStatus.eventHandler {
                                 NSEvent.removeMonitor(handler)
                                 eventHandler = nil
                                 print()

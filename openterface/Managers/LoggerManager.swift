@@ -27,10 +27,10 @@ class Logger {
     static let shared = Logger()
     
     var isPrintEnabled = false
-    var KeyboardPrint = false
+    var KeyboardPrint = true
     var MouseEventPrint = false
     var ScrollPrint = false
-    var SerialDataPrint = false
+    var SerialDataPrint = true
     
     var logToFile = false
     
@@ -91,7 +91,11 @@ class Logger {
     }
     
     func log(content: String) {
-        print(content);
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        let dateString = dateFormatter.string(from: Date())
+                            
+        print("[\(dateString)] " + content);
         if(logToFile){
             writeLogFile(string: content)
         }

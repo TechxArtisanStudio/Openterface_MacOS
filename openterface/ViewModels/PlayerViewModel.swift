@@ -399,10 +399,10 @@ class PlayerViewModel: NSObject, ObservableObject {
     @objc func windowdidResignMain(_ notification: Notification) {
         AppStatus.isFouceWindow = false
         AppStatus.isMouseInView = false
-        if let handler = AppStatus.evnHandler {
+        if let handler = AppStatus.eventHandler {
             Logger.shared.log(content: "removeMonitor handler")
             NSEvent.removeMonitor(handler)
-            AppStatus.evnHandler = nil
+            AppStatus.eventHandler = nil
         }
         // NSCursor.unhide()
     }
