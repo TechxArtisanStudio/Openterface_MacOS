@@ -79,6 +79,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
         Logger.shared.log(content: "Serial port Disconnected")
         self.closeSerialPort()
+        AppStatus.isTargetConnected = false
+        AppStatus.isKeyboardConnected = false
+        AppStatus.isMouseConnected = false
     }
 
     

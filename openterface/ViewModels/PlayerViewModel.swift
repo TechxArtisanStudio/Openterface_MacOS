@@ -410,6 +410,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
             prepareVideo()
             captureSession.commitConfiguration()
+            AppStatus.hasHdmiSignal = true
         }
     }
     
@@ -421,6 +422,7 @@ class PlayerViewModel: NSObject, ObservableObject {
             let videoInputs = captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
             videoInputs.forEach { captureSession.removeInput($0) }
             captureSession.commitConfiguration()
+            AppStatus.hasHdmiSignal = false
         }
     }
 }
