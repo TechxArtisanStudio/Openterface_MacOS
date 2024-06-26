@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // var observation: NSKeyValueObservation?
     var log = Logger.shared
     
-    let aspectRatio = CGSize(width: 1080, height: 630)
+    let aspectRatio = CGSize(width: 1080, height: 659)
     
     var isDarkMode: Bool {
         if #available(macOS 10.14, *) {
@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             window.delegate = self
             window.backgroundColor = NSColor.fromHex("#222222")
             
-            let fixedSize = NSSize(width: 1080, height: 630)
+            let fixedSize = aspectRatio
             window.setContentSize(fixedSize)
             window.minSize = fixedSize
             window.maxSize = fixedSize
@@ -57,23 +57,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
-    func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-            // maintain the height / width ratio
-            var newSize: NSSize = targetFrameSize
-            let newAspectRatio = targetFrameSize.width / targetFrameSize.height
-            let desiredAspectRatio = aspectRatio.width / aspectRatio.height
-            
-            if newAspectRatio > desiredAspectRatio {
-                // Window too wide, adjust the width to maintain the height / width ratio
-                newSize.width = targetFrameSize.height * desiredAspectRatio
-            } else {
-                // Window too tall, adjust the height to maintain the height / width ratio
-                newSize.height = targetFrameSize.width / desiredAspectRatio
+    func windowDidResize(_ notification: Notification) {
+        print("Window resized")
+        
+        if let window = NSApplication.shared.mainWindow {
+            if let toolbar = window.toolbar, toolbar.isVisible {
+                let windowHeight = window.frame.height
+                let contentLayoutRect = window.contentLayoutRect
+                let titlebarHeight = windowHeight - contentLayoutRect.height
+                print(window.frame)
+                print(contentLayoutRect)
+                print("toolbar height: \(titlebarHeight)")
+                AppStatus.currentView = contentLayoutRect
+                AppStatus.currentWindow = window.frame
             }
-            
-            return newSize
         }
+    }
+    
+    func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
+        // maintain the height / width ratio
+        var newSize: NSSize = targetFrameSize
+//        let newAspectRatio = targetFrameSize.width / targetFrameSize.height
+//        let desiredAspectRatio = aspectRatio.width / aspectRatio.height
+//        
+        newSize.height = (AppStatus.currentView.width / 1.7777) + (AppStatus.currentWindow.height - AppStatus.currentView.height)
+//        if newAspectRatio > desiredAspectRatio {
+//            // Window too wide, adjust the width to maintain the height / width ratio
+//            // newSize.width = targetFrameSize.width
+//            
+//            newSize.width = targetFrameSize.height * 1.77777
+//            newSize.height = targetFrameSize.height
+//        } else {
+//            // Window too tall, adjust the height to maintain the height / width ratio
+//            newSize.width = targetFrameSize.width
+//            
+//            newSize.height = (AppStatus.currentView.width / 1.7777) + (AppStatus.currentWindow.height - AppStatus.currentView.height)
+//        }
+           
+        return newSize
+    }
 
+    func windowWillStartLiveResize(_ notification: Notification) {
+        let mouseLocation = NSEvent.mouseLocation
+        // 根据mouseLocation和window.frame可以推断鼠标可能在哪条边上
+        print("Resize started, mouse location: \(mouseLocation)")
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        let mouseLocation = NSEvent.mouseLocation
+        // 再次检查鼠标位置来确认
+        print("Resize ended, mouse location: \(mouseLocation)")
+    }
 
     // click on window close button to exit the programme
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -36,7 +36,7 @@ final class UserSettings: ObservableObject {
     @Published var MouseControl:MouseControlMode
     @Published var viewWidth: Float
     @Published var viewHigh: Float
-    @Published var edgeThreshold: CGFloat = 10.0
+    @Published var edgeThreshold: CGFloat = 5
     @Published var isFullScreen: Bool
     @Published var isAbsoluteModeMouseHide: Bool = true
 }

@@ -41,14 +41,16 @@ struct openterfaceApp: App {
     @State private var  _isMouseConnected: Bool = false
     @State private var  _isSwitchToHost: Bool?
     
+    // @State private var _currentAspectRatio: CGFloat = 16/9
+    
     var log = Logger.shared
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 //.frame(width: 1920 / 2, height: 1080 / 2)
-                .aspectRatio(16/9, contentMode: .fit)
+                //.aspectRatio(_currentAspectRatio, contentMode: .fit)
                 .navigationTitle("Openterface Mini-KVM")
                 .toolbar{
                     ToolbarItem(placement: .automatic) {
