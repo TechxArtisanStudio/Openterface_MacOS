@@ -52,6 +52,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     @Published var selectedSerialPort: ORSSerialPort?
     @Published var serialPorts : [ORSSerialPort] = []
     
+    var lastHIDEventTime: Date?
+    var lastCts:Bool = false
+    var timer:Timer?
+    
     var baudrate:Int = 0
     public var ready:Bool = false
     
@@ -104,6 +108,44 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 usleep(1000000) // sleep 1s
                 self.closeSerialPort()
             }
+        }     
+        if timer == nil {
+            timer = Timer.scheduledTimer(withTimeInterval:0.5, repeats: true) { [weak self] _ in
+                // To check any HID events send to target computer
+                guard let self = self else { return }
+                if self.ready {
+                    self.checkCTS()
+                }
+            }
+        }
+    }
+
+    func checkCTS() {
+        if let cts = self.serialPort?.cts {
+            if lastCts != cts {
+                AppStatus.isKeyboardConnected = true
+                AppStatus.isMouseConnected = true
+                lastHIDEventTime = Date()
+                lastCts = cts
+            }
+        }
+        
+        self.checkHIDEventTime()
+    }
+
+    func checkHIDEventTime() {
+        if let lastTime = lastHIDEventTime {
+            if Date().timeIntervalSince(lastTime) > 5 {
+                // 自上次HID事件以来已经过去了5秒
+                if Logger.shared.SerialDataPrint {
+                    Logger.shared.log(content: "No hid update more than 5 second, check the HID information")
+                }
+                // 重置时间，避免重复打印日志
+                lastHIDEventTime = Date()
+                getHidInfo()
+            }
+        } else{
+            getHidInfo()
         }
     }
 
@@ -139,8 +181,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 let chipVersion = dataBytes[5]
                 AppStatus.chipVersion = Int8(chipVersion)
 
-                let isTargetConnected = dataBytes[6]
-                AppStatus.isTargetConnected = isTargetConnected == 0x01
+                let isTargetConnected = dataBytes[6] == 0x01
+                AppStatus.isTargetConnected = isTargetConnected
+                
+                AppStatus.isKeyboardConnected = isTargetConnected
+                AppStatus.isMouseConnected = isTargetConnected
 
                 // The fist byte of the data is the status of the NumLock
                 let isNumLockOn = (dataBytes[7] & 0x01) == 0x01
@@ -160,7 +205,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 if Logger.shared.SerialDataPrint  {
                     Logger.shared.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
                 }
-                AppStatus.isKeyboardConnected = kbStatus == 0x00 ? true : false
+
                 break
             case 0x83:  //multimedia data hid execution status 0 - success
                 if Logger.shared.SerialDataPrint  {
@@ -173,7 +218,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 if Logger.shared.SerialDataPrint {
                    Logger.shared.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
                 }
-                AppStatus.isMouseConnected = kbStatus == 0x00 ? true : false
                 break
             case 0x86, 0x87:  //custom hid execution status 0 - success
                 if Logger.shared.SerialDataPrint  {
