@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 //        let newAspectRatio = targetFrameSize.width / targetFrameSize.height
 //        let desiredAspectRatio = aspectRatio.width / aspectRatio.height
 //        
-        newSize.height = (AppStatus.currentView.width / 1.7777) + (AppStatus.currentWindow.height - AppStatus.currentView.height)
+        newSize.height = (AppStatus.currentView.width / (AppStatus.videoDimensions.width / AppStatus.videoDimensions.height)) + (AppStatus.currentWindow.height - AppStatus.currentView.height)
 //        if newAspectRatio > desiredAspectRatio {
 //            // Window too wide, adjust the width to maintain the height / width ratio
 //            // newSize.width = targetFrameSize.width

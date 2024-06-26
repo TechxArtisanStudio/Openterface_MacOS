@@ -37,8 +37,8 @@ struct openterfaceApp: App {
     
     
     @State private var  _hasHdmiSignal: Bool = false
-    @State private var  _isKeyboardConnected: Bool = false
-    @State private var  _isMouseConnected: Bool = false
+    @State private var  _isKeyboardConnected: Bool?
+    @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
     
     // @State private var _currentAspectRatio: CGFloat = 16/9
@@ -59,11 +59,11 @@ struct openterfaceApp: App {
                     }
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "keyboard.fill")
-                            .foregroundColor(_isKeyboardConnected ? Color(red255: 124, green255: 205, blue255: 124) :.gray)
+                            .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
                     }
                     ToolbarItem(placement: .automatic) {
                         Image(systemName: "computermouse.fill")
-                            .foregroundColor(_isMouseConnected ? Color(red255: 124, green255: 205, blue255: 124)  :.gray)
+                            .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                     }
                     ToolbarItemGroup(placement: .automatic) {
                         Toggle(isOn: $_isSwitchToggleOn) {
@@ -183,6 +183,21 @@ struct openterfaceApp: App {
         controller.window?.title = "Setting"
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: false)
+    }
+    
+    // 辅助函数来根据连接状态返回不同的颜色
+    private func colorForConnectionStatus(_ isConnected: Bool?) -> Color {
+        switch isConnected {
+        case .some(true):
+            // 如果键盘连接，返回绿色
+            return Color(red: 124 / 255.0, green: 205 / 255.0, blue: 124 / 255.0)
+        case .some(false):
+            // 如果键盘未连接，假设返回红色
+            return .red
+        case .none:
+            // 如果连接状态未知，返回灰色
+            return .gray
+        }
     }
 }
 
