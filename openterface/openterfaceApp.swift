@@ -185,17 +185,13 @@ struct openterfaceApp: App {
         NSApp.activate(ignoringOtherApps: false)
     }
     
-    // 辅助函数来根据连接状态返回不同的颜色
     private func colorForConnectionStatus(_ isConnected: Bool?) -> Color {
         switch isConnected {
         case .some(true):
-            // 如果键盘连接，返回绿色
             return Color(red: 124 / 255.0, green: 205 / 255.0, blue: 124 / 255.0)
         case .some(false):
-            // 如果键盘未连接，假设返回红色
-            return .red
+            return .orange
         case .none:
-            // 如果连接状态未知，返回灰色
             return .gray
         }
     }
