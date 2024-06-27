@@ -53,7 +53,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     @Published var serialPorts : [ORSSerialPort] = []
     
     var lastHIDEventTime: Date?
-    var lastCts:Bool = false
+    var lastCts:Bool?
     var timer:Timer?
     
     var baudrate:Int = 0
@@ -111,9 +111,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }     
         if timer == nil {
             timer = Timer.scheduledTimer(withTimeInterval:0.5, repeats: true) { [weak self] _ in
-                // To check any HID events send to target computer
                 guard let self = self else { return }
                 if self.ready {
+                    // To check any HID events send to target computer
                     self.checkCTS()
                 }
             }
@@ -122,6 +122,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
     func checkCTS() {
         if let cts = self.serialPort?.cts {
+            if lastCts == nil { lastCts = cts}
             if lastCts != cts {
                 AppStatus.isKeyboardConnected = true
                 AppStatus.isMouseConnected = true
