@@ -220,7 +220,7 @@ func handleMouseEvent(type: CGEventType, event: CGEvent, isRelative: Bool) {
                                                  dragged: dragged)
                 } else {
                     let leftPadding = Int((AppStatus.currentWindow.width - AppStatus.currentView.width) / 2)
-                    let bottomPadding = Int((AppStatus.currentWindow.height - AppStatus.currentView.height - 30) / 2)
+                    let bottomPadding = Int((AppStatus.currentWindow.height - AppStatus.currentView.height - (AppStatus.currentWindow.height - AppStatus.currentView.height)) / 2)
                     let x = (mouseLocation.x - AppStatus.currentWindow.minX - CGFloat(leftPadding)) * 4096 / AppStatus.currentView.width
                     let y = (AppStatus.currentView.height - (mouseLocation.y - AppStatus.currentWindow.minY - CGFloat(bottomPadding))) * 4096 / AppStatus.currentView.height
                     mm.handleAbsoluteMouseAction(x: Int(x),
