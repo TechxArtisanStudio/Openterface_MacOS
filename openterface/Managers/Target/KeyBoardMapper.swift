@@ -93,8 +93,8 @@ class KeyboardMapper {
         100: 0x41, // f8
         101: 0x42, // f9
         109: 0x43, // f10
-        111: 0x44, // f11
-//        ??: 0x45, // f12
+        103: 0x44, // f11
+        111: 0x45, // f12
 //        "Print Scr": 0x46,
 //        "ScrollLock": 0x47,
 //        "Pause Break": 0x48,
@@ -180,6 +180,22 @@ class KeyboardMapper {
         ".".utf16.first!: 47, ">".utf16.first!: 47,
         "/".utf16.first!: 44 , "?".utf16.first!: 44
     ]
+    
+    enum SpecialKey: String {
+        case F1 = "F1"
+        case F2 = "F2"
+        case F3 = "F3"
+        case F4 = "F4"
+        case F5 = "F5"
+        case F6 = "F6"
+        case F7 = "F7"
+        case F8 = "F8"
+        case F9 = "F9"
+        case F10 = "F10"
+        case F11 = "F11"
+        case F12 = "F12"
+        case CtrlAltDel = "CAD"
+    }
     
     var charToKeyCode: [UInt16: UInt8] = [:]
 
@@ -275,4 +291,34 @@ class KeyboardMapper {
         return UInt8(data.reduce(0, { (sum, element) in sum + Int(element) }) & 0xFF)
     }
 
+    func fromSpecialKeyToKeyCode(code: SpecialKey) -> UInt16? {
+        if code == .F1 {
+            return 122
+        } else if code == .F2 {
+            return 120
+        } else if code == .F3 {
+            return 99
+        } else if code == .F4 {
+            return 118
+        } else if code == .F5 {
+            return 96
+        } else if code == .F6 {
+            return 97
+        } else if code == .F7 {
+            return 98
+        } else if code == .F8 {
+            return 100
+        } else if code == .F9 {
+            return 101
+        } else if code == .F10 {
+            return 109
+        } else if code == .F11 {
+            return 103
+        } else if code == .F12 {
+            return 111
+        } else if code == .CtrlAltDel {
+            return 117
+        }
+        return nil
+    }
 }

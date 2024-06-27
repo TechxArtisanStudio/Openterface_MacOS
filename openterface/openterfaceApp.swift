@@ -51,7 +51,9 @@ struct openterfaceApp: App {
             ZStack(alignment: .top) {
                 VStack(alignment: .leading) {
                     HStack(spacing: 20) {
-                        Button("F11", action: { print("test F11") })
+                        Button("F11", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F11 )
+                        })
                             .buttonStyle(CustomButtonStyle())
                         Button("F12", action: { print("test F12") })
                             .buttonStyle(CustomButtonStyle())
@@ -61,7 +63,7 @@ struct openterfaceApp: App {
                     HStack(spacing: 20) {
                         Button("Win", action: { print("test win") })
                             .buttonStyle(CustomButtonStyle())
-                        Button("Ctrl + Alt + Del", action: { print("test Ctrl + Alt + Del") })
+                        Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
                             .buttonStyle(CustomButtonStyle())
                     }
                     HStack(spacing: 20) {

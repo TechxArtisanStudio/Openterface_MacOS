@@ -137,4 +137,23 @@ class KeyboardManager {
             Thread.sleep(forTimeInterval: 0.01) // 5 ms
         }
     }
+
+
+    func sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey) {
+        if code == KeyboardMapper.SpecialKey.CtrlAltDel {
+            if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
+                kbm.pressKey(keys: [key], modifiers: [.option, .control])
+                Thread.sleep(forTimeInterval: 0.005) // 1 ms
+                kbm.releaseKey()
+                Thread.sleep(forTimeInterval: 0.01) // 5 ms
+            }
+        }else{
+            if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
+                kbm.pressKey(keys: [key], modifiers: [])
+                Thread.sleep(forTimeInterval: 0.005) // 1 ms
+                kbm.releaseKey()
+                Thread.sleep(forTimeInterval: 0.01) // 5 ms
+            }
+        }
+    }
 }
