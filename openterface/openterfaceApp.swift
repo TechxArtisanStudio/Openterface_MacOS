@@ -41,44 +41,83 @@ struct openterfaceApp: App {
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
     
-    // @State private var _currentAspectRatio: CGFloat = 16/9
-    
+    @State private var showButtons = false
+
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                //.frame(width: 1920 / 2, height: 1080 / 2)
-                //.aspectRatio(_currentAspectRatio, contentMode: .fit)
-                .navigationTitle("Openterface Mini-KVM")
-                .toolbar{
-                    ToolbarItem(placement: .automatic) {
-                        Image(systemName: "display")
-                            .foregroundColor(.gray)
+            ZStack(alignment: .top) {
+                VStack(alignment: .leading) {
+                    HStack(spacing: 20) {
+                        Button("F11", action: { print("test F11") })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F12", action: { print("test F12") })
+                            .buttonStyle(CustomButtonStyle())
+                            
                     }
-                    ToolbarItem(placement: .automatic) {
-                        Image(systemName: "keyboard.fill")
-                            .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
+                    .buttonStyle(TransparentBackgroundButtonStyle())
+                    HStack(spacing: 20) {
+                        Button("Win", action: { print("test win") })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("Ctrl + Alt + Del", action: { print("test Ctrl + Alt + Del") })
+                            .buttonStyle(CustomButtonStyle())
                     }
-                    ToolbarItem(placement: .automatic) {
-                        Image(systemName: "computermouse.fill")
-                            .foregroundColor(colorForConnectionStatus(_isMouseConnected))
+                    HStack(spacing: 20) {
+                        Text("Testing FEATURE Only can use absolute mode!")
                     }
-                    ToolbarItemGroup(placement: .automatic) {
-                        Toggle(isOn: $_isSwitchToggleOn) {
-                            Image(systemName: _isSwitchToggleOn ? "xserve" : "pc")
-                                .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
-                            Text(_isSwitchToggleOn ? "target" : "host")
-                                .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
+                }
+                .padding()
+                .background(Color.gray.opacity(0)) // 半透明背景
+                .cornerRadius(10)
+                .opacity(showButtons ? 1 : 0)
+                .offset(y: showButtons ? 20 : -100)
+                .animation(.easeInOut(duration: 0.5), value: showButtons)
+                .zIndex(100)
+                ContentView()
+                    .navigationTitle("Openterface Mini-KVM")
+                    .toolbar{
+                        ToolbarItem(placement: .automatic) {
+                            Button(action: {
+                                showButtons.toggle()
+                            }) {
+                                Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
+                            }
                         }
-                        .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                        ToolbarItem(placement: .automatic) {
+                            Image(systemName: "poweron") // spacer
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Image(systemName: "display")
+                                .foregroundColor(.gray)
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Image(systemName: "keyboard.fill")
+                                .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Image(systemName: "computermouse.fill")
+                                .foregroundColor(colorForConnectionStatus(_isMouseConnected))
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Image(systemName: "poweron") // spacer
+                        }
+                        ToolbarItemGroup(placement: .automatic) {
+                            Toggle(isOn: $_isSwitchToggleOn) {
+                                Image(systemName: _isSwitchToggleOn ? "xserve" : "pc")
+                                    .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
+                                Text(_isSwitchToggleOn ? "target" : "host")
+                                    .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
+                            }
+                            .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                        }
                     }
-                }
-                .onReceive(timer) { _ in
-                    _isKeyboardConnected = AppStatus.isKeyboardConnected
-                    _isMouseConnected = AppStatus.isMouseConnected
-                }
+                    .onReceive(timer) { _ in
+                        _isKeyboardConnected = AppStatus.isKeyboardConnected
+                        _isMouseConnected = AppStatus.isMouseConnected
+                    }
+            }
         }
         .commands { 
             // Customize menu
@@ -271,3 +310,28 @@ extension Color {
         self.init(red: red255 / 255.0, green: green255 / 255.0, blue: blue255 / 255.0, opacity: opacity)
     }
 }
+
+struct TransparentBackgroundButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(.blue) // 文字颜色
+            .padding() // 按钮内边距
+            .background(RoundedRectangle(cornerRadius: 8) // 按钮背景形状
+                .fill(Color.blue.opacity(0.01)) // 背景填充为半透明
+                .opacity(configuration.isPressed ? 0.01 : 1)) // 点击时改变透明度
+                .scaleEffect(configuration.isPressed ? 1.2 : 1)
+            .overlay(RoundedRectangle(cornerRadius: 8) // 外层添加边框
+                        .stroke(Color.blue, lineWidth: 2)) // 设置边框为不透明
+    }
+}
+
+struct CustomButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(.white)
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.5)))
+            .scaleEffect(configuration.isPressed ? 1.2 : 1)
+    }
+}
+
