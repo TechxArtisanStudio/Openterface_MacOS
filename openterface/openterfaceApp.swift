@@ -51,23 +51,65 @@ struct openterfaceApp: App {
             ZStack(alignment: .top) {
                 VStack(alignment: .leading) {
                     HStack(spacing: 20) {
+                        Button("F1", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F1 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F2", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F2 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F3", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F3 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F4", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F4 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F5", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F5 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F6", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F6 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F7", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F7 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F8", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F8 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F9", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F9 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                        Button("F10", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F10 )
+                        })
+                            .buttonStyle(CustomButtonStyle())
                         Button("F11", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F11 )
                         })
                             .buttonStyle(CustomButtonStyle())
-                        Button("F12", action: { print("test F12") })
+                        Button("F12", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F12 )
+                        })
                             .buttonStyle(CustomButtonStyle())
-                            
+                        Button("DEL", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .del )
+                        })
+                            .buttonStyle(CustomButtonStyle())
                     }
                     .buttonStyle(TransparentBackgroundButtonStyle())
                     HStack(spacing: 20) {
-                        Button("Win", action: { print("test win") })
-                            .buttonStyle(CustomButtonStyle())
+//                        Button("Win", action: { print("test win") })
+//                            .buttonStyle(CustomButtonStyle())
                         Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
                             .buttonStyle(CustomButtonStyle())
-                    }
-                    HStack(spacing: 20) {
-                        Text("Testing FEATURE Only can use absolute mode!")
                     }
                 }
                 .padding()
@@ -316,14 +358,14 @@ extension Color {
 struct TransparentBackgroundButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundColor(.blue) // 文字颜色
-            .padding() // 按钮内边距
-            .background(RoundedRectangle(cornerRadius: 8) // 按钮背景形状
-                .fill(Color.blue.opacity(0.01)) // 背景填充为半透明
-                .opacity(configuration.isPressed ? 0.01 : 1)) // 点击时改变透明度
+            .foregroundColor(.blue) 
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 8)
+                .fill(Color.blue.opacity(0.01))
+                .opacity(configuration.isPressed ? 0.01 : 1))
                 .scaleEffect(configuration.isPressed ? 1.2 : 1)
-            .overlay(RoundedRectangle(cornerRadius: 8) // 外层添加边框
-                        .stroke(Color.blue, lineWidth: 2)) // 设置边框为不透明
+            .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.blue, lineWidth: 2))
     }
 }
 

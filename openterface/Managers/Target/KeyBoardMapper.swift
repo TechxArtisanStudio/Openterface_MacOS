@@ -195,6 +195,7 @@ class KeyboardMapper {
         case F11 = "F11"
         case F12 = "F12"
         case CtrlAltDel = "CAD"
+        case del = "del"
     }
     
     var charToKeyCode: [UInt16: UInt8] = [:]
@@ -317,6 +318,8 @@ class KeyboardMapper {
         } else if code == .F12 {
             return 111
         } else if code == .CtrlAltDel {
+            return 117
+        } else if code == .del {
             return 117
         }
         return nil
