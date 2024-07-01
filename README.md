@@ -1,6 +1,3 @@
-# 🚨 Last Chance Alert! 🚨 
-Back us now on [Crowd Supply](https://www.crowdsupply.com/techxartisan/openterface-mini-kvm) to get the Openterface Mini-KVM **at a wallet-friendly price** of $79 - $99 before the campaign ends on **June 13, 2024, at 4:59 PM PDT**. Post-campaign prices are likely to increase as the product matures. Don’t miss out – act now!
-
 # Welcome to Openterface Mini-KVM MacOS App
 
 [![Watch the video](https://img.youtube.com/vi/r3HNUflWGOY/0.jpg)](https://www.youtube.com/watch?v=r3HNUflWGOY)
@@ -15,9 +12,25 @@ Check out [use cases](https://openterface.com/use-cases/) and some early [demos]
 
 ![use-case-demo-industrial-pc](https://openterface.com/images/product/use-case-demo-industrial-pc.jpg)
 
-## CrowdFunding Live Now!
+## Pre-Order on CrowdSupply!
 
-Our Openterface Mini-KVM crowdfunding campaign is now live on [Crowd Supply](https://www.crowdsupply.com/techxartisan/openterface-mini-kvm)! Check it out and please consider supporting us by backing our project. Thanks a lot!
+Our Openterface Mini-KVM crowdfunding was successed and now already for pre-order on [Crowd Supply](https://www.crowdsupply.com/techxartisan/openterface-mini-kvm)! Check it out and please consider supporting us by backing our project. Thanks a lot!
+
+## Openterface MacOS version
+### Current and future features
+ - [x] Basic KVM operations
+ - [x] Mouse control absolute mode
+ - [x] Mouse control relative mode
+ - [x] Audio playing from target
+ - [x] Paste text to Target device
+ - [x] OCR text from Target device
+ - [x] HDMI, K/M connnection indicators [Required Hardward 1.9] 
+ - [x] Special keys support (F1 - F12, Del, Ctrl+Alt+Del)
+ - [ ] Keystrokes marco support
+ - [ ] Custom keyboard layout support
+ - [ ] Audio bypass from target to host (required additonal hardward)
+ - [ ] Other feature request? Please join the [Discord channel](https://discord.gg/sFTJD6a3R8) and tell me
+
 
 ## 🚀 **Let's shake things up in KVM technology together!**
 
