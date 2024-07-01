@@ -122,7 +122,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
     func checkCTS() {
         if let cts = self.serialPort?.cts {
-            if lastCts == nil { lastCts = cts}
+            if lastCts == nil {
+                lastCts = cts
+                lastHIDEventTime = Date()
+            }
             if lastCts != cts {
                 AppStatus.isKeyboardConnected = true
                 AppStatus.isMouseConnected = true
@@ -137,16 +140,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     func checkHIDEventTime() {
         if let lastTime = lastHIDEventTime {
             if Date().timeIntervalSince(lastTime) > 5 {
-                // 自上次HID事件以来已经过去了5秒
+
+                // 5 seconds pass since last HID event
                 if Logger.shared.SerialDataPrint {
                     Logger.shared.log(content: "No hid update more than 5 second, check the HID information")
                 }
-                // 重置时间，避免重复打印日志
+                // Rest the time, to avoide duplicated check
+                Logger.shared.log(content: "Has lastHIDEventTime")
                 lastHIDEventTime = Date()
                 getHidInfo()
             }
-        } else{
-            getHidInfo()
         }
     }
 
