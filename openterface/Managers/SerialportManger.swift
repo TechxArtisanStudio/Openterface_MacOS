@@ -27,7 +27,7 @@ import os.log
 
 class SerialPortManager: NSObject, ORSSerialPortDelegate {
     static let shared = SerialPortManager()
-
+    
     public static var MOUSE_ABS_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x04, 0x07, 0x02]
     public static var MOUSE_REL_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x05, 0x05, 0x01]
     public static let CMD_GET_HID_INFO: [UInt8] = [0x57, 0xAB, 0x00, 0x01, 0x00]

@@ -55,54 +55,179 @@ struct openterfaceApp: App {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F1 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F2", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F2 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F3", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F3 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F4", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F4 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F5", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F5 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F6", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F6 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F7", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F7 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F8", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F8 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F9", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F9 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F10", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F10 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }.onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F11", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F11 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("F12", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .F12 )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                         Button("DEL", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .del )
                         })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                     }
                     .buttonStyle(TransparentBackgroundButtonStyle())
                     HStack(spacing: 20) {
@@ -110,6 +235,15 @@ struct openterfaceApp: App {
 //                            .buttonStyle(CustomButtonStyle())
                         Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
                             .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
                     }
                 }
                 .padding()
@@ -339,7 +473,7 @@ struct SwitchToggleStyle: ToggleStyle {
                         .animation(.linear(duration: 0.1), value: configuration.isOn)
                     )
                 .onTapGesture {
-                withAnimation(.spring(duration: 0.1)) { // 使用withAnimation
+                withAnimation(.spring(duration: 0.1)) { // withAnimation
                     configuration.isOn.toggle()
                 }
             }
