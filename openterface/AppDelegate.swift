@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
  
         if let window = NSApplication.shared.windows.first {
             window.delegate = self
-            window.backgroundColor = NSColor.fromHex("#222222")
+            window.backgroundColor = NSColor.fromHex("#000000")
             window.styleMask.remove(.resizable)
             
             let fixedSize = aspectRatio
