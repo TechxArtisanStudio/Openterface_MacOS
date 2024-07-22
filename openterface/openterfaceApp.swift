@@ -283,9 +283,12 @@ struct openterfaceApp: App {
                         }
                         ToolbarItemGroup(placement: .automatic) {
                             Toggle(isOn: $_isSwitchToggleOn) {
-                                Image(systemName: _isSwitchToggleOn ? "xserve" : "pc")
+                                Image(_isSwitchToggleOn ? "Target_icon" : "Host_icon")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit) // 保持图像的宽高比
+                                    .frame(width: 20, height: 15)
                                     .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
-                                Text(_isSwitchToggleOn ? "target" : "host")
+                                Text(_isSwitchToggleOn ? "Target" : "Host")
                                     .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
                             }
                             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
