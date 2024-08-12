@@ -1,10 +1,24 @@
-//
-//  SCContext.swift
-//  openterface
-//
-//  Created by Shawn Ling on 2024/5/23.
-//
-
+/*
+* ========================================================================== *
+*                                                                            *
+*    This file is part of the Openterface Mini KVM                           *
+*                                                                            *
+*    Copyright (C) 2024   <info@openterface.com>                             *
+*                                                                            *
+*    This program is free software: you can redistribute it and/or modify    *
+*    it under the terms of the GNU General Public License as published by    *
+*    the Free Software Foundation version 3.                                 *
+*                                                                            *
+*    This program is distributed in the hope that it will be useful, but     *
+*    WITHOUT ANY WARRANTY; without even the implied warranty of              *
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU        *
+*    General Public License for more details.                                *
+*                                                                            *
+*    You should have received a copy of the GNU General Public License       *
+*    along with this program. If not, see <http://www.gnu.org/licenses/>.    *
+*                                                                            *
+* ========================================================================== *
+*/
 
 import SwiftUI
 import ScreenCaptureKit
@@ -12,28 +26,28 @@ import AVFAudio
 import AVFoundation
 
 class SCContext {
-    static var audioSettings: [String : Any]! // 用于存储音频录制设置的字典，比如采样率和通道数。
-    static var isPaused = false // 一个布尔变量，表示录制是否被暂停。
-    static var isResume = false // 一个布尔变量，表示录制是否处于继续(从暂停状态恢复)状态。
+    static var audioSettings: [String : Any]!
+    static var isPaused = false // A boolean variable indicating whether the recording is paused.
+    static var isResume = false // A boolean variable indicating whether the recording is resumed (from a paused state).
     static var lastPTS: CMTime?
-    static var timeOffset = CMTimeMake(value: 0, timescale: 0) // 表示录制时的时间偏移，类型为 CMTime。
-    static var screenArea: NSRect? // 表示要捕获的屏幕区域的矩形，为可选 NSRect 类型。
-    static let audioEngine = AVAudioEngine() // 一个 AVAudioEngine 实例，用于管理和处理音频。
-    static var backgroundColor: CGColor = CGColor.black // 录制过程中使用的背景颜色，默认为黑色。
-    static var recordMic = false // 一个布尔变量，指示是否应该记录麦克风的音频。
-    static var filePath: String!  // - 录制文件的存储路径。
-    static var audioFile: AVAudioFile? // 存储音频录制数据的文件。
-    static var vW: AVAssetWriter! // 用于写入视频数据到文件的 AVAssetWriter 实例。
-    static var vwInput, awInput, micInput: AVAssetWriterInput!  // - 分别用于视频、音频、以及麦克风输入的 AVAssetWriterInput 实例。
-    static var startTime: Date? // 表示录制开始的时间。
-    static var timePassed: TimeInterval = 0 //  记录从录制开始到现在的经过时间。
-    static var stream: SCStream! // - 表示一个屏幕捕获流实例。
-    static var screen: SCDisplay?  //  - 可能用于表示要捕获的特定屏幕。
-    static var window: [SCWindow]? // - 表示要捕获的特定窗口数组。
-    static var application: [SCRunningApplication]?  // - 表示要捕获的特定应用程序数组。
-    static var availableContent: SCShareableContent? // 表示可以捕获的内容，如屏幕、窗口等。
+    static var timeOffset = CMTimeMake(value: 0, timescale: 0) // The time offset during recording, of type CMTime.
+    static var screenArea: NSRect? // The rectangle representing the screen area to be captured, optional NSRect type.
+    static let audioEngine = AVAudioEngine() // An AVAudioEngine instance for managing and processing audio.
+    static var backgroundColor: CGColor = CGColor.black // The background color used during recording, default is black.
+    static var recordMic = false // A boolean variable indicating whether the microphone audio should be recorded.
+    static var filePath: String! // The storage path of the recording file.
+    static var audioFile: AVAudioFile? // The file storing audio recording data.
+    static var vW: AVAssetWriter! // An AVAssetWriter instance for writing video data to a file.
+    static var vwInput, awInput, micInput: AVAssetWriterInput! // AVAssetWriterInput instances for video, audio, and microphone input respectively.
+    static var startTime: Date? // The start time of the recording.
+    static var timePassed: TimeInterval = 0 // The elapsed time from the start of the recording to now.
+    static var stream: SCStream! // Represents a screen capture stream instance.
+    static var screen: SCDisplay? // May represent a specific screen to be captured.
+    static var window: [SCWindow]? // Represents an array of specific windows to be captured.
+    static var application: [SCRunningApplication]? // Represents an array of specific applications to be captured.
+    static var availableContent: SCShareableContent? // Represents the content available for capture, such as screens, windows, etc.
     
-    //  一个数组，包含了在录制时应该被排除的应用程序的包名。这用于过滤那些不希望被录制的应用程序。
+    //  An array containing the bundle identifiers of applications that should be excluded during recording. This is used to filter out applications that should not be recorded.
     static let excludedApps = ["", "com.apple.dock", "com.apple.screencaptureui", "com.apple.controlcenter", "com.apple.notificationcenterui", "com.apple.systemuiserver", "com.apple.WindowManager", "dev.mnpn.Azayaka", "com.gaosun.eul", "com.pointum.hazeover", "net.matthewpalmer.Vanilla", "com.dwarvesv.minimalbar", "com.bjango.istatmenus.status"]
     
     static func getScreenWithMouse() -> NSScreen? {
