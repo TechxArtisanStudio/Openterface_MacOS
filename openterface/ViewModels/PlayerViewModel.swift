@@ -407,22 +407,30 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
 
     @objc func videoWasConnected(notification: NSNotification) {
-        if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
-            prepareVideo()
-            captureSession.commitConfiguration()
-            AppStatus.hasHdmiSignal = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
+                self.prepareVideo()
+                self.captureSession.commitConfiguration()
+                DispatchQueue.main.async {
+                    AppStatus.hasHdmiSignal = true
+                }
+            }
         }
     }
     
     @objc func videoWasDisconnected(notification: NSNotification) {
-        if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
-            stopVideoSession()
-            
-            // Remove all existing video input
-            let videoInputs = captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
-            videoInputs.forEach { captureSession.removeInput($0) }
-            captureSession.commitConfiguration()
-            AppStatus.hasHdmiSignal = false
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
+                self.stopVideoSession()
+                
+                // Remove all existing video input
+                let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
+                videoInputs.forEach { self.captureSession.removeInput($0) }
+                self.captureSession.commitConfiguration()
+                DispatchQueue.main.async {
+                    AppStatus.hasHdmiSignal = false
+                }
+            }
         }
     }
 }

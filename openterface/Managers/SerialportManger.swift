@@ -182,8 +182,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 Once the k/m usb port is connected the target computer, the HID
                 chip will automatically send the HID info to the host. 
                 */
-                let chipVersion = dataBytes[5]
-                AppStatus.chipVersion = Int8(chipVersion)
+                var chipVersion: Int8 = 0
+                if dataBytes.count > 5 {
+                    let byteValue = dataBytes[5]
+                    chipVersion = Int8(bitPattern: byteValue)
+                    AppStatus.chipVersion = Int8(chipVersion)
+                } else {
+                    Logger.shared.log(content: "chipVersion data is invalid")
+                }
 
                 let isTargetConnected = dataBytes[6] == 0x01
                 AppStatus.isTargetConnected = isTargetConnected
