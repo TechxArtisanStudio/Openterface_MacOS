@@ -254,8 +254,16 @@ struct openterfaceApp: App {
                 .animation(.easeInOut(duration: 0.5), value: showButtons)
                 .zIndex(100)
                 ContentView()
-                    .navigationTitle("Openterface Mini-KVM")
+                    .navigationTitle("")
                     .toolbar{
+                        ToolbarItemGroup(placement: .navigation) {
+                            Text("Openterface Mini-KVM")
+                            Button(action: {
+                                
+                            }) {
+                                MultiLineButtonView() // 添加自定义按钮
+                            }
+                                                    }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
                                 showButtons.toggle()
@@ -516,3 +524,31 @@ struct CustomButtonStyle: ButtonStyle {
     }
 }
 
+struct MultiLineButtonView: View {
+    var body: some View {
+        Button(action: {
+            // Add your button action here
+        }) {
+            HStack{
+                VStack {
+                    Text("openinterface")
+                        .font(.caption) // 调整文本大小
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5) // 设置文本最小比例因子
+
+                    Text("serial")
+                        .font(.caption) // 调整文本大小
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5) // 设置文本最小比例因子
+                }
+                .cornerRadius(3) // 设置圆角半径3
+                VStack {
+                    Text(">")
+                }
+            }
+            
+        }
+        .frame(maxWidth: 80, maxHeight: 30) // 限制按钮的最大尺寸
+        .buttonStyle(PlainButtonStyle()) // 使用PlainButtonStyle
+    }
+}
