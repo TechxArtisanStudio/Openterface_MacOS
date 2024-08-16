@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43B2B5A1A3800BADF35 /* UserSetting.swift */; };
 		5308F43E2B5A674E00BADF35 /* MouseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43D2B5A674E00BADF35 /* MouseManager.swift */; };
+		5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531665492C6F48F000E3F90F /* USBDevicesManager.swift */; };
 		531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531BAC352B5E40BA00950525 /* KeyBoardManager.swift */; };
 		531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531BAC372B5E423600950525 /* KeyBoardMapper.swift */; };
 		531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531BAC392B5E47F000950525 /* MouseMapper.swift */; };
@@ -58,6 +59,7 @@
 /* Begin PBXFileReference section */
 		5308F43B2B5A1A3800BADF35 /* UserSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSetting.swift; sourceTree = "<group>"; };
 		5308F43D2B5A674E00BADF35 /* MouseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseManager.swift; sourceTree = "<group>"; };
+		531665492C6F48F000E3F90F /* USBDevicesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesManager.swift; sourceTree = "<group>"; };
 		531BAC352B5E40BA00950525 /* KeyBoardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBoardManager.swift; sourceTree = "<group>"; };
 		531BAC372B5E423600950525 /* KeyBoardMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBoardMapper.swift; sourceTree = "<group>"; };
 		531BAC392B5E47F000950525 /* MouseMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseMapper.swift; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				5351254C2B59177F0002A91E /* HostManager.swift */,
+				531665492C6F48F000E3F90F /* USBDevicesManager.swift */,
 			);
 			path = Host;
 			sourceTree = "<group>";
@@ -394,6 +397,7 @@
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				538462992BFF12D2002966FE /* SCContext.swift in Sources */,
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
+				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,

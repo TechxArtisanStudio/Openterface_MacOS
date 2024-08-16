@@ -51,6 +51,15 @@ struct AppStatus {
     static var currentWindow: NSRect = NSRect(x:0,y:0,width:0,height:0)
     static var videoDimensions: CGSize = CGSize(width: 1920, height: 1080)
     
+    static var USBDevices: [USBDeviceInfo] = []
+    
     static let logFileName: String = "info.log"
 }
 
+
+struct USBDeviceInfo {
+    let productName: String
+    let vendorID: Int
+    let productID: Int
+    let locationID: String
+}

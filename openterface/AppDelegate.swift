@@ -27,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var statusBarManager = StatusBarManager()
     var hostmanager = HostManager()
     var keyboardManager = KeyboardManager.shared
+    var usbDevicesManger = USBDeivcesManager.shared
+    
     // var observation: NSKeyValueObservation?
     var log = Logger.shared
     
@@ -43,8 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApp.mainMenu?.delegate = self
-        
- 
+
+        AppStatus.USBDevices = usbDevicesManger.getUSBDevices()
+
         if let window = NSApplication.shared.windows.first {
             window.delegate = self
             window.backgroundColor = NSColor.fromHex("#000000")
