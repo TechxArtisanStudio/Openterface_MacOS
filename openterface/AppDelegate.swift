@@ -46,7 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApp.mainMenu?.delegate = self
 
-        AppStatus.USBDevices = usbDevicesManger.getUSBDevices()
+        usbDevicesManger.update()
+        
+        print("✅✅✅✅✅✅✅")
+        print(AppStatus.groupOpenterfaceDevices)
 
         if let window = NSApplication.shared.windows.first {
             window.delegate = self

@@ -52,6 +52,7 @@ struct AppStatus {
     static var videoDimensions: CGSize = CGSize(width: 1920, height: 1080)
     
     static var USBDevices: [USBDeviceInfo] = []
+    static var groupOpenterfaceDevices: [[USBDeviceInfo]] = []
     
     static let logFileName: String = "info.log"
 }

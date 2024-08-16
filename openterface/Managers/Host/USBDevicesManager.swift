@@ -14,6 +14,11 @@ class USBDeivcesManager {
     // Singleton instance
     static let shared = USBDeivcesManager()
     
+    func update() {
+        AppStatus.USBDevices = getUSBDevices()
+        groundByOpenterface()
+    }
+    
     func getUSBDevices() -> [USBDeviceInfo] {
         var devices = [USBDeviceInfo]()
         
@@ -51,5 +56,70 @@ class USBDeivcesManager {
         
         IOObjectRelease(iterator)
         return devices
+    }
+    
+    func groundByOpenterface() {
+        var groupedDevices: [[USBDeviceInfo]] = []
+        var tempGroup: [USBDeviceInfo]?
+        
+        for device in AppStatus.USBDevices {
+            if device.productName.contains("Openterface") {
+                if tempGroup == nil {
+                    tempGroup = []
+                }
+                tempGroup?.append(device)
+            }
+        }
+        
+        if let validTempGroup = tempGroup {
+            for device in validTempGroup {
+                let ex_ = trimHexString(removeTrailingZeros(from: device.locationID))
+                
+                for _d in AppStatus.USBDevices {
+                    if _d.locationID.hasPrefix(ex_) {
+
+                        // First check if there is already a group with that prefix
+                        if let index = groupedDevices.firstIndex(where: { $0.first?.locationID.hasPrefix(ex_) == true }) {
+                            groupedDevices[index].append(_d)
+                        } else {
+                            // Create a new array to add to groups
+                            groupedDevices.append([_d])
+                        }
+                    }
+                }
+            }
+            AppStatus.groupOpenterfaceDevices = groupedDevices
+        } else {
+            print("tempGroup is nil")
+        }
+    }
+    
+    func removeTrailingZeros(from hexString: String) -> String {
+        guard hexString.hasPrefix("0x") else {
+            return hexString // 保持原样，如果字符串不以 "0x" 开头
+        }
+
+        let hexPrefix = "0x"
+        var hexWithoutPrefix = String(hexString.dropFirst(hexPrefix.count))
+        
+        while hexWithoutPrefix.last == "0" {
+            hexWithoutPrefix = String(hexWithoutPrefix.dropLast())
+        }
+        
+        return hexPrefix + hexWithoutPrefix
+    }
+    
+    func trimHexString(_ hexString: String) -> String {
+        guard hexString.hasPrefix("0x") else {
+            return hexString  // 保持原样，如果字符串不以 "0x" 开头
+        }
+        
+        let hexPrefix = "0x"
+        let hexWithoutPrefix = String(hexString.dropFirst(hexPrefix.count))
+        
+        // 去掉最后一位
+        let trimmedHex = String(hexWithoutPrefix.dropLast())
+        
+        return hexPrefix + trimmedHex
     }
 }
