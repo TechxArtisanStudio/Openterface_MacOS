@@ -304,8 +304,25 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func openSerialPort(name: String, baudrate: Int) {
-        self.serialPorts = ORSSPM.availablePorts // Get the list of available serial ports
-        self.selectedSerialPort = self.serialPorts.filter{ $0.path.contains(name)}.first
+        // 获取当前可用的串行端口
+        guard let availablePorts = ORSSerialPortManager.shared().availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
+            Logger.shared.log(content: "No available serial ports found")
+            return
+        }
+
+        self.serialPorts = availablePorts // Get the list of available serial ports
+        
+        // 打印调试信息
+        Logger.shared.log(content: "Available Ports: \(self.serialPorts)")
+        Logger.shared.log(content: "Looking for port with name: \(name)")
+        
+        // 使用过滤器查找名称匹配的端口
+        guard let selectedPort = self.serialPorts.first(where: { $0.path.contains(name) }) else {
+            Logger.shared.log(content: "No matching serial port found with name: \(name)")
+            return
+        }
+        self.selectedSerialPort = selectedPort
+        // self.selectedSerialPort = self.serialPorts.filter{ $0.path.contains(name)}.first
         
         self.selectedSerialPort?.baudRate = NSNumber(value: baudrate)
         Logger.shared.log(content: "Try to open serial port: \(self.selectedSerialPort?.name) with baudrate \(baudrate)")

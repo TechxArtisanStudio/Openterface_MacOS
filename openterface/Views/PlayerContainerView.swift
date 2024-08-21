@@ -31,7 +31,6 @@ struct PlayerContainerView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> PlayerView {
-        
         return PlayerView(captureSession: captureSession)
     }
 

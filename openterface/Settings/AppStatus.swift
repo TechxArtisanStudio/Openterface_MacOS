@@ -53,7 +53,8 @@ struct AppStatus {
     
     static var USBDevices: [USBDeviceInfo] = []
     static var groupOpenterfaceDevices: [[USBDeviceInfo]] = []
-    
+    static var DefaultVideoDevice: USBDeviceInfo?
+    static var DefaultUSBSerial: USBDeviceInfo?
     static let logFileName: String = "info.log"
 }
 

@@ -15,7 +15,17 @@ class USBDeivcesManager {
     static let shared = USBDeivcesManager()
     
     func update() {
-        AppStatus.USBDevices = getUSBDevices()
+        // get usb devices info
+        let _d: [USBDeviceInfo] = getUSBDevices()
+        
+        // 
+        if !_d.isEmpty {
+            AppStatus.USBDevices = _d
+        } else {
+            print("No USB devices found")
+            // 处理无设备情况，例如记录日志或显示错误提示
+            Logger.shared.log(content: "No USB devices found")
+        }
         groundByOpenterface()
     }
     
@@ -70,7 +80,7 @@ class USBDeivcesManager {
                 tempGroup?.append(device)
             }
         }
-        
+
         if let validTempGroup = tempGroup {
             for device in validTempGroup {
                 let ex_ = trimHexString(removeTrailingZeros(from: device.locationID))
@@ -88,7 +98,21 @@ class USBDeivcesManager {
                     }
                 }
             }
-            AppStatus.groupOpenterfaceDevices = groupedDevices
+            if !groupedDevices.isEmpty {
+                AppStatus.groupOpenterfaceDevices = groupedDevices
+            }
+            
+            
+            //setting default video and serial device
+            if !groupedDevices.isEmpty {
+                if let defaultGroup = groupedDevices.first {
+                    let defaultVideoDevice = defaultGroup.first { $0.productName.contains("Openterface") }
+                    let defaultSerialDevice = defaultGroup.first { $0.productName.contains("Serial") }
+                    
+                    AppStatus.DefaultVideoDevice = defaultVideoDevice
+                    AppStatus.DefaultUSBSerial = defaultSerialDevice
+                }
+            }
         } else {
             print("tempGroup is nil")
         }
@@ -117,7 +141,7 @@ class USBDeivcesManager {
         let hexPrefix = "0x"
         let hexWithoutPrefix = String(hexString.dropFirst(hexPrefix.count))
         
-        // 去掉最后一位
+        // delete last 
         let trimmedHex = String(hexWithoutPrefix.dropLast())
         
         return hexPrefix + trimmedHex

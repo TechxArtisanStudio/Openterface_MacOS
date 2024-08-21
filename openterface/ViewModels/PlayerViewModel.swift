@@ -32,13 +32,16 @@ class PlayerViewModel: NSObject, ObservableObject {
     @Published var isAudioGranted: Bool = false
     @Published var dimensions = CMVideoDimensions()
     
+    let usbDevicesManger = USBDeivcesManager.shared
+    
     var audioDeviceId:AudioDeviceID? = nil
     
     var captureSession: AVCaptureSession!
     private var engine: AVAudioEngine!
-
     private var cancellables = Set<AnyCancellable>()
-
+    
+    var hasObserverBeenAdded = false
+    
     override init() {
         captureSession = AVCaptureSession()
         engine = AVAudioEngine()
@@ -251,7 +254,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
     
     func prepareVideo() {
-
+        
+        usbDevicesManger.update()
+        
         captureSession.sessionPreset = .high // A preset value that indicates the quality level or bit rate of the output.
         // get devices
         let videioDeviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera,
@@ -263,8 +268,11 @@ class PlayerViewModel: NSObject, ObservableObject {
         var videoDevices = [AVCaptureDevice]()
         // Add only specified input device
         for device in videoDiscoverySession.devices {
-            if(device.localizedName == "Openterface" ){
-                videoDevices.append(device)
+            // 0x
+            if let _v = AppStatus.DefaultVideoDevice {
+                if(device.uniqueID.contains(_v.locationID)){
+                    videoDevices.append(device)
+                }
             }
         }
 
@@ -302,7 +310,8 @@ class PlayerViewModel: NSObject, ObservableObject {
         var audioDevices = [AVCaptureDevice]()
         // Add only specified input device
         for device in audioDiscoverySession.devices {
-            if device.localizedName == "OpenterfaceA", !audioDevices.contains(where: { $0.localizedName == device.localizedName }) {
+            // 0x
+            if device.uniqueID.contains(AppStatus.DefaultVideoDevice?.locationID ?? "nil"), !audioDevices.contains(where: { $0.localizedName == device.localizedName }) {
                 audioDevices.append(device)
             }
         }
@@ -337,6 +346,8 @@ class PlayerViewModel: NSObject, ObservableObject {
     func observeDeviceNotifications() {
         let playViewNtf = NotificationCenter.default
         
+        guard !hasObserverBeenAdded else { return }
+        
         // get video source event
         playViewNtf.addObserver(self, selector: #selector(videoWasConnected), name: .AVCaptureDeviceWasConnected, object: nil)
         playViewNtf.addObserver(self, selector: #selector(videoWasDisconnected), name: .AVCaptureDeviceWasDisconnected, object: nil)
@@ -348,13 +359,14 @@ class PlayerViewModel: NSObject, ObservableObject {
         // observer full Screen Nootification
         // playViewNtf.addObserver(self, selector: #selector(handleDidEnterFullScreenNotification(_:)), name: NSWindow.didEnterFullScreenNotification, object: nil)
         
+        self.hasObserverBeenAdded = true
         // Handle audio device disconnected
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-
+        
        let result = AudioObjectAddPropertyListenerBlock(
            AudioObjectID(kAudioObjectSystemObject),
            &propertyAddress,
@@ -376,7 +388,11 @@ class PlayerViewModel: NSObject, ObservableObject {
        }
     }
     
-    // 通知处理方法
+    deinit {
+        let playViewNtf = NotificationCenter.default
+        playViewNtf.removeObserver(self, name: .AVCaptureDeviceWasConnected, object: nil)
+    }
+
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
             if window.styleMask.contains(.fullScreen) {
@@ -407,30 +423,30 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
 
     @objc func videoWasConnected(notification: NSNotification) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
-                self.prepareVideo()
-                self.captureSession.commitConfiguration()
-                DispatchQueue.main.async {
-                    AppStatus.hasHdmiSignal = true
-                }
+        usbDevicesManger.update()
+        
+        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
+            self.prepareVideo()
+            self.captureSession.commitConfiguration()
+            DispatchQueue.main.async {
+                AppStatus.hasHdmiSignal = true
             }
         }
     }
     
     @objc func videoWasDisconnected(notification: NSNotification) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            if let device = notification.object as? AVCaptureDevice, device.localizedName == "Openterface" {
-                self.stopVideoSession()
-                
-                // Remove all existing video input
-                let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
-                videoInputs.forEach { self.captureSession.removeInput($0) }
-                self.captureSession.commitConfiguration()
-                DispatchQueue.main.async {
-                    AppStatus.hasHdmiSignal = false
-                }
+        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
+            self.stopVideoSession()
+            
+            // Remove all existing video input
+            let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
+            videoInputs.forEach { self.captureSession.removeInput($0) }
+            self.captureSession.commitConfiguration()
+            DispatchQueue.main.async {
+                AppStatus.hasHdmiSignal = false
             }
         }
+        
+        usbDevicesManger.update()
     }
 }
