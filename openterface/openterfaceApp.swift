@@ -329,6 +329,7 @@ struct openterfaceApp: App {
                         absoluteTitle = "Absolute"
                         UserSettings.shared.MouseControl = .relative
                         NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
+                        NSCursor.hide()
                     }) {
                         Text(relativeTitle)
                     }
@@ -336,6 +337,7 @@ struct openterfaceApp: App {
                         relativeTitle = "Relative"
                         absoluteTitle = "Absolute ✓"
                         UserSettings.shared.MouseControl = .absolute
+                        NSCursor.unhide()
                     }) {
                         Text(absoluteTitle)
                     }
