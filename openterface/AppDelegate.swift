@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if let toolbar = window.toolbar, toolbar.isVisible {
                 let windowHeight = window.frame.height
                 let contentLayoutRect = window.contentLayoutRect
-                let titlebarHeight = windowHeight - contentLayoutRect.height
+                _ = windowHeight - contentLayoutRect.height
                 AppStatus.currentView = contentLayoutRect
                 AppStatus.currentWindow = window.frame
             }

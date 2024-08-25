@@ -176,7 +176,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let dataBytes = [UInt8](data)
         if dataBytes.starts(with: prefix) {
             // get check the following bytes
-            let cmd = dataBytes[3]
             let len = dataBytes[4]
 
             if dataBytes.count < Int(len) + 5 {
@@ -184,7 +183,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 receiveBuffer.append(data)
                 return
             }else{
-                handleSerialData(data: data)
+                let chksum = dataBytes[data.count - 1]
+                let checksum = self.calculateChecksum(data: Array(dataBytes[0...data.count - 2]))
+                if chksum == checksum {
+                    handleSerialData(data: data)
+                } else {
+                    let errorDataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    let checksumHex = String(format: "%02X", checksum)
+                    let chksumHex = String(format: "%02X", chksum)
+                    Logger.shared.log(content: "Checksum error, discard the data: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
+                }
             }
         } else {
             //Logger.shared.log(content: "Data does not start with the correct prefix")

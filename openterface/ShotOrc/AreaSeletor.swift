@@ -29,7 +29,7 @@ import Vision
 
 
 func takeScreenshot(of rect: NSRect?) {
-    let cimg = captureFullScreen()
+    _ = captureFullScreen()
 }
 
 func captureFullScreen() -> NSImage? {
