@@ -110,7 +110,6 @@ class PlayerView: NSView, NSWindowDelegate {
     }
     
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
-        
         if let screen = NSScreen.main {
             let screenSize = screen.frame.size
             Logger.shared.log(content: "Screen resolution is \(screenSize.width) x \(screenSize.height)")
@@ -171,9 +170,115 @@ class PlayerView: NSView, NSWindowDelegate {
         }
         
         // Create and add new tracking areas
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
+        self.window?.acceptsMouseMovedEvents = true
+        let options: NSTrackingArea.Options = [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .activeAlways]
         let trackingArea = NSTrackingArea(rect: self.bounds, options: options, owner: self, userInfo: nil)
         self.addTrackingArea(trackingArea)
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x01)
+        if UserSettings.shared.MouseControl == .relative {
+            AppStatus.isFouceWindow = true
+            NSCursor.hide()
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x00)
+    }
+    
+    override func rightMouseDown(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x02)
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x00)
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x04)
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x00)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x00)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x01)
+    }
+    
+    override func rightMouseDragged(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x02)
+    }
+    
+    override func otherMouseDragged(with event: NSEvent) {
+        handleMouseMovement(with: event, mouseEvent: 0x04)  // Be AWARE! 0x04 may not match to Middle mouse button correctly! Need to Test Further!
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        let wheelMovement = Int(event.scrollingDeltaY)
+        handleMouseMovement(with: event, wheelMovement: wheelMovement)
+    }
+
+
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        return true
+    }
+
+    override func awakeFromNib() {
+        super.awakeFromNib()
+        self.window?.makeFirstResponder(self)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        handleKeyboardEvent(with: event, isKeyDown: true)
+    }
+
+    override func keyUp(with event: NSEvent) {
+        handleKeyboardEvent(with: event, isKeyDown: false)
+    }
+
+    private func handleKeyboardEvent(with event: NSEvent, isKeyDown: Bool) {
+        let keyCode = event.keyCode
+        let modifierFlags = event.modifierFlags
+
+        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifierFlags, isKeyDown: isKeyDown)
+    }
+
+    private func handleMouseMovement(with event: NSEvent, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
+        if UserSettings.shared.MouseControl == .relative {
+            let deltaX = Int(event.deltaX)
+            let deltaY = Int(event.deltaY)
+            let mouseLocation = convert(event.locationInWindow, from: nil)
+            let mouseXPtg = Float(mouseLocation.x) / Float(self.frame.width)
+            let mouseYPtg = 1 - Float(mouseLocation.y) / Float(self.frame.height)
+
+            // Skip the event if the mouse is at the screen center and the delta is larger than 100
+            if (deltaX > 100 || deltaY > 100) 
+                && (mouseXPtg > 0.4 && mouseXPtg < 0.6)
+                && (mouseYPtg > 0.4 && mouseYPtg < 0.6) {
+                return
+            }
+            
+            HostManager.shared.handleRelativeMouseAction(dx: deltaX, dy: deltaY, 
+                                                        mouseEvent: mouseEvent, 
+                                                        wheelMovement: wheelMovement, 
+                                                        dragged: true)
+        } else {
+            let mouseLocation = convert(event.locationInWindow, from: nil)
+            let mouseX = Float(mouseLocation.x) / Float(self.frame.width) * 4096.0
+            let mouseY = 4096.0 - Float(mouseLocation.y) / Float(self.frame.height) * 4096.0
+            HostManager.shared.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+        }
     }
     
     override func mouseEntered(with event: NSEvent) {
@@ -193,8 +298,12 @@ class PlayerView: NSView, NSWindowDelegate {
         super.mouseExited(with: event)
         // Logic for when the mouse exits the view
         AppStatus.isMouseInView = false
+        
+        if UserSettings.shared.MouseControl == .relative && AppStatus.isFouceWindow {
+            HostManager.shared.moveToAppCenter()
+        }
     }
-    
+
     // Get window dimensions
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -207,7 +316,7 @@ class PlayerView: NSView, NSWindowDelegate {
             window.center()
             
             // Update the frame of playerBackgroundImage
-             playerBackgroundImage.frame = self.bounds
+            playerBackgroundImage.frame = self.bounds
         } else {
             Logger.shared.log(content: "The view is not in a window yet.")
         }

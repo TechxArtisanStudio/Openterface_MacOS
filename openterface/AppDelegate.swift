@@ -48,8 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         usbDevicesManger.update()
         
-        print("✅✅✅✅✅✅✅")
-        print(AppStatus.groupOpenterfaceDevices)
+        // print("✅✅✅✅✅✅✅")
+        // print(AppStatus.groupOpenterfaceDevices)
 
         if let window = NSApplication.shared.windows.first {
             window.delegate = self
