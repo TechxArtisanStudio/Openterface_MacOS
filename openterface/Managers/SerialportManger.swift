@@ -28,6 +28,8 @@ import os.log
 class SerialPortManager: NSObject, ORSSerialPortDelegate {
     static let shared = SerialPortManager()
     
+    var receiveBuffer = Data()
+
     public static var MOUSE_ABS_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x04, 0x07, 0x02]
     public static var MOUSE_REL_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x05, 0x05, 0x01]
     public static let CMD_GET_HID_INFO: [UInt8] = [0x57, 0xAB, 0x00, 0x01, 0x00]
@@ -176,120 +178,133 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             // get check the following bytes
             let cmd = dataBytes[3]
             let len = dataBytes[4]
-            switch cmd {
-            case 0x81:  // HID info
-                /*
-                Once the k/m usb port is connected the target computer, the HID
-                chip will automatically send the HID info to the host. 
-                */
-                var chipVersion: Int8 = 0
-                if dataBytes.count > 5 {
-                    let byteValue = dataBytes[5]
-                    chipVersion = Int8(bitPattern: byteValue)
-                    AppStatus.chipVersion = Int8(chipVersion)
-                } else {
-                    Logger.shared.log(content: "chipVersion data is invalid")
-                }
 
-                let isTargetConnected = dataBytes[6] == 0x01
-                AppStatus.isTargetConnected = isTargetConnected
-                
-                AppStatus.isKeyboardConnected = isTargetConnected
-                AppStatus.isMouseConnected = isTargetConnected
-
-                // The fist byte of the data is the status of the NumLock
-                let isNumLockOn = (dataBytes[7] & 0x01) == 0x01
-                AppStatus.isNumLockOn = isNumLockOn
-
-                // The seconde byte of the data is the status of the CapLock
-                let isCapLockOn = (dataBytes[7] & 0x02) == 0x02
-                AppStatus.isCapLockOn = isCapLockOn
-
-                // The third byte of the data is the status of the Scroll
-                let isScrollOn = (dataBytes[7] & 0x04) == 0x04
-                AppStatus.isScrollOn = isScrollOn
-                Logger.shared.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
-                break
-            case 0x82:  //Keyboard hid execution status 0 - success
-                let kbStatus = dataBytes[5]
-                if Logger.shared.SerialDataPrint  {
-                    Logger.shared.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
-                }
-
-                break
-            case 0x83:  //multimedia data hid execution status 0 - success
-                if Logger.shared.SerialDataPrint  {
-                    let kbStatus = dataBytes[5]
-                    Logger.shared.log(content: "Receive multi-meida status: \(String(format: "0x%02X", kbStatus))")
-                }
-                break
-            case 0x84, 0x85:  //Mouse hid execution status 0 - success
-                let kbStatus = dataBytes[5]
-                if Logger.shared.SerialDataPrint {
-                   Logger.shared.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
-                }
-                break
-            case 0x86, 0x87:  //custom hid execution status 0 - success
-                if Logger.shared.SerialDataPrint  {
-                    let kbStatus = dataBytes[5]
-                    Logger.shared.log(content: "Receive \(cmd == 0x86 ? "SEND" : "READ") custom hid status: \(String(format: "0x%02X", kbStatus))")
-                }
-                break
-            case 0x88:  // get para cfg
-                let baudrateData = Data(dataBytes[8...11])
-                let mode = dataBytes[5]
-                let baudrateInt32 = baudrateData.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> Int32 in
-                    let intPointer = pointer.bindMemory(to: Int32.self)
-                    return intPointer[0].bigEndian
-                }
-                self.baudrate = Int(baudrateInt32)
-                Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
-                if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
-                    self.ready = true
-                    
-                    self.getHidInfo()
-                }
-                else {
-                    Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")
-                    // set baudrate to 115200 and mode 2
-                    var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
-                    command.append(contentsOf: dataBytes[12...31])
-                    // append zero to the end
-                    for _ in 0...22 {
-                        command.append(0x00)
-                    }
-                    self.sendCommand(command: command, force: true)
-                    do {
-                        usleep(500000)
-                    }
-                    Logger.shared.log(content:"Reset chipset now...")
-                    self.resetHidChip()
-                    self.baudrate = SerialPortManager.DEFAULT_BAUDRATE
-                    do {
-                        usleep(1000000)
-                    }
-                    closeSerialPort()
-                    do {
-                        usleep(1000000)
-                    }
-                    openSerialPort(name: "usbserial", baudrate: SerialPortManager.DEFAULT_BAUDRATE)
-                }
-                break
-            case 0x89:  // set para cfg
-                if Logger.shared.SerialDataPrint {
-                    let status = dataBytes[5]
-                    Logger.shared.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
-                }
-                break
-            default:
-                let hexCmd = String(format: "%02hhX", cmd)
-                Logger.shared.log(content: "Unknown command: \(hexCmd)")
+            if dataBytes.count < Int(len) + 5 {
+                // if the data length is not complete, put it into the buffer
+                receiveBuffer.append(data)
+                return
+            }else{
+                handleSerialData(data: data)
             }
         } else {
-            Logger.shared.log(content: "Data does not start with the correct prefix")
+            //Logger.shared.log(content: "Data does not start with the correct prefix")
+            // if the data does not start with the correct prefix and the buffer is empty, ignore it
+            if receiveBuffer.isEmpty {
+                return
+            }else{
+                // if the data does not start with the correct prefix and the buffer is not empty, append the data to the buffer
+                receiveBuffer.append(data)
+                let dataBytes = [UInt8](receiveBuffer)
+                if dataBytes.starts(with: prefix) {
+                    // get check the following bytes
+                    let cmd = dataBytes[3]
+                    let len = dataBytes[4]
+                    if dataBytes.count < Int(len) + 5 {
+                        // if the data length is not complete, put it into the buffer
+                        return
+                    }else{
+                        handleSerialData(data: receiveBuffer)
+                        receiveBuffer.removeAll()
+                    }
+                }
+            }
         }
     }
-    
+
+    func handleSerialData(data: Data) {
+        let cmd = data[3]
+        let len = data[4]
+
+        switch cmd {
+        case 0x81:  // HID info
+            let byteValue = data[5]
+            let chipVersion: Int8 = Int8(bitPattern: byteValue)
+            AppStatus.chipVersion = Int8(chipVersion)
+            
+            let isTargetConnected = data[6] == 0x01
+            AppStatus.isTargetConnected = isTargetConnected
+            
+            AppStatus.isKeyboardConnected = isTargetConnected
+            AppStatus.isMouseConnected = isTargetConnected
+            
+            let isNumLockOn = (data[7] & 0x01) == 0x01
+            AppStatus.isNumLockOn = isNumLockOn
+            
+            let isCapLockOn = (data[7] & 0x02) == 0x02
+            AppStatus.isCapLockOn = isCapLockOn
+            
+            let isScrollOn = (data[7] & 0x04) == 0x04
+            AppStatus.isScrollOn = isScrollOn
+            
+            Logger.shared.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
+            
+        case 0x82:  //Keyboard hid execution status 0 - success
+            let kbStatus = data[5]
+            if Logger.shared.SerialDataPrint  {
+                Logger.shared.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
+            }
+            
+        case 0x83:  //multimedia data hid execution status 0 - success
+            if Logger.shared.SerialDataPrint  {
+                let kbStatus = data[5]
+                Logger.shared.log(content: "Receive multi-meida status: \(String(format: "0x%02X", kbStatus))")
+            }
+            
+        case 0x84, 0x85:  //Mouse hid execution status 0 - success
+            let kbStatus = data[5]
+            if Logger.shared.SerialDataPrint {
+                Logger.shared.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
+            }
+            
+        case 0x86, 0x87:  //custom hid execution status 0 - success
+            if Logger.shared.SerialDataPrint  {
+                let kbStatus = data[5]
+                Logger.shared.log(content: "Receive \(cmd == 0x86 ? "SEND" : "READ") custom hid status: \(String(format: "0x%02X", kbStatus))")
+            }
+            
+        case 0x88:  // get para cfg
+            let baudrateData = Data(data[8...11])
+            let mode = data[5]
+            let baudrateInt32 = baudrateData.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> Int32 in
+                let intPointer = pointer.bindMemory(to: Int32.self)
+                return intPointer[0].bigEndian
+            }
+            self.baudrate = Int(baudrateInt32)
+            Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
+            if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
+                self.ready = true
+                self.getHidInfo()
+            }
+            else {
+                Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")
+                var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
+                command.append(contentsOf: data[12...31])
+                for _ in 0...22 {
+                    command.append(0x00)
+                }
+                self.sendCommand(command: command, force: true)
+                usleep(500000)
+                Logger.shared.log(content:"Reset chipset now...")
+                self.resetHidChip()
+                self.baudrate = SerialPortManager.DEFAULT_BAUDRATE
+                usleep(1000000)
+                closeSerialPort()
+                usleep(1000000)
+                openSerialPort(name: "usbserial", baudrate: SerialPortManager.DEFAULT_BAUDRATE)
+            }
+            
+        case 0x89:  // set para cfg
+            if Logger.shared.SerialDataPrint {
+                let status = data[5]
+                Logger.shared.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
+            }
+            
+        default:
+            let hexCmd = String(format: "%02hhX", cmd)
+            Logger.shared.log(content: "Unknown command: \(hexCmd)")
+        }
+    }
+
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {
         self.selectedSerialPort = nil
     }
