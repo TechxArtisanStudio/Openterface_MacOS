@@ -21,10 +21,13 @@
 */
 
 import SwiftUI
+#if canImport(ScreenCaptureKit)
 import ScreenCaptureKit
+#endif
 import AVFAudio
 import AVFoundation
 
+@available(macOS 12.3, *)
 class SCContext {
     static var audioSettings: [String : Any]!
     static var isPaused = false // A boolean variable indicating whether the recording is paused.
@@ -51,23 +54,32 @@ class SCContext {
     static let excludedApps = ["", "com.apple.dock", "com.apple.screencaptureui", "com.apple.controlcenter", "com.apple.notificationcenterui", "com.apple.systemuiserver", "com.apple.WindowManager", "dev.mnpn.Azayaka", "com.gaosun.eul", "com.pointum.hazeover", "net.matthewpalmer.Vanilla", "com.dwarvesv.minimalbar", "com.bjango.istatmenus.status"]
     
     static func getScreenWithMouse() -> NSScreen? {
-        let mouseLocation = NSEvent.mouseLocation
-        let screenWithMouse = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) })
-        return screenWithMouse
+        if #available(macOS 12.3, *) {
+            let mouseLocation = NSEvent.mouseLocation
+            let screenWithMouse = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) })
+            return screenWithMouse
+        } else {
+            // Handle older macOS versions
+            // Provide fallback mechanism or user instructions here.
+            print("ScreenCaptureKit is not available, provide an alternative.")
+            return nil
+        }
     }
     
     static func updateAvailableContent(completion: @escaping () -> Void) {
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { content, error in
-            if let error = error {
-                switch error {
-                case SCStreamError.userDeclined: requestPermissions()
-                default: print("Error: failed to fetch available content: ".local, error.localizedDescription)
+        if #available(macOS 12.3, *) {
+            SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { content, error in
+                if let error = error {
+                    switch error {
+                    case SCStreamError.userDeclined: requestPermissions()
+                    default: print("Error: failed to fetch available content: ".local, error.localizedDescription)
+                    }
+                    return
                 }
-                return
+                availableContent = content
+                assert(availableContent?.displays.isEmpty != nil, "There needs to be at least one display connected!".local)
+                completion()
             }
-            availableContent = content
-            assert(availableContent?.displays.isEmpty != nil, "There needs to be at least one display connected!".local)
-            completion()
         }
     }
     

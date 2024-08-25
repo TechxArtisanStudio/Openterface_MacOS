@@ -28,10 +28,12 @@ import CoreGraphics
 import Vision
 
 
+@available(macOS 12.3, *)
 func takeScreenshot(of rect: NSRect?) {
     _ = captureFullScreen()
 }
 
+@available(macOS 12.3, *)
 func captureFullScreen() -> NSImage? {
     let _y = Int(NSScreen.main?.frame.height ?? 0) - Int(SCContext.screenArea?.minY ?? 0)-Int(SCContext.screenArea?.height ?? 500)
     let bounds = CGRect(
@@ -106,6 +108,7 @@ func copyTextToClipboard(text: String) {
     pasteboard.setString(text, forType: .string)
 }
 
+@available(macOS 12.3, *)
 class ScreenshotOverlayView: NSView {
     var selectionRect: NSRect?
     var initialLocation: NSPoint?
@@ -303,6 +306,7 @@ class ScreenshotOverlayView: NSView {
 }
 
 
+@available(macOS 12.3, *)
 class ScreenshotWindow: NSWindow {
     let overlayView = ScreenshotOverlayView()
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing bufferingType: NSWindow.BackingStoreType, defer flag: Bool) {

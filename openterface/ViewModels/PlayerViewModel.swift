@@ -32,8 +32,6 @@ class PlayerViewModel: NSObject, ObservableObject {
     @Published var isAudioGranted: Bool = false
     @Published var dimensions = CMVideoDimensions()
     
-    let usbDevicesManger = USBDeivcesManager.shared
-    
     var audioDeviceId:AudioDeviceID? = nil
     
     var captureSession: AVCaptureSession!
@@ -255,7 +253,11 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     func prepareVideo() {
         
-        usbDevicesManger.update()
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        } else {
+            // Fallback on earlier versions
+        }
         
         captureSession.sessionPreset = .high // A preset value that indicates the quality level or bit rate of the output.
         // get devices
@@ -423,7 +425,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
 
     @objc func videoWasConnected(notification: NSNotification) {
-        usbDevicesManger.update()
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        } 
         
         if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
             self.prepareVideo()
@@ -447,6 +451,8 @@ class PlayerViewModel: NSObject, ObservableObject {
             }
         }
         
-        usbDevicesManger.update()
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        }
     }
 }
