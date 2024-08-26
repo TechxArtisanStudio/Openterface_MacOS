@@ -26,6 +26,7 @@
 		53EE38402B45365700CCA753 /* SerialProtTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53EE383F2B45365700CCA753 /* SerialProtTests.swift */; };
 		53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F7C7122B440C8E00ED872F /* SerialPortManger.swift */; };
 		53F7C7162B44113100ED872F /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = 53F7C7152B44113100ED872F /* ORSSerial */; };
+		53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */; };
 		53FBE7AE2B3D66D2007785B0 /* openterfaceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */; };
 		53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AF2B3D66D2007785B0 /* ContentView.swift */; };
 		53FBE7B22B3D66D6007785B0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 53FBE7B12B3D66D6007785B0 /* Assets.xcassets */; };
@@ -74,6 +75,7 @@
 		53CC660E2B8EE70C0081F927 /* LogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTests.swift; sourceTree = "<group>"; };
 		53EE383F2B45365700CCA753 /* SerialProtTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialProtTests.swift; sourceTree = "<group>"; };
 		53F7C7122B440C8E00ED872F /* SerialPortManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortManger.swift; sourceTree = "<group>"; };
+		53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManager.swift; sourceTree = "<group>"; };
 		53FBE7AA2B3D66D2007785B0 /* openterface.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = openterface.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = openterfaceApp.swift; sourceTree = "<group>"; };
 		53FBE7AF2B3D66D2007785B0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -231,6 +233,7 @@
 				53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */,
 				53F7C7122B440C8E00ED872F /* SerialPortManger.swift */,
 				53CC66092B8EDB390081F927 /* LoggerManager.swift */,
+				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -403,6 +406,7 @@
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,
 				53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */,
 				53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */,
+				53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */,
 				53955CC02BF497D000FA4493 /* SettingsScreen.swift in Sources */,
 				5308F43E2B5A674E00BADF35 /* MouseManager.swift in Sources */,
 				531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */,
