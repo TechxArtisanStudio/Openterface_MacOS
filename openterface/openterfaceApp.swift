@@ -34,7 +34,7 @@ struct openterfaceApp: App {
     @State private var mouseHideTitle = "Hide"
     
     @State private var _isSwitchToggleOn = false
-    
+    @State private var _isLockSwitch = true
     
     @State private var  _hasHdmiSignal: Bool = false
     @State private var  _isKeyboardConnected: Bool?
@@ -295,11 +295,25 @@ struct openterfaceApp: App {
                                     .resizable()
                                     .aspectRatio(contentMode: .fit) // 保持图像的宽高比
                                     .frame(width: 20, height: 15)
-                                    .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
+                                    .foregroundColor(_isLockSwitch ? .gray.opacity(0.5) : (_isSwitchToggleOn ? .gray : .orange))
                                 Text(_isSwitchToggleOn ? "Target" : "Host")
-                                    .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
+                                    .foregroundColor(_isLockSwitch ? .gray.opacity(0.5) : (_isSwitchToggleOn ? .gray : .orange))
                             }
                             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                            .disabled(_isLockSwitch) // 禁用点击功能
+                            .opacity(_isLockSwitch ? 0.5 : 1.0) // 整体变灰
+                        }
+                        
+                        ToolbarItem(placement: .automatic) {
+                            Toggle(isOn: $_isLockSwitch) {
+                                ZStack {
+                                    Image(systemName: "lock")
+                                        .opacity(_isLockSwitch ? 1 : 0)
+                                    Image(systemName: "lock.open")
+                                        .opacity(_isLockSwitch ? 0 : 1)
+                                }
+                                .frame(width: 24) // 设置一个固定宽度，依据图标中最大宽度之一
+                            }
                         }
                     }
                     .onReceive(timer) { _ in
