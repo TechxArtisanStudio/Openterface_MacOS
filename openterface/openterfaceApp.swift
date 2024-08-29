@@ -263,7 +263,7 @@ struct openterfaceApp: App {
                             }) {
                                 MultiLineButtonView() // 添加自定义按钮
                             }
-                                                    }
+                        }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
                                 showButtons.toggle()
@@ -466,6 +466,18 @@ final class AppState: ObservableObject {
     }
 }
 
+func hexStringToDecimalInt(hexString: String) -> Int? {
+    var cleanedHexString = hexString
+    if hexString.hasPrefix("0x") {
+        cleanedHexString = String(hexString.dropFirst(2))
+    }
+    
+    guard let hexValue = UInt(cleanedHexString, radix: 16) else {
+        return nil
+    }
+    
+    return Int(hexValue)
+}
 
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {

@@ -55,6 +55,7 @@ struct AppStatus {
     static var groupOpenterfaceDevices: [[USBDeviceInfo]] = []
     static var DefaultVideoDevice: USBDeviceInfo?
     static var DefaultUSBSerial: USBDeviceInfo?
+    static var isHIDOpen: Bool?
     static let logFileName: String = "info.log"
 }
 

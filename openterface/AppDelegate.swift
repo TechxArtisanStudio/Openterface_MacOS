@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var hostmanager = HostManager()
     var keyboardManager = KeyboardManager.shared
     var usbDevicesManger = USBDeivcesManager.shared
+    var hid = HIDManager.shared
     
     // var observation: NSKeyValueObservation?
     var log = Logger.shared
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NSApp.mainMenu?.delegate = self
         
         usbDevicesManger.update()
+        
         
         print("✅✅✅✅✅✅✅")
         print(AppStatus.groupOpenterfaceDevices)

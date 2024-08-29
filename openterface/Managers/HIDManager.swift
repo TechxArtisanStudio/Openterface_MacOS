@@ -28,49 +28,91 @@ import IOKit.hid
 class HIDManager {
     // 单例模式
     static let shared = HIDManager()
-
+    
     var manager: IOHIDManager!
     @Published var device: IOHIDDevice?     // 当前打开的HID设备
     @Published var isOpen: Bool?            // 设备是否打开
-
-
-    // 私有初始化方法
+    
+    private var timer: DispatchSourceTimer?
+    private let queue = DispatchQueue(label: "com.example.hidCommunicator", qos: .background)
+    
     private init() {
+        //        DispatchQueue.global(qos: .background).async {
+        //            // 执行耗时的后台任务
+        //            for i in 0..<5 {
+        //                print("后台任务正在运行 \(i)")
+        //                Thread.sleep(forTimeInterval: 1) // 模拟耗时任务
+        //            }
+        //            print("后台任务完成")
+        //        }
+        // open hid
+        print(AppStatus.groupOpenterfaceDevices)
+        if (AppStatus.DefaultVideoDevice != nil){
+            print(AppStatus.DefaultVideoDevice)
+            if let _v = AppStatus.DefaultVideoDevice?.vendorID, let _p = AppStatus.DefaultVideoDevice?.productID, let _l = AppStatus.DefaultVideoDevice?.locationID {
+                openHID(vid: _v, pid: _p, lid: _l)
+            }
+        }else{
+            print("没有HID")
+        }
+        
+//        startCommunication()
+    }
+    
+    func startCommunication() {
+        timer = DispatchSource.makeTimerSource(queue: queue)
+        timer?.schedule(deadline: .now(), repeating: .seconds(2))
+        timer?.setEventHandler { [weak self] in
+            if AppStatus.isHIDOpen == nil {
+                print("hid没有🦥🦥🦥🦥🦥🦥🦥")
+            } else if AppStatus.isHIDOpen == false {
+                print("hid没有打开🌹🌹🌹🌹")
+            } else {
+                print("打开了🐯🐯🐯🐯🐯")
+            }
+        }
+        timer?.resume()
     }
 
 
     // 打开指定的HID设备
-    func openHID(vid: Int, pid: Int, lid: NSNumber ) {
+    func openHID(vid: Int, pid: Int, lid: String ) {
         manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
-        
-        let deviceMatching: [String: Any] = [
-            kIOHIDVendorIDKey: vid,
-            kIOHIDProductIDKey: pid,
-            kIOHIDLocationIDKey: lid,
-        ]
-        
-        IOHIDManagerSetDeviceMatching(manager, deviceMatching as CFDictionary)
-        
-        // 打开 HID Manager
-        let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
-        if result != kIOReturnSuccess {
-            print("Failed to open HID Manager")
-            return
-        }
-        
-        // 获取匹配的设备
-        if let deviceSet = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>, let matchedDevice = deviceSet.first {
-            // 尝试打开设备
-            let openResult = IOHIDDeviceOpen(matchedDevice, IOOptionBits(kIOHIDOptionsTypeNone))
-            if openResult == kIOReturnSuccess {
-                self.device = matchedDevice
-                self.isOpen = true
-            } else {
-                self.isOpen = false
+        print(lid)
+        if let _lid = hexStringToDecimalInt(hexString: lid) {
+            let deviceMatching: [String: Any] = [
+                kIOHIDVendorIDKey: vid,
+                kIOHIDProductIDKey: pid,
+                kIOHIDLocationIDKey: _lid,
+            ]
+            
+            IOHIDManagerSetDeviceMatching(manager, deviceMatching as CFDictionary)
+            
+            // 打开 HID Manager
+            let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            if result != kIOReturnSuccess {
+                print("Failed to open HID Manager")
+                return
             }
-        } else {
-            self.isOpen = nil
+            
+            // 获取匹配的设备
+            if let deviceSet = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>, let matchedDevice = deviceSet.first {
+                // 尝试打开设备
+                let openResult = IOHIDDeviceOpen(matchedDevice, IOOptionBits(kIOHIDOptionsTypeNone))
+                if openResult == kIOReturnSuccess {
+                    self.device = matchedDevice
+                    self.isOpen = true
+                    AppStatus.isHIDOpen = true
+                } else {
+                    self.isOpen = false
+                    AppStatus.isHIDOpen = false
+                }
+            } else {
+                self.isOpen = nil
+                AppStatus.isHIDOpen = nil
+            }
         }
+        
     }
 
     // 关闭HID设备
@@ -111,5 +153,18 @@ class HIDManager {
         } else {
             print("Failed to send HID Report")
         }
+    }
+    
+    func hexStringToDecimalInt(hexString: String) -> Int? {
+        var cleanedHexString = hexString
+        if hexString.hasPrefix("0x") {
+            cleanedHexString = String(hexString.dropFirst(2))
+        }
+        
+        guard let hexValue = UInt(cleanedHexString, radix: 16) else {
+            return nil
+        }
+        
+        return Int(hexValue)
     }
 }
