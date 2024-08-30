@@ -45,6 +45,8 @@ struct AppStatus {
     static var isNumLockOn: Bool = false
     static var isCapLockOn: Bool = false
     static var isScrollOn: Bool = false
+    static var isSwitchToggleOn: Bool = false
+    static var isLockSwitchOn: Bool = false
     
     static var eventHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)

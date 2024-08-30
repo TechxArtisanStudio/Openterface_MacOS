@@ -247,7 +247,7 @@ struct openterfaceApp: App {
                     }
                 }
                 .padding()
-                .background(Color.gray.opacity(0)) // 半透明背景
+                .background(Color.gray.opacity(0))
                 .cornerRadius(10)
                 .opacity(showButtons ? 1 : 0)
                 .offset(y: showButtons ? 20 : -100)
@@ -261,7 +261,7 @@ struct openterfaceApp: App {
                             Button(action: {
                                 
                             }) {
-                                MultiLineButtonView() // 添加自定义按钮
+                                MultiLineButtonView()
                             }
                         }
                         ToolbarItem(placement: .automatic) {
@@ -293,15 +293,15 @@ struct openterfaceApp: App {
                             Toggle(isOn: $_isSwitchToggleOn) {
                                 Image(_isSwitchToggleOn ? "Target_icon" : "Host_icon")
                                     .resizable()
-                                    .aspectRatio(contentMode: .fit) // 保持图像的宽高比
+                                    .aspectRatio(contentMode: .fit)
                                     .frame(width: 20, height: 15)
                                     .foregroundColor(_isLockSwitch ? .gray.opacity(0.5) : (_isSwitchToggleOn ? .gray : .orange))
                                 Text(_isSwitchToggleOn ? "Target" : "Host")
                                     .foregroundColor(_isLockSwitch ? .gray.opacity(0.5) : (_isSwitchToggleOn ? .gray : .orange))
                             }
                             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-                            .disabled(_isLockSwitch) // 禁用点击功能
-                            .opacity(_isLockSwitch ? 0.5 : 1.0) // 整体变灰
+                            .disabled(_isLockSwitch)
+                            .opacity(_isLockSwitch ? 0.5 : 1.0)
                         }
                         
                         ToolbarItem(placement: .automatic) {
@@ -312,13 +312,14 @@ struct openterfaceApp: App {
                                     Image(systemName: "lock.open")
                                         .opacity(_isLockSwitch ? 0 : 1)
                                 }
-                                .frame(width: 24) // 设置一个固定宽度，依据图标中最大宽度之一
+                                .frame(width: 24)
                             }
                         }
                     }
                     .onReceive(timer) { _ in
                         _isKeyboardConnected = AppStatus.isKeyboardConnected
                         _isMouseConnected = AppStatus.isMouseConnected
+                        _isSwitchToggleOn = AppStatus.isSwitchToggleOn
                     }
             }
         }
@@ -553,28 +554,27 @@ struct CustomButtonStyle: ButtonStyle {
 struct MultiLineButtonView: View {
     var body: some View {
         Button(action: {
-            // Add your button action here
         }) {
             HStack{
                 VStack {
                     Text("openinterface")
-                        .font(.caption) // 调整文本大小
+                        .font(.caption)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.5) // 设置文本最小比例因子
+                        .minimumScaleFactor(0.5)
 
                     Text("serial")
-                        .font(.caption) // 调整文本大小
+                        .font(.caption)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.5) // 设置文本最小比例因子
+                        .minimumScaleFactor(0.5)
                 }
-                .cornerRadius(3) // 设置圆角半径3
+                .cornerRadius(3) 
                 VStack {
                     Text(">")
                 }
             }
             
         }
-        .frame(maxWidth: 80, maxHeight: 30) // 限制按钮的最大尺寸
-        .buttonStyle(PlainButtonStyle()) // 使用PlainButtonStyle
+        .frame(maxWidth: 80, maxHeight: 30)
+        .buttonStyle(PlainButtonStyle())
     }
 }
