@@ -48,6 +48,8 @@ struct AppStatus {
     static var isSwitchToggleOn: Bool = false
     static var isLockSwitchOn: Bool = false
     
+    static var MS2109Version: String = ""
+    
     static var eventHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)
     static var currentWindow: NSRect = NSRect(x:0,y:0,width:0,height:0)
