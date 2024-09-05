@@ -62,7 +62,7 @@ class HIDManager {
                 print(self?.getSwitchStatus() ?? "read HID Device data is worry!")
                 
                 print(self?.getResolution() ?? "nil")
-                
+                AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
                 print(self?.getFps() ?? "nil")
                 
                 print(self?.getVersion() ?? "nil")

@@ -42,6 +42,8 @@ struct openterfaceApp: App {
     @State private var  _isSwitchToHost: Bool?
     
     @State private var showButtons = false
+    
+    @State private var _resolution = (width: 0, height: 0)
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -258,11 +260,6 @@ struct openterfaceApp: App {
                     .toolbar{
                         ToolbarItemGroup(placement: .navigation) {
                             Text("Openterface Mini-KVM")
-                            Button(action: {
-                                
-                            }) {
-                                MultiLineButtonView()
-                            }
                         }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
@@ -277,6 +274,9 @@ struct openterfaceApp: App {
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "display")
                                 .foregroundColor(.gray)
+                        }
+                        ToolbarItem(placement: .primaryAction) {
+                            ResolutionView(width: _resolution.width, height: _resolution.height)
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "keyboard.fill")
@@ -320,6 +320,7 @@ struct openterfaceApp: App {
                         _isKeyboardConnected = AppStatus.isKeyboardConnected
                         _isMouseConnected = AppStatus.isMouseConnected
                         _isSwitchToggleOn = AppStatus.isSwitchToggleOn
+                        _resolution = AppStatus.hidReadResolusion
                     }
             }
         }
@@ -551,30 +552,17 @@ struct CustomButtonStyle: ButtonStyle {
     }
 }
 
-struct MultiLineButtonView: View {
+struct ResolutionView: View {
+    let width: Int
+    let height: Int
+    
     var body: some View {
-        Button(action: {
-        }) {
-            HStack{
-                VStack {
-                    Text("openinterface")
-                        .font(.caption)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-
-                    Text("serial")
-                        .font(.caption)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                }
-                .cornerRadius(3) 
-                VStack {
-                    Text(">")
-                }
-            }
-            
+        VStack(alignment: .leading, spacing: -2) {
+            Text("W: \(width)")
+                .font(.system(size: 8, weight: .medium))
+            Text("H: \(height)")
+                .font(.system(size: 8, weight: .medium))
         }
-        .frame(maxWidth: 80, maxHeight: 30)
-        .buttonStyle(PlainButtonStyle())
+        .frame(width: 40)  // 调整宽度以适应toolbar
     }
 }

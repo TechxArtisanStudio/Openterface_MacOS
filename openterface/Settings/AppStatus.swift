@@ -40,6 +40,8 @@ struct AppStatus {
     static var isMouseConnected: Bool? = false
     static var isSwitchToHost: Bool?
     
+    static var hidReadResolusion = (width: 0, height: 0)
+    
     static var chipVersion: Int8 = 0
     static var isTargetConnected: Bool = false
     static var isNumLockOn: Bool = false
