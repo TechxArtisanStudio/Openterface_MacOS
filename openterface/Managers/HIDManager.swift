@@ -61,11 +61,12 @@ class HIDManager {
                 //  HID has been opened!
                 print(self?.getSwitchStatus() ?? "read HID Device data is worry!")
                 
-                print(self?.getResolution() ?? "nil")
+//                print(self?.getResolution() ?? "nil")
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
-                print(self?.getFps() ?? "nil")
-                
-                print(self?.getVersion() ?? "nil")
+//                print(self?.getFps() ?? "nil")
+                AppStatus.hidReadFps = self?.getFps() ?? 0
+//                print(self?.getVersion() ?? "nil")
+                AppStatus.MS2109Version = self?.getVersion() ?? ""
             }
         }
         timer?.resume()

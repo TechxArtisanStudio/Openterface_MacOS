@@ -44,6 +44,8 @@ struct openterfaceApp: App {
     @State private var showButtons = false
     
     @State private var _resolution = (width: 0, height: 0)
+    @State private var _fps = 0
+    @State private var _ms2109version = ""
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -276,7 +278,7 @@ struct openterfaceApp: App {
                                 .foregroundColor(.gray)
                         }
                         ToolbarItem(placement: .primaryAction) {
-                            ResolutionView(width: _resolution.width, height: _resolution.height)
+                            ResolutionView(width: _resolution.width, height: _resolution.height, fps: _fps, version: _ms2109version)
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "keyboard.fill")
@@ -321,6 +323,8 @@ struct openterfaceApp: App {
                         _isMouseConnected = AppStatus.isMouseConnected
                         _isSwitchToggleOn = AppStatus.isSwitchToggleOn
                         _resolution = AppStatus.hidReadResolusion
+                        _fps = AppStatus.hidReadFps
+                        _ms2109version = AppStatus.MS2109Version
                     }
             }
         }
@@ -552,17 +556,3 @@ struct CustomButtonStyle: ButtonStyle {
     }
 }
 
-struct ResolutionView: View {
-    let width: Int
-    let height: Int
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: -2) {
-            Text("W: \(width)")
-                .font(.system(size: 8, weight: .medium))
-            Text("H: \(height)")
-                .font(.system(size: 8, weight: .medium))
-        }
-        .frame(width: 40)  // 调整宽度以适应toolbar
-    }
-}

@@ -331,9 +331,9 @@ class PlayerViewModel: NSObject, ObservableObject {
             }
         }
         
-        if self.audioDeviceId != nil {
-            startAudioSession()
-        }
+//        if self.audioDeviceId != nil {
+//            startAudioSession()
+//        }
     }
 
     func addInput(_ input: AVCaptureInput) {
@@ -425,9 +425,12 @@ class PlayerViewModel: NSObject, ObservableObject {
     @objc func videoWasConnected(notification: NSNotification) {
         usbDevicesManger.update()
         
+        
+        let hid = HIDManager.shared
         if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
             self.prepareVideo()
             self.captureSession.commitConfiguration()
+            hid.openHID(vid: _v.vendorID, pid: _v.productID, lid: _v.locationID)
             DispatchQueue.main.async {
                 AppStatus.hasHdmiSignal = true
             }
@@ -446,7 +449,8 @@ class PlayerViewModel: NSObject, ObservableObject {
                 AppStatus.hasHdmiSignal = false
             }
         }
-        
+        let hid = HIDManager.shared
+        hid.closeHID()
         usbDevicesManger.update()
     }
 }
