@@ -295,25 +295,9 @@ struct openterfaceApp: App {
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
                                     .frame(width: 20, height: 15)
-                                    .foregroundColor(_isLockSwitch ? .gray.opacity(0.5) : (_isSwitchToggleOn ? .gray : .orange))
                                 Text(_isSwitchToggleOn ? "Target" : "Host")
-                                    .foregroundColor(_isLockSwitch ? .gray.opacity(0.5) : (_isSwitchToggleOn ? .gray : .orange))
                             }
                             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-                            .disabled(_isLockSwitch)
-                            .opacity(_isLockSwitch ? 0.5 : 1.0)
-                        }
-                        
-                        ToolbarItem(placement: .automatic) {
-                            Toggle(isOn: $_isLockSwitch) {
-                                ZStack {
-                                    Image(systemName: "lock")
-                                        .opacity(_isLockSwitch ? 1 : 0)
-                                    Image(systemName: "lock.open")
-                                        .opacity(_isLockSwitch ? 0 : 1)
-                                }
-                                .frame(width: 24)
-                            }
                         }
                     }
                     .onReceive(timer) { _ in
