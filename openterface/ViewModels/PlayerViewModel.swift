@@ -431,9 +431,6 @@ class PlayerViewModel: NSObject, ObservableObject {
             self.prepareVideo()
             self.captureSession.commitConfiguration()
             hid.openHID(vid: _v.vendorID, pid: _v.productID, lid: _v.locationID)
-            DispatchQueue.main.async {
-                AppStatus.hasHdmiSignal = true
-            }
         }
     }
     
@@ -445,9 +442,6 @@ class PlayerViewModel: NSObject, ObservableObject {
             let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
             videoInputs.forEach { self.captureSession.removeInput($0) }
             self.captureSession.commitConfiguration()
-            DispatchQueue.main.async {
-                AppStatus.hasHdmiSignal = false
-            }
         }
         let hid = HIDManager.shared
         hid.closeHID()

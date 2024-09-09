@@ -36,15 +36,15 @@ struct openterfaceApp: App {
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
     
-    @State private var  _hasHdmiSignal: Bool = false
+    @State private var  _hasHdmiSignal: Bool?
     @State private var  _isKeyboardConnected: Bool?
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
     
     @State private var showButtons = false
     
-    @State private var _resolution = (width: 0, height: 0)
-    @State private var _fps = 0
+    @State private var _resolution = (width: "", height: "")
+    @State private var _fps = ""
     @State private var _ms2109version = ""
 
     var log = Logger.shared
@@ -235,8 +235,6 @@ struct openterfaceApp: App {
                     }
                     .buttonStyle(TransparentBackgroundButtonStyle())
                     HStack(spacing: 20) {
-//                        Button("Win", action: { print("test win") })
-//                            .buttonStyle(CustomButtonStyle())
                         Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
                             .buttonStyle(CustomButtonStyle())
                             .onHover { hovering in
@@ -275,10 +273,10 @@ struct openterfaceApp: App {
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "display")
-                                .foregroundColor(.gray)
+                                .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
                         }
                         ToolbarItem(placement: .primaryAction) {
-                            ResolutionView(width: _resolution.width, height: _resolution.height, fps: _fps, version: _ms2109version)
+                            ResolutionView(width: _resolution.width, height: _resolution.height, fps: _fps)
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "keyboard.fill")
@@ -322,9 +320,21 @@ struct openterfaceApp: App {
                         _isKeyboardConnected = AppStatus.isKeyboardConnected
                         _isMouseConnected = AppStatus.isMouseConnected
                         _isSwitchToggleOn = AppStatus.isSwitchToggleOn
-                        _resolution = AppStatus.hidReadResolusion
-                        _fps = AppStatus.hidReadFps
-                        _ms2109version = AppStatus.MS2109Version
+                        _hasHdmiSignal = AppStatus.hasHdmiSignal
+                        
+                        if _hasHdmiSignal == nil {
+                            _resolution.width = "-"
+                            _resolution.height = "-"
+                            _fps = "-"
+                        }else if _hasHdmiSignal == false {
+                            _resolution.width = "?"
+                            _resolution.height = "?"
+                            _fps = "?"
+                        }else {
+                            _resolution.width = "\( AppStatus.hidReadResolusion.width)"
+                            _resolution.height = "\( AppStatus.hidReadResolusion.height)"
+                            _fps = "\(AppStatus.hidReadFps)"
+                        }
                     }
             }
         }

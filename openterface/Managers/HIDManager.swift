@@ -59,14 +59,18 @@ class HIDManager {
                 print("HID device has not been opened!")
             } else {
                 //  HID has been opened!
-                print(self?.getSwitchStatus() ?? "read HID Device data is worry!")
-                
+//                print(self?.getSwitchStatus() ?? "read HID Device data is worry!")
+                self?.getSwitchStatus()
+//                print(self?.getHDMIStatus() ?? "no hide status")
+                self?.getHDMIStatus()
 //                print(self?.getResolution() ?? "nil")
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
 //                print(self?.getFps() ?? "nil")
                 AppStatus.hidReadFps = self?.getFps() ?? 0
 //                print(self?.getVersion() ?? "nil")
                 AppStatus.MS2109Version = self?.getVersion() ?? ""
+                
+                
             }
         }
         timer?.resume()
@@ -179,8 +183,27 @@ class HIDManager {
         return false
     }
     
+    func getHDMIStatus() -> Bool {
+        self.sendHIDReport(report: [181, 250, 140, 0, 0, 0, 0, 0, 0])
+        
+        if let report = self.readHIDReport() {
+            let statusByte = report[3]
+            let binaryString = String(statusByte, radix: 2).padLeft(toLength: 8, withPad: "0")
+            
+            if statusByte & 0x01 == 1 {
+                AppStatus.hasHdmiSignal = true
+                return true
+            } else {
+                AppStatus.hasHdmiSignal = false
+                return false
+            }
+        } else {
+            AppStatus.hasHdmiSignal = nil
+            return false
+        }
+    }
+    
     func getResolution() -> (width: Int, height: Int)? {
-        // 发送宽度和高度的命令并读取响应
         let widthHighReport = generateHIDReport(for: .resolutionWidthHigh)
         let widthLowReport = generateHIDReport(for: .resolutionWidthLow)
         let heightHighReport = generateHIDReport(for: .resolutionHeightHigh)
@@ -226,7 +249,6 @@ class HIDManager {
     }
     
     func getVersion() -> String? {
-        // 发送宽度和高度的命令并读取响应
         let v1 = generateHIDReport(for: .version1)
         let v2 = generateHIDReport(for: .version2)
         let v3 = generateHIDReport(for: .version3)
@@ -295,4 +317,18 @@ enum HIDSubCommand: UInt16 {
     case version2 = 0xCBDD
     case version3 = 0xCBDE
     case version4 = 0xCBDF
+    
+    // ADDR_HDMI_CONNECTION_STATUS
+    case HDMI_CONNECTION_STATUS = 0xFA8C
+}
+
+
+extension String {
+    func padLeft(toLength: Int, withPad character: Character) -> String {
+        let paddingLength = toLength - self.count
+        if paddingLength <= 0 {
+            return self
+        }
+        return String(repeating: character, count: paddingLength) + self
+    }
 }

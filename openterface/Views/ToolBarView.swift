@@ -8,10 +8,9 @@
 import SwiftUI
 
 struct ResolutionView: View {
-    let width: Int
-    let height: Int
-    let fps: Int
-    let version: String
+    let width: String
+    let height: String
+    let fps: String
     
     var body: some View {
         HStack(spacing: 4) {
@@ -23,13 +22,7 @@ struct ResolutionView: View {
             }
             Text("\(fps)")
                 .font(.system(size: 16, weight: .medium))
-            VStack(alignment: .leading, spacing: -2) {
-                Text(" ")
-                    .font(.system(size: 8, weight: .medium))
-                Text("\(version)")
-                    .font(.system(size: 8, weight: .medium))
-            }
         }
-        .frame(width: 120, alignment: .leading)  // 调整宽度以适应toolbar
+        .frame(width: 50, alignment: .leading)
     }
 }

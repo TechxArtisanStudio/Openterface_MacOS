@@ -35,7 +35,6 @@ struct AppStatus {
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
 
-    static var hasHdmiSignal: Bool? = false
     static var isKeyboardConnected: Bool? = false
     static var isMouseConnected: Bool? = false
     static var isSwitchToHost: Bool?
@@ -52,6 +51,7 @@ struct AppStatus {
     static var isLockSwitchOn: Bool = false
     
     static var MS2109Version: String = ""
+    static var hasHdmiSignal: Bool?
     
     static var eventHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)
