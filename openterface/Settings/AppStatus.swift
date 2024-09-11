@@ -64,6 +64,52 @@ struct AppStatus {
     static var DefaultUSBSerial: USBDeviceInfo?
     static var isHIDOpen: Bool?
     static let logFileName: String = "info.log"
+    
+    static var isHardwareConnetionToTarget: Bool = true
+    static var isHardwareSwitchOn: Bool = false {
+        didSet {
+            if oldValue != isHardwareSwitchOn {
+                // 值发生变化时执行的代码
+                handleHardwareSwitchChange()
+            }
+        }
+    }
+    
+    static var isSoftwareSwitchOn: Bool = false {
+        didSet {
+            if oldValue != isSoftwareSwitchOn {
+                // 值发生变化时执行的代码
+                handleSoftwareSwitchChange()
+            }
+        }
+    }
+    
+
+    static func handleHardwareSwitchChange() {
+        if isHardwareSwitchOn {
+            // print("Hardware switch to Target") // true
+            if isSoftwareSwitchOn != isHardwareSwitchOn {
+                isSoftwareSwitchOn = isHardwareSwitchOn
+                AppStatus.isSwitchToggleOn = isHardwareSwitchOn
+            }
+        } else {
+            // print("Hardware switch to Host") // false
+            if isSoftwareSwitchOn != isHardwareSwitchOn {
+                isSoftwareSwitchOn = isHardwareSwitchOn
+                AppStatus.isSwitchToggleOn = isHardwareSwitchOn
+            }
+        }
+    }
+    
+    static func handleSoftwareSwitchChange() {
+        if isSoftwareSwitchOn {
+            print("Software switch to Target") // true
+
+        } else {
+            print("Software switch to Host")  // false
+
+        }
+    }
 }
 
 

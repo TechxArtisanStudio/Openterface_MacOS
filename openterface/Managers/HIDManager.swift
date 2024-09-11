@@ -50,6 +50,13 @@ class HIDManager {
     }
     
     func startCommunication() {
+        AppStatus.isSwitchToggleOn = self.getSwitchStatus()
+//        if AppStatus.isSwitchToggleOn {
+//            
+//        } else {
+//            
+//        }
+//        
         timer = DispatchSource.makeTimerSource(queue: queue)
         timer?.schedule(deadline: .now(), repeating: .seconds(1))
         timer?.setEventHandler { [weak self] in
@@ -63,6 +70,14 @@ class HIDManager {
                 self?.getSwitchStatus()
 //                print(self?.getHDMIStatus() ?? "no hide status")
                 self?.getHDMIStatus()
+                if let _status = self?.getHardwareConnetionStatus() {
+                    AppStatus.isHardwareConnetionToTarget = _status
+                }
+                if AppStatus.isHardwareConnetionToTarget {
+                    print("HW to Target")
+                } else {
+                    print("HW to Host")
+                }
 //                print(self?.getResolution() ?? "nil")
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
 //                print(self?.getFps() ?? "nil")
@@ -166,21 +181,42 @@ class HIDManager {
         return readHIDReport()
     }
     
+    func setUSBtoHost() {
+        self.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
+    }
+    
+    func setUSBtoTrager() {
+        self.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
+    }
+    
+    func getHardwareConnetionStatus() -> Bool {
+        self.sendHIDReport(report: [181, 223, 1, 0, 0, 0, 0, 0])
+        if let report = self.readHIDReport() {
+            print("🍠🍠🍠🍠")
+            print(report)
+            if report[3] == 0 { // to host
+                return false
+            } else {
+                return true
+            }
+        }
+        return true
+    }
     
     func getSwitchStatus() -> Bool {
         self.sendHIDReport(report: [181, 223, 0, 1, 0, 0, 0, 0, 0])
         
         if let report = self.readHIDReport() {
             if report[3] == 0 { // to host
-                AppStatus.isSwitchToggleOn = false
-                return true
-            } else {
-                AppStatus.isSwitchToggleOn = true
+                AppStatus.isHardwareSwitchOn = false
                 return false
+            } else {
+                AppStatus.isHardwareSwitchOn = true
+                return true
             }
         }
-        AppStatus.isSwitchToggleOn = true
-        return false
+        AppStatus.isHardwareSwitchOn = true
+        return true
     }
     
     func getHDMIStatus() -> Bool {
@@ -188,7 +224,7 @@ class HIDManager {
         
         if let report = self.readHIDReport() {
             let statusByte = report[3]
-            let binaryString = String(statusByte, radix: 2).padLeft(toLength: 8, withPad: "0")
+//            _ = String(statusByte, radix: 2).padLeft(toLength: 8, withPad: "0")
             
             if statusByte & 0x01 == 1 {
                 AppStatus.hasHdmiSignal = true
@@ -320,6 +356,7 @@ enum HIDSubCommand: UInt16 {
     
     // ADDR_HDMI_CONNECTION_STATUS
     case HDMI_CONNECTION_STATUS = 0xFA8C
+
 }
 
 

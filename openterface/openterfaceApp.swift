@@ -50,6 +50,7 @@ struct openterfaceApp: App {
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
+    
     var body: some Scene {
         WindowGroup {
             ZStack(alignment: .top) {
@@ -246,6 +247,36 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
+                        Button("T0", action: {
+                            print("TTT")
+                            let hid = HIDManager.shared
+                            hid.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
+                        Button("T1", action: {
+                                print("TTT")
+                                let hid = HIDManager.shared
+                                hid.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
+                            })
+                                .buttonStyle(CustomButtonStyle())
+                                .onHover { hovering in
+                                    if hovering {
+                                        // Mouse entered
+                                        AppStatus.isExit = true
+                                    } else {
+                                        // Mouse exited
+                                        AppStatus.isExit = false
+                                    }
+                                }
                     }
                 }
                 .padding()
@@ -298,6 +329,9 @@ struct openterfaceApp: App {
                                 Text(_isSwitchToggleOn ? "Target" : "Host")
                             }
                             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                            .onChange(of: _isSwitchToggleOn) { newValue in
+                                handleSwitchToggle(isOn: newValue)
+                            }
                         }
                     }
                     .onReceive(timer) { _ in
@@ -436,6 +470,22 @@ struct openterfaceApp: App {
         case .none:
             return .gray
         }
+    }
+    
+    private func handleSwitchToggle(isOn: Bool) {
+        if isOn {
+            print("to Target model") // true
+            let hid = HIDManager.shared
+            hid.setUSBtoTrager()
+            
+        } else {
+            print("to Host model") // false
+            let hid = HIDManager.shared
+            hid.setUSBtoHost()
+        }
+
+        // update AppStatus
+        AppStatus.isSwitchToggleOn = isOn
     }
 }
 
