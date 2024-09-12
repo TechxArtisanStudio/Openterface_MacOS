@@ -477,7 +477,6 @@ struct openterfaceApp: App {
             print("to Target model") // true
             let hid = HIDManager.shared
             hid.setUSBtoTrager()
-            
         } else {
             print("to Host model") // false
             let hid = HIDManager.shared

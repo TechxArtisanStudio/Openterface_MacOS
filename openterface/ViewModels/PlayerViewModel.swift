@@ -270,7 +270,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         for device in videoDiscoverySession.devices {
             // 0x
             if let _v = AppStatus.DefaultVideoDevice {
-                if(device.uniqueID.contains(_v.locationID)){
+                if(matchesLocalID(device.uniqueID, _v.locationID)){
                     videoDevices.append(device)
                 }
             }
@@ -294,6 +294,21 @@ class PlayerViewModel: NSObject, ObservableObject {
             startVideoSession()
             AppStatus.isHDMIConnected = true
         }
+        
+    }
+    
+    func matchesLocalID(_ uniqueID: String, _ locationID: String) -> Bool {
+
+        func hexToInt(_ hex: String) -> Int {
+            return Int(hex.replacingOccurrences(of: "0x", with: ""), radix: 16) ?? 0
+        }
+
+        let uniqueIDValue = hexToInt(uniqueID)
+        let locationIDValue = hexToInt(locationID)
+
+        let maskedUniqueID = uniqueIDValue >> 32
+
+        return maskedUniqueID == locationIDValue
     }
 
     func prepareAudio() {
