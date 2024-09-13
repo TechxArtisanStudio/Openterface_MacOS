@@ -49,21 +49,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         usbDevicesManger.update()
         
-        
-        print("✅✅✅✅✅✅✅")
-        print(AppStatus.groupOpenterfaceDevices)
+//        if let window = NSApplication.shared.windows.first {
+//            window.delegate = self
+//            window.backgroundColor = NSColor.fromHex("#000000")
+//            window.styleMask.remove(.resizable)
+//            
+//            let fixedSize = aspectRatio
+//            window.setContentSize(fixedSize)
+//            window.minSize = fixedSize
+//            window.maxSize = fixedSize
+//            
+//            window.center()
+//        }
+//        
+        NSApplication.shared.windows.forEach { window in
+            let windowType = type(of: window)
+            let windowTypeName = String(describing: windowType)
 
-        if let window = NSApplication.shared.windows.first {
-            window.delegate = self
-            window.backgroundColor = NSColor.fromHex("#000000")
-            window.styleMask.remove(.resizable)
-            
-            let fixedSize = aspectRatio
-            window.setContentSize(fixedSize)
-            window.minSize = fixedSize
-            window.maxSize = fixedSize
-            
-            window.center()
+            print("Window title: \(window.title)")
+            print("Window type: \(windowTypeName)")
+
+            // 检查类型名是否为 "AppKitWindow"
+            if windowTypeName == "AppKitWindow" {
+                print("🔥🔥🔥🔥🔥🔥🔥")
+                window.delegate = self
+                window.backgroundColor = NSColor.fromHex("#000000")
+                window.styleMask.remove(.resizable)
+                
+                let fixedSize = aspectRatio
+                window.setContentSize(fixedSize)
+                window.minSize = fixedSize
+                window.maxSize = fixedSize
+                
+                window.center()
+            }
         }
     }
     
@@ -132,3 +151,4 @@ extension NSColor {
         return NSColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: CGFloat(a) / 255)
     }
 }
+

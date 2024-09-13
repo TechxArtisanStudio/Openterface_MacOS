@@ -73,11 +73,11 @@ class HIDManager {
                 if let _status = self?.getHardwareConnetionStatus() {
                     AppStatus.isHardwareConnetionToTarget = _status
                 }
-                if AppStatus.isHardwareConnetionToTarget {
-                    print("HW to Target")
-                } else {
-                    print("HW to Host")
-                }
+//                if AppStatus.isHardwareConnetionToTarget {
+//                    print("HW to Target")
+//                } else {
+//                    print("HW to Host")
+//                }
 //                print(self?.getResolution() ?? "nil")
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
 //                print(self?.getFps() ?? "nil")
@@ -192,8 +192,6 @@ class HIDManager {
     func getHardwareConnetionStatus() -> Bool {
         self.sendHIDReport(report: [181, 223, 1, 0, 0, 0, 0, 0])
         if let report = self.readHIDReport() {
-            print("🍠🍠🍠🍠")
-            print(report)
             if report[3] == 0 { // to host
                 return false
             } else {

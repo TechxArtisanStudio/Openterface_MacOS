@@ -598,4 +598,3 @@ struct CustomButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 1.2 : 1)
     }
 }
-
