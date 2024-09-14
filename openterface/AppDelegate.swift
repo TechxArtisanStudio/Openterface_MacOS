@@ -27,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var statusBarManager = StatusBarManager()
     var hostmanager = HostManager()
     var keyboardManager = KeyboardManager.shared
+
+    var hid = HIDManager.shared
+
     
     // var observation: NSKeyValueObservation?
     var log = Logger.shared
@@ -50,21 +53,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         } else {
             print("USBDeivcesManager.shared.update() is not available on macOS 12.0")
         }
-        
-        // print("✅✅✅✅✅✅✅")
-        // print(AppStatus.groupOpenterfaceDevices)
 
-        if let window = NSApplication.shared.windows.first {
-            window.delegate = self
-            window.backgroundColor = NSColor.fromHex("#000000")
-            window.styleMask.remove(.resizable)
-            
-            let fixedSize = aspectRatio
-            window.setContentSize(fixedSize)
-            window.minSize = fixedSize
-            window.maxSize = fixedSize
-            
-            window.center()
+        NSApplication.shared.windows.forEach { window in
+            if let windownName = window.identifier?.rawValue {
+                if windownName.contains(UserSettings.shared.mainWindownName) {
+                    window.delegate = self
+                    window.backgroundColor = NSColor.fromHex("#000000")
+                    window.styleMask.remove(.resizable)
+                    
+                    let fixedSize = aspectRatio
+                    window.setContentSize(fixedSize)
+                    window.minSize = fixedSize
+                    window.maxSize = fixedSize
+                    
+                    window.center()
+                }
+                    
+                   
+            }
         }
     }
     
@@ -133,3 +139,4 @@ extension NSColor {
         return NSColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: CGFloat(a) / 255)
     }
 }
+

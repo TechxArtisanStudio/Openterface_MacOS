@@ -34,20 +34,25 @@ struct openterfaceApp: App {
     @State private var mouseHideTitle = "Hide"
     
     @State private var _isSwitchToggleOn = false
+    @State private var _isLockSwitch = true
     
-    
-    @State private var  _hasHdmiSignal: Bool = false
+    @State private var  _hasHdmiSignal: Bool?
     @State private var  _isKeyboardConnected: Bool?
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
     
     @State private var showButtons = false
+    
+    @State private var _resolution = (width: "", height: "")
+    @State private var _fps = ""
+    @State private var _ms2109version = ""
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
+    
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: UserSettings.shared.mainWindownName) {
             ZStack(alignment: .top) {
                 VStack(alignment: .leading) {
                     HStack(spacing: 20) {
@@ -231,8 +236,6 @@ struct openterfaceApp: App {
                     }
                     .buttonStyle(TransparentBackgroundButtonStyle())
                     HStack(spacing: 20) {
-//                        Button("Win", action: { print("test win") })
-//                            .buttonStyle(CustomButtonStyle())
                         Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
                             .buttonStyle(CustomButtonStyle())
                             .onHover { hovering in
@@ -244,10 +247,40 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
+                        Button("T0", action: {
+                            print("TTT")
+                            let hid = HIDManager.shared
+                            hid.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
+                        })
+                            .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
+                        Button("T1", action: {
+                                print("TTT")
+                                let hid = HIDManager.shared
+                                hid.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
+                            })
+                                .buttonStyle(CustomButtonStyle())
+                                .onHover { hovering in
+                                    if hovering {
+                                        // Mouse entered
+                                        AppStatus.isExit = true
+                                    } else {
+                                        // Mouse exited
+                                        AppStatus.isExit = false
+                                    }
+                                }
                     }
                 }
                 .padding()
-                .background(Color.gray.opacity(0)) // 半透明背景
+                .background(Color.gray.opacity(0))
                 .cornerRadius(10)
                 .opacity(showButtons ? 1 : 0)
                 .offset(y: showButtons ? 20 : -100)
@@ -258,12 +291,7 @@ struct openterfaceApp: App {
                     .toolbar{
                         ToolbarItemGroup(placement: .navigation) {
                             Text("Openterface Mini-KVM")
-                            Button(action: {
-                                
-                            }) {
-                                MultiLineButtonView() // 添加自定义按钮
-                            }
-                                                    }
+                        }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
                                 showButtons.toggle()
@@ -276,7 +304,10 @@ struct openterfaceApp: App {
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "display")
-                                .foregroundColor(.gray)
+                                .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
+                        }
+                        ToolbarItem(placement: .primaryAction) {
+                            ResolutionView(width: _resolution.width, height: _resolution.height, fps: _fps)
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "keyboard.fill")
@@ -293,18 +324,35 @@ struct openterfaceApp: App {
                             Toggle(isOn: $_isSwitchToggleOn) {
                                 Image(_isSwitchToggleOn ? "Target_icon" : "Host_icon")
                                     .resizable()
-                                    .aspectRatio(contentMode: .fit) // 保持图像的宽高比
+                                    .aspectRatio(contentMode: .fit)
                                     .frame(width: 20, height: 15)
-                                    .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
                                 Text(_isSwitchToggleOn ? "Target" : "Host")
-                                    .foregroundColor(_isSwitchToggleOn ? .gray : .orange)
                             }
                             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                            .onChange(of: _isSwitchToggleOn) { newValue in
+                                handleSwitchToggle(isOn: newValue)
+                            }
                         }
                     }
                     .onReceive(timer) { _ in
                         _isKeyboardConnected = AppStatus.isKeyboardConnected
                         _isMouseConnected = AppStatus.isMouseConnected
+                        _isSwitchToggleOn = AppStatus.isSwitchToggleOn
+                        _hasHdmiSignal = AppStatus.hasHdmiSignal
+                        
+                        if _hasHdmiSignal == nil {
+                            _resolution.width = "-"
+                            _resolution.height = "-"
+                            _fps = "-"
+                        }else if _hasHdmiSignal == false {
+                            _resolution.width = "?"
+                            _resolution.height = "?"
+                            _fps = "?"
+                        }else {
+                            _resolution.width = "\( AppStatus.hidReadResolusion.width)"
+                            _resolution.height = "\( AppStatus.hidReadResolusion.height)"
+                            _fps = "\(AppStatus.hidReadFps)"
+                        }
                     }
             }
         }
@@ -425,6 +473,21 @@ struct openterfaceApp: App {
             return .gray
         }
     }
+    
+    private func handleSwitchToggle(isOn: Bool) {
+        if isOn {
+            print("to Target model") // true
+            let hid = HIDManager.shared
+            hid.setUSBtoTrager()
+        } else {
+            print("to Host model") // false
+            let hid = HIDManager.shared
+            hid.setUSBtoHost()
+        }
+
+        // update AppStatus
+        AppStatus.isSwitchToggleOn = isOn
+    }
 }
 
 
@@ -454,6 +517,18 @@ final class AppState: ObservableObject {
     }
 }
 
+func hexStringToDecimalInt(hexString: String) -> Int? {
+    var cleanedHexString = hexString
+    if hexString.hasPrefix("0x") {
+        cleanedHexString = String(hexString.dropFirst(2))
+    }
+    
+    guard let hexValue = UInt(cleanedHexString, radix: 16) else {
+        return nil
+    }
+    
+    return Int(hexValue)
+}
 
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {
@@ -533,34 +608,5 @@ struct CustomButtonStyle: ButtonStyle {
             .padding()
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.5)))
             .scaleEffect(configuration.isPressed ? 1.2 : 1)
-    }
-}
-
-struct MultiLineButtonView: View {
-    var body: some View {
-        Button(action: {
-            // Add your button action here
-        }) {
-            HStack{
-                VStack {
-                    Text("openinterface")
-                        .font(.caption) // 调整文本大小
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5) // 设置文本最小比例因子
-
-                    Text("serial")
-                        .font(.caption) // 调整文本大小
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5) // 设置文本最小比例因子
-                }
-                .cornerRadius(3) // 设置圆角半径3
-                VStack {
-                    Text(">")
-                }
-            }
-            
-        }
-        .frame(maxWidth: 80, maxHeight: 30) // 限制按钮的最大尺寸
-        .buttonStyle(PlainButtonStyle()) // 使用PlainButtonStyle
     }
 }

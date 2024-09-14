@@ -35,16 +35,23 @@ struct AppStatus {
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
 
-    static var hasHdmiSignal: Bool? = false
     static var isKeyboardConnected: Bool? = false
     static var isMouseConnected: Bool? = false
     static var isSwitchToHost: Bool?
+    
+    static var hidReadResolusion = (width: 0, height: 0)
+    static var hidReadFps = 0
     
     static var chipVersion: Int8 = 0
     static var isTargetConnected: Bool = false
     static var isNumLockOn: Bool = false
     static var isCapLockOn: Bool = false
     static var isScrollOn: Bool = false
+    static var isSwitchToggleOn: Bool = false
+    static var isLockSwitchOn: Bool = false
+    
+    static var MS2109Version: String = ""
+    static var hasHdmiSignal: Bool?
     
     static var eventHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)
@@ -55,7 +62,54 @@ struct AppStatus {
     static var groupOpenterfaceDevices: [[USBDeviceInfo]] = []
     static var DefaultVideoDevice: USBDeviceInfo?
     static var DefaultUSBSerial: USBDeviceInfo?
+    static var isHIDOpen: Bool?
     static let logFileName: String = "info.log"
+    
+    static var isHardwareConnetionToTarget: Bool = true
+    static var isHardwareSwitchOn: Bool = false {
+        didSet {
+            if oldValue != isHardwareSwitchOn {
+                // 值发生变化时执行的代码
+                handleHardwareSwitchChange()
+            }
+        }
+    }
+    
+    static var isSoftwareSwitchOn: Bool = false {
+        didSet {
+            if oldValue != isSoftwareSwitchOn {
+                // 值发生变化时执行的代码
+                handleSoftwareSwitchChange()
+            }
+        }
+    }
+    
+
+    static func handleHardwareSwitchChange() {
+        if isHardwareSwitchOn {
+            // print("Hardware switch to Target") // true
+            if isSoftwareSwitchOn != isHardwareSwitchOn {
+                isSoftwareSwitchOn = isHardwareSwitchOn
+                AppStatus.isSwitchToggleOn = isHardwareSwitchOn
+            }
+        } else {
+            // print("Hardware switch to Host") // false
+            if isSoftwareSwitchOn != isHardwareSwitchOn {
+                isSoftwareSwitchOn = isHardwareSwitchOn
+                AppStatus.isSwitchToggleOn = isHardwareSwitchOn
+            }
+        }
+    }
+    
+    static func handleSoftwareSwitchChange() {
+        if isSoftwareSwitchOn {
+            print("Software switch to Target") // true
+
+        } else {
+            print("Software switch to Host")  // false
+
+        }
+    }
 }
 
 

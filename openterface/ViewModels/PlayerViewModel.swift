@@ -256,7 +256,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         if #available(macOS 12.0, *) {
             USBDeivcesManager.shared.update()
         } else {
-            // Fallback on earlier versions
+            print("USBDeivcesManager.shared.update() is not available on macOS 12.0")
         }
         
         captureSession.sessionPreset = .high // A preset value that indicates the quality level or bit rate of the output.
@@ -272,7 +272,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         for device in videoDiscoverySession.devices {
             // 0x
             if let _v = AppStatus.DefaultVideoDevice {
-                if(device.uniqueID.contains(_v.locationID)){
+                if(matchesLocalID(device.uniqueID, _v.locationID)){
                     videoDevices.append(device)
                 }
             }
@@ -296,6 +296,21 @@ class PlayerViewModel: NSObject, ObservableObject {
             startVideoSession()
             AppStatus.isHDMIConnected = true
         }
+        
+    }
+    
+    func matchesLocalID(_ uniqueID: String, _ locationID: String) -> Bool {
+
+        func hexToInt(_ hex: String) -> Int {
+            return Int(hex.replacingOccurrences(of: "0x", with: ""), radix: 16) ?? 0
+        }
+
+        let uniqueIDValue = hexToInt(uniqueID)
+        let locationIDValue = hexToInt(locationID)
+
+        let maskedUniqueID = uniqueIDValue >> 32
+
+        return maskedUniqueID == locationIDValue
     }
 
     func prepareAudio() {
@@ -333,9 +348,9 @@ class PlayerViewModel: NSObject, ObservableObject {
             }
         }
         
-        if self.audioDeviceId != nil {
-            startAudioSession()
-        }
+//        if self.audioDeviceId != nil {
+//            startAudioSession()
+//        }
     }
 
     func addInput(_ input: AVCaptureInput) {
@@ -426,33 +441,32 @@ class PlayerViewModel: NSObject, ObservableObject {
 
     @objc func videoWasConnected(notification: NSNotification) {
         if #available(macOS 12.0, *) {
-            USBDeivcesManager.shared.update()
-        } 
+           USBDeivcesManager.shared.update()
+        }
+
         
-        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
+        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
+            let hid = HIDManager.shared
             self.prepareVideo()
-            self.captureSession.commitConfiguration()
-            DispatchQueue.main.async {
-                AppStatus.hasHdmiSignal = true
-            }
+            hid.startHID()
         }
     }
     
     @objc func videoWasDisconnected(notification: NSNotification) {
-        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
+        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
             self.stopVideoSession()
             
             // Remove all existing video input
             let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
             videoInputs.forEach { self.captureSession.removeInput($0) }
             self.captureSession.commitConfiguration()
-            DispatchQueue.main.async {
-                AppStatus.hasHdmiSignal = false
-            }
+            
+            let hid = HIDManager.shared
+            hid.closeHID()
         }
-        
+            
         if #available(macOS 12.0, *) {
-            USBDeivcesManager.shared.update()
+           USBDeivcesManager.shared.update()
         }
     }
 }
