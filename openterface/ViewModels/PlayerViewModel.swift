@@ -32,8 +32,6 @@ class PlayerViewModel: NSObject, ObservableObject {
     @Published var isAudioGranted: Bool = false
     @Published var dimensions = CMVideoDimensions()
     
-    let usbDevicesManger = USBDeivcesManager.shared
-    
     var audioDeviceId:AudioDeviceID? = nil
     
     var captureSession: AVCaptureSession!
@@ -444,7 +442,8 @@ class PlayerViewModel: NSObject, ObservableObject {
     @objc func videoWasConnected(notification: NSNotification) {
         if #available(macOS 12.0, *) {
            USBDeivcesManager.shared.update()
-       }
+        }
+
         
         if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
             let hid = HIDManager.shared

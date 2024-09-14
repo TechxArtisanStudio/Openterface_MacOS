@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var keyboardManager = KeyboardManager.shared
 
     var hid = HIDManager.shared
+
     
     // var observation: NSKeyValueObservation?
     var log = Logger.shared

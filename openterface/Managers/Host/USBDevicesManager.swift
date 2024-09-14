@@ -25,6 +25,7 @@ import IOKit
 import IOKit.usb
 import IOKit.hid
 
+@available(macOS 12.0, *)
 class USBDeivcesManager {
     // Singleton instance
     static let shared = USBDeivcesManager()

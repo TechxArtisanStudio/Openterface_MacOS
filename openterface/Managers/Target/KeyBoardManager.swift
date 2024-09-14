@@ -32,6 +32,7 @@ class KeyboardManager {
     let kbm = KeyboardMapper()
     
     init() {
+        monitorKeyboardEvents()
     }
     
     func modifierFlagsDescription(_ flags: NSEvent.ModifierFlags) -> String {
@@ -53,25 +54,20 @@ class KeyboardManager {
         return descriptions.isEmpty ? "None" : descriptions.joined(separator: ", ")
     }
 
-//    NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-//        let commandKey = NSEvent.ModifierFlags.command.rawValue
-//        let shiftKey = NSEvent.ModifierFlags.shift.rawValue
-//        let keyF: UInt16 = 0x03 // The keyCode for the F key is 3
-//
-//        // Check if the event is a key press event
-//        if event.type == .keyDown {
-//            let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue
-//
-//            // Check if Command + Shift + F is pressed
     
+    func pressKey(keys: [UInt16], modifiers: NSEvent.ModifierFlags) {
+        kbm.pressKey(keys: keys, modifiers: modifiers)
+    }
+
+    func releaseKey() {
+        kbm.releaseKey()
+    }
+
     func monitorKeyboardEvents() {
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             let modifiers = event.modifierFlags
             self.kbm.pressKey(keys: [event.keyCode], modifiers: modifiers)
-            // I don't kown how this code issui is 「Assertion failure」
-            // let modifierDescription = self.modifierFlagsDescription(modifiers)
-            //Logger.shared.log(content: "Modifiers: \(modifierDescription). Key pressed: \(event.characters ?? "") with keycode: \(event.keyCode). ")
-            
+
             Logger.shared.writeLogFile(string: "key pressed: \(event.keyCode)")
             
             if event.keyCode == 53 {
@@ -91,12 +87,12 @@ class KeyboardManager {
 
                             AppStatus.isExit = true
                             AppStatus.isCursorHidden = false
+                            AppStatus.isFouceWindow = false
                             NSCursor.unhide()
 
                             if let handler = AppStatus.eventHandler {
                                 NSEvent.removeMonitor(handler)
                                 eventHandler = nil
-                                print()
                                 // AppStatus.isExit = true
                             }
                         }

@@ -377,6 +377,7 @@ struct openterfaceApp: App {
                         absoluteTitle = "Absolute"
                         UserSettings.shared.MouseControl = .relative
                         NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
+                        NSCursor.hide()
                     }) {
                         Text(relativeTitle)
                     }
@@ -384,6 +385,7 @@ struct openterfaceApp: App {
                         relativeTitle = "Relative"
                         absoluteTitle = "Absolute ✓"
                         UserSettings.shared.MouseControl = .absolute
+                        NSCursor.unhide()
                     }) {
                         Text(absoluteTitle)
                     }
@@ -531,11 +533,21 @@ func hexStringToDecimalInt(hexString: String) -> Int? {
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {
         AppStatus.isAreaOCRing = true
-        guard let screen = SCContext.getScreenWithMouse() else { return }
-        let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
-        screenshotWindow.title = "Area Selector".local
-        screenshotWindow.makeKeyAndOrderFront(nil)
-        screenshotWindow.orderFrontRegardless()
+        if #available(macOS 12.3, *) {
+            guard let screen = SCContext.getScreenWithMouse() else { return }
+            let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
+            screenshotWindow.title = "Area Selector".local
+            screenshotWindow.makeKeyAndOrderFront(nil)
+            screenshotWindow.orderFrontRegardless()
+        } else {
+            let alert = NSAlert()
+            alert.messageText = "OCR feature not available"
+            alert.informativeText = "OCR function is not available on this version of macOS. Please upgrade to macOS 12.3 or later."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Ok")
+            alert.runModal()
+        }
+
     }
 }
 

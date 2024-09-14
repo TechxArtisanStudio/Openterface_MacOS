@@ -84,7 +84,4 @@ class MouseManager {
     func relativeMouse2BottomRight() {
         mouserMapper.relativeMouse2BottomRight()
     }
-
-
-    
 }
