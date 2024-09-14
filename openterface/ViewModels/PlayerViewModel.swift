@@ -255,7 +255,11 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     func prepareVideo() {
         
-        usbDevicesManger.update()
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        } else {
+            print("USBDeivcesManager.shared.update() is not available on macOS 12.0")
+        }
         
         captureSession.sessionPreset = .high // A preset value that indicates the quality level or bit rate of the output.
         // get devices
@@ -438,7 +442,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
 
     @objc func videoWasConnected(notification: NSNotification) {
-        usbDevicesManger.update()
+        if #available(macOS 12.0, *) {
+           USBDeivcesManager.shared.update()
+       }
         
         if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
             let hid = HIDManager.shared
@@ -460,6 +466,8 @@ class PlayerViewModel: NSObject, ObservableObject {
             hid.closeHID()
         }
             
-        usbDevicesManger.update()
+        if #available(macOS 12.0, *) {
+           USBDeivcesManager.shared.update()
+        }
     }
 }

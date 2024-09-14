@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var statusBarManager = StatusBarManager()
     var hostmanager = HostManager()
     var keyboardManager = KeyboardManager.shared
-    var usbDevicesManger = USBDeivcesManager.shared
+
     var hid = HIDManager.shared
     
     // var observation: NSKeyValueObservation?
@@ -47,8 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApp.mainMenu?.delegate = self
         
-        usbDevicesManger.update()
-           
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        } else {
+            print("USBDeivcesManager.shared.update() is not available on macOS 12.0")
+        }
+
         NSApplication.shared.windows.forEach { window in
             if let windownName = window.identifier?.rawValue {
                 if windownName.contains(UserSettings.shared.mainWindownName) {
