@@ -440,26 +440,26 @@ class PlayerViewModel: NSObject, ObservableObject {
     @objc func videoWasConnected(notification: NSNotification) {
         usbDevicesManger.update()
         
-        
-        let hid = HIDManager.shared
-        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
+        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
+            let hid = HIDManager.shared
             self.prepareVideo()
-            self.captureSession.commitConfiguration()
-            hid.openHID(vid: _v.vendorID, pid: _v.productID, lid: _v.locationID)
+            hid.startHID()
         }
     }
     
     @objc func videoWasDisconnected(notification: NSNotification) {
-        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, device.uniqueID.contains(_v.locationID) {
+        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
             self.stopVideoSession()
             
             // Remove all existing video input
             let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
             videoInputs.forEach { self.captureSession.removeInput($0) }
             self.captureSession.commitConfiguration()
+            
+            let hid = HIDManager.shared
+            hid.closeHID()
         }
-        let hid = HIDManager.shared
-        hid.closeHID()
+            
         usbDevicesManger.update()
     }
 }

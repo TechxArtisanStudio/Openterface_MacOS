@@ -38,6 +38,12 @@ class HIDManager {
     
     private init() {
         print(AppStatus.groupOpenterfaceDevices)
+        
+        startHID()
+        startCommunication()
+    }
+    
+    func startHID() {
         if (AppStatus.DefaultVideoDevice != nil){
             if let _v = AppStatus.DefaultVideoDevice?.vendorID, let _p = AppStatus.DefaultVideoDevice?.productID, let _l = AppStatus.DefaultVideoDevice?.locationID {
                 openHID(vid: _v, pid: _p, lid: _l)
@@ -45,8 +51,6 @@ class HIDManager {
         }else{
             print("No HID device")
         }
-        
-        startCommunication()
     }
     
     func startCommunication() {
@@ -94,7 +98,8 @@ class HIDManager {
 
     // Open specify HID
     func openHID(vid: Int, pid: Int, lid: String ) {
-        manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+        self.manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+
         if let _lid = hexStringToDecimalInt(hexString: lid) {
             let deviceMatching: [String: Any] = [
                 kIOHIDVendorIDKey: vid,
@@ -131,15 +136,27 @@ class HIDManager {
         
     }
 
-    // close hid device
+//    // close hid device
+//    func closeHID() {
+//        if let device = self.device {
+//            IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+//        }
+//        IOHIDManagerClose(self.manager, IOOptionBits(kIOHIDOptionsTypeNone))
+//        print("HID Manager closed")
+//    }
+//    
     func closeHID() {
         if let device = self.device {
             IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+            self.device = nil
         }
-        IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        if manager != nil {
+            IOHIDManagerClose(self.manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            manager = nil
+        }
         print("HID Manager closed")
     }
-
+    
     // read date from HID device
     func readHIDReport() -> [UInt8]? {
         guard let device = self.device else {
