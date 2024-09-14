@@ -39,6 +39,7 @@ final class UserSettings: ObservableObject {
     @Published var edgeThreshold: CGFloat = 5
     @Published var isFullScreen: Bool
     @Published var isAbsoluteModeMouseHide: Bool = true
+    @Published var mainWindownName: String = "main_openterface"
 }
 
 enum MouseControlMode: Int {

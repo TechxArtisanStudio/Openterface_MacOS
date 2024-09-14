@@ -48,40 +48,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NSApp.mainMenu?.delegate = self
         
         usbDevicesManger.update()
-        
-//        if let window = NSApplication.shared.windows.first {
-//            window.delegate = self
-//            window.backgroundColor = NSColor.fromHex("#000000")
-//            window.styleMask.remove(.resizable)
-//            
-//            let fixedSize = aspectRatio
-//            window.setContentSize(fixedSize)
-//            window.minSize = fixedSize
-//            window.maxSize = fixedSize
-//            
-//            window.center()
-//        }
-//        
+           
         NSApplication.shared.windows.forEach { window in
-            let windowType = type(of: window)
-            let windowTypeName = String(describing: windowType)
-
-            print("Window title: \(window.title)")
-            print("Window type: \(windowTypeName)")
-
-            // 检查类型名是否为 "AppKitWindow"
-            if windowTypeName == "AppKitWindow" {
-                print("🔥🔥🔥🔥🔥🔥🔥")
-                window.delegate = self
-                window.backgroundColor = NSColor.fromHex("#000000")
-                window.styleMask.remove(.resizable)
-                
-                let fixedSize = aspectRatio
-                window.setContentSize(fixedSize)
-                window.minSize = fixedSize
-                window.maxSize = fixedSize
-                
-                window.center()
+            if let windownName = window.identifier?.rawValue {
+                if windownName.contains(UserSettings.shared.mainWindownName) {
+                    window.delegate = self
+                    window.backgroundColor = NSColor.fromHex("#000000")
+                    window.styleMask.remove(.resizable)
+                    
+                    let fixedSize = aspectRatio
+                    window.setContentSize(fixedSize)
+                    window.minSize = fixedSize
+                    window.maxSize = fixedSize
+                    
+                    window.center()
+                }
+                    
+                   
             }
         }
     }

@@ -52,7 +52,7 @@ struct openterfaceApp: App {
     
     
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: UserSettings.shared.mainWindownName) {
             ZStack(alignment: .top) {
                 VStack(alignment: .leading) {
                     HStack(spacing: 20) {
