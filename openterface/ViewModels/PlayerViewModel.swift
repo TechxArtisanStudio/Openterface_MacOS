@@ -47,8 +47,14 @@ class PlayerViewModel: NSObject, ObservableObject {
         self.setupBindings()
 
         setupSession()
-        // Add observe event
-        self.observeDeviceNotifications()
+        
+        if AppStatus.isFristRun == false {
+            // Add observe event
+            self.observeDeviceNotifications()
+            
+            AppStatus.isFristRun = true
+        }
+        
     }
 
     func startAudioSession(){
