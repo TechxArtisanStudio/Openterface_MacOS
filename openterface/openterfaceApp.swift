@@ -351,7 +351,7 @@ struct openterfaceApp: App {
                         }else {
                             _resolution.width = "\( AppStatus.hidReadResolusion.width)"
                             _resolution.height = "\( AppStatus.hidReadResolusion.height)"
-                            _fps = "\(AppStatus.hidReadFps)"
+                            _fps = "\(AppStatus.hidReadFps)Hz"
                         }
                     }
             }

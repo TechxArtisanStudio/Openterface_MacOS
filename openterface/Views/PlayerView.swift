@@ -274,10 +274,12 @@ class PlayerView: NSView, NSWindowDelegate {
                                                         wheelMovement: wheelMovement, 
                                                         dragged: true)
         } else {
-            let mouseLocation = convert(event.locationInWindow, from: nil)
-            let mouseX = Float(mouseLocation.x) / Float(self.frame.width) * 4096.0
-            let mouseY = 4096.0 - Float(mouseLocation.y) / Float(self.frame.height) * 4096.0
-            HostManager.shared.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+            if AppStatus.isMouseInView {
+                let mouseLocation = convert(event.locationInWindow, from: nil)
+                let mouseX = Float(mouseLocation.x) / Float(self.frame.width) * 4096.0
+                let mouseY = 4096.0 - Float(mouseLocation.y) / Float(self.frame.height) * 4096.0
+                HostManager.shared.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+            }
         }
     }
     
