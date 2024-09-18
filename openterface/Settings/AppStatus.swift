@@ -25,6 +25,8 @@ import Foundation
 import AppKit
 
 struct AppStatus {
+    static var isFristRun: Bool = false
+    
     static var isMouseInView: Bool = true
     static var isFouceWindow: Bool = true
     static var isSerialPortConnected: Bool = true

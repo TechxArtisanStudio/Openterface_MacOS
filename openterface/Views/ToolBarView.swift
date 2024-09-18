@@ -17,12 +17,12 @@ struct ResolutionView: View {
             VStack(alignment: .leading, spacing: -2) {
                 Text("\(width)")
                     .font(.system(size: 8, weight: .medium))
-                Text("\(height)")
+                Text("\(fps)")
                     .font(.system(size: 8, weight: .medium))
             }
-            Text("\(fps)")
+            Text("\(height)")
                 .font(.system(size: 16, weight: .medium))
         }
-        .frame(width: 50, alignment: .leading)
+        .frame(width: 66, alignment: .leading)
     }
 }
