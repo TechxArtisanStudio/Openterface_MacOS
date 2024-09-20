@@ -354,9 +354,9 @@ class PlayerViewModel: NSObject, ObservableObject {
             }
         }
         
-//        if self.audioDeviceId != nil {
-//            startAudioSession()
-//        }
+        if self.audioDeviceId != nil {
+            startAudioSession()
+        }
     }
 
     func addInput(_ input: AVCaptureInput) {
