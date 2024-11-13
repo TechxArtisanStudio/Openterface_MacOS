@@ -310,13 +310,30 @@ struct openterfaceApp: App {
                             ResolutionView(width: _resolution.width, height: _resolution.height, fps: _fps)
                         }
                         ToolbarItem(placement: .automatic) {
-                            Image(systemName: "keyboard.fill")
-                                .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
+                            Button(action: {
+                                // Add your code to execute when the button is clicked, e.g., open a window
+                                showUSBDevicesWindow()
+                            }) {
+                                HStack {
+                                    Image(systemName: "keyboard.fill")
+                                        .resizable()
+                                        .frame(width: 16, height: 12) // 调整图标大小
+                                        .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
+                                    Image(systemName: "computermouse.fill")
+                                        .resizable()
+                                        .frame(width: 10, height: 12) // 调整图标大小
+                                        .foregroundColor(colorForConnectionStatus(_isMouseConnected))
+                                }
+                            }
                         }
-                        ToolbarItem(placement: .automatic) {
-                            Image(systemName: "computermouse.fill")
-                                .foregroundColor(colorForConnectionStatus(_isMouseConnected))
-                        }
+//                        ToolbarItem(placement: .automatic) {
+//                            Image(systemName: "keyboard.fill")
+//                                .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
+//                        }
+//                        ToolbarItem(placement: .automatic) {
+//                            Image(systemName: "computermouse.fill")
+//                                .foregroundColor(colorForConnectionStatus(_isMouseConnected))
+//                        }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
                         }
@@ -435,6 +452,11 @@ struct openterfaceApp: App {
                     takeAreaOCRing()
                 }) {
                     Text("Area OCR")
+                }
+                Button(action: {
+                    showUSBDevicesWindow()
+                }) {
+                    Text("USB Info")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -609,4 +631,14 @@ struct CustomButtonStyle: ButtonStyle {
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.5)))
             .scaleEffect(configuration.isPressed ? 1.2 : 1)
     }
+}
+
+func showUSBDevicesWindow() {
+    let usbDevicesView = USBDevicesView()
+    let controller = NSHostingController(rootView: usbDevicesView)
+    let window = NSWindow(contentViewController: controller)
+    window.title = "USB Devices"
+    window.setContentSize(NSSize(width: 400, height: 600))
+    window.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
 }

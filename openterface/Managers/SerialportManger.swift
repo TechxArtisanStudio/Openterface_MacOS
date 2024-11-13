@@ -327,7 +327,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func openSerialPort(name: String, baudrate: Int) {
-        // 获取当前可用的串行端口
+        //Open Serial
         guard let availablePorts = ORSSerialPortManager.shared().availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
             Logger.shared.log(content: "No available serial ports found")
             return
@@ -335,11 +335,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
         self.serialPorts = availablePorts // Get the list of available serial ports
         
-        // 打印调试信息
+        // Print debug information
         Logger.shared.log(content: "Available Ports: \(self.serialPorts)")
         Logger.shared.log(content: "Looking for port with name: \(name)")
         
-        // 使用过滤器查找名称匹配的端口
+        // Use a filter to find ports that match the name
         guard let selectedPort = self.serialPorts.first(where: { $0.path.contains(name) }) else {
             Logger.shared.log(content: "No matching serial port found with name: \(name)")
             return

@@ -1,10 +1,3 @@
-//
-//  USBDevicesView.swift
-//  openterface
-//
-//  Created by Shawn on 2024/11/12.
-//
-
 import SwiftUI
 
 struct USBDevicesView: View {
@@ -36,4 +29,4 @@ struct USBDevicesView: View {
         }
         .padding()
     }
-}
+} 
