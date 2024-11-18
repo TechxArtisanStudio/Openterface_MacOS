@@ -36,7 +36,7 @@ struct AppStatus {
     static var isExit: Bool = false
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
-
+    
     static var isKeyboardConnected: Bool? = false
     static var isMouseConnected: Bool? = false
     static var isSwitchToHost: Bool?
@@ -63,6 +63,7 @@ struct AppStatus {
     static var USBDevices: [USBDeviceInfo] = []
     static var groupOpenterfaceDevices: [[USBDeviceInfo]] = []
     static var DefaultVideoDevice: USBDeviceInfo?
+    static var isMatchVideoDevice: Bool = false
     static var DefaultUSBSerial: USBDeviceInfo?
     static var isHIDOpen: Bool?
     static let logFileName: String = "info.log"

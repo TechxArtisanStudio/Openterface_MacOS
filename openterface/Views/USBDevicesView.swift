@@ -33,6 +33,19 @@ struct USBDevicesView: View {
                     }
                 }
             }
+            Text("DefaultVideoDevice")  
+                .font(.headline)
+            if let defaultDevice = AppStatus.DefaultVideoDevice {
+                VStack(alignment: .leading) {
+                    Text("Product Name: \(defaultDevice.productName)")
+                    Text("Vendor ID: \(defaultDevice.vendorID)")
+                    Text("Product ID: \(defaultDevice.productID)")
+                    Text("Location ID: \(defaultDevice.locationID)")
+                    Text("Is Match Video: \(AppStatus.isMatchVideoDevice)")
+                }
+            } else {
+                Text("No Default Video Device")
+            }
         }
         .padding()
     }

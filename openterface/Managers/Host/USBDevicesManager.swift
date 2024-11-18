@@ -37,8 +37,6 @@ class USBDeivcesManager {
         // 
         if !_d.isEmpty {
             AppStatus.USBDevices = _d
-            print("🔥🔥🔥")
-            print(_d)
         } else {
             print("No USB devices found")
             // 处理无设备情况，例如记录日志或显示错误提示
@@ -119,7 +117,6 @@ class USBDeivcesManager {
             if !groupedDevices.isEmpty {
                 AppStatus.groupOpenterfaceDevices = groupedDevices
             }
-            
             
             //setting default video and serial device
             if !groupedDevices.isEmpty {
