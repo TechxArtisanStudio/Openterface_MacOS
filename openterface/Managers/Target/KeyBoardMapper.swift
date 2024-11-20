@@ -227,6 +227,7 @@ class KeyboardMapper {
 
     func pressKey(keys: [UInt16], modifiers: NSEvent.ModifierFlags) {
         sendKeyData(keyCode: keys, isRelease: false, modifiers: modifiers)
+        print("🤮🤮🤮🤮🤮\(keys)")
         Logger.shared.log(content: "Send Key Data: \(keys)")
     }
     
@@ -245,6 +246,7 @@ class KeyboardMapper {
                 Logger.shared.log(content: "Warning: \(kc) is not mapped.")
             }
         }
+        print("🚗🚗🚗\(keyDat)")
 
         var combinedModifiers: UInt8 = 0
 

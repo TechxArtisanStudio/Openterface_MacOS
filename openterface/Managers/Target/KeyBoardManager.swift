@@ -31,6 +31,9 @@ class KeyboardManager {
     
     let kbm = KeyboardMapper()
     
+    // 使用数组来跟踪当前按下的按键
+    var pressedKeys: [UInt16] = []
+    
     init() {
         monitorKeyboardEvents()
     }
@@ -68,8 +71,19 @@ class KeyboardManager {
             let modifiers = event.modifierFlags
             self.kbm.pressKey(keys: [event.keyCode], modifiers: modifiers)
 
+            // 如果按键不在数组中，则添加
+            if !self.pressedKeys.contains(event.keyCode) {
+                self.pressedKeys.append(event.keyCode)
+            }
+            print("🔥🔥🔥🔥🔥Current pressed keys: \(self.pressedKeys)")
+
+            print("Key down: \(event.keyCode) with modifiers: \(self.modifierFlagsDescription(modifiers))")
+
             Logger.shared.writeLogFile(string: "key pressed: \(event.keyCode)")
-            
+
+            // 处理功能键的释放
+            self.handleModifierKeys(event: event)
+
             if event.keyCode == 53 {
                 for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
                     w.close()
@@ -111,8 +125,43 @@ class KeyboardManager {
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             self.kbm.releaseKey()
+
+            // 从数组中移除按键
+            if let index = self.pressedKeys.firstIndex(of: event.keyCode) {
+                self.pressedKeys.remove(at: index)
+            }
+            print("Current pressed keys: \(self.pressedKeys)")
+
+            print("💦💦💦Key up: \(event.keyCode) with modifiers: \(modifierDescription)")
+
             Logger.shared.log(content: "Modifiers: \(modifierDescription). Key release.")
             return nil
+        }
+    }
+
+    // 新增方法来处理功能键的状态变化
+    func handleModifierKeys(event: NSEvent) {
+        let modifierKeys: [UInt16] = [0x3B, 0x3A, 0x37, 0x36, 0x38, 0x3C] // Example key codes for Ctrl, Alt, Cmd, Shift
+        for keyCode in modifierKeys {
+            if !event.modifierFlags.contains(.control) && keyCode == 0x3B {
+                removeKeyFromPressedKeys(keyCode)
+            }
+            if !event.modifierFlags.contains(.option) && keyCode == 0x3A {
+                removeKeyFromPressedKeys(keyCode)
+            }
+            if !event.modifierFlags.contains(.command) && keyCode == 0x37 {
+                removeKeyFromPressedKeys(keyCode)
+            }
+            if !event.modifierFlags.contains(.shift) && keyCode == 0x38 {
+                removeKeyFromPressedKeys(keyCode)
+            }
+        }
+    }
+
+    // 辅助方法来从数组中移除按键
+    func removeKeyFromPressedKeys(_ keyCode: UInt16) {
+        if let index = self.pressedKeys.firstIndex(of: keyCode) {
+            self.pressedKeys.remove(at: index)
         }
     }
     
