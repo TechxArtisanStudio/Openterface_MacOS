@@ -72,15 +72,11 @@ class KeyboardManager {
             
             let capsLockIsOn = event.modifierFlags.contains(.capsLock)
             
-            print("✈️✈️✈️✈️✈️✈️")
-            print(capsLockIsOn)
             if !capsLockIsOn {
                 if let index = self.pressedKeys.firstIndex(of: 57) {
                     self.pressedKeys[index] = 255
                 }
             }
-            //print(event.keyCode)
-            print("✈️✈️✈️✈️✈️✈️")
             
             if event.keyCode == 53 {
                 for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
@@ -142,11 +138,9 @@ class KeyboardManager {
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             
             // 移除释放的键
-            print("🤮🤮🤮\(event.keyCode)")
             if let index = self.pressedKeys.firstIndex(of: event.keyCode) {
                 self.pressedKeys[index] = 255
             }
-            print(self.pressedKeys)
             
             self.kbm.releaseKey(keys: self.pressedKeys)
             Logger.shared.log(content: "Modifiers: \(modifierDescription). Key release.")

@@ -227,7 +227,7 @@ class KeyboardMapper {
 
     func pressKey(keys: [UInt16], modifiers: NSEvent.ModifierFlags) {
         sendKeyData(keyCode: keys, isRelease: false, modifiers: modifiers)
-        Logger.shared.log(content: "💦💦💦Send Key Data: \(keys)")
+        Logger.shared.log(content: "Send Key Data: \(keys)")
     }
     
     func releaseKey(keys: [UInt16]) {
@@ -240,10 +240,6 @@ class KeyboardMapper {
         print(keyCode)
         for (index, kc) in keyCode.prefix(6).enumerated() {
             if let mappedValue = keyCodeMapping[kc] {
-                print("🌈🌈🌈🌈🌈🌈🌈")
-                print(kc)
-                print(mappedValue)
-                print("🌈🌈🌈🌈🌈🌈🌈")
                 keyDat[7 + index] = mappedValue
             } else {
                 Logger.shared.log(content: "Warning: \(kc) is not mapped.")
@@ -283,13 +279,12 @@ class KeyboardMapper {
 
         keyDat[5] = combinedModifiers
         
-//        if isRelease {
-//            keyDat[7] = 0x00
-//        }
+        //        if isRelease {
+        //            keyDat[7] = 0x00
+        //        }
         
         keyDat[13] = calculateChecksum(data: keyDat)
         
-        print("🚗🚗🚗：\(keyDat)")
         let _ = self.spm.writeByte(data:keyDat)
     }
     
