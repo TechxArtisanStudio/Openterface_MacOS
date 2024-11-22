@@ -74,6 +74,11 @@ class KeyboardManager {
             
             print("✈️✈️✈️✈️✈️✈️")
             print(capsLockIsOn)
+            if !capsLockIsOn {
+                if let index = self.pressedKeys.firstIndex(of: 57) {
+                    self.pressedKeys[index] = 255
+                }
+            }
             //print(event.keyCode)
             print("✈️✈️✈️✈️✈️✈️")
             
