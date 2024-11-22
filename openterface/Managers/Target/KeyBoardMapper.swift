@@ -81,8 +81,8 @@ class KeyboardMapper {
         50: 0x35, // `
         43: 0x36, // ,
         47: 0x37, 65: 0x37, // .
-        44: 0x38, // /
-        57: 0x39, // caps lock
+        44: 0x38, //
+//        57: 0x39, // caps lock
         122: 0x3A, // f1
         120: 0x3B, // f2
         99: 0x3C, // f3
@@ -227,20 +227,24 @@ class KeyboardMapper {
 
     func pressKey(keys: [UInt16], modifiers: NSEvent.ModifierFlags) {
         sendKeyData(keyCode: keys, isRelease: false, modifiers: modifiers)
-        Logger.shared.log(content: "Send Key Data: \(keys)")
+        Logger.shared.log(content: "💦💦💦Send Key Data: \(keys)")
     }
     
-    func releaseKey() {
-        sendKeyData(keyCode: [], isRelease: true, modifiers: [])
+    func releaseKey(keys: [UInt16]) {
+        sendKeyData(keyCode: keys, isRelease: true, modifiers: [])
     }
     
 
     func sendKeyData(keyCode: [UInt16], isRelease: Bool, modifiers: NSEvent.ModifierFlags) {
         var keyDat: [UInt8] = [0x57, 0xAB, 0x00, 0x02, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        
-        for kc in keyCode {
+        print(keyCode)
+        for (index, kc) in keyCode.prefix(6).enumerated() {
             if let mappedValue = keyCodeMapping[kc] {
-                keyDat[7] = mappedValue
+                print("🌈🌈🌈🌈🌈🌈🌈")
+                print(kc)
+                print(mappedValue)
+                print("🌈🌈🌈🌈🌈🌈🌈")
+                keyDat[7 + index] = mappedValue
             } else {
                 Logger.shared.log(content: "Warning: \(kc) is not mapped.")
             }
@@ -279,12 +283,13 @@ class KeyboardMapper {
 
         keyDat[5] = combinedModifiers
         
-        if isRelease {
-            keyDat[7] = 0x00
-        }
+//        if isRelease {
+//            keyDat[7] = 0x00
+//        }
         
         keyDat[13] = calculateChecksum(data: keyDat)
         
+        print("🚗🚗🚗：\(keyDat)")
         let _ = self.spm.writeByte(data:keyDat)
     }
     

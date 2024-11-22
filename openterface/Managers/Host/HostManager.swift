@@ -37,7 +37,7 @@ class HostManager {
         if isKeyDown {
             km.pressKey(keys: [keyCode], modifiers: modifierFlags)
         } else {
-            km.releaseKey()
+            km.releaseKey(keys: [keyCode])
         }
     }
 

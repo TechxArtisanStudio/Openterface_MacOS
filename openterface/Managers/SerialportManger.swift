@@ -191,7 +191,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                     let errorDataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
                     let checksumHex = String(format: "%02X", checksum)
                     let chksumHex = String(format: "%02X", chksum)
-                    Logger.shared.log(content: "Checksum error, discard the data: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
+                    // Logger.shared.log(content: "Checksum error, discard the data: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
                 }
             }
         } else {
@@ -244,7 +244,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             let isScrollOn = (data[7] & 0x04) == 0x04
             AppStatus.isScrollOn = isScrollOn
             
-            Logger.shared.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
+            // Logger.shared.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
             
         case 0x82:  //Keyboard hid execution status 0 - success
             let kbStatus = data[5]

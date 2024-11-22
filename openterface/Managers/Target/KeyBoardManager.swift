@@ -31,6 +31,9 @@ class KeyboardManager {
     
     let kbm = KeyboardMapper()
     
+    // 新增一个数组用于存储同时按下的键
+    var pressedKeys: [UInt16] = [255,255,255,255,255,255]
+    
     init() {
         monitorKeyboardEvents()
     }
@@ -59,16 +62,15 @@ class KeyboardManager {
         kbm.pressKey(keys: keys, modifiers: modifiers)
     }
 
-    func releaseKey() {
-        kbm.releaseKey()
+    func releaseKey(keys: [UInt16]) {
+        kbm.releaseKey(keys: self.pressedKeys)
     }
 
     func monitorKeyboardEvents() {
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             let modifiers = event.modifierFlags
-            self.kbm.pressKey(keys: [event.keyCode], modifiers: modifiers)
-
-            Logger.shared.writeLogFile(string: "key pressed: \(event.keyCode)")
+            
+           
             
             if event.keyCode == 53 {
                 for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
@@ -104,13 +106,39 @@ class KeyboardManager {
                     }
                 }
             }
+            
+            
+            Logger.shared.log(content: "🔥🔥🔥key pressed: \(event.keyCode)")
+            // 先判断是否功能键ctrl alt option command 
+            // 例如 keycode 为：56，60，59，62，58，55，54 都不处理
+            let functionKeyCodes: [UInt16] = [56, 60, 59, 62, 58, 55, 54]
+            if !functionKeyCodes.contains(event.keyCode) {
+                // 先检查按键是否已经存在，如果按键不在数组中，则添加
+                if !self.pressedKeys.contains(event.keyCode) {
+                    // 记录按下的键
+                    if let index = self.pressedKeys.firstIndex(of: 255) {
+                        self.pressedKeys[index] = event.keyCode
+                    }
+                }
+            }
+            
+            
+            self.kbm.pressKey(keys: self.pressedKeys, modifiers: modifiers)
             return nil
         }
 
-        NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
+        NSEvent.addLocalMonitorForEvents(matching: [.keyUp, .flagsChanged]) { event in
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
-            self.kbm.releaseKey()
+            
+            // 移除释放的键
+            print("🤮🤮🤮\(event.keyCode)")
+            if let index = self.pressedKeys.firstIndex(of: event.keyCode) {
+                self.pressedKeys[index] = 255
+            }
+            print(self.pressedKeys)
+            
+            self.kbm.releaseKey(keys: self.pressedKeys)
             Logger.shared.log(content: "Modifiers: \(modifierDescription). Key release.")
             return nil
         }
@@ -129,7 +157,7 @@ class KeyboardManager {
             let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : []
             kbm.pressKey(keys: [key], modifiers: modifiers)
             Thread.sleep(forTimeInterval: 0.005) // 1 ms
-            kbm.releaseKey()
+            kbm.releaseKey(keys: self.pressedKeys)
             Thread.sleep(forTimeInterval: 0.01) // 5 ms
         }
     }
@@ -140,14 +168,14 @@ class KeyboardManager {
             if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
                 kbm.pressKey(keys: [key], modifiers: [.option, .control])
                 Thread.sleep(forTimeInterval: 0.005) // 1 ms
-                kbm.releaseKey()
+                kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
             }
         }else{
             if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
                 kbm.pressKey(keys: [key], modifiers: [])
                 Thread.sleep(forTimeInterval: 0.005) // 1 ms
-                kbm.releaseKey()
+                kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
             }
         }
