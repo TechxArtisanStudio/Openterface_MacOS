@@ -82,7 +82,7 @@ class KeyboardMapper {
         43: 0x36, // ,
         47: 0x37, 65: 0x37, // .
         44: 0x38, //
-//        57: 0x39, // caps lock
+        57: 0x39, // caps lock
         122: 0x3A, // f1
         120: 0x3B, // f2
         99: 0x3C, // f3

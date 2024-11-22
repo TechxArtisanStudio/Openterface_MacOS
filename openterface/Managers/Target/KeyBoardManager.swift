@@ -70,7 +70,12 @@ class KeyboardManager {
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             let modifiers = event.modifierFlags
             
-           
+            let capsLockIsOn = event.modifierFlags.contains(.capsLock)
+            
+            print("✈️✈️✈️✈️✈️✈️")
+            print(capsLockIsOn)
+            //print(event.keyCode)
+            print("✈️✈️✈️✈️✈️✈️")
             
             if event.keyCode == 53 {
                 for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
@@ -108,8 +113,8 @@ class KeyboardManager {
             }
             
             
-            Logger.shared.log(content: "🔥🔥🔥key pressed: \(event.keyCode)")
-            // 先判断是否功能键ctrl alt option command 
+            // Logger.shared.log(content: "🔥🔥🔥key pressed: \(event.keyCode)")
+            // 先判断是否功能键ctrl alt option command
             // 例如 keycode 为：56，60，59，62，58，55，54 都不处理
             let functionKeyCodes: [UInt16] = [56, 60, 59, 62, 58, 55, 54]
             if !functionKeyCodes.contains(event.keyCode) {
