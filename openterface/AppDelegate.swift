@@ -28,9 +28,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var hostmanager = HostManager()
     var keyboardManager = KeyboardManager.shared
 
-    var hid = HIDManager.shared
-
-    
     // var observation: NSKeyValueObservation?
     var log = Logger.shared
     
@@ -54,6 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             Logger.shared.log(content: "USB device management requires macOS 12.0 or later. Current functionality is limited.")
         }
 
+        // init HIDManager after USB device manager updated
+        _ = HIDManager.shared
+        
         NSApplication.shared.windows.forEach { window in
             if let windownName = window.identifier?.rawValue {
                 if windownName.contains(UserSettings.shared.mainWindownName) {
