@@ -51,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if #available(macOS 12.0, *) {
             USBDeivcesManager.shared.update()
         } else {
-            print("USBDeivcesManager.shared.update() is not available on macOS 12.0")
+            Logger.shared.log(content: "USB device management requires macOS 12.0 or later. Current functionality is limited.")
         }
 
         NSApplication.shared.windows.forEach { window in

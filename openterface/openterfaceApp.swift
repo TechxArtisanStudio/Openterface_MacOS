@@ -247,36 +247,6 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
-                        Button("T0", action: {
-                            print("TTT")
-                            let hid = HIDManager.shared
-                            hid.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
-                        })
-                            .buttonStyle(CustomButtonStyle())
-                            .onHover { hovering in
-                                if hovering {
-                                    // Mouse entered
-                                    AppStatus.isExit = true
-                                } else {
-                                    // Mouse exited
-                                    AppStatus.isExit = false
-                                }
-                            }
-                        Button("T1", action: {
-                                print("TTT")
-                                let hid = HIDManager.shared
-                                hid.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
-                            })
-                                .buttonStyle(CustomButtonStyle())
-                                .onHover { hovering in
-                                    if hovering {
-                                        // Mouse entered
-                                        AppStatus.isExit = true
-                                    } else {
-                                        // Mouse exited
-                                        AppStatus.isExit = false
-                                    }
-                                }
                     }
                 }
                 .padding()
@@ -498,11 +468,11 @@ struct openterfaceApp: App {
     
     private func handleSwitchToggle(isOn: Bool) {
         if isOn {
-            print("to Target model") // true
+            Logger.shared.log(content: "Switching USB connection to Target device")
             let hid = HIDManager.shared
             hid.setUSBtoTrager()
         } else {
-            print("to Host model") // false
+            Logger.shared.log(content: "Switching USB connection to Host device")
             let hid = HIDManager.shared
             hid.setUSBtoHost()
         }
