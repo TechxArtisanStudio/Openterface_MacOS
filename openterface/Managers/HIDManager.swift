@@ -26,7 +26,6 @@ import IOKit.usb
 import IOKit.hid
 
 class HIDManager {
-    // 单例模式
     static let shared = HIDManager()
     
     var manager: IOHIDManager!
@@ -34,10 +33,10 @@ class HIDManager {
     @Published var isOpen: Bool?
     
     private var timer: DispatchSourceTimer?
-    private let queue = DispatchQueue(label: "com.example.hidCommunicator", qos: .background)
+    private let queue = DispatchQueue(label: "com.openterface.hidCommunicator", qos: .background)
     
     private init() {
-        print(AppStatus.groupOpenterfaceDevices)
+        Logger.shared.log(content: "Detected Openterface devices: \(AppStatus.groupOpenterfaceDevices)")
         
         startHID()
         startCommunication()
@@ -49,47 +48,31 @@ class HIDManager {
                 openHID(vid: _v, pid: _p, lid: _l)
             }
         }else{
-            print("No HID device")
+            Logger.shared.log(content: "No HID device detected when start HID Manager.")
         }
     }
     
     func startCommunication() {
         AppStatus.isSwitchToggleOn = self.getSwitchStatus()
-//        if AppStatus.isSwitchToggleOn {
-//            
-//        } else {
-//            
-//        }
-//        
+  
         timer = DispatchSource.makeTimerSource(queue: queue)
         timer?.schedule(deadline: .now(), repeating: .seconds(1))
         timer?.setEventHandler { [weak self] in
             if AppStatus.isHIDOpen == nil {
-                print("no HID device")
+                Logger.shared.log(content: "No HID device detected during communication check")
             } else if AppStatus.isHIDOpen == false {
-                print("HID device has not been opened!")
+                Logger.shared.log(content: "HID device exists but failed to open - check device permissions and connectivity")
             } else {
                 //  HID has been opened!
-//                print(self?.getSwitchStatus() ?? "read HID Device data is worry!")
                 self?.getSwitchStatus()
-//                print(self?.getHDMIStatus() ?? "no hide status")
                 self?.getHDMIStatus()
                 if let _status = self?.getHardwareConnetionStatus() {
                     AppStatus.isHardwareConnetionToTarget = _status
                 }
-//                if AppStatus.isHardwareConnetionToTarget {
-//                    print("HW to Target")
-//                } else {
-//                    print("HW to Host")
-//                }
-//                print(self?.getResolution() ?? "nil")
+
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
-//                print(self?.getFps() ?? "nil")
                 AppStatus.hidReadFps = self?.getFps() ?? 0
-//                print(self?.getVersion() ?? "nil")
                 AppStatus.MS2109Version = self?.getVersion() ?? ""
-                
-                
             }
         }
         timer?.resume()
@@ -112,7 +95,7 @@ class HIDManager {
             // Open HID Manager
             let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             if result != kIOReturnSuccess {
-                print("Failed to open HID Manager")
+                Logger.shared.log(content: "Failed to open HID Manager with error code: \(result). Please check device permissions and connectivity.")
                 return
             }
             
@@ -136,15 +119,6 @@ class HIDManager {
         
     }
 
-//    // close hid device
-//    func closeHID() {
-//        if let device = self.device {
-//            IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
-//        }
-//        IOHIDManagerClose(self.manager, IOOptionBits(kIOHIDOptionsTypeNone))
-//        print("HID Manager closed")
-//    }
-//    
     func closeHID() {
         if let device = self.device {
             IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -154,13 +128,13 @@ class HIDManager {
             IOHIDManagerClose(self.manager, IOOptionBits(kIOHIDOptionsTypeNone))
             manager = nil
         }
-        print("HID Manager closed")
+        Logger.shared.log(content: "HID Manager and device connections closed successfully")
     }
     
     // read date from HID device
     func readHIDReport() -> [UInt8]? {
         guard let device = self.device else {
-            print("No HID device available")
+            Logger.shared.log(content: "Cannot read HID report - no HID device is currently connected or available")
             return nil
         }
 
@@ -170,10 +144,8 @@ class HIDManager {
         let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeInput, CFIndex(0), &report, &reportLength)
         
         if result == kIOReturnSuccess {
-            // print("HID Report read successfully")
             return Array(report[0..<reportLength])
         } else {
-            // print("Failed to read HID Report. Error: \(result)")
             return nil
         }
     }
@@ -184,17 +156,10 @@ class HIDManager {
         var report = report
 
         _ = IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, CFIndex(0), &report, report.count)
-        // if result == kIOReturnSuccess {
-        //     print("HID Report sent: \(report)")
-        // } else {
-        //     print("Failed to send HID Report")
-        // }
     }
     
     func sendAndReadHIDReport(_ report: [UInt8]) -> [UInt8]? {
-        // print(report)
         self.sendHIDReport(report: report)
-        // print(readHIDReport())
         return readHIDReport()
     }
     
@@ -264,7 +229,7 @@ class HIDManager {
               let widthLowResponse = self.sendAndReadHIDReport(widthLowReport),
               let heightHighResponse = self.sendAndReadHIDReport(heightHighReport),
               let heightLowResponse = self.sendAndReadHIDReport(heightLowReport) else {
-            print("Failed to read resolution data")
+            Logger.shared.log(content: "Failed to read resolution data from HID device. Check if device is properly connected.")
             return nil
         }
         
@@ -287,7 +252,7 @@ class HIDManager {
         
         guard let fpsHighResponse = self.sendAndReadHIDReport(fpsHighReport),
               let fpsLowResponse = self.sendAndReadHIDReport(fpsLowReport) else {
-            print("Failed to read FPS data")
+            Logger.shared.log(content: "Failed to read FPS data from HID device. Check if device is properly connected.")
             return nil
         }
         
@@ -309,7 +274,7 @@ class HIDManager {
               let _v2 = self.sendAndReadHIDReport(v2),
               let _v3 = self.sendAndReadHIDReport(v3),
               let _v4 = self.sendAndReadHIDReport(v4) else {
-            print("Failed to read resolution data")
+            Logger.shared.log(content: "Failed to read version data from HID device. Check if device is properly connected.")
             return nil
         }
 

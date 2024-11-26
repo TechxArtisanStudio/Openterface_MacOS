@@ -262,7 +262,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         if #available(macOS 12.0, *) {
             USBDeivcesManager.shared.update()
         } else {
-            print("USBDeivcesManager.shared.update() is not available on macOS 12.0")
+            Logger.shared.log(content: "Warning: USB device management requires macOS 12.0 or later. Current device status cannot be updated.")
         }
         
         captureSession.sessionPreset = .high // A preset value that indicates the quality level or bit rate of the output.

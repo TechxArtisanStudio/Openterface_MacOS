@@ -90,13 +90,11 @@ struct AppStatus {
 
     static func handleHardwareSwitchChange() {
         if isHardwareSwitchOn {
-            // print("Hardware switch to Target") // true
             if isSoftwareSwitchOn != isHardwareSwitchOn {
                 isSoftwareSwitchOn = isHardwareSwitchOn
                 AppStatus.isSwitchToggleOn = isHardwareSwitchOn
             }
         } else {
-            // print("Hardware switch to Host") // false
             if isSoftwareSwitchOn != isHardwareSwitchOn {
                 isSoftwareSwitchOn = isHardwareSwitchOn
                 AppStatus.isSwitchToggleOn = isHardwareSwitchOn
@@ -106,11 +104,10 @@ struct AppStatus {
     
     static func handleSoftwareSwitchChange() {
         if isSoftwareSwitchOn {
-            print("Software switch to Target") // true
+            Logger.shared.log(content: "Software switch toggled: Switching to Target device mode")
 
         } else {
-            print("Software switch to Host")  // false
-
+            Logger.shared.log(content: "Software switch toggled: Switching to Host device mode")
         }
     }
 }

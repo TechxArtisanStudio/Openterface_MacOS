@@ -38,7 +38,7 @@ class USBDeivcesManager {
         if !_d.isEmpty {
             AppStatus.USBDevices = _d
         } else {
-            print("No USB devices found")
+            Logger.shared.log(content: "USB device scan completed: No USB devices detected on the system")
             // 处理无设备情况，例如记录日志或显示错误提示
             Logger.shared.log(content: "No USB devices found")
         }
@@ -54,7 +54,7 @@ class USBDeivcesManager {
         var iterator: io_iterator_t = 0
         let kr = IOServiceGetMatchingServices(masterPort, matchingDict, &iterator)
         if kr != KERN_SUCCESS {
-            print("Error: Unable to get matching services")
+            Logger.shared.log(content: "Failed to get matching USB services. This may indicate issues with USB device enumeration or system permissions.")
             return devices
         }
 
@@ -129,7 +129,7 @@ class USBDeivcesManager {
                 }
             }
         } else {
-            print("tempGroup is nil")
+            Logger.shared.log(content: "No Openterface devices found in USB device list")
         }
     }
     

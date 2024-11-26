@@ -74,7 +74,7 @@ func captureFullScreen() -> NSImage? {
             do {
                 try imageRequestHandler.perform(requests)
             } catch let error {
-                print("Error: \(error)")
+                Logger.shared.log(content: "Failed to perform text detection on screenshot: \(error.localizedDescription)")
             }
         }
         
@@ -86,11 +86,11 @@ func captureFullScreen() -> NSImage? {
 
 func handleDetectedText(request: VNRequest?, error: Error?) {
     if let error = error {
-        print("ERROR: \(error)")
+        Logger.shared.log(content: "Text detection failed with error: \(error.localizedDescription)")
         return
     }
     guard let results = request?.results, results.count > 0 else {
-        print("No text found")
+        Logger.shared.log(content: "Text detection completed: No text found in screenshot")
         return
     }
     for result in results {
@@ -188,7 +188,7 @@ class ScreenshotOverlayView: NSView {
     
     func handleForPoint(_ point: NSPoint) -> ResizeHandle {
         guard let rect = selectionRect else { return .none }
-        print("rect: \(rect)")
+        Logger.shared.log(content: "Checking handle for point in selection rect: \(rect.origin), size: \(rect.size)")
         
         for handle in ResizeHandle.allCases {
             if let controlPoint = controlPointForHandle(handle, inRect: rect), NSRect(origin: controlPoint, size: CGSize(width: controlPointSize, height: controlPointSize)).contains(point) {

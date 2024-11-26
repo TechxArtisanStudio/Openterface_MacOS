@@ -61,7 +61,7 @@ class SCContext {
         } else {
             // Handle older macOS versions
             // Provide fallback mechanism or user instructions here.
-            print("ScreenCaptureKit is not available, provide an alternative.")
+            Logger.shared.log(content: "ScreenCaptureKit requires macOS 12.3 or later. Current functionality is limited.")
             return nil
         }
     }
@@ -72,7 +72,7 @@ class SCContext {
                 if let error = error {
                     switch error {
                     case SCStreamError.userDeclined: requestPermissions()
-                    default: print("Error: failed to fetch available content: ".local, error.localizedDescription)
+                    default: Logger.shared.log(content: "Failed to fetch available screen content for capture. Error: \(error.localizedDescription)")
                     }
                     return
                 }

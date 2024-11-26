@@ -237,7 +237,6 @@ class KeyboardMapper {
 
     func sendKeyData(keyCode: [UInt16], isRelease: Bool, modifiers: NSEvent.ModifierFlags) {
         var keyDat: [UInt8] = [0x57, 0xAB, 0x00, 0x02, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        print(keyCode)
         for (index, kc) in keyCode.prefix(6).enumerated() {
             if let mappedValue = keyCodeMapping[kc] {
                 keyDat[7 + index] = mappedValue
