@@ -126,6 +126,16 @@ class KeyboardMapper {
 //        ??: 0x62, // Numpad Insert
 //        ??: 0x63, // Numpad Delete
 //        ??: 0x65, // Numpad Apps
+         105: 0x46, // Print Screen
+         110: 0x65, // App
+         56: 0xE1, // Left Shift
+         60: 0xE5, // Right Shift
+         59: 0xE0, // Left Ctrl
+         62: 0xE4, // Right Ctrl
+         58: 0xE2, // Left Option, Left Alt
+         61: 0xE6, // Rigth Option, Right Alt
+         55: 0xE3, // Left Command, Left Win
+         54: 0xE7  // Right Command, Right Win
     ]
 
     let charMapping: [UInt16: UInt8] = [
