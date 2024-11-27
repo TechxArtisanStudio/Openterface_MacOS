@@ -53,7 +53,9 @@ class KeyboardManager {
         if flags.contains(.shift) {
             descriptions.append("Shift")
         }
-        
+        if flags.contains(.capsLock) {
+            descriptions.append("CapsLock")
+        }
         return descriptions.isEmpty ? "None" : descriptions.joined(separator: ", ")
     }
 
@@ -67,16 +69,169 @@ class KeyboardManager {
     }
 
     func monitorKeyboardEvents() {
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
             let modifiers = event.modifierFlags
+            let modifierDescription = self.modifierFlagsDescription(modifiers)
+            let capsLockState = modifiers.contains(.capsLock) ? "ON" : "OFF"
+            Logger.shared.log(content: "Modifier flags changed: \(modifierDescription), CapsLock: \(capsLockState)")
             
-            let capsLockIsOn = event.modifierFlags.contains(.capsLock)
-            
-            if !capsLockIsOn {
-                if let index = self.pressedKeys.firstIndex(of: 57) {
-                    self.pressedKeys[index] = 255
+            // Handle Shift keys
+            if modifiers.contains(.shift) {
+                let rawValue = modifiers.rawValue
+                if rawValue & 0x102 == 0x102 { // Left Shift
+                    if !self.pressedKeys.contains(56) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 56
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                } else if (rawValue & 0x104 == 0x104) { // Right Shift
+                    if !self.pressedKeys.contains(60) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 60
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                }
+            } else {
+                // Release Shift keys
+                if self.pressedKeys.contains(56) {
+                    if let index = self.pressedKeys.firstIndex(of: 56) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+                if self.pressedKeys.contains(60) {
+                    if let index = self.pressedKeys.firstIndex(of: 60) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
                 }
             }
+            
+            // Handle Control keys
+            if modifiers.contains(.control) {
+                let rawValue = modifiers.rawValue
+                if (rawValue & 0x101) == 0x101 { // Left Control
+                    if !self.pressedKeys.contains(59) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 59
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                } else if (rawValue & 0x2100) == 0x2100 { // Right Control
+                    if !self.pressedKeys.contains(62) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 62
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                }
+            } else {
+                // Release Control keys
+                if self.pressedKeys.contains(59) {
+                    if let index = self.pressedKeys.firstIndex(of: 59) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+                if self.pressedKeys.contains(62) {
+                    if let index = self.pressedKeys.firstIndex(of: 62) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+            }
+            
+            // Handle Option/Alt keys
+            if modifiers.contains(.option) {
+                let rawValue = modifiers.rawValue
+                if (rawValue & 0x120) == 0x120 { // Left Option
+                    if !self.pressedKeys.contains(58) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 58
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                } else if (rawValue & 0x140) == 0x140 { // Right Option
+                    if !self.pressedKeys.contains(61) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 61
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                }
+            } else {
+                // Release Option keys
+                if self.pressedKeys.contains(58) {
+                    if let index = self.pressedKeys.firstIndex(of: 58) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+                if self.pressedKeys.contains(61) {
+                    if let index = self.pressedKeys.firstIndex(of: 61) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+            }
+            
+            // Handle Command keys
+            if modifiers.contains(.command) {
+                let rawValue = modifiers.rawValue
+                if (rawValue & 0x108) == 0x108 { // Left Command
+                    if !self.pressedKeys.contains(55) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 55
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                } else if (rawValue & 0x110) == 0x110 { // Right Command
+                    if !self.pressedKeys.contains(54) {
+                        if let index = self.pressedKeys.firstIndex(of: 255) {
+                            self.pressedKeys[index] = 54
+                            self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+                        }
+                    }
+                }
+            } else {
+                // Release Command keys
+                if self.pressedKeys.contains(55) {
+                    if let index = self.pressedKeys.firstIndex(of: 55) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+                if self.pressedKeys.contains(54) {
+                    if let index = self.pressedKeys.firstIndex(of: 54) {
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+            }
+            
+            // Handle capsLock keys
+            if modifiers.contains(.capsLock) || modifiers.rawValue == 256 {
+                if !self.pressedKeys.contains(57) {
+                    if let index = self.pressedKeys.firstIndex(of: 255) {
+                        self.pressedKeys[index] = 57
+                        self.kbm.pressKey(keys: self.pressedKeys, modifiers: [])
+
+                        self.pressedKeys[index] = 255
+                        self.kbm.releaseKey(keys: self.pressedKeys)
+                    }
+                }
+            }
+            return nil
+        }
+        
+        NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            let modifiers = event.modifierFlags
+            let modifierDescription = self.modifierFlagsDescription(modifiers)
+            
+            // Log the key press with its keycode
+            Logger.shared.log(content: "Key pressed: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
             
             if event.keyCode == 53 {
                 for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
@@ -113,29 +268,22 @@ class KeyboardManager {
                 }
             }
             
-            
-            // Logger.shared.log(content: "🔥🔥🔥key pressed: \(event.keyCode)")
-            // 先判断是否功能键ctrl alt option command
-            // 例如 keycode 为：56，60，59，62，58，55，54 都不处理
-            let functionKeyCodes: [UInt16] = [56, 60, 59, 62, 58, 55, 54]
-            if !functionKeyCodes.contains(event.keyCode) {
-                // 先检查按键是否已经存在，如果按键不在数组中，则添加
-                if !self.pressedKeys.contains(event.keyCode) {
-                    // 记录按下的键
-                    if let index = self.pressedKeys.firstIndex(of: 255) {
-                        self.pressedKeys[index] = event.keyCode
-                    }
+            if !self.pressedKeys.contains(event.keyCode) {
+                if let index = self.pressedKeys.firstIndex(of: 255) {
+                    self.pressedKeys[index] = event.keyCode
                 }
             }
-            
             
             self.kbm.pressKey(keys: self.pressedKeys, modifiers: modifiers)
             return nil
         }
 
-        NSEvent.addLocalMonitorForEvents(matching: [.keyUp, .flagsChanged]) { event in
+        NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
+            
+            // Log the key release with its keycode
+            Logger.shared.log(content: "Key released: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
             
             // 移除释放的键
             if let index = self.pressedKeys.firstIndex(of: event.keyCode) {
@@ -143,7 +291,6 @@ class KeyboardManager {
             }
             
             self.kbm.releaseKey(keys: self.pressedKeys)
-            Logger.shared.log(content: "Modifiers: \(modifierDescription). Key release.")
             return nil
         }
     }
