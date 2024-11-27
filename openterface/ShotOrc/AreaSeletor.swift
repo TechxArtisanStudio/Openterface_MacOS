@@ -85,27 +85,42 @@ func captureFullScreen() -> NSImage? {
 }
 
 func handleDetectedText(request: VNRequest?, error: Error?) {
+    // Create the message first
+    let message: String
+    
     if let error = error {
         Logger.shared.log(content: "Text detection failed with error: \(error.localizedDescription)")
-        return
-    }
-    guard let results = request?.results, results.count > 0 else {
-        Logger.shared.log(content: "Text detection completed: No text found in screenshot")
-        return
-    }
-    for result in results {
-        if let observation = result as? VNRecognizedTextObservation {
-            for text in observation.topCandidates(1) {
-                copyTextToClipboard(text: text.string)
+        message = "OCR Failed"
+    } else if let results = request?.results, results.count > 0 {
+        var foundText = false
+        for result in results {
+            if let observation = result as? VNRecognizedTextObservation {
+                for text in observation.topCandidates(1) {
+                    copyTextToClipboard(text: text.string)
+                    foundText = true
+                    break
+                }
+                if foundText { break }
             }
         }
+        message = "Text Copied to Clipboard"
+    } else {
+        Logger.shared.log(content: "Text detection completed: No text found in screenshot")
+        message = "No Text Found"
+    }
+    
+    // Show notification on main thread
+    DispatchQueue.main.async {
+        TipLayerManager.shared.showTip(text: message, window: NSApp.mainWindow)
     }
 }
 
 func copyTextToClipboard(text: String) {
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(text, forType: .string)
+    DispatchQueue.main.async {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
 }
 
 @available(macOS 12.3, *)

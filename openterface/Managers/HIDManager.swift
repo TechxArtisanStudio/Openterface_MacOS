@@ -63,6 +63,7 @@ class HIDManager {
             } else if AppStatus.isHIDOpen == false {
                 Logger.shared.log(content: "HID device exists but failed to open - check device permissions and connectivity")
             } else {
+                // Get switch and HDMI status since HID device is now open and ready
                 //  HID has been opened!
                 self?.getSwitchStatus()
                 self?.getHDMIStatus()

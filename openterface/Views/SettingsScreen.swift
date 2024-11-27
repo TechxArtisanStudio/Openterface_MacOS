@@ -6,34 +6,35 @@
 //
 
 import SwiftUI
-
-import SwiftUI
 import KeyboardShortcuts
 
 struct SettingsScreen: View {
     var body: some View {
-//        Form {
-//            KeyboardShortcuts.Recorder("Exit relative mode:", name: .exitRelativeMode)
-//        }
-        Form{
-            KeyboardShortcuts.Recorder("Exit full screen mode", name: .exitFullScreenMode)
-        }
-        Form{
-            KeyboardShortcuts.Recorder("Trigger Area OCR", name: .triggerAreaOCR)
+        VStack {
+            Form {
+                KeyboardShortcuts.Recorder("Exit full screen mode", name: .exitFullScreenMode)
+            }
+            .padding(.horizontal, 50)
+            .padding(.vertical, 10)
+            
+            Form {
+                KeyboardShortcuts.Recorder("Trigger Area OCR", name: .triggerAreaOCR)
+            }
+            .padding(.horizontal, 50)
+            .padding(.vertical, 10)
         }
     }
 }
 
 class SettingsScreenWC<RootView : View>: NSWindowController, NSWindowDelegate {
     convenience init(rootView: RootView) {
-        let hostingController = NSHostingController(rootView: rootView.frame(width: 500, height: 500))
+        let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
         window.makeKey()
         window.orderFrontRegardless()
-        window.setContentSize(NSSize(width: 500, height: 500))
+        window.setContentSize(hostingController.sizeThatFits(in: NSSize(width: 500, height: CGFloat.infinity)))
 
         self.init(window: window)
-        // Set the window's delegate to self to receive close notifications
         self.window?.delegate = self
     }
 }
@@ -42,4 +43,8 @@ extension KeyboardShortcuts.Name {
     static let exitRelativeMode = Self("exitRelativeMode")
     static let exitFullScreenMode = Self("exitFullScreenMode")
     static let triggerAreaOCR = Self("triggerAreaOCR")
+}
+
+extension Notification.Name {
+    static let ocrComplete = Notification.Name("ocrComplete")
 }

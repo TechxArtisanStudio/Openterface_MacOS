@@ -30,8 +30,8 @@ struct openterfaceApp: App {
     
     @State private var relativeTitle = "Relative"
     @State private var absoluteTitle = "Absolute ✓"
-    @State private var logModeTitle = "LogMode"
-    @State private var mouseHideTitle = "Hide"
+    @State private var logModeTitle = "No logging ✓"
+    @State private var mouseHideTitle = "Auto-hide in Control Mode"
     
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
@@ -346,13 +346,13 @@ struct openterfaceApp: App {
         .commands { 
             // Customize menu
             CommandMenu("Settings") {
-                Menu("Mouse Setting") {
+                Menu("Cursor Behavior") {
                     Button(action: {
                         UserSettings.shared.isAbsoluteModeMouseHide = !UserSettings.shared.isAbsoluteModeMouseHide
                         if UserSettings.shared.isAbsoluteModeMouseHide {
-                            mouseHideTitle = "Unhide"
-                        }else{
-                            mouseHideTitle = "Hide"
+                            mouseHideTitle = "Always Show Host Cursor"
+                        } else {
+                            mouseHideTitle = "Auto-hide Host Cursor"
                         }
                     }, label: {
                         Text(mouseHideTitle)
@@ -377,29 +377,33 @@ struct openterfaceApp: App {
                         Text(absoluteTitle)
                     }
                 }
-                Menu("Show Log File"){
+                Menu("Logging Setting"){
                     Button(action: {
-                        AppStatus.isLogMode = !AppStatus.isLogMode
-                        
-                        if AppStatus.isLogMode {
-                            logModeTitle = "LogMode ✓"
-                            
-                            if log.checkLogFileExist() {
-                                log.openLogFile()
-                            } else {
-                                log.createLogFile()
-                            }
-                            log.logToFile = true
-                            log.writeLogFile(string: "Enable Log Mode!")
-                        } else {
-                            logModeTitle = "LogMode"
-                            log.writeLogFile(string: "Disable Log Mode!")
-                            log.closeLogFile()
-                            log.logToFile = false
-                        }
+                        AppStatus.isLogMode = false
+                        logModeTitle = "No logging ✓"
+                        log.writeLogFile(string: "Disable Log Mode!")
+                        log.closeLogFile()
+                        log.logToFile = false
                     }) {
-                        Text(logModeTitle)
+                        Text(logModeTitle == "No logging ✓" ? "No logging ✓" : "No logging")
                     }
+                    
+                    Button(action: {
+                        AppStatus.isLogMode = true
+                        logModeTitle = "Log to file ✓"
+                        if log.checkLogFileExist() {
+                            log.openLogFile()
+                        } else {
+                            log.createLogFile()
+                        }
+                        log.logToFile = true
+                        log.writeLogFile(string: "Enable Log Mode!")
+                    }) {
+                        Text(logModeTitle == "Log to file ✓" ? "Log to file ✓" : "Log to file")
+                    }
+                    
+                    Divider()
+                    
                     Button(action: {
                         var infoFilePath: URL?
                         let fileManager = FileManager.default
@@ -410,18 +414,18 @@ struct openterfaceApp: App {
                         
                         NSWorkspace.shared.selectFile(infoFilePath?.relativePath, inFileViewerRootedAtPath: "")
                     }) {
-                        Text("Open in Finder")
+                        Text("Reveal in Finder")
                     }
                 }
                 Button(action: {
                     showSetKeyWindow()
                 }) {
-                    Text("ShortKey")
+                    Text("Shortcut Keys")
                 }
                 Button(action: {
                     takeAreaOCRing()
                 }) {
-                    Text("Area OCR")
+                    Text("Target Screen OCR")
                 }
                 Button(action: {
                     showUSBDevicesWindow()
@@ -450,12 +454,13 @@ struct openterfaceApp: App {
         NSApp.activate(ignoringOtherApps: true)
         let detailView = SettingsScreen()
         let controller = SettingsScreenWC(rootView: detailView)
-        controller.window?.title = "Setting"
+        controller.window?.title = "Shortcut Keys Setting"
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: false)
     }
     
     private func colorForConnectionStatus(_ isConnected: Bool?) -> Color {
+        Logger.shared.log(content: "colorForConnectionStatus")
         switch isConnected {
         case .some(true):
             return Color(red: 124 / 255.0, green: 205 / 255.0, blue: 124 / 255.0)
@@ -467,6 +472,7 @@ struct openterfaceApp: App {
     }
     
     private func handleSwitchToggle(isOn: Bool) {
+        Logger.shared.log(content: "handleSwitchToggle")
         if isOn {
             Logger.shared.log(content: "Switching USB connection to Target device")
             let hid = HIDManager.shared
@@ -524,22 +530,32 @@ func hexStringToDecimalInt(hexString: String) -> Int? {
 
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {
-        AppStatus.isAreaOCRing = true
-        if #available(macOS 12.3, *) {
-            guard let screen = SCContext.getScreenWithMouse() else { return }
-            let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
-            screenshotWindow.title = "Area Selector".local
-            screenshotWindow.makeKeyAndOrderFront(nil)
-            screenshotWindow.orderFrontRegardless()
-        } else {
-            let alert = NSAlert()
-            alert.messageText = "OCR feature not available"
-            alert.informativeText = "OCR function is not available on this version of macOS. Please upgrade to macOS 12.3 or later."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Ok")
-            alert.runModal()
+        // Show tip before starting OCR
+        if let window = NSApplication.shared.mainWindow {
+            TipLayerManager.shared.showTip(
+                text: "Double Click to copy text from target",
+                window: window
+            )
         }
-
+        
+        // Wait a moment to let user read the tip, then start OCR
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            AppStatus.isAreaOCRing = true
+            if #available(macOS 12.3, *) {
+                guard let screen = SCContext.getScreenWithMouse() else { return }
+                let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
+                screenshotWindow.title = "Area Selector".local
+                screenshotWindow.makeKeyAndOrderFront(nil)
+                screenshotWindow.orderFrontRegardless()
+            } else {
+                let alert = NSAlert()
+                alert.messageText = "OCR feature not available"
+                alert.informativeText = "OCR function is not available on this version of macOS. Please upgrade to macOS 12.3 or later."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Ok")
+                alert.runModal()
+            }
+        }
     }
 }
 
