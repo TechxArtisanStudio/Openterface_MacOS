@@ -541,7 +541,6 @@ func takeAreaOCRing() {
         // Wait a moment to let user read the tip, then start OCR
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             AppStatus.isAreaOCRing = true
-            Logger.shared.log(content: "Start OCR...")
             if #available(macOS 12.3, *) {
                 guard let screen = SCContext.getScreenWithMouse() else { return }
                 let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
@@ -556,7 +555,6 @@ func takeAreaOCRing() {
                 alert.addButton(withTitle: "Ok")
                 alert.runModal()
             }
-            Logger.shared.log(content: "OCR completed.")
         }
     }
 }

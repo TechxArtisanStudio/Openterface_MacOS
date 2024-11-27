@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AppKit
 
 public class TipLayerManager {
     public static let shared = TipLayerManager()

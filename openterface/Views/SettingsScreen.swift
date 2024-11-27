@@ -6,22 +6,23 @@
 //
 
 import SwiftUI
-
-import SwiftUI
 import KeyboardShortcuts
 
 struct SettingsScreen: View {
     var body: some View {
-        Form{
-            KeyboardShortcuts.Recorder("Exit full screen mode", name: .exitFullScreenMode)
+        VStack {
+            Form {
+                KeyboardShortcuts.Recorder("Exit full screen mode", name: .exitFullScreenMode)
+            }
+            .padding(.horizontal, 50)
+            .padding(.vertical, 10)
+            
+            Form {
+                KeyboardShortcuts.Recorder("Trigger Area OCR", name: .triggerAreaOCR)
+            }
+            .padding(.horizontal, 50)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 50)
-        .padding(.vertical, 10)
-        Form{
-            KeyboardShortcuts.Recorder("Trigger Area OCR", name: .triggerAreaOCR)
-        }
-        .padding(.horizontal, 50)
-        .padding(.vertical, 10)
     }
 }
 
@@ -42,4 +43,8 @@ extension KeyboardShortcuts.Name {
     static let exitRelativeMode = Self("exitRelativeMode")
     static let exitFullScreenMode = Self("exitFullScreenMode")
     static let triggerAreaOCR = Self("triggerAreaOCR")
+}
+
+extension Notification.Name {
+    static let ocrComplete = Notification.Name("ocrComplete")
 }
