@@ -38,7 +38,7 @@ final class UserSettings: ObservableObject {
     @Published var viewHigh: Float
     @Published var edgeThreshold: CGFloat = 5
     @Published var isFullScreen: Bool
-    @Published var isAbsoluteModeMouseHide: Bool = true
+    @Published var isAbsoluteModeMouseHide: Bool = false
     @Published var mainWindownName: String = "main_openterface"
 }
 

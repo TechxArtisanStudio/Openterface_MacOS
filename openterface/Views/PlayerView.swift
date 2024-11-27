@@ -25,9 +25,16 @@ import AVFoundation
 import KeyboardShortcuts
 
 class PlayerView: NSView, NSWindowDelegate {
+    private let tipLayer = TipLayerManager.shared
     var previewLayer: AVCaptureVideoPreviewLayer?
     let playerBackgorundWarringLayer = CATextLayer()
     let playerBackgroundImage = CALayer()
+    
+    // Add these variables to track mouse movement
+    private var lastMouseEventTimestamp: TimeInterval = 0
+    private var lastMousePosition: NSPoint = .zero
+    private let minimumTimeBetweenEvents: TimeInterval = 0.016  // About 60fps
+    private let minimumMouseDelta: CGFloat = 1.0  // Minimum pixels moved to trigger event
     
     init(captureSession: AVCaptureSession) {
         super.init(frame: .zero)
@@ -61,98 +68,32 @@ class PlayerView: NSView, NSWindowDelegate {
         
         // observer full Screen Nootification
         playViewNtf.addObserver(self, selector: #selector(handleDidEnterFullScreenNotification(_:)), name: NSWindow.didEnterFullScreenNotification, object: nil)
-        playViewNtf.addObserver(self, selector: #selector(handleCustomNotification(_:)), name: .enableRelativeModeNotification, object: nil)
+        playViewNtf.addObserver(self, selector: #selector(promptUserHowToExitRelativeMode(_:)), name: .enableRelativeModeNotification, object: nil)
     }
     
-    func map(value: Double, inMin: Double, inMax: Double, outMin: Double, outMax: Double) -> Double {
-        // Prevent division by zero
-        guard inMax - inMin != 0 else { return outMin }
-      
-        // Calculate the input value's ratio within the input range
-        let inputScale = (value - inMin) / (inMax - inMin)
-      
-        // Map the input ratio to the output range
-        let outputValue = outMin + (outMax - outMin) * inputScale
-        return outputValue
-    }
-    
-    @objc func handleCustomNotification(_ notification: Notification) {
-        if let screen = NSScreen.main {
-            let screenSize = screen.frame.size
-            Logger.shared.log(content: "Screen resolution is \(screenSize.width) x \(screenSize.height)")
-
-            if let layer = self.layer {
-                let screenSize = self.bounds.size
-                let textLayer = CATextLayer()
-                let tips = "Press click「ESC」 multiple times to exit relative mode"
-                textLayer.string = tips
-                textLayer.fontSize = map(value: screenSize.width, inMin: 100, inMax: 2000, outMin: 10, outMax: 30)
-                textLayer.frame = CGRect(x: screenSize.width - CGFloat(CGFloat(tips.count) * textLayer.fontSize * 0.5), y: screenSize.height - textLayer.fontSize * 1.5 , width: CGFloat(CGFloat(tips.count) * textLayer.fontSize * 0.5), height: textLayer.fontSize * 1.5)
-                textLayer.foregroundColor = NSColor.white.cgColor
-                textLayer.backgroundColor = NSColor.black.cgColor
-                textLayer.alignmentMode = .center
-                textLayer.contentsScale = self.window?.backingScaleFactor ?? 1
-
-                layer.addSublayer(textLayer)
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    let fadeAnimation = CABasicAnimation(keyPath: "opacity")
-                    fadeAnimation.fromValue = 1.0
-                    fadeAnimation.toValue = 0.0
-                    fadeAnimation.duration = 5.0
-                    fadeAnimation.isRemovedOnCompletion = false
-                    fadeAnimation.fillMode = .forwards
-
-                    textLayer.add(fadeAnimation, forKey: nil)
-                }
-            }
+    @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
+        let tips = "Press click「ESC」 multiple times to exit relative mode"
+        if let window = self.window {
+            tipLayer.showTip(
+                text: tips,
+                window: window
+            )
         }
     }
     
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
-        if let screen = NSScreen.main {
-            let screenSize = screen.frame.size
-            Logger.shared.log(content: "Screen resolution is \(screenSize.width) x \(screenSize.height)")
-            
-            if let window = notification.object as? NSWindow  , let _ =  self.window?.contentView?.frame.size{
-                // NSEvent.addLocalMonitorForEvents(matching: NSEvent.EventTypeMask.keyDown, handler: myKeyDownEvent)
-                if window.styleMask.contains(.fullScreen) {
-                    let textLayer = CATextLayer()
-                    var description:String = ""
-                    if let shortcut = KeyboardShortcuts.getShortcut(for: .exitFullScreenMode) {
-                        description = "\(shortcut)"
-                    }
-                    let tips = "「\(String(describing: description))」exit to full screen"
-                    textLayer.string = tips
-                    textLayer.fontSize = map(value: screenSize.width, inMin: 100, inMax: 2000, outMin: 10, outMax: 30)
-                    
-                    let _x = screenSize.width - CGFloat(CGFloat(tips.count) * textLayer.fontSize * 0.6)
-                    let _y = screenSize.height - textLayer.fontSize * 6
-                    let _w = CGFloat(CGFloat(tips.count) * textLayer.fontSize * 0.5)
-                    let _h = textLayer.fontSize * 1.5
-                    
-                    textLayer.frame = CGRect(
-                        x: _x,
-                        y: _y ,
-                        width: _w,
-                        height: _h
-                    )
-                    
-                    textLayer.backgroundColor = NSColor.black.cgColor
-            
-                    self.previewLayer?.addSublayer(textLayer)
-            
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        let fadeAnimation = CABasicAnimation(keyPath: "opacity")
-                        fadeAnimation.fromValue = 1.0
-                        fadeAnimation.toValue = 0.0
-                        fadeAnimation.duration = 2.0
-                        fadeAnimation.isRemovedOnCompletion = false
-                        fadeAnimation.fillMode = .forwards
-                        
-                        textLayer.add(fadeAnimation, forKey: "opacityAnimation")
-                    }
+        if let window = notification.object as? NSWindow {
+            if window.styleMask.contains(.fullScreen) {
+                var description = ""
+                if let shortcut = KeyboardShortcuts.getShortcut(for: .exitFullScreenMode) {
+                    description = "\(shortcut)"
                 }
+                let tips = "「\(description)」exit to full screen"
+                tipLayer.showTip(
+                    text: tips,
+                    yOffset: 6.0,
+                    window: window
+                )
             }
         }
     }
@@ -187,7 +128,7 @@ class PlayerView: NSView, NSWindowDelegate {
     override func mouseUp(with event: NSEvent) {
         handleMouseMovement(with: event, mouseEvent: 0x00)
     }
-    
+
     override func rightMouseDown(with event: NSEvent) {
         handleMouseMovement(with: event, mouseEvent: 0x02)
     }
@@ -205,7 +146,22 @@ class PlayerView: NSView, NSWindowDelegate {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        handleMouseMovement(with: event, mouseEvent: 0x00)
+        // Filter duplicate events
+        let currentTime = ProcessInfo.processInfo.systemUptime
+        let currentPosition = event.locationInWindow
+        
+        // Check if enough time has passed and mouse has moved enough
+        let timeDelta = currentTime - lastMouseEventTimestamp
+        let positionDelta = hypot(currentPosition.x - lastMousePosition.x,
+                                currentPosition.y - lastMousePosition.y)
+        
+        if timeDelta >= minimumTimeBetweenEvents && positionDelta >= minimumMouseDelta {
+            handleMouseMovement(with: event, mouseEvent: 0x00)
+            
+            // Update tracking variables
+            lastMouseEventTimestamp = currentTime
+            lastMousePosition = currentPosition
+        }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -269,16 +225,22 @@ class PlayerView: NSView, NSWindowDelegate {
                 return
             }
             
+            let isDragging = event.type == .leftMouseDragged || 
+                            event.type == .rightMouseDragged || 
+                            event.type == .otherMouseDragged
+            
             HostManager.shared.handleRelativeMouseAction(dx: deltaX, dy: deltaY, 
-                                                        mouseEvent: mouseEvent, 
-                                                        wheelMovement: wheelMovement, 
-                                                        dragged: true)
+                                                       mouseEvent: mouseEvent, 
+                                                       wheelMovement: wheelMovement, 
+                                                       dragged: isDragging)
         } else {
             if AppStatus.isMouseInView {
                 let mouseLocation = convert(event.locationInWindow, from: nil)
                 let mouseX = Float(mouseLocation.x) / Float(self.frame.width) * 4096.0
                 let mouseY = 4096.0 - Float(mouseLocation.y) / Float(self.frame.height) * 4096.0
-                HostManager.shared.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+                HostManager.shared.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), 
+                                                           mouseEvent: mouseEvent, 
+                                                           wheelMovement: wheelMovement)
             }
         }
     }
@@ -287,6 +249,16 @@ class PlayerView: NSView, NSWindowDelegate {
         super.mouseEntered(with: event)
         // Logic for when the mouse enters the view
         AppStatus.isMouseInView = true
+
+        if UserSettings.shared.MouseControl == .absolute {
+            if UserSettings.shared.isAbsoluteModeMouseHide {
+                NSCursor.hide()
+                AppStatus.isCursorHidden = true
+            } else {
+                NSCursor.unhide()
+                AppStatus.isCursorHidden = false
+            }
+        }
         
         if let viewFrame = self.previewLayer {
             AppStatus.currentView = viewFrame.frame
@@ -301,6 +273,10 @@ class PlayerView: NSView, NSWindowDelegate {
         // Logic for when the mouse exits the view
         AppStatus.isMouseInView = false
         
+        if UserSettings.shared.MouseControl == .absolute {
+            NSCursor.unhide()
+        }
+
         if UserSettings.shared.MouseControl == .relative && AppStatus.isFouceWindow {
             HostManager.shared.moveToAppCenter()
         }
