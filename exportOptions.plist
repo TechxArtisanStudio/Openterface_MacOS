@@ -6,5 +6,9 @@
     <string>mac-application</string>
     <key>teamID</key>
     <string>NXWD68TXUQ</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>signingCertificate</key>
+    <string>Apple Development</string>
 </dict>
 </plist> 
