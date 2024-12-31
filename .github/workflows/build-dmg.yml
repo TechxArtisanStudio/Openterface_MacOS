@@ -18,8 +18,8 @@ jobs:
     # Install the Apple certificate and provisioning profile
     - name: Install Apple Certificate
       env:
-        BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-        P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+        PRIVATE_KEY_BASE64: ${{ secrets.PRIVATE_KEY_BASE64 }}
         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       run: |
         # Create keychain
@@ -27,13 +27,32 @@ jobs:
         security default-keychain -s build.keychain
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
         
-        # Import certificate
-        echo $BUILD_CERTIFICATE_BASE64 | base64 --decode > certificate.p12
-        security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+        # Import certificate and private key
+        echo $CERTIFICATE_BASE64 | base64 --decode > certificate.pem
+        echo $PRIVATE_KEY_BASE64 | base64 --decode > private_key.pem
+        
+        # Convert PEM to P12
+        openssl pkcs12 -export \
+          -in certificate.pem \
+          -inkey private_key.pem \
+          -out certificate.p12 \
+          -passout pass:temp_password
+        
+        # Import into keychain
+        security import certificate.p12 \
+          -k build.keychain \
+          -P temp_password \
+          -T /usr/bin/codesign
+        
+        # Set keychain settings
+        security set-keychain-settings -t 3600 -l ~/Library/Keychains/build.keychain
+        
+        # Unlock keychain and allow codesign to access it
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
         
-        # Allow xcodebuild to access keychain
-        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+        # Verify certificate
+        security find-identity -v -p codesigning build.keychain
     
     # Build the macOS app using xcodebuild
     - name: Build macOS App
@@ -94,7 +113,7 @@ jobs:
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v3
       with:
-        name: app-dmg
+        name: Openterface-dmg
         path: build/*.dmg
         
     # Create a release if tagged
@@ -113,3 +132,9 @@ jobs:
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node- 
+
+    - name: Debug Certificates
+      run: |
+        security find-identity -v -p codesigning
+        security list-keychains
+        security show-keychain-info build.keychain 
