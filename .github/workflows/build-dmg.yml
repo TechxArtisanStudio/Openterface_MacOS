@@ -1,0 +1,80 @@
+name: Build DMG
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allows manual trigger from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    # Build the macOS app using xcodebuild
+    - name: Build macOS App
+      run: |
+        xcodebuild -scheme "openterface" -configuration Release -archivePath "build/Openterface.xcarchive" archive
+        xcodebuild -exportArchive -archivePath "build/Openterface.xcarchive" -exportPath "build/export" -exportOptionsPlist exportOptions.plist
+
+    # Create DMG using create-dmg
+    - name: Install create-dmg
+      run: brew install create-dmg
+
+    - name: Install Apple Certificate
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+        P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        # Create keychain
+        security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        
+        # Import certificate
+        echo $BUILD_CERTIFICATE_BASE64 | base64 --decode > certificate.p12
+        security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+    - name: Create DMG
+      run: |
+        create-dmg \
+          --volname "Openterface" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --icon "Openterface.app" 200 190 \
+          --hide-extension "Openterface.app" \
+          --app-drop-link 600 185 \
+          "build/Openterface.dmg" \
+          "build/export/Openterface.app"
+        
+    # Upload DMG as artifact
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-dmg
+        path: build/*.dmg
+        
+    # Create a release if tagged
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/*.dmg
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+
+    - name: Cache node modules
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node- 

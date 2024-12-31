@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "make": "electron-builder --mac dmg"
+  },
+  "build": {
+    "mac": {
+      "target": "dmg"
+    }
+  }
+} 
