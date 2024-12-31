@@ -44,14 +44,34 @@ jobs:
           -configuration Release \
           -archivePath "build/Openterface.xcarchive" \
           archive \
-          CODE_SIGN_IDENTITY="Apple Development" \
-          CODE_SIGN_STYLE="Automatic" \
+          CODE_SIGN_IDENTITY="Developer ID Application" \
+          CODE_SIGN_STYLE="Manual" \
           DEVELOPMENT_TEAM="NXWD68TXUQ"
         
         xcodebuild -exportArchive \
           -archivePath "build/Openterface.xcarchive" \
           -exportPath "build/export" \
           -exportOptionsPlist exportOptions.plist
+
+    # Notarize the app
+    - name: Notarize App
+      env:
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      run: |
+        # Create temporary keychain
+        xcrun notarytool store-credentials "notarytool-profile" \
+          --apple-id "$APPLE_ID" \
+          --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+          --team-id "NXWD68TXUQ"
+        
+        # Submit app for notarization
+        xcrun notarytool submit "build/export/Openterface.app" \
+          --keychain-profile "notarytool-profile" \
+          --wait
+        
+        # Staple the notarization ticket
+        xcrun stapler staple "build/export/Openterface.app"
 
     # Create DMG using create-dmg
     - name: Install create-dmg
