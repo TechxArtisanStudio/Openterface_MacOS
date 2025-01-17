@@ -92,8 +92,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        var newSize: NSSize = targetFrameSize
-        newSize.height = (AppStatus.currentView.width / (AppStatus.videoDimensions.width / AppStatus.videoDimensions.height)) + (AppStatus.currentWindow.height - AppStatus.currentView.height)
+        // Calculate target aspect ratio
+        let targetAspectRatio = aspectRatio.width / aspectRatio.height
+        
+        // Get the screen that contains the window
+        guard let screen = sender.screen ?? NSScreen.main else { return targetFrameSize }
+        let screenFrame = screen.visibleFrame
+        
+        // Calculate new size maintaining aspect ratio
+        var newSize = targetFrameSize
+        
+        // Calculate height based on width to maintain aspect ratio
+        let heightFromWidth = targetFrameSize.width / targetAspectRatio
+        // Calculate width based on height to maintain aspect ratio
+        let widthFromHeight = targetFrameSize.height * targetAspectRatio
+        
+        // Choose the smaller dimension to ensure window fits within screen
+        if heightFromWidth <= screenFrame.height {
+            newSize.height = heightFromWidth
+        } else {
+            newSize.width = widthFromHeight
+        }
+        
+        // Ensure size doesn't exceed screen bounds
+        newSize.width = min(newSize.width, screenFrame.width * 0.9)
+        newSize.height = min(newSize.height, screenFrame.height * 0.9)
+        
+        // Ensure size doesn't go below minimum
+        newSize.width = max(newSize.width, sender.minSize.width)
+        newSize.height = max(newSize.height, sender.minSize.height)
+        
         return newSize
     }
 
@@ -103,6 +131,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func windowDidEndLiveResize(_ notification: Notification) {
          
+    }
+
+    // Handle window moving between screens
+    func windowDidChangeScreen(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              let screen = window.screen else { return }
+        
+        let screenFrame = screen.visibleFrame
+        let currentFrame = window.frame
+        
+        // Calculate the current aspect ratio of the window
+        let currentAspectRatio = currentFrame.width / currentFrame.height
+        let targetAspectRatio = aspectRatio.width / aspectRatio.height
+        
+        // Check if aspect ratio is significantly different (allowing for small floating point differences)
+        if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
+            // Calculate new size that fits the screen while maintaining aspect ratio
+            let maxPossibleWidth = screenFrame.width * 0.9
+            let maxPossibleHeight = screenFrame.height * 0.9
+            
+            let newSize: NSSize
+            if maxPossibleWidth / targetAspectRatio <= maxPossibleHeight {
+                // Width is the limiting factor
+                newSize = NSSize(
+                    width: maxPossibleWidth,
+                    height: maxPossibleWidth / targetAspectRatio
+                )
+            } else {
+                // Height is the limiting factor
+                newSize = NSSize(
+                    width: maxPossibleHeight * targetAspectRatio,
+                    height: maxPossibleHeight
+                )
+            }
+            
+            // Ensure the new size is not smaller than minimum allowed
+            let finalSize = NSSize(
+                width: max(newSize.width, window.minSize.width),
+                height: max(newSize.height, window.minSize.height)
+            )
+            
+            // Calculate center position on new screen
+            let newX = screenFrame.origin.x + (screenFrame.width - finalSize.width) / 2
+            let newY = screenFrame.origin.y + (screenFrame.height - finalSize.height) / 2
+            
+            let newFrame = NSRect(
+                x: newX,
+                y: newY,
+                width: finalSize.width,
+                height: finalSize.height
+            )
+            
+            window.setFrame(newFrame, display: true, animate: true)
+        }
     }
 
     // click on window close button to exit the programme
