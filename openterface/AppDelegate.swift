@@ -59,12 +59,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 if windownName.contains(UserSettings.shared.mainWindownName) {
                     window.delegate = self
                     window.backgroundColor = NSColor.fromHex("#000000")
-                    window.styleMask.remove(.resizable)
                     
-                    let fixedSize = aspectRatio
-                    window.setContentSize(fixedSize)
-                    window.minSize = fixedSize
-                    window.maxSize = fixedSize
+                    // Allow window resizing but maintain aspect ratio
+                    window.styleMask.insert(.resizable)
+                    
+                    let initialSize = aspectRatio
+                    window.setContentSize(initialSize)
+                    
+                    // Set minimum size to prevent too small windows
+                    window.minSize = NSSize(width: aspectRatio.width / 2, height: aspectRatio.height / 2)
+                    // Set maximum size to something reasonable (2x initial size)
+                    window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
                     
                     window.center()
                 }
@@ -115,6 +120,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     func applicationWillUpdate(_ notification: Notification) {
         
+    }
+    
+    // Add window zoom control
+    func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
+        let currentFrame = sender.frame
+        
+        // If window is at normal size, zoom to maximum
+        if currentFrame.size.width == aspectRatio.width {
+            let maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
+            let maxFrame = NSRect(
+                x: currentFrame.origin.x,
+                y: currentFrame.origin.y - (maxSize.height - currentFrame.height),
+                width: maxSize.width,
+                height: maxSize.height
+            )
+            sender.setFrame(maxFrame, display: true, animate: true)
+        } else {
+            // Return to normal size
+            let normalFrame = NSRect(
+                x: currentFrame.origin.x,
+                y: currentFrame.origin.y + (currentFrame.height - aspectRatio.height) / 2,
+                width: aspectRatio.width,
+                height: aspectRatio.height
+            )
+            sender.setFrame(normalFrame, display: true, animate: true)
+        }
+        
+        return false
     }
 }
 
