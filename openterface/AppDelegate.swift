@@ -126,21 +126,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
         let currentFrame = sender.frame
         
+        // Get the screen that contains the window
+        guard let screen = sender.screen ?? NSScreen.main else { return false }
+        let screenFrame = screen.visibleFrame
+        
         // If window is at normal size, zoom to maximum
         if currentFrame.size.width == aspectRatio.width {
-            let maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
+            // Calculate maximum possible size while maintaining aspect ratio
+            let maxPossibleWidth = screenFrame.width * 0.9  // Leave 10% margin
+            let maxPossibleHeight = screenFrame.height * 0.9 // Leave 10% margin
+            
+            // Calculate size based on aspect ratio constraints
+            let aspectRatioValue = aspectRatio.width / aspectRatio.height
+            let maxSize: NSSize
+            
+            if maxPossibleWidth / aspectRatioValue <= maxPossibleHeight {
+                // Width is the limiting factor
+                maxSize = NSSize(
+                    width: maxPossibleWidth,
+                    height: maxPossibleWidth / aspectRatioValue
+                )
+            } else {
+                // Height is the limiting factor
+                maxSize = NSSize(
+                    width: maxPossibleHeight * aspectRatioValue,
+                    height: maxPossibleHeight
+                )
+            }
+            
+            // Calculate center position
+            let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
+            let newY = screenFrame.origin.y + (screenFrame.height - maxSize.height) / 2
+            
             let maxFrame = NSRect(
-                x: currentFrame.origin.x,
-                y: currentFrame.origin.y - (maxSize.height - currentFrame.height),
+                x: newX,
+                y: newY,
                 width: maxSize.width,
                 height: maxSize.height
             )
             sender.setFrame(maxFrame, display: true, animate: true)
         } else {
             // Return to normal size
+            // Calculate center position for normal size
+            let newX = screenFrame.origin.x + (screenFrame.width - aspectRatio.width) / 2
+            let newY = screenFrame.origin.y + (screenFrame.height - aspectRatio.height) / 2
+            
             let normalFrame = NSRect(
-                x: currentFrame.origin.x,
-                y: currentFrame.origin.y + (currentFrame.height - aspectRatio.height) / 2,
+                x: newX,
+                y: newY,
                 width: aspectRatio.width,
                 height: aspectRatio.height
             )
