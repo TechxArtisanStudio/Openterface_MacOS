@@ -41,7 +41,7 @@ struct USBDevicesView: View {
                     Text("Vendor ID: \(defaultDevice.vendorID)")
                     Text("Product ID: \(defaultDevice.productID)")
                     Text("Location ID: \(defaultDevice.locationID)")
-                    Text("Is Match Video: \(AppStatus.isMatchVideoDevice)")
+                    Text("Is Match Video: \(String(AppStatus.isMatchVideoDevice))")
                 }
             } else {
                 Text("No Default Video Device")

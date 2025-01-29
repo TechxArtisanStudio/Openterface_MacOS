@@ -112,7 +112,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         }
 
         for deviceID in deviceIDs {
-            var nameSize: UInt32 = 0
+            var nameSize = UInt32(MemoryLayout<CFString>.size)
             var nameAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioDevicePropertyDeviceNameCFString,
                 mScope: kAudioObjectPropertyScopeGlobal,
@@ -125,14 +125,21 @@ class PlayerViewModel: NSObject, ObservableObject {
                 continue
             }
 
-            var deviceName: CFString = "" as CFString
-            result = AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &deviceName)
+            var deviceName: Unmanaged<CFString>?
+            result = AudioObjectGetPropertyData(
+                deviceID,
+                &nameAddress,
+                0,
+                nil,
+                &nameSize,
+                &deviceName
+            )
             guard result == noErr else {
                 Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyData")
                 continue
             }
-
-            if deviceName as String == name {
+            
+            if let cfString = deviceName?.takeRetainedValue() as String?, cfString == name {
                 return deviceID
             }
         }
