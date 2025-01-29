@@ -72,8 +72,7 @@ class KeyboardManager {
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
-            let capsLockState = modifiers.contains(.capsLock) ? "ON" : "OFF"
-            Logger.shared.log(content: "Modifier flags changed: \(modifierDescription), CapsLock: \(capsLockState)")
+            Logger.shared.log(content: "Modifier flags changed: \(modifierDescription), CapsLock toggle: \(modifiers.contains(.capsLock))")
             
             // Handle Shift keys
             if modifiers.contains(.shift) {
@@ -212,7 +211,7 @@ class KeyboardManager {
             }
             
             // Handle capsLock keys
-            if modifiers.contains(.capsLock) || modifiers.rawValue == 256 {
+            if modifiers.contains(.capsLock) {
                 if !self.pressedKeys.contains(57) {
                     if let index = self.pressedKeys.firstIndex(of: 255) {
                         self.pressedKeys[index] = 57
