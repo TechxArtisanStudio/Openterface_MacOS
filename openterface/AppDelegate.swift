@@ -92,43 +92,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        // 获取工具栏的高度（如果可见）
+        // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
-        // 计算目标宽高比
+        // Calculate the target aspect ratio
         let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
         
         let defaultAspectRatio = aspectRatio.width / aspectRatio.height
         
         
-        // 获取包含窗口的屏幕
+        // Get the screen containing the window
         guard let screen = sender.screen ?? NSScreen.main else { return targetFrameSize }
         let screenFrame = screen.visibleFrame
         
-        // 计算保持内容区域宽高比的新尺寸
+        // Calculate new size maintaining content area aspect ratio
         var newSize = targetFrameSize
         
-        // 调整高度计算以考虑工具栏
+        // Adjust height calculation to account for the toolbar
         let contentHeight = targetFrameSize.height - toolbarHeight
         let contentWidth = targetFrameSize.width
         
-        // 根据宽高比计算内容尺寸
+        // Calculate content size based on aspect ratio
         let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
         let heightFromWidth = (contentWidth / CGFloat(aspectRatioToUse))
         let widthFromHeight = (contentHeight * CGFloat(aspectRatioToUse))
         
-        // 选择较小的尺寸以确保窗口适合屏幕
+        // Choose the smaller size to ensure the window fits the screen
         if heightFromWidth + toolbarHeight <= screenFrame.height {
             newSize.height = heightFromWidth + toolbarHeight
         } else {
             newSize.width = widthFromHeight
         }
 
-        // 确保尺寸不超过屏幕边界
+        // Ensure the size does not exceed screen boundaries
         newSize.width = min(newSize.width, screenFrame.width * 1)
         newSize.height = min(newSize.height, screenFrame.height * 1)
         
-        // 确保尺寸不低于最小值（考虑工具栏）
+        // Ensure the size is not below the minimum (considering the toolbar)
         let minContentHeight = sender.minSize.height - toolbarHeight
         let minContentWidth = sender.minSize.width
         newSize.width = max(newSize.width, minContentWidth)
@@ -147,7 +147,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     // Handle window moving between screens
     func windowDidChangeScreen(_ notification: Notification) {
-        
         guard let window = notification.object as? NSWindow,
               let screen = window.screen else { return }
         
@@ -219,35 +218,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // Add window zoom control
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
+        // Print debug information
+        print("💦💦💦💦💦")
+        
+        // Get the current window frame
         let currentFrame = sender.frame
         
-        // Get the screen that contains the window
+        // Get the screen containing the window, return false if none
         guard let screen = sender.screen ?? NSScreen.main else { return false }
+        
+        // Get the visible frame of the screen
         let screenFrame = screen.visibleFrame
         
-        // Get the toolbar height if visible
+        // Get the height of the toolbar if visible
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
-        // If window is at normal size, zoom to maximum
-        if abs(currentFrame.size.width - aspectRatio.width) < 1.0 {
-            // Calculate maximum possible size while maintaining aspect ratio
+        // Calculate target aspect ratio
+        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+        let defaultAspectRatio = aspectRatio.width / aspectRatio.height
+        // Calculate content size based on aspect ratio
+        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
+        
+        // If the window is at normal size, zoom to maximum
+        print(currentFrame.size.width)
+        if currentFrame.size.width  < aspectRatio.width {
+            
+            // Calculate the maximum possible width while maintaining aspect ratio
             let maxPossibleWidth = screenFrame.width * 1
+            // Calculate the maximum possible height while maintaining aspect ratio
             let maxPossibleHeight = (screenFrame.height - toolbarHeight) * 1
             
-            // Calculate size based on aspect ratio constraints
-            let aspectRatioValue = aspectRatio.width / aspectRatio.height
+            // Calculate maximum size
             let maxSize: NSSize
             
-            if maxPossibleWidth / aspectRatioValue <= maxPossibleHeight {
+            // Determine if width is the limiting factor
+            if maxPossibleWidth / aspectRatioToUse <= maxPossibleHeight {
                 // Width is the limiting factor
                 maxSize = NSSize(
                     width: maxPossibleWidth,
-                    height: (maxPossibleWidth / aspectRatioValue) + toolbarHeight
+                    height: (maxPossibleWidth / aspectRatioToUse) + toolbarHeight
                 )
             } else {
                 // Height is the limiting factor
                 maxSize = NSSize(
-                    width: maxPossibleHeight * aspectRatioValue,
+                    width: maxPossibleHeight * aspectRatioToUse,
                     height: maxPossibleHeight + toolbarHeight
                 )
             }
@@ -256,6 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - maxSize.height) / 2
             
+            // Set the maximum frame of the window
             let maxFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -266,14 +281,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         } else {
             // Return to normal size
             // Calculate center position for normal size
-            let normalSize = NSSize(
-                width: aspectRatio.width,
-                height: aspectRatio.height + toolbarHeight
-            )
+            let normalSize: NSSize
+            if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+                normalSize = NSSize(
+                    width: CGFloat(AppStatus.hidReadResolusion.width) / 2,
+                    height: CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
+                )
+            } else {
+                normalSize = NSSize(
+                    width: aspectRatio.width,
+                    height: aspectRatio.height + toolbarHeight
+                )
+            }
             
             let newX = screenFrame.origin.x + (screenFrame.width - normalSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - normalSize.height) / 2
             
+            // Set the normal frame of the window
             let normalFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -283,6 +307,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             sender.setFrame(normalFrame, display: true, animate: true)
         }
         
+        // Return false to indicate not using the default zoom behavior
         return false
     }
 }
