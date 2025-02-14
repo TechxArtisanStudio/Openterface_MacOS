@@ -219,7 +219,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // Add window zoom control
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
         // Print debug information
-        print("💦💦💦💦💦")
         
         // Get the current window frame
         let currentFrame = sender.frame
@@ -241,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // If the window is at normal size, zoom to maximum
         print(currentFrame.size.width)
-        if currentFrame.size.width  < aspectRatio.width {
+        if currentFrame.size.width  <= aspectRatio.width {
             
             // Calculate the maximum possible width while maintaining aspect ratio
             let maxPossibleWidth = screenFrame.width * 1
