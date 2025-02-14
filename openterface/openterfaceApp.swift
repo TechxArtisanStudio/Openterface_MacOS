@@ -473,6 +473,8 @@ struct openterfaceApp: App {
     
     private func handleSwitchToggle(isOn: Bool) {
         Logger.shared.log(content: "handleSwitchToggle")
+
+
         if isOn {
             Logger.shared.log(content: "Switching USB connection to Target device")
             let hid = HIDManager.shared
@@ -482,9 +484,16 @@ struct openterfaceApp: App {
             let hid = HIDManager.shared
             hid.setUSBtoHost()
         }
-
+        
         // update AppStatus
         AppStatus.isSwitchToggleOn = isOn
+        
+        let ser = SerialPortManager.shared
+        ser.raiseDTR()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            ser.lowerDTR()
+        }
     }
 }
 

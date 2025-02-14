@@ -426,4 +426,24 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     func getHidInfo(){
         self.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO)
     }
+    
+    // 添加设置 DTR 的方法
+    func setDTR(_ enabled: Bool) {
+        if let port = self.serialPort {
+            port.dtr = enabled
+            Logger.shared.log(content: "Set DTR to: \(enabled)")
+        } else {
+            Logger.shared.log(content: "Cannot set DTR: Serial port not available")
+        }
+    }
+    
+    // 可选：添加一个快捷方法来拉低 DTR
+    func lowerDTR() {
+        setDTR(false)
+    }
+    
+    // 可选：添加一个快捷方法来拉高 DTR
+    func raiseDTR() {
+        setDTR(true)
+    }
 }
