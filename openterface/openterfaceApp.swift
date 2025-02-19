@@ -432,6 +432,11 @@ struct openterfaceApp: App {
                 }) {
                     Text("USB Info")
                 }
+                Button(action: {
+                    resetFactoryHIDbySerial()
+                }) {
+                    Text("Reset HID(keyboard)")
+                }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
                 EmptyView()
@@ -636,4 +641,57 @@ func showUSBDevicesWindow() {
     window.setContentSize(NSSize(width: 400, height: 600))
     window.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
+}
+
+
+func resetFactoryHIDbySerial() {
+//    AppStatus.isRefactoring = true
+    let ser = SerialPortManager.shared
+    
+    // 检查串口是否已打开
+    if ser.serialFile != -1 && ser.serialPort != nil {
+        // 获取当前波特率
+        let currentBaudrate = ser.baudrate
+        Logger.shared.log(content: "Current baudrate: \(currentBaudrate)")
+        
+        // 发送命令到串口
+        ser.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO, force: true)
+        
+        //
+//        print("开始恢复出厂设置") 
+//        ser.raiseRTS()
+//        usleep(3100000)
+//        ser.lowerRTS()
+//        usleep(1000000)
+//        print("完成")
+//        
+        // 关闭串口
+        print("关闭串口")
+        ser.closeSerialPort()
+        usleep(1000000)
+
+        // 重新打开串口
+        print("打开串口")
+        ser.openSerialPort(name: "usbserial", baudrate: SerialPortManager.ORIGINAL_BAUDRATE)
+        
+        print("发送1")
+         // 发送命令到串口
+        ser.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO, force: true)
+        usleep(1000000)
+        // 发送命令到串口
+        print("发送2")
+        ser.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO, force: true)
+
+        usleep(1000000)
+        // 发送命令到串口
+        print("发送3")
+        ser.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO, force: true)
+        
+        
+
+    } else {
+        Logger.shared.log(content: "Serial port is not open")
+    }
+    
+    // AppStatus.isRefactoring = false
 }

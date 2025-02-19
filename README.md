@@ -26,7 +26,7 @@ Our Openterface Mini-KVM crowdfunding was successed and now already for pre-orde
  - [x] OCR text from Target device
  - [x] HDMI, K/M connnection indicators [Required Hardward 1.9] 
  - [x] Special keys support (F1 - F12, Del, Ctrl+Alt+Del)
- - [ ] Keystrokes marco support
+ - [X] Keystrokes marco support
  - [ ] Custom keyboard layout support
  - [ ] Audio bypass from target to host (required additonal hardward)
  - [ ] Other feature request? Please join the [Discord channel](https://discord.gg/sFTJD6a3R8) and tell me
@@ -41,3 +41,4 @@ Admittedly, this is an early stage of development, which means the code might be
 Moreover, if you are interested in joining our dev team and [contributing](https://openterface.com/contributing/), you can drop me an email at: info@techxartisan.com
 
 We keep our community updated on all things Openterface Mini-KVM on our Reddit: [r/Openterface_miniKVM/](https://www.reddit.com/r/Openterface_miniKVM/). You can also join us on Discord [TechxArtisan](https://discord.gg/sFTJD6a3R8), especially for development-related discussions! Cheers!
+
