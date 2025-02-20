@@ -672,7 +672,7 @@ func resetFactoryHIDbySerial() {
 
         // 重新打开串口
         print("打开串口")
-        ser.openSerialPort(name: "usbserial", baudrate: SerialPortManager.ORIGINAL_BAUDRATE)
+        // ser.openSerialPort(name: "usbserial", baudrate: SerialPortManager.ORIGINAL_BAUDRATE)
         
         print("发送1")
          // 发送命令到串口

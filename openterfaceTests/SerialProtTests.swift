@@ -43,30 +43,30 @@ final class SerialProtTests: XCTestCase {
         // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
         // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
         
-        print("=====test go=====")
-        print("list serial ports")
-        let p  = spm.listSerialPorts()
-        print(p)
-        
-        print("open serial")
-        // spm.OpenSerialPort(name: "usbserial-14120", baudrate: 115200)
-        
-        // TODO: -
-        print("send message")
-        
-        var command: [UInt8] = [0x57, 0xAB, 0x00, 0x05, 0x05, 0x01]
-        
-        command.append(0x00)
-        command.append(0x11)
-        command.append(0x71)
-        command.append(0x00) // scroll up 0x01-0x7F; scroll down: 0x81-0xFF
-        command.append(spm.calculateChecksum(data: command))
-        print(command)
-        let _ = spm.writeByte(data: command)
-        Thread.sleep(forTimeInterval: 1)
-        let _ = spm.writeByte(data: command)
-        // TODO: -
-        print("receive message")
+//        print("=====test go=====")
+//        print("list serial ports")
+//        let p  = spm.listSerialPorts()
+//        print(p)
+//        
+//        print("open serial")
+//        // spm.OpenSerialPort(name: "usbserial-14120", baudrate: 115200)
+//        
+//        // TODO: -
+//        print("send message")
+//        
+//        var command: [UInt8] = [0x57, 0xAB, 0x00, 0x05, 0x05, 0x01]
+//        
+//        command.append(0x00)
+//        command.append(0x11)
+//        command.append(0x71)
+//        command.append(0x00) // scroll up 0x01-0x7F; scroll down: 0x81-0xFF
+//        command.append(spm.calculateChecksum(data: command))
+//        print(command)
+//        let _ = spm.writeByte(data: command)
+//        Thread.sleep(forTimeInterval: 1)
+//        let _ = spm.writeByte(data: command)
+//        // TODO: -
+//        print("receive message")
     }
 
 //    func testPerformanceExample() throws {
