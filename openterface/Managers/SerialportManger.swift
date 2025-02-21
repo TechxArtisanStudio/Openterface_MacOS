@@ -26,6 +26,8 @@ import ORSSerial
 import os.log
 
 class SerialPortManager: NSObject, ORSSerialPortDelegate {
+    let ORSSPM = ORSSerialPortManager.shared()
+    
     static let shared = SerialPortManager()
     var tryOpenTimer: Timer?
     var receiveBuffer = Data()
@@ -40,6 +42,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     public static let DEFAULT_BAUDRATE:Int = 115200
     
     @objc let serialPortManager = ORSSerialPortManager.shared()
+    
     @objc dynamic var serialPort: ORSSerialPort? {
         didSet {
             oldValue?.close()
@@ -48,10 +51,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
     }
     
-    let ORSSPM = ORSSerialPortManager.shared()
+    
     @Published var serialFile: Int32 = 0
     
-    @Published var selectedSerialPort: ORSSerialPort?
+//    @Published var serialPort: ORSSerialPort?
     @Published var serialPorts : [ORSSerialPort] = []
     
     var lastHIDEventTime: Date?
@@ -67,7 +70,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         // Initialise the serial port
         self.initializeSerialPort()
 
-        observerSerialPortNotifications()
+//        observerSerialPortNotifications()
     }
     
     private func observerSerialPortNotifications() {
@@ -96,7 +99,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 //        DispatchQueue.global(qos: .background).async {
 //            while !self.ready {
 //                // try DEFAULT_BAUDRATE first
-//                if self.selectedSerialPort != nil {
+//                if self.serialPort != nil {
 //                    self.closeSerialPort()
 //                }   
 //                self.openSerialPort(name: "usbserial", baudrate: SerialPortManager.DEFAULT_BAUDRATE)
@@ -168,6 +171,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
      * Receive data from serial
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
+        print("💦💦💦💦💦")
         if Logger.shared.SerialDataPrint {
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             Logger.shared.log(content: "Serial port receive data: \(dataString)")
@@ -315,7 +319,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {
-        self.selectedSerialPort = nil
+        self.serialPort = nil
     }
     
     func serialPort(_ serialPort: ORSSerialPort, didEncounterError error: Error) {
@@ -328,6 +332,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func tryOpenSerialPort() {
+        print("🔥")
         // get all available serial ports
         guard let availablePorts = ORSSerialPortManager.shared().availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
             Logger.shared.log(content: "No available serial ports found")
@@ -335,105 +340,47 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
         self.serialPorts = availablePorts // Get the list of available serial ports
 
-        self.selectedSerialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-        if self.selectedSerialPort != nil {
-             self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
+        self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+        if self.serialPort != nil {
+             self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE) //ORIGINAL_BAUDRATE
         }
-
+        
+        
     }
     
     func openSerialPort( baudrate: Int) {
+
+        self.serialPort?.baudRate = NSNumber(value: baudrate)
         
-        self.selectedSerialPort?.baudRate = NSNumber(value: baudrate)
-        self.selectedSerialPort?.open()
-        
-        if self.selectedSerialPort?.isOpen == true {
-            guard let port = self.selectedSerialPort else {
-                if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial port not selected") }
-                return
+        if let port = self.serialPort {
+            port.open()
+            if port.isOpen {
+                print("The serial port has been opened")
+            } else {
+                print("the serial port fail to open")
             }
-            
-            self.serialPort = port
-            let path = port.path
-            self.serialFile = open(path, O_RDWR | O_NOCTTY | O_NDELAY)
-            if self.serialFile == -1 {
-                Logger.shared.log(content: "Error: Unable to open port. errno: \(errno) - \(String(cString: strerror(errno)))")
-                return
-            }
-            
-            var options = termios()
-            tcgetattr(self.serialFile, &options)
-            cfsetspeed(&options, speed_t(Int32(baudrate)))
-            options.c_cflag |= UInt((CLOCAL | CREAD))
-            tcsetattr(self.serialFile, TCSANOW, &options)
-            
-            self.getHidParameterCfg()
         }
-//        //Open Serial
-//        guard let availablePorts = ORSSerialPortManager.shared().availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-//            Logger.shared.log(content: "No available serial ports found")
-//            return
-//        }
-//
-//        self.serialPorts = availablePorts // Get the list of available serial ports
-//        
-//        // Print debug information
-//        Logger.shared.log(content: "Available Ports: \(self.serialPorts)")
-//        Logger.shared.log(content: "Looking for port with name: \(name)")
-//        
-//        // Use a filter to find ports that match the name
-//        guard let selectedPort = self.serialPorts.first(where: { $0.path.contains(name) }) else {
-//            Logger.shared.log(content: "No matching serial port found with name: \(name)")
-//            return
-//        }
-//        self.selectedSerialPort = selectedPort
-//        // self.selectedSerialPort = self.serialPorts.filter{ $0.path.contains(name)}.first
-//        
-//        self.selectedSerialPort?.baudRate = NSNumber(value: baudrate)
-//        Logger.shared.log(content: "Try to open serial port: \(self.selectedSerialPort?.name) with baudrate \(baudrate)")
-//        self.selectedSerialPort?.open()
-//        
-//        if self.selectedSerialPort?.isOpen == true {
-//            // hostConnected
-//            guard let port = self.selectedSerialPort else {
-//                if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial port not selected") }
-//                return
-//            }
-//            self.serialPort = port
-//            let path = port.path
-//            self.serialFile = open(path, O_RDWR | O_NOCTTY | O_NDELAY)
-//            if self.serialFile == -1 {
-//                Logger.shared.log(content: "Error: Unable to open port. errno: \(errno) - \(String(cString: strerror(errno)))")
-//                return
-//            }
-//            
-//            
-//            var options = termios()
-//            tcgetattr(self.serialFile, &options)
-//            cfsetspeed(&options, speed_t(Int32(baudrate)))
-//            options.c_cflag |= UInt((CLOCAL | CREAD))
-//            tcsetattr(self.serialFile, TCSANOW, &options)
-//            
-//        } else {
-//            Logger.shared.log(content: "Open serial failure")
-//        }
+        self.getHidParameterCfg()
+        self.getHidParameterCfg()
     }
+
     
     func closeSerialPort() {
-        if self.serialFile != -1 {
-            close(self.serialFile)
-            self.serialFile = -1
-            self.selectedSerialPort = nil
-            self.serialPort = nil
-            Logger.shared.log(content: "Serial port closed")
-            self.ready = false
-        } else {
-            Logger.shared.log(content: "Error: Serial port not open")
-        }
+//        if self.serialFile != -1 {
+//            close(self.serialFile)
+//            self.serialFile = -1
+//            self.serialPort = nil
+//            self.serialPort = nil
+//            Logger.shared.log(content: "Serial port closed")
+//            self.ready = false
+//        } else {
+//            Logger.shared.log(content: "Error: Serial port not open")
+//        }
+        self.serialPort?.close()
     }
     
     func writeByte(data: [UInt8]) {
-        guard self.selectedSerialPort != nil else {
+        guard self.serialPort != nil else {
             Logger.shared.log(content: "Serial port not selected")
             return
         }
@@ -444,12 +391,36 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Sent data: \(dataString)") }
     }
     
-    func sendCommand(command:[UInt8], force:Bool=false) {
-        var mutableCommand = command
-        mutableCommand.append(self.calculateChecksum(data: command))
+//    func sendCommand(command:[UInt8], force:Bool=false) {
+//        var mutableCommand = command
+//        mutableCommand.append(self.calculateChecksum(data: command))
+//        
+//        if self.ready || force{
+//         let _ = self.writeByte(data: mutableCommand)
+//        }
+//    }
+    func sendCommand(command: [UInt8], force: Bool = false) {
+        guard let serialPort = self.serialPort else {
+            Logger.shared.log(content: "Serial port is not open or not selected")
+            return
+        }
         
-        if self.ready || force{
-         let _ = self.writeByte(data: mutableCommand)
+        // 创建可变命令并追加校验和
+        var mutableCommand = command
+        let checksum = self.calculateChecksum(data: command)
+        mutableCommand.append(checksum)
+        
+        // 将 [UInt8] 转换为 Data
+        let data = Data(mutableCommand)
+        
+        // 记录发送的数据
+        let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        Logger.shared.log(content: "➡️ Sending command: \(dataString)")
+        
+        // 检查 ready 状态并发送
+        if self.ready || force {
+            print("✉️✉️✉️✉️✉️")
+            serialPort.send(data)
         }
     }
     
