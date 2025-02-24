@@ -100,15 +100,18 @@ jobs:
 
     # Notarize the app
     - name: Notarize App
+      # main branch only
+      if: github.ref == 'refs/heads/master'
       env:
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM || 'NXWD68TXUQ' }}
       run: |
         # Create temporary keychain
         xcrun notarytool store-credentials "notarytool-profile" \
           --apple-id "$APPLE_ID" \
           --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-          --team-id "NXWD68TXUQ"
+          --team-id "$DEVELOPMENT_TEAM"
         
         # Submit app for notarization
         xcrun notarytool submit "build/export/Openterface.app" \
