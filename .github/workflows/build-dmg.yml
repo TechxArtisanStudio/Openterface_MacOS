@@ -58,14 +58,16 @@ jobs:
     - name: Build macOS App
       env:
         DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+        CODE_SIGN_IDENTITY: ${{ vars.CODE_SIGN_IDENTITY || 'Developer ID Application' }}
+        DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM || 'NXWD68TXUQ' }}
       run: |
         xcodebuild -scheme "openterface" \
           -configuration Release \
           -archivePath "build/Openterface.xcarchive" \
           archive \
-          CODE_SIGN_IDENTITY="Developer ID Application" \
+          CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
           CODE_SIGN_STYLE="Manual" \
-          DEVELOPMENT_TEAM="NXWD68TXUQ"
+          DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
         
         xcodebuild -exportArchive \
           -archivePath "build/Openterface.xcarchive" \
