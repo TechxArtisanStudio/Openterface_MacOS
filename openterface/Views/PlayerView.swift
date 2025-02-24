@@ -61,6 +61,7 @@ class PlayerView: NSView, NSWindowDelegate {
         layer = self.previewLayer
 
         Logger.shared.log(content: "Setup layer completed")
+        
     }
     
     func observe() {

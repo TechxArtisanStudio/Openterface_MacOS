@@ -51,6 +51,7 @@ struct openterfaceApp: App {
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     
+    
     var body: some Scene {
         WindowGroup(id: UserSettings.shared.mainWindownName) {
             ZStack(alignment: .top) {
