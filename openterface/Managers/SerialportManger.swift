@@ -53,7 +53,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     @Published var serialFile: Int32 = 0
     
-//    @Published var serialPort: ORSSerialPort?
     @Published var serialPorts : [ORSSerialPort] = []
     
     var lastHIDEventTime: Date?
@@ -62,44 +61,35 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     var baudrate:Int = 0
     public var ready:Bool = false
-    
-    var T:Int = 0
+    public var isRight:Bool = false
+    var isTrying:Bool = false
     
     override init(){
         super.init()
-        
-        // Initialise the serial port
-        self.initializeSerialPort()
 
-//        observerSerialPortNotifications()
+        self.initializeSerialPort()
+        self.observerSerialPortNotifications()
+    }
+    
+    func initializeSerialPort(){
+
     }
     
     private func observerSerialPortNotifications() {
         let serialPortNtf = NotificationCenter.default
-        
+       
         serialPortNtf.addObserver(self, selector: #selector(serialPortsWereConnected(_:)), name: NSNotification.Name.ORSSerialPortsWereConnected, object: nil)
         serialPortNtf.addObserver(self, selector: #selector(serialPortsWereDisconnected(_:)), name: NSNotification.Name.ORSSerialPortsWereDisconnected, object: nil)
     }
-    
+
     @objc func serialPortsWereConnected(_ notification: Notification) {
-        Logger.shared.log(content: "Serial port Connected")
-        self.initializeSerialPort()
+        Logger.shared.log(content: "✈️✈️✈️✈️✈️Serial port Connected")
+        self.tryOpenSerialPort()
     }
     
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
         Logger.shared.log(content: "Serial port Disconnected")
         self.closeSerialPort()
-        AppStatus.isTargetConnected = false
-        AppStatus.isKeyboardConnected = false
-        AppStatus.isMouseConnected = false
-    }
-
-    
-    func initializeSerialPort(){
-//        print("🐶🐶🐶🐶🐶gogogo")
-//        print(T)
-//        tryOpenSerialPort()
-//        self.T = self.T + 1
     }
 
     func checkCTS() {
@@ -140,6 +130,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
+
         if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial port was closed") }
     }
     
@@ -148,6 +139,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
         print("💦💦💦💦💦")
+
         if Logger.shared.SerialDataPrint {
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             Logger.shared.log(content: "Serial port receive data: \(dataString)")
@@ -156,6 +148,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let prefix: [UInt8] = [0x57, 0xAB, 0x00]
         let dataBytes = [UInt8](data)
         if dataBytes.starts(with: prefix) {
+            self.isRight = true
             // get check the following bytes
             let len = dataBytes[4]
 
@@ -266,20 +259,17 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             }
             else {
                 Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")
-//                var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
-//                command.append(contentsOf: data[12...31])
-//                for _ in 0...22 {
-//                    command.append(0x00)
-//                }
-//                self.sendCommand(command: command, force: true)
-//                usleep(500000)
-//                Logger.shared.log(content:"Reset chipset now...")
-//                self.resetHidChip()
-//                self.baudrate = SerialPortManager.DEFAULT_BAUDRATE
-//                usleep(1000000)
-//                closeSerialPort()
-//                usleep(1000000)
-//                openSerialPort(name: "usbserial", baudrate: SerialPortManager.DEFAULT_BAUDRATE)
+                var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
+                command.append(contentsOf: data[12...31])
+                for _ in 0...22 {
+                    command.append(0x00)
+                }
+                self.sendCommand(command: command, force: true)
+                
+                print("完成✅✅✅✅✅✅")
+//                self.closeSerialPort()
+//                self.blockMainThreadFor2Seconds()
+//                self.tryOpenSerialPort()
             }
             
         case 0x89:  // set para cfg
@@ -300,6 +290,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func serialPort(_ serialPort: ORSSerialPort, didEncounterError error: Error) {
         if Logger.shared.SerialDataPrint { Logger.shared.log(content: "SerialPort \(serialPort) encountered an error: \(error)") }
+        self.closeSerialPort()
+        
     }
 
     func listSerialPorts() -> [ORSSerialPort] {
@@ -308,6 +300,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func tryOpenSerialPort() {
+        self.isTrying = true
+        print("🚽🚽🚽🚽🚽")
         // get all available serial ports
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
             Logger.shared.log(content: "No available serial ports found")
@@ -319,144 +313,46 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         let backgroundQueue = DispatchQueue(label: "com.example.background", qos: .background)
         backgroundQueue.async { [weak self] in
+            print("🔥🔥🔥🔥🔥🔥🔥")
             
             guard let self = self else { return }
             
-            self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-            if self.serialPort != nil {
-                self.openSerialPort(baudrate: SerialPortManager.ORIGINAL_BAUDRATE)  //ORIGINAL_BAUDRATE  // DEFAULT_BAUDRATE
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self.getHidParameterCfg()
+            print("🤮🤮🤮🤮🤮🤮🤮")
+            while !isRight {
+                self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+                if self.serialPort != nil {
+                    self.openSerialPort(baudrate: SerialPortManager.ORIGINAL_BAUDRATE)  //ORIGINAL_BAUDRATE  // DEFAULT_BAUDRATE
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.getHidParameterCfg()
+                    }
                 }
-            }
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort?.close()
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-            if self.serialPort != nil {
-                self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self.getHidParameterCfg()
+                
+                self.blockMainThreadFor2Seconds()
+                
+                if isRight { return }
+                
+                self.closeSerialPort()
+                
+                self.blockMainThreadFor2Seconds()
+                
+                self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+                if self.serialPort != nil {
+                    self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.getHidParameterCfg()
+                    }
                 }
+                
+                self.blockMainThreadFor2Seconds()
+                
+                if isRight { return }
+                
+                self.closeSerialPort()
+                
+                self.blockMainThreadFor2Seconds()
+            
             }
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort?.close()
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-            if self.serialPort != nil {
-                self.openSerialPort(baudrate: SerialPortManager.ORIGINAL_BAUDRATE)  //ORIGINAL_BAUDRATE  // DEFAULT_BAUDRATE
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self.getHidParameterCfg()
-                }
-            }
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort?.close()
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-            if self.serialPort != nil {
-                self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self.getHidParameterCfg()
-                }
-            }
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort?.close()
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-            if self.serialPort != nil {
-                self.openSerialPort(baudrate: SerialPortManager.ORIGINAL_BAUDRATE)  //ORIGINAL_BAUDRATE  // DEFAULT_BAUDRATE
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self.getHidParameterCfg()
-                }
-            }
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort?.close()
-            
-            self.blockMainThreadFor2Seconds()
-            
-            self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-            if self.serialPort != nil {
-                self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self.getHidParameterCfg()
-                }
-            }
-            
-            self.blockMainThreadFor2Seconds()
-            
-             // self.serialPort?.close()
-            
-//            self.blockMainThreadFor2Seconds()
         }
-        
-        
-        
-//        let backgroundQueue = DispatchQueue(label: "com.example.background", qos: .background)
-//        var out:Bool = false
-//        backgroundQueue.async { [weak self] in
-//            guard let self = self else { return }
-//            while !out {
-//                guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-//                    Logger.shared.log(content: "No available serial ports found")
-//                    return
-//                }
-//                self.serialPorts = availablePorts // Get the list of available serial ports
-//
-//                self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-//                if self.serialPort != nil {
-//                    self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE) //ORIGINAL_BAUDRATE  // DEFAULT_BAUDRATE
-//                }
-//                
-//                self.blockMainThreadFor2Seconds()
-////                self.serialPort?.close()
-////                self.serialPort = nil
-////                
-////                self.blockMainThreadFor2Seconds()
-////                print(self.serialPort)
-////                self.blockMainThreadFor2Seconds()
-////                
-////                // get all available serial ports
-////                guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-////                    Logger.shared.log(content: "No available serial ports found")
-////                    return
-////                }
-////                self.serialPorts = availablePorts // Get the list of available serial ports
-////
-////                self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
-////                if self.serialPort != nil {
-////                    self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE) //ORIGINAL_BAUDRATE  // DEFAULT_BAUDRATE
-////                }
-////                
-////                self.blockMainThreadFor2Seconds()
-//                
-//                
-//                out = true
-//            }
-//            print("任务已退出")
-//        }
-        
-        
-        // self.serialPort?.close()
-        
-        
         
     }
     
@@ -470,6 +366,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     func openSerialPort( baudrate: Int) {
 
         self.serialPort?.baudRate = NSNumber(value: baudrate)
+        self.serialPort?.delegate = self
         
         if let port = self.serialPort {
             port.open()
@@ -480,23 +377,20 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 print("the serial port fail to open")
             }
         }
-        
-        
+
     }
 
     
     func closeSerialPort() {
-//        if self.serialFile != -1 {
-//            close(self.serialFile)
-//            self.serialFile = -1
-//            self.serialPort = nil
-//            self.serialPort = nil
-//            Logger.shared.log(content: "Serial port closed")
-//            self.ready = false
-//        } else {
-//            Logger.shared.log(content: "Error: Serial port not open")
-//        }
+        self.isRight = false
         self.serialPort?.close()
+        self.serialPort = nil
+
+        AppStatus.isTargetConnected = false
+        AppStatus.isKeyboardConnected = false
+        AppStatus.isMouseConnected = false
+        
+        
     }
     
     func writeByte(data: [UInt8]) {
@@ -538,8 +432,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
         print(self.serialPort?.isOpen)
         Logger.shared.log(content: "➡️ Sending command: \(dataString)")
+        Logger.shared.log(content: "➡️ current baudRate: \(serialPort.baudRate)")
+        if self.isRight || force {
+            serialPort.send(data)
+        } else {
+            print("还未ready 不发送✈️✈️✈️✈️")
+        }
         
-        serialPort.send(data)
         
     }
     
@@ -577,5 +476,51 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     // 可选：添加一个快捷方法来拉高 DTR
     func raiseDTR() {
         setDTR(true)
+    }
+
+    // 添加设置 RTS 的方法
+    func setRTS(_ enabled: Bool) {
+        if let port = self.serialPort {
+            port.rts = enabled
+            Logger.shared.log(content: "Set RTS to: \(enabled)")
+        } else {
+            Logger.shared.log(content: "Cannot set RTS: Serial port not available")
+        }
+    }
+    
+    // 可选：添加一个快捷方法来拉低 RTS
+    func lowerRTS() {
+        setRTS(false)
+    }
+    
+    // 可选：添加一个快捷方法来拉高 RTS
+    func raiseRTS() {
+        setRTS(true)
+    }
+    
+    func resetFactoryHIDbySerial() {
+        if let port = self.serialPort, port.isOpen == true {
+            print("串口已经打开,开始reset！")
+            
+            print("开始恢复出厂设置")
+            self.isRight = false
+            print("RTS enable")
+            self.raiseRTS()
+            usleep(3100000)
+            print("RTS disable")
+            self.lowerRTS()
+            usleep(1000000)
+            
+            print("关闭串口")
+            self.closeSerialPort()
+            
+            print("打开串口")
+            self.tryOpenSerialPort()
+            
+            
+        }
+        else{
+            print("串口未打开")
+        }
     }
 }
