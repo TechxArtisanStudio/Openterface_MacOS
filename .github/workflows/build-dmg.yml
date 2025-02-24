@@ -57,7 +57,7 @@ jobs:
     # Build the macOS app using xcodebuild
     - name: Build macOS App
       env:
-        DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+        DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
         CODE_SIGN_IDENTITY: ${{ vars.CODE_SIGN_IDENTITY || 'Developer ID Application' }}
         DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM || 'NXWD68TXUQ' }}
         CI_EXPORT_OPTIONS_PLIST: 'ciExportOptions.plist'
