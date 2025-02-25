@@ -49,8 +49,7 @@ struct openterfaceApp: App {
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    
-    
+
     
     var body: some Scene {
         WindowGroup(id: UserSettings.shared.mainWindownName) {
@@ -297,14 +296,6 @@ struct openterfaceApp: App {
                                 }
                             }
                         }
-//                        ToolbarItem(placement: .automatic) {
-//                            Image(systemName: "keyboard.fill")
-//                                .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
-//                        }
-//                        ToolbarItem(placement: .automatic) {
-//                            Image(systemName: "computermouse.fill")
-//                                .foregroundColor(colorForConnectionStatus(_isMouseConnected))
-//                        }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
                         }
@@ -437,6 +428,14 @@ struct openterfaceApp: App {
                     resetFactoryHIDbySerial()
                 }) {
                     Text("Reset HID(keyboard)")
+                }
+                
+                Divider()
+                
+                Button(action: {
+                    showResetFactoryWindow()
+                }) {
+                    Text("Reset Serial to Factory")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -648,4 +647,43 @@ func showUSBDevicesWindow() {
 func resetFactoryHIDbySerial() {
     let ser = SerialPortManager.shared
     ser.resetFactoryHIDbySerial()
+}
+
+
+func showResetFactoryWindow() {
+    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
+        // 如果窗口已存在，则使其震动并成为前台窗口
+        
+        // 使用系统提供的注意力请求功能（会使窗口或Dock图标弹跳）
+        NSApp.requestUserAttention(.criticalRequest)
+        
+        // 将窗口带到前台
+        existingWindow.makeKeyAndOrderFront(nil)
+        existingWindow.orderFrontRegardless()
+        return
+    }
+    
+    // 如果窗口不存在，则创建新窗口
+    let resetFactoryView = ResetFactoryView()
+    let controller = NSHostingController(rootView: resetFactoryView)
+    var window = NSWindow(contentViewController: controller)
+    window.title = "Reset Serial to Factory"
+    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetFactoryWindow")
+    window.setContentSize(NSSize(width: 400, height: 700))
+    window.styleMask = [.titled, .closable]
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+    
+    // 设置窗口关闭时的回调，以清除引用
+    window.isReleasedWhenClosed = false
+    NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { _ in
+        // aboutWindow = nil
+//        if let windown = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
+//            windown.close()
+//        }
+    }
+    
+    // 保存窗口引用
+    // aboutWindow = window
+    NSApp.activate(ignoringOtherApps: true)
 }

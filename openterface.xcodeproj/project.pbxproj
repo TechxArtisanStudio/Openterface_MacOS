@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
+		29E5E0DE2D6D594900E1849A /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DD2D6D594900E1849A /* AboutView.swift */; };
+		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
 		5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43B2B5A1A3800BADF35 /* UserSetting.swift */; };
 		5308F43E2B5A674E00BADF35 /* MouseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43D2B5A674E00BADF35 /* MouseManager.swift */; };
 		5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531665492C6F48F000E3F90F /* USBDevicesManager.swift */; };
@@ -61,6 +63,8 @@
 
 /* Begin PBXFileReference section */
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
+		29E5E0DD2D6D594900E1849A /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
 		5308F43B2B5A1A3800BADF35 /* UserSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSetting.swift; sourceTree = "<group>"; };
 		5308F43D2B5A674E00BADF35 /* MouseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseManager.swift; sourceTree = "<group>"; };
 		531665492C6F48F000E3F90F /* USBDevicesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesManager.swift; sourceTree = "<group>"; };
@@ -250,6 +254,8 @@
 				53955CBF2BF497D000FA4493 /* SettingsScreen.swift */,
 				538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */,
 				2950CB502CE33C8D00888267 /* USBDevicesView.swift */,
+				29E5E0DD2D6D594900E1849A /* AboutView.swift */,
+				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -419,6 +425,8 @@
 				531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */,
 				5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */,
 				53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */,
+				29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */,
+				29E5E0DE2D6D594900E1849A /* AboutView.swift in Sources */,
 				53A6E1BF2B3E943300B652A5 /* PlayerView.swift in Sources */,
 				5351254D2B59177F0002A91E /* HostManager.swift in Sources */,
 				538F5E262C8AB1F50014CFB0 /* ToolBarView.swift in Sources */,
