@@ -254,24 +254,34 @@ struct ResetFactoryView: View {
                     })
                     .frame(width: 220)
                     .disabled(isResetting && !isCompleted && !hasError)
+
+                    ColorButton(
+                        color: .purple,
+                        title: "Soft Reboot Serial",
+                        textColor: .white,
+                        action: {
+                        softRebootSerial()
+                        
+                    })
+                    .frame(width: 220)
                     
                     // Cancel button (only shown in error state)
-                    if hasError {
-                        Button(action: {
-                            // Cancel operation, reset state
-                            isResetting = false
-                            hasError = false
-                            currentStep = 0
-                            serialPortStatus = ""
-                        }) {
-                            Text("Cancel")
-                                .font(.system(size: 16, weight: .medium))
-                                .frame(width: 100, height: 46)
-                                .background(Color.gray.opacity(0.3))
-                                .foregroundColor(.white)
-                                .cornerRadius(23)
-                        }
-                    }
+                    // if hasError {
+                    //     Button(action: {
+                    //         // Cancel operation, reset state
+                    //         isResetting = false
+                    //         hasError = false
+                    //         currentStep = 0
+                    //         serialPortStatus = ""
+                    //     }) {
+                    //         Text("Cancel")
+                    //             .font(.system(size: 16, weight: .medium))
+                    //             .frame(width: 100, height: 46)
+                    //             .background(Color.gray.opacity(0.3))
+                    //             .foregroundColor(.white)
+                    //             .cornerRadius(23)
+                    //     }
+                    // }
                 }
                 .padding(.bottom, isCompleted ? 30 : 10) // 增加底部按钮的留白，特别是在完成状态下
                 
@@ -284,6 +294,20 @@ struct ResetFactoryView: View {
         .frame(width: 500, height: 760) // Increased height for new buttons
     }
     
+    func softRebootSerial() {
+        smp.resetHidChip()
+        
+        // 等待 0.5 秒后关闭串口
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            smp.closeSerialPort()
+            
+            // 再等待 0.5 秒后尝试启动串口
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                smp.tryOpenSerialPort()
+            }
+        }
+    }
+
     func resetFactory() {
         isResetting = true
         currentStep = 0
