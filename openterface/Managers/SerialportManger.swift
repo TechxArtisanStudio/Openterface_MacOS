@@ -294,7 +294,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func tryOpenSerialPort() {
         self.isTrying = true
-        print("🚽🚽🚽🚽🚽")
         // get all available serial ports
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
             Logger.shared.log(content: "No available serial ports found")

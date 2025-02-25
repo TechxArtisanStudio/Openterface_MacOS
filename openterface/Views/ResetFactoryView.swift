@@ -6,80 +6,135 @@
 //
 
 import SwiftUI
+import Foundation
+import ORSSerial
 
 struct ResetFactoryView: View {
+    
+    let smp = SerialPortManager.shared
+    
     @Environment(\.colorScheme) var colorScheme
     @State private var isResetting = false
     @State private var isCompleted = false
     @State private var currentStep = 0
     @State private var isHovering = false
+    @State private var serialPortStatus: String = ""
+    @State private var hasError: Bool = false
     @State private var stepMessages = [
-        "准备开始恢复出厂设置...",
-        "1. 打开串口",
-        "2. 开始恢复出厂设置",
-        "3. 启用 RTS",
-        "4. 等待中...",
-        "5. 禁用 RTS",
-        "6. 等待中...",
-        "7. 关闭串口",
-        "8. 重新打开串口",
-        "恢复出厂设置完成！"
+        "Preparing to reset Serial to factory settings...",
+        "1. Checking serial port connection",
+        "2. Starting Serial to factory reset",
+        "3. Enabling RTS signal",
+        "4. Disabling RTS signal",
+        "5. Closing serial port",
+        "6. Reopening serial port",
+        "Factory reset completed!"
     ]
     
-    // 用于自动滚动的ID
+    // ID for auto-scrolling
     @Namespace private var bottomID
     
     var body: some View {
         ZStack {
-            // 背景
+            // Background
             colorScheme == .dark ? Color.black : Color.white
             
             VStack(alignment: .center, spacing: 30) {
                 Spacer()
                     .frame(height: 20)
                 
-                // 图标
-                Image(systemName: isCompleted ? "checkmark.circle" : "arrow.triangle.2.circlepath")
-                    .font(.system(size: 60))
-                    .foregroundColor(isCompleted ? .green : .blue)
+                // Icon
+                Image(systemName: isCompleted ? "checkmark.circle" : (hasError ? "exclamationmark.circle" : "arrow.triangle.2.circlepath"))
+                    .font(.system(size: 50))
+                    .foregroundColor(isCompleted ? .green : (hasError ? .red : .blue))
                     .opacity(0.9)
                     .padding(.bottom, 10)
                 
-                // 标题
-                Text(isCompleted ? "恢复出厂设置完成" : "恢复出厂设置")
-                    .font(.system(size: 24, weight: .medium))
+                // Title
+                Text(isCompleted ? "Factory Reset Complete" : (hasError ? "Factory Reset Failed" : "Factory Reset"))
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(hasError ? .red : .primary)
                     .padding(.bottom, 5)
                 
-                // 说明文字
+                // Description
                 if !isCompleted && !isResetting {
-                    Text("此操作将会将设备恢复到出厂状态")
+                    Text("This operation will restore the serial to factory settings")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                         .padding(.bottom, 20)
                 }
                 
-                // 当前步骤显示
+                // Current step display
                 if isResetting || isCompleted {
-                    // 进度条
+                    // Progress bar
                     ProgressView(value: Double(currentStep), total: Double(stepMessages.count - 1))
                         .progressViewStyle(LinearProgressViewStyle())
                         .frame(width: 280)
                         .padding(.bottom, 15)
                     
-                    // 步骤列表
+                    // Error message box
+                    if hasError {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                                Text("Connection Error")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.red)
+                            }
+                            
+                            Text("Cannot connect to device serial port. Please check:")
+                                .font(.system(size: 14))
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("• Device is properly connected")
+                                Text("• USB cable is working")
+                                Text("• Device is powered on")
+                                Text("• Drivers are installed")
+                            }
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            
+                            Text("Click Retry to attempt connection again")
+                                .font(.system(size: 13, weight: .medium))
+                                .padding(.top, 5)
+                        }
+                        .padding(15)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.red.opacity(0.1))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 15)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.3), value: hasError)
+                    }
+                    
+                    // Steps list
                     ScrollViewReader { scrollProxy in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 10) {
                                 ForEach(0..<min(currentStep + 1, stepMessages.count), id: \.self) { index in
                                     HStack(spacing: 12) {
-                                        // 步骤状态图标
+                                        // Step status icon
                                         ZStack {
                                             Circle()
-                                                .fill(index == currentStep && !isCompleted ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
+                                                .fill(index == currentStep && !isCompleted ? 
+                                                    (hasError && index == 1 ? Color.red.opacity(0.15) : Color.blue.opacity(0.15)) 
+                                                    : Color.green.opacity(0.15))
                                                 .frame(width: 26, height: 26)
                                             
                                             if index == currentStep && !isCompleted {
-                                                if isResetting {
+                                                if hasError && index == 1 {
+                                                    // Error icon
+                                                    Image(systemName: "exclamationmark.triangle")
+                                                        .font(.system(size: 12))
+                                                        .foregroundColor(.red)
+                                                } else if isResetting {
                                                     Image(systemName: "arrow.triangle.2.circlepath")
                                                         .font(.system(size: 12))
                                                         .foregroundColor(.blue)
@@ -96,10 +151,27 @@ struct ResetFactoryView: View {
                                             }
                                         }
                                         
-                                        // 步骤文字
-                                        Text(stepMessages[index])
-                                            .font(.system(size: 14))
-                                            .foregroundColor(index == currentStep && !isCompleted ? .primary : .secondary)
+                                        // Step text
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(stepMessages[index])
+                                                .font(.system(size: 14))
+                                                .foregroundColor(index == currentStep && !isCompleted ? .primary : .secondary)
+                                            
+                                            // Display serial port status (only at step 1 when status is available)
+                                            if index == 1 && !serialPortStatus.isEmpty {
+                                                Text(serialPortStatus)
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(serialPortStatus.contains("not connected") || serialPortStatus.contains("not open") || hasError ? .red : .green)
+                                                    .padding(.top, 2)
+                                                    .padding(.bottom, 4)
+                                                    .padding(.horizontal, 8)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 4)
+                                                            .fill(Color.gray.opacity(0.1))
+                                                    )
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                            }
+                                        }
                                     }
                                     .padding(.vertical, 6)
                                     .padding(.horizontal, 12)
@@ -108,9 +180,9 @@ struct ResetFactoryView: View {
                                         RoundedRectangle(cornerRadius: 8)
                                             .fill(index == currentStep && !isCompleted ? Color.blue.opacity(0.08) : Color.clear)
                                     )
-                                    .id(index) // 为每个步骤设置ID
+                                    .id(index) // Set ID for each step
                                     
-                                    // 为最后一个步骤添加底部ID标记
+                                    // Add bottom ID marker for the last step
                                     if index == currentStep {
                                         Color.clear
                                             .frame(height: 1)
@@ -126,7 +198,7 @@ struct ResetFactoryView: View {
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                         .onChange(of: currentStep) { _ in
-                            // 当步骤变化时，自动滚动到底部
+                            // Auto-scroll to bottom when step changes
                             withAnimation {
                                 scrollProxy.scrollTo(bottomID, anchor: .bottom)
                             }
@@ -135,14 +207,14 @@ struct ResetFactoryView: View {
                     .padding(.bottom, 20)
                 }
                 
-                // 完成后的额外指导
+                // Post-completion guidance
                 if isCompleted {
                     VStack(alignment: .leading, spacing: 15) {
-                        Text("后续操作指南")
+                        Text("Next Steps")
                             .font(.system(size: 16, weight: .medium))
                             .padding(.bottom, 5)
                         
-                        ForEach(["1. 请关闭软件", "2. 断开硬件连接", "3. 等待3秒", "4. 重新连接硬件", "5. 重启软件"], id: \.self) { step in
+                        ForEach(["1. Close the software", "2. Disconnect hardware", "3. Wait 3 seconds", "4. Reconnect hardware", "5. Restart software"], id: \.self) { step in
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.right.circle.fill")
                                     .foregroundColor(.blue)
@@ -161,177 +233,143 @@ struct ResetFactoryView: View {
                     .padding(.bottom, 20)
                 }
                 
-                // 按钮
-                Button(action: {
-                    if isCompleted {
-                        // 重置状态
-                        isCompleted = false
-                        isResetting = false
-                        currentStep = 0
-                    } else {
-                        resetFactory()
-                    }
-                }) {
-                    Text(isCompleted ? "返回" : (isResetting ? "正在恢复中..." : "开始恢复出厂设置"))
-                        .font(.system(size: 16, weight: .medium))
-                        .frame(width: 220, height: 46)
-                        .background(isCompleted ? Color.green : (isResetting ? Color.gray.opacity(0.5) : Color.blue))
-                        .foregroundColor(.white)
-                        .cornerRadius(23)
-                }
-                .disabled(isResetting && !isCompleted)
-                
-                // 新增的好看按钮示例
-                if !isResetting && !isCompleted {
-                    Button(action: {
-                        // 这里可以添加按钮的操作
-                    }) {
-                        HStack(spacing: 12) {
-                            // 左侧图标
-                            ZStack {
-                                Circle()
-                                    .fill(Color.orange.opacity(0.2))
-                                    .frame(width: 36, height: 36)
-                                
-                                Image(systemName: "questionmark.circle")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.orange)
-                            }
-                            
-                            // 文字部分
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("查看帮助文档")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(colorScheme == .dark ? .white : .black)
-                                
-                                Text("了解更多关于恢复出厂设置的信息")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            // 右侧箭头
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.orange)
-                                .opacity(isHovering ? 1.0 : 0.7)
-                                .offset(x: isHovering ? 5 : 0)
-                                .animation(.spring(response: 0.3), value: isHovering)
+                // Buttons
+                HStack(spacing: 15) {
+                    // Main button
+                    ColorButton(
+                        color: isCompleted ? .green : (isResetting ? (hasError ? .orange : .gray) : .blue),
+                        title: isCompleted ? "Back" : (isResetting ? (hasError ? "Retry Connection" : "Resetting...") : "Start Factory Reset"),
+                        textColor: .white,
+                        action: {
+                        if isCompleted {
+                            // Reset state
+                            isCompleted = false
+                            isResetting = false
+                            currentStep = 0
+                            hasError = false
+                        } else {
+                            resetFactory()
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(.darkGray).opacity(0.3) : Color.white)
-                                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.orange.opacity(isHovering ? 0.5 : 0.2), lineWidth: 1)
-                        )
-                        .scaleEffect(isHovering ? 1.02 : 1.0)
-                        .animation(.spring(response: 0.3), value: isHovering)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .onHover { hovering in
-                        isHovering = hovering
-                    }
-                    .frame(width: 320)
-                    .padding(.top, 10)
+                        
+                    })
+                    .frame(width: 220)
+                    .disabled(isResetting && !isCompleted && !hasError)
                     
-                    // 彩色按钮组
-                    VStack(spacing: 15) {
-                        // 第一行按钮
-                        HStack(spacing: 15) {
-                            // 粉色按钮
-                            ColorButton(color: .pink, title: "Pink Button")
-                            
-                            // 绿色按钮
-                            ColorButton(color: .green, title: "Green Button")
-                        }
-                        
-                        // 第二行按钮
-                        HStack(spacing: 15) {
-                            // 蓝色按钮
-                            ColorButton(color: .blue, title: "Blue Button")
-                            
-                            // 红色按钮
-                            ColorButton(color: .red, title: "Red Button")
-                        }
-                        
-                        // 第三行按钮
-                        HStack(spacing: 15) {
-                            // 橙色按钮
-                            ColorButton(color: .orange, title: "Orange Button")
-                            
-                            // 黄色按钮
-                            ColorButton(color: .yellow, title: "Yellow Button", textColor: .black)
+                    // Cancel button (only shown in error state)
+                    if hasError {
+                        Button(action: {
+                            // Cancel operation, reset state
+                            isResetting = false
+                            hasError = false
+                            currentStep = 0
+                            serialPortStatus = ""
+                        }) {
+                            Text("Cancel")
+                                .font(.system(size: 16, weight: .medium))
+                                .frame(width: 100, height: 46)
+                                .background(Color.gray.opacity(0.3))
+                                .foregroundColor(.white)
+                                .cornerRadius(23)
                         }
                     }
-                    .padding(.top, 20)
                 }
+                .padding(.bottom, isCompleted ? 30 : 10) // 增加底部按钮的留白，特别是在完成状态下
                 
-                // 占位空间，保持窗口大小一致
-                Spacer(minLength: 80)
+                // Spacer to maintain consistent window size
+                Spacer(minLength: isCompleted ? 120 : 80)
             }
             .padding(.horizontal, 30)
+            .padding(.bottom, isCompleted ? 20 : 0) // 增加整个VStack底部的留白
         }
-        .frame(width: 500, height: 700) // 增加高度以适应新按钮
+        .frame(width: 500, height: 760) // Increased height for new buttons
     }
     
     func resetFactory() {
         isResetting = true
         currentStep = 0
+        serialPortStatus = ""
+        hasError = false  // Reset error state
         
-        // 模拟进度更新
+        // Use actual SerialPortManager for factory reset
         DispatchQueue.global(qos: .userInitiated).async {
-            // 步骤1: 打开串口
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            // Step 1: Check serial port connection
+            DispatchQueue.main.async {
                 currentStep = 1
-            }
-            
-            // 步骤2-8: 模拟恢复出厂设置过程
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                // 开始恢复出厂设置
-                currentStep = 2
                 
-                // 启用 RTS
+                
+                // Add delay to simulate checking process
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    currentStep = 3
+                    guard let port = smp.serialPort, port.isOpen else {
+                        // Update serial port status
+                        serialPortStatus = "Serial port not connected or not open"
+                        // Set error state
+                        hasError = true
+                        // Don't reset isResetting state, stay at current step
+                        // Just update UI to show error
+                        return
+                    }
                     
-                    // 等待中...
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        currentStep = 4
+                    // Clear error state
+                    hasError = false
+                    
+                    // Update serial port status
+                    serialPortStatus = "Serial port connected, status normal\n (Port: \(port.path))"
+                    
+                    // Add more serial port info
+                    if let baudRate = port.baudRate as? NSNumber {
+                        serialPortStatus += "\nBaud rate: \(baudRate) bps"
+                    }
+                    
+                    // Check data bits, stop bits and parity
+                    serialPortStatus += "\nData bits: \(port.numberOfDataBits)"
+                    serialPortStatus += " | Stop bits: \(port.numberOfStopBits == 1 ? "1" : "2")"
+                    
+                    // Parity info
+                    let parityString: String
+                    switch port.parity {
+                    case .none: parityString = "None"
+                    case .odd: parityString = "Odd"
+                    case .even: parityString = "Even"
+                    default: parityString = "Unknown"
+                    }
+                    serialPortStatus += " | Parity: \(parityString)"
+                    
+                    // Only continue with subsequent steps if no errors
+                    continueResetProcess()
+                }
+            }
+        }
+    }
+    
+    // Extract subsequent steps to a separate method, only called when serial port connection is normal
+    private func continueResetProcess() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            currentStep = 2
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                currentStep = 3
+                
+                smp.isRight = false
+                smp.raiseRTS()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                    currentStep = 4
+                    smp.lowerRTS()
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        currentStep = 5
+                        smp.closeSerialPort()
                         
-                        // 禁用 RTS
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.1) {
-                            currentStep = 5
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            currentStep = 6
+                            smp.tryOpenSerialPort()
                             
-                            // 等待中...
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                currentStep = 6
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                                currentStep = 7
+                                isResetting = false
+                                isCompleted = true
                                 
-                                // 关闭串口
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                    currentStep = 7
-                                    
-                                    // 重新打开串口
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        currentStep = 8
-                                        
-                                        // 完成
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            currentStep = 9
-                                            
-                                            // 设置为完成状态，但不重置界面
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                                isResetting = false
-                                                isCompleted = true
-                                            }
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -341,16 +379,18 @@ struct ResetFactoryView: View {
     }
 }
 
-// 彩色按钮组件
+// Color button component
 struct ColorButton: View {
     var color: Color
     var title: String
     var textColor: Color = .white
+    var action: (() -> Void)? = nil
     @State private var isHovering = false
     
     var body: some View {
         Button(action: {
-            // 按钮点击操作
+            // Execute the passed click action
+            action?()
         }) {
             Text(title)
                 .font(.system(size: 14, weight: .medium))

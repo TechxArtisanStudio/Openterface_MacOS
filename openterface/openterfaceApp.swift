@@ -424,12 +424,6 @@ struct openterfaceApp: App {
                 }) {
                     Text("USB Info")
                 }
-                Button(action: {
-                    resetFactoryHIDbySerial()
-                }) {
-                    Text("Reset HID(keyboard)")
-                }
-                
                 Divider()
                 
                 Button(action: {
@@ -643,13 +637,6 @@ func showUSBDevicesWindow() {
     NSApp.activate(ignoringOtherApps: true)
 }
 
-
-func resetFactoryHIDbySerial() {
-    let ser = SerialPortManager.shared
-    ser.resetFactoryHIDbySerial()
-}
-
-
 func showResetFactoryWindow() {
     if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
         // 如果窗口已存在，则使其震动并成为前台窗口
@@ -669,7 +656,7 @@ func showResetFactoryWindow() {
     var window = NSWindow(contentViewController: controller)
     window.title = "Reset Serial to Factory"
     window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetFactoryWindow")
-    window.setContentSize(NSSize(width: 400, height: 700))
+    window.setContentSize(NSSize(width: 400, height: 760))
     window.styleMask = [.titled, .closable]
     window.center()
     window.makeKeyAndOrderFront(nil)
