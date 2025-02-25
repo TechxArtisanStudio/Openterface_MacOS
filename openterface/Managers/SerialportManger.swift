@@ -83,7 +83,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     @objc func serialPortsWereConnected(_ notification: Notification) {
-        Logger.shared.log(content: "✈️✈️✈️✈️✈️Serial port Connected")
+        Logger.shared.log(content: "Serial port Connected")
         self.tryOpenSerialPort()
     }
     
@@ -138,8 +138,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
      * Receive data from serial
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
-        print("💦💦💦💦💦")
-
         if Logger.shared.SerialDataPrint {
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             Logger.shared.log(content: "Serial port receive data: \(dataString)")
@@ -265,11 +263,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                     command.append(0x00)
                 }
                 self.sendCommand(command: command, force: true)
-                
-                print("完成✅✅✅✅✅✅")
-//                self.closeSerialPort()
-//                self.blockMainThreadFor2Seconds()
-//                self.tryOpenSerialPort()
             }
             
         case 0x89:  // set para cfg
@@ -313,11 +306,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         let backgroundQueue = DispatchQueue(label: "com.example.background", qos: .background)
         backgroundQueue.async { [weak self] in
-            print("🔥🔥🔥🔥🔥🔥🔥")
             
             guard let self = self else { return }
-            
-            print("🤮🤮🤮🤮🤮🤮🤮")
+
             while !isRight {
                 self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
                 if self.serialPort != nil {
@@ -393,33 +384,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
     }
     
-    func writeByte(data: [UInt8]) {
-//        guard self.serialPort != nil else {
-//            Logger.shared.log(content: "Serial port not selected")
-//            return
-//        }
-//
-//        let _ = write(serialFile, data, data.count)
-//        
-//        let dataString = data.map { String(format: "0x%02X", $0) }.joined(separator: ", ")
-//        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Sent data: \(dataString)") }
-    }
-    
-//    func sendCommand(command:[UInt8], force:Bool=false) {
-//        var mutableCommand = command
-//        mutableCommand.append(self.calculateChecksum(data: command))
-//        
-//        if self.ready || force{
-//         let _ = self.writeByte(data: mutableCommand)
-//        }
-//    }
     func sendCommand(command: [UInt8], force: Bool = false) {
         guard let serialPort = self.serialPort , serialPort.isOpen else {
             Logger.shared.log(content: "Serial port is not open or not selected")
             return
         }
     
-        
         // 创建可变命令并追加校验和
         var mutableCommand = command
         let checksum = self.calculateChecksum(data: command)
@@ -436,7 +406,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         if self.isRight || force {
             serialPort.send(data)
         } else {
-            print("还未ready 不发送✈️✈️✈️✈️")
+            print("is not ready")
         }
         
         
@@ -488,12 +458,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
     }
     
-    // 可选：添加一个快捷方法来拉低 RTS
     func lowerRTS() {
         setRTS(false)
     }
     
-    // 可选：添加一个快捷方法来拉高 RTS
     func raiseRTS() {
         setRTS(true)
     }
