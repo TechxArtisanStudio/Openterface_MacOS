@@ -46,10 +46,14 @@ struct openterfaceApp: App {
     @State private var _resolution = (width: "", height: "")
     @State private var _fps = ""
     @State private var _ms2109version = ""
+    
+    // 添加串口信息状态变量
+    @State private var _serialPortName: String = "N/A"
+    @State private var _serialPortBaudRate: Int = 0
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    
+
     
     var body: some Scene {
         WindowGroup(id: UserSettings.shared.mainWindownName) {
@@ -287,23 +291,19 @@ struct openterfaceApp: App {
                                 HStack {
                                     Image(systemName: "keyboard.fill")
                                         .resizable()
-                                        .frame(width: 16, height: 12) // 调整图标大小
+                                        .frame(width: 16, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
                                     Image(systemName: "computermouse.fill")
                                         .resizable()
-                                        .frame(width: 10, height: 12) // 调整图标大小
+                                        .frame(width: 10, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
                         }
-//                        ToolbarItem(placement: .automatic) {
-//                            Image(systemName: "keyboard.fill")
-//                                .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
-//                        }
-//                        ToolbarItem(placement: .automatic) {
-//                            Image(systemName: "computermouse.fill")
-//                                .foregroundColor(colorForConnectionStatus(_isMouseConnected))
-//                        }
+                        // Add serial port information display
+                        ToolbarItem(placement: .automatic) {
+                            SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate)
+                        }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
                         }
@@ -326,6 +326,10 @@ struct openterfaceApp: App {
                         _isMouseConnected = AppStatus.isMouseConnected
                         _isSwitchToggleOn = AppStatus.isSwitchToggleOn
                         _hasHdmiSignal = AppStatus.hasHdmiSignal
+                        
+                        // 更新串口信息
+                        _serialPortName = AppStatus.serialPortName
+                        _serialPortBaudRate = AppStatus.serialPortBaudRate
                         
                         if _hasHdmiSignal == nil {
                             _resolution.width = "-"
@@ -431,6 +435,13 @@ struct openterfaceApp: App {
                     showUSBDevicesWindow()
                 }) {
                     Text("USB Info")
+                }
+                Divider()
+                
+                Button(action: {
+                    showResetFactoryWindow()
+                }) {
+                    Text("Reset Serial Tool")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -635,5 +646,43 @@ func showUSBDevicesWindow() {
     window.title = "USB Devices"
     window.setContentSize(NSSize(width: 400, height: 600))
     window.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
+}
+
+func showResetFactoryWindow() {
+    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetSerialToolWindow" }) {
+        // 如果窗口已存在，则使其震动并成为前台窗口
+        
+        // 使用系统提供的注意力请求功能（会使窗口或Dock图标弹跳）
+        NSApp.requestUserAttention(.criticalRequest)
+        
+        // 将窗口带到前台
+        existingWindow.makeKeyAndOrderFront(nil)
+        existingWindow.orderFrontRegardless()
+        return
+    }
+    
+    // 如果窗口不存在，则创建新窗口
+    let resetFactoryView = ResetFactoryView()
+    let controller = NSHostingController(rootView: resetFactoryView)
+    var window = NSWindow(contentViewController: controller)
+    window.title = "Reset Serial Tool"
+    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetSerialToolWindow")
+    window.setContentSize(NSSize(width: 400, height: 760))
+    window.styleMask = [.titled, .closable]
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+    
+    // 设置窗口关闭时的回调，以清除引用
+    window.isReleasedWhenClosed = false
+    NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { _ in
+        // aboutWindow = nil
+//        if let windown = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
+//            windown.close()
+//        }
+    }
+    
+    // 保存窗口引用
+    // aboutWindow = window
     NSApp.activate(ignoringOtherApps: true)
 }

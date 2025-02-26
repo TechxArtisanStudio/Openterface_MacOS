@@ -36,10 +36,11 @@ class HIDManager {
     private let queue = DispatchQueue(label: "com.openterface.hidCommunicator", qos: .background)
     
     private init() {
-        Logger.shared.log(content: "Detected Openterface devices: \(AppStatus.groupOpenterfaceDevices)")
         
         startHID()
         startCommunication()
+        let spm = SerialPortManager.shared
+        spm.tryOpenSerialPort()
     }
     
     func startHID() {

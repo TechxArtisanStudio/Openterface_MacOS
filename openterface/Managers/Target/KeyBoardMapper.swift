@@ -293,8 +293,10 @@ class KeyboardMapper {
         //        }
         
         keyDat[13] = calculateChecksum(data: keyDat)
-        
-        let _ = self.spm.writeByte(data:keyDat)
+        //
+        // let _ = self.spm.writeByte(data:keyDat)
+        //
+        let _ = spm.sendCommand(command: keyDat)
     }
     
     func calculateChecksum(data: [UInt8]) -> UInt8 {

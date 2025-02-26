@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
+		29E5E0DE2D6D594900E1849A /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DD2D6D594900E1849A /* AboutView.swift */; };
+		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
 		5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43B2B5A1A3800BADF35 /* UserSetting.swift */; };
 		5308F43E2B5A674E00BADF35 /* MouseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43D2B5A674E00BADF35 /* MouseManager.swift */; };
 		5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531665492C6F48F000E3F90F /* USBDevicesManager.swift */; };
@@ -25,7 +27,6 @@
 		53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */; };
 		53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC66092B8EDB390081F927 /* LoggerManager.swift */; };
 		53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC660E2B8EE70C0081F927 /* LogTests.swift */; };
-		53EE38402B45365700CCA753 /* SerialProtTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53EE383F2B45365700CCA753 /* SerialProtTests.swift */; };
 		53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F7C7122B440C8E00ED872F /* SerialPortManger.swift */; };
 		53F7C7162B44113100ED872F /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = 53F7C7152B44113100ED872F /* ORSSerial */; };
 		53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */; };
@@ -62,6 +63,8 @@
 
 /* Begin PBXFileReference section */
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
+		29E5E0DD2D6D594900E1849A /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
 		5308F43B2B5A1A3800BADF35 /* UserSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSetting.swift; sourceTree = "<group>"; };
 		5308F43D2B5A674E00BADF35 /* MouseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseManager.swift; sourceTree = "<group>"; };
 		531665492C6F48F000E3F90F /* USBDevicesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesManager.swift; sourceTree = "<group>"; };
@@ -78,7 +81,6 @@
 		53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		53CC66092B8EDB390081F927 /* LoggerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerManager.swift; sourceTree = "<group>"; };
 		53CC660E2B8EE70C0081F927 /* LogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTests.swift; sourceTree = "<group>"; };
-		53EE383F2B45365700CCA753 /* SerialProtTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialProtTests.swift; sourceTree = "<group>"; };
 		53F7C7122B440C8E00ED872F /* SerialPortManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortManger.swift; sourceTree = "<group>"; };
 		53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManager.swift; sourceTree = "<group>"; };
 		53FBE7AA2B3D66D2007785B0 /* openterface.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = openterface.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -217,7 +219,6 @@
 			children = (
 				53FBE7BF2B3D66D6007785B0 /* openterfaceTests.swift */,
 				53CC660E2B8EE70C0081F927 /* LogTests.swift */,
-				53EE383F2B45365700CCA753 /* SerialProtTests.swift */,
 			);
 			path = openterfaceTests;
 			sourceTree = "<group>";
@@ -253,6 +254,8 @@
 				53955CBF2BF497D000FA4493 /* SettingsScreen.swift */,
 				538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */,
 				2950CB502CE33C8D00888267 /* USBDevicesView.swift */,
+				29E5E0DD2D6D594900E1849A /* AboutView.swift */,
+				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -332,8 +335,9 @@
 		53FBE7A22B3D66D2007785B0 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				BuildIndependentTargetsInParallel = YES;
 				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 1620;
 				TargetAttributes = {
 					53FBE7A92B3D66D2007785B0 = {
 						CreatedOnToolsVersion = 15.0.1;
@@ -422,6 +426,8 @@
 				531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */,
 				5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */,
 				53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */,
+				29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */,
+				29E5E0DE2D6D594900E1849A /* AboutView.swift in Sources */,
 				53A6E1BF2B3E943300B652A5 /* PlayerView.swift in Sources */,
 				5351254D2B59177F0002A91E /* HostManager.swift in Sources */,
 				538F5E262C8AB1F50014CFB0 /* ToolBarView.swift in Sources */,
@@ -434,7 +440,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				53EE38402B45365700CCA753 /* SerialProtTests.swift in Sources */,
 				53FBE7C02B3D66D6007785B0 /* openterfaceTests.swift in Sources */,
 				53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */,
 			);
@@ -499,6 +504,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -562,6 +568,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -593,7 +600,8 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 35;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"openterface/Preview Content\"";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -609,8 +617,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -628,7 +635,8 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 35;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"openterface/Preview Content\"";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -644,8 +652,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -656,10 +663,10 @@
 		53FBE7D32B3D66D6007785B0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 368S6GT8T7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
@@ -675,10 +682,10 @@
 		53FBE7D42B3D66D6007785B0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 368S6GT8T7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
@@ -694,9 +701,9 @@
 		53FBE7D62B3D66D6007785B0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 368S6GT8T7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -711,9 +718,9 @@
 		53FBE7D72B3D66D6007785B0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 368S6GT8T7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;

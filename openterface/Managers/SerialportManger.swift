@@ -26,8 +26,9 @@ import ORSSerial
 import os.log
 
 class SerialPortManager: NSObject, ORSSerialPortDelegate {
-    static let shared = SerialPortManager()
     
+    static let shared = SerialPortManager()
+    var tryOpenTimer: Timer?
     var receiveBuffer = Data()
 
     public static var MOUSE_ABS_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x04, 0x07, 0x02]
@@ -40,6 +41,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     public static let DEFAULT_BAUDRATE:Int = 115200
     
     @objc let serialPortManager = ORSSerialPortManager.shared()
+    
     @objc dynamic var serialPort: ORSSerialPort? {
         didSet {
             oldValue?.close()
@@ -48,10 +50,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
     }
     
-    let ORSSPM = ORSSerialPortManager.shared()
+    
     @Published var serialFile: Int32 = 0
     
-    @Published var selectedSerialPort: ORSSerialPort?
     @Published var serialPorts : [ORSSerialPort] = []
     
     var lastHIDEventTime: Date?
@@ -60,66 +61,35 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     var baudrate:Int = 0
     public var ready:Bool = false
+    public var isRight:Bool = false
+    var isTrying:Bool = false
     
     override init(){
         super.init()
-        
-        // Initialise the serial port
-        self.initializeSerialPort()
 
-        observerSerialPortNotifications()
+        self.initializeSerialPort()
+        self.observerSerialPortNotifications()
+    }
+    
+    func initializeSerialPort(){
+
     }
     
     private func observerSerialPortNotifications() {
         let serialPortNtf = NotificationCenter.default
-        
+       
         serialPortNtf.addObserver(self, selector: #selector(serialPortsWereConnected(_:)), name: NSNotification.Name.ORSSerialPortsWereConnected, object: nil)
         serialPortNtf.addObserver(self, selector: #selector(serialPortsWereDisconnected(_:)), name: NSNotification.Name.ORSSerialPortsWereDisconnected, object: nil)
     }
-    
+
     @objc func serialPortsWereConnected(_ notification: Notification) {
         Logger.shared.log(content: "Serial port Connected")
-        self.initializeSerialPort()
+        self.tryOpenSerialPort()
     }
     
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
         Logger.shared.log(content: "Serial port Disconnected")
         self.closeSerialPort()
-        AppStatus.isTargetConnected = false
-        AppStatus.isKeyboardConnected = false
-        AppStatus.isMouseConnected = false
-    }
-
-    
-    func initializeSerialPort(){
-        DispatchQueue.global(qos: .background).async {
-            while !self.ready {
-                // try DEFAULT_BAUDRATE first
-                if self.selectedSerialPort != nil {
-                    self.closeSerialPort()
-                }   
-                self.openSerialPort(name: "usbserial", baudrate: SerialPortManager.DEFAULT_BAUDRATE)
-                self.getHidParameterCfg()
-                usleep(1000000) // sleep 1s
-
-                if self.ready { break }
-                // try ORIGINAL_BAUDRATE
-                self.closeSerialPort()
-                self.openSerialPort(name: "usbserial", baudrate: SerialPortManager.ORIGINAL_BAUDRATE)
-                self.getHidParameterCfg()
-                usleep(1000000) // sleep 1s
-                self.closeSerialPort()
-            }
-        }     
-        if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval:0.5, repeats: true) { [weak self] _ in
-                guard let self = self else { return }
-                if self.ready {
-                    // To check any HID events send to target computer
-                    self.checkCTS()
-                }
-            }
-        }
     }
 
     func checkCTS() {
@@ -160,6 +130,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
+
         if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial port was closed") }
     }
     
@@ -175,6 +146,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let prefix: [UInt8] = [0x57, 0xAB, 0x00]
         let dataBytes = [UInt8](data)
         if dataBytes.starts(with: prefix) {
+            self.isRight = true
             // get check the following bytes
             let len = dataBytes[4]
 
@@ -291,14 +263,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                     command.append(0x00)
                 }
                 self.sendCommand(command: command, force: true)
-                usleep(500000)
-                Logger.shared.log(content:"Reset chipset now...")
-                self.resetHidChip()
-                self.baudrate = SerialPortManager.DEFAULT_BAUDRATE
-                usleep(1000000)
-                closeSerialPort()
-                usleep(1000000)
-                openSerialPort(name: "usbserial", baudrate: SerialPortManager.DEFAULT_BAUDRATE)
             }
             
         case 0x89:  // set para cfg
@@ -314,101 +278,140 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {
-        self.selectedSerialPort = nil
+        self.serialPort = nil
     }
     
     func serialPort(_ serialPort: ORSSerialPort, didEncounterError error: Error) {
         if Logger.shared.SerialDataPrint { Logger.shared.log(content: "SerialPort \(serialPort) encountered an error: \(error)") }
+        self.closeSerialPort()
+        
     }
 
     func listSerialPorts() -> [ORSSerialPort] {
-        self.serialPorts = ORSSPM.availablePorts
+        self.serialPorts = serialPortManager.availablePorts
         return self.serialPorts
     }
     
-    func openSerialPort(name: String, baudrate: Int) {
-        //Open Serial
-        guard let availablePorts = ORSSerialPortManager.shared().availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
+    func tryOpenSerialPort( priorityBaudrate: Int =  SerialPortManager.DEFAULT_BAUDRATE) {
+        self.isTrying = true
+        // get all available serial ports
+        guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
             Logger.shared.log(content: "No available serial ports found")
             return
         }
-
         self.serialPorts = availablePorts // Get the list of available serial ports
         
-        // Print debug information
-        Logger.shared.log(content: "Available Ports: \(self.serialPorts)")
-        Logger.shared.log(content: "Looking for port with name: \(name)")
-        
-        // Use a filter to find ports that match the name
-        guard let selectedPort = self.serialPorts.first(where: { $0.path.contains(name) }) else {
-            Logger.shared.log(content: "No matching serial port found with name: \(name)")
-            return
-        }
-        self.selectedSerialPort = selectedPort
-        // self.selectedSerialPort = self.serialPorts.filter{ $0.path.contains(name)}.first
-        
-        self.selectedSerialPort?.baudRate = NSNumber(value: baudrate)
-        Logger.shared.log(content: "Try to open serial port: \(self.selectedSerialPort?.name) with baudrate \(baudrate)")
-        self.selectedSerialPort?.open()
-        
-        if self.selectedSerialPort?.isOpen == true {
-            // hostConnected
-            guard let port = self.selectedSerialPort else {
-                if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial port not selected") }
-                return
+        let backgroundQueue = DispatchQueue(label: "com.example.background", qos: .background)
+        backgroundQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            while !isRight {
+                // Try to connect with priority baudrate first
+                let baudrates = priorityBaudrate == SerialPortManager.DEFAULT_BAUDRATE ? 
+                    [SerialPortManager.DEFAULT_BAUDRATE, SerialPortManager.ORIGINAL_BAUDRATE] :
+                    [SerialPortManager.ORIGINAL_BAUDRATE, SerialPortManager.DEFAULT_BAUDRATE]
+                
+                for baudrate in baudrates {
+                    if self.tryConnectWithBaudrate(baudrate) {
+                        return // Connection successful, exit the loop
+                    }
+                }
             }
-            self.serialPort = port
-            let path = port.path
-            self.serialFile = open(path, O_RDWR | O_NOCTTY | O_NDELAY)
-            if self.serialFile == -1 {
-                Logger.shared.log(content: "Error: Unable to open port. errno: \(errno) - \(String(cString: strerror(errno)))")
-                return
-            }
-            
-            
-            var options = termios()
-            tcgetattr(self.serialFile, &options)
-            cfsetspeed(&options, speed_t(Int32(baudrate)))
-            options.c_cflag |= UInt((CLOCAL | CREAD))
-            tcsetattr(self.serialFile, TCSANOW, &options)
-            
-        } else {
-            Logger.shared.log(content: "Open serial failure")
         }
     }
     
-    func closeSerialPort() {
-        if self.serialFile != -1 {
-            close(self.serialFile)
-            self.serialFile = -1
-            self.selectedSerialPort = nil
-            self.serialPort = nil
-            Logger.shared.log(content: "Serial port closed")
-            self.ready = false
-        } else {
-            Logger.shared.log(content: "Error: Serial port not open")
+    // Helper method: Try to connect with specified baud rate
+    private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
+        self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+        if self.serialPort != nil {
+            self.openSerialPort(baudrate: baudrate)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.getHidParameterCfg()
+            }
+        }
+        
+        self.blockMainThreadFor2Seconds()
+        
+        if isRight { return true }
+        
+        self.closeSerialPort()
+        self.blockMainThreadFor2Seconds()
+        
+        return false
+    }
+    
+    func blockMainThreadFor2Seconds() {
+        let expirationDate = Date(timeIntervalSinceNow: 2)
+        while Date() < expirationDate {
+            RunLoop.current.run(mode: .default, before: expirationDate)
         }
     }
     
-    func writeByte(data: [UInt8]) {
-        guard self.selectedSerialPort != nil else {
-            Logger.shared.log(content: "Serial port not selected")
-            return
+    func openSerialPort( baudrate: Int) {
+
+        self.serialPort?.baudRate = NSNumber(value: baudrate)
+        self.serialPort?.delegate = self
+        
+        if let port = self.serialPort {
+            port.open()
+            if port.isOpen {
+                print(port.baudRate.intValue)
+                print("The serial port has been opened")
+                
+                // 更新AppStatus中的串口信息
+                AppStatus.serialPortBaudRate = port.baudRate.intValue
+                if let portPath = port.path as String? {
+                    AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
+                }
+                
+                self.baudrate = port.baudRate.intValue
+            } else {
+                print("the serial port fail to open")
+            }
         }
 
-        let _ = write(serialFile, data, data.count)
+    }
+
+    
+    func closeSerialPort() {
+        self.isRight = false
+        self.serialPort?.close()
+        self.serialPort = nil
+
+        AppStatus.isTargetConnected = false
+        AppStatus.isKeyboardConnected = false
+        AppStatus.isMouseConnected = false
         
-        let dataString = data.map { String(format: "0x%02X", $0) }.joined(separator: ", ")
-        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Sent data: \(dataString)") }
+        AppStatus.serialPortName = "N/A"
+        AppStatus.serialPortBaudRate = 0
     }
     
-    func sendCommand(command:[UInt8], force:Bool=false) {
-        var mutableCommand = command
-        mutableCommand.append(self.calculateChecksum(data: command))
-        
-        if self.ready || force{
-         let _ = self.writeByte(data: mutableCommand)
+    func sendCommand(command: [UInt8], force: Bool = false) {
+        guard let serialPort = self.serialPort , serialPort.isOpen else {
+            Logger.shared.log(content: "Serial port is not open or not selected")
+            return
         }
+    
+        // Create a mutable command and append the checksum
+        var mutableCommand = command
+        let checksum = self.calculateChecksum(data: command)
+        mutableCommand.append(checksum)
+        
+        // Convert [UInt8] to Data
+        let data = Data(mutableCommand)
+        
+        // Record the sent data
+        let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        print(self.serialPort?.isOpen)
+        Logger.shared.log(content: "➡️ Sending command: \(dataString)")
+        Logger.shared.log(content: "➡️ current baudRate: \(serialPort.baudRate)")
+        if self.isRight || force {
+            serialPort.send(data)
+        } else {
+            print("is not ready")
+        }
+        
+        
     }
     
     func calculateChecksum(data: [UInt8]) -> UInt8 {
@@ -437,13 +440,31 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
     }
     
-    // 可选：添加一个快捷方法来拉低 DTR
+    // Optional: Add a shortcut method to pull down DTR
     func lowerDTR() {
         setDTR(false)
     }
     
-    // 可选：添加一个快捷方法来拉高 DTR
+    // Optional: Add a shortcut method to pull up DTR
     func raiseDTR() {
         setDTR(true)
+    }
+
+    // Optional: Add a shortcut method to pull up RTS
+    func setRTS(_ enabled: Bool) {
+        if let port = self.serialPort {
+            port.rts = enabled
+            Logger.shared.log(content: "Set RTS to: \(enabled)")
+        } else {
+            Logger.shared.log(content: "Cannot set RTS: Serial port not available")
+        }
+    }
+    
+    func lowerRTS() {
+        setRTS(false)
+    }
+    
+    func raiseRTS() {
+        setRTS(true)
     }
 }

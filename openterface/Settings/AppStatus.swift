@@ -68,6 +68,9 @@ struct AppStatus {
     static var isHIDOpen: Bool?
     static let logFileName: String = "info.log"
     
+    static var serialPortName: String = "N/A"
+    static var serialPortBaudRate: Int = 0
+    
     static var isHardwareConnetionToTarget: Bool = true
     static var isHardwareSwitchOn: Bool = false {
         didSet {
