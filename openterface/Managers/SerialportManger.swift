@@ -357,6 +357,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             if port.isOpen {
                 print(port.baudRate.intValue)
                 print("The serial port has been opened")
+                
+                // 更新AppStatus中的串口信息
+                AppStatus.serialPortBaudRate = port.baudRate.intValue
+                if let portPath = port.path {
+                    AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
+                }
+                
+                self.baudrate = port.baudRate.intValue
             } else {
                 print("the serial port fail to open")
             }
