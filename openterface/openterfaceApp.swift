@@ -441,7 +441,7 @@ struct openterfaceApp: App {
                 Button(action: {
                     showResetFactoryWindow()
                 }) {
-                    Text("Reset Serial to Factory")
+                    Text("Reset Serial Tool")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -666,7 +666,7 @@ func showResetFactoryWindow() {
     let resetFactoryView = ResetFactoryView()
     let controller = NSHostingController(rootView: resetFactoryView)
     var window = NSWindow(contentViewController: controller)
-    window.title = "Reset Serial to Factory"
+    window.title = "Reset Serial Tool"
     window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetFactoryWindow")
     window.setContentSize(NSSize(width: 400, height: 760))
     window.styleMask = [.titled, .closable]

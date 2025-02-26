@@ -382,7 +382,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         AppStatus.isKeyboardConnected = false
         AppStatus.isMouseConnected = false
         
-        
+        AppStatus.serialPortName = "N/A"
+        AppStatus.serialPortBaudRate = 0
     }
     
     func sendCommand(command: [UInt8], force: Bool = false) {

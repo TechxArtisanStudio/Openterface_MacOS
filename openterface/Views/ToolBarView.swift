@@ -39,7 +39,7 @@ struct SerialInfoView: View {
             VStack(alignment: .leading, spacing: -2) {
                 Text("\(portName)")
                     .font(.system(size: 9, weight: .medium))
-                Text("\(baudRate) bps")
+                Text("\(baudRate) ")
                     .font(.system(size: 9, weight: .medium))
             }
         }

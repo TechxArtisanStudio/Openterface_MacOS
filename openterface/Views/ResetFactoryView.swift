@@ -59,6 +59,10 @@ struct ResetFactoryView: View {
                 
                 // Description
                 if !isCompleted && !isResetting {
+                    Text("When your mouse or keyboard stops working, you can try...")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                        .padding(.bottom, 20)
                     Text("This operation will restore the serial to factory settings")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
@@ -211,9 +215,12 @@ struct ResetFactoryView: View {
                 // Post-completion guidance
                 if isCompleted {
                     VStack(alignment: .leading, spacing: 15) {
-                         Text("If the problem persists, please try the following steps:")
+                        Text("If the issue persists, try physically disconnecting it by following these steps:")
                             .font(.system(size: 16, weight: .medium))
                             .padding(.bottom, 5)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(nil)
+                        
                         
                         ForEach(["1. Close the software", "2. Disconnect hardware", "3. Wait 3 seconds", "4. Reconnect hardware", "5. Restart software"], id: \.self) { step in
                             HStack(spacing: 10) {
@@ -264,7 +271,7 @@ struct ResetFactoryView: View {
                         softRebootSerial()
                         
                     })
-                    .frame(width: 160)
+                    .frame(width: 120)
                     
                     // Cancel button (only shown in error state)
                     // if hasError {
