@@ -37,6 +37,8 @@ class PlayerViewModel: NSObject, ObservableObject {
     var captureSession: AVCaptureSession!
     private var engine: AVAudioEngine!
     private var cancellables = Set<AnyCancellable>()
+    // 添加变量保存监听器ID
+    private var audioPropertyListenerID: AudioObjectPropertyListenerBlock?
     
     var hasObserverBeenAdded = false
     
@@ -58,6 +60,8 @@ class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func startAudioSession(){
+        stopAudioSession()
+        
         // Get the input node (microphone)
         let inputNode = engine.inputNode
         self.audioDeviceId = getAudioDeviceByName(name: "OpenterfaceA")
@@ -163,7 +167,7 @@ class PlayerViewModel: NSObject, ObservableObject {
                 if isAudioGranted {
                     self?.prepareAudio()
                 } else {
-                    self?.stopAuidoSession()
+                    self?.stopAudioSession()
                 }
             }
             .store(in: &cancellables)
@@ -259,9 +263,18 @@ class PlayerViewModel: NSObject, ObservableObject {
         AppStatus.isHDMIConnected = false
     }
     
-    func stopAuidoSession() {
+    func stopAudioSession() {
+        // 先检查引擎是否运行
+        if engine.isRunning {
+            engine.stop()
+            
+            // 断开所有连接
+            let inputNode = engine.inputNode
+            let outputNode = engine.outputNode
+            engine.disconnectNodeOutput(inputNode)
+        }
+        
         self.audioDeviceId = nil
-        self.engine.stop()
     }
     
     func prepareVideo() {
@@ -409,7 +422,7 @@ class PlayerViewModel: NSObject, ObservableObject {
 
                if self.getAudioDeviceByName(name: "OpenterfaceA") == nil {
                    Logger.shared.log(content: "Audio device disconnected.")
-                   self.stopAuidoSession()
+                   self.stopAudioSession()
                } else {
                    Logger.shared.log(content: "Audio device connected.")
                    self.prepareAudio()
@@ -425,6 +438,25 @@ class PlayerViewModel: NSObject, ObservableObject {
     deinit {
         let playViewNtf = NotificationCenter.default
         playViewNtf.removeObserver(self, name: .AVCaptureDeviceWasConnected, object: nil)
+        
+        // 停止音频引擎
+        stopAudioSession()
+        
+        // 移除音频属性监听器
+        if let listenerID = audioPropertyListenerID {
+            var propertyAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDevices,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &propertyAddress,
+                nil,
+                listenerID
+            )
+        }
     }
 
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
