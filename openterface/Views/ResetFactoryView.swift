@@ -28,6 +28,7 @@ struct ResetFactoryView: View {
         "4. Disabling RTS signal",
         "5. Closing serial port",
         "6. Reopening serial port",
+        "7, ReBoot serial port",
         "Factory reset completed!"
     ]
     
@@ -252,18 +253,18 @@ struct ResetFactoryView: View {
                         }
                         
                     })
-                    .frame(width: 220)
+                    .frame(width: 200)
                     .disabled(isResetting && !isCompleted && !hasError)
 
                     ColorButton(
                         color: .purple,
-                        title: "Soft Reboot Serial",
+                        title: "Reboot Serial",
                         textColor: .white,
                         action: {
                         softRebootSerial()
                         
                     })
-                    .frame(width: 220)
+                    .frame(width: 160)
                     
                     // Cancel button (only shown in error state)
                     // if hasError {
@@ -387,13 +388,18 @@ struct ResetFactoryView: View {
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                             currentStep = 6
-                            smp.tryOpenSerialPort()
+                            smp.tryOpenSerialPort(priorityBaudrate: SerialPortManager.ORIGINAL_BAUDRATE)
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                                 currentStep = 7
-                                isResetting = false
-                                isCompleted = true
+                                softRebootSerial()
                                 
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                                    currentStep = 8
+                                    
+                                    isResetting = false
+                                    isCompleted = true
+                                }
                             }
                         }
                     }
