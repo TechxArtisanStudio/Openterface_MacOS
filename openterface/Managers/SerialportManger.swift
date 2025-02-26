@@ -360,7 +360,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 
                 // 更新AppStatus中的串口信息
                 AppStatus.serialPortBaudRate = port.baudRate.intValue
-                if let portPath = port.path {
+                if let portPath = port.path as String? {
                     AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
                 }
                 

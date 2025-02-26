@@ -46,6 +46,10 @@ struct openterfaceApp: App {
     @State private var _resolution = (width: "", height: "")
     @State private var _fps = ""
     @State private var _ms2109version = ""
+    
+    // 添加串口信息状态变量
+    @State private var _serialPortName: String = "N/A"
+    @State private var _serialPortBaudRate: Int = 0
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -287,14 +291,18 @@ struct openterfaceApp: App {
                                 HStack {
                                     Image(systemName: "keyboard.fill")
                                         .resizable()
-                                        .frame(width: 16, height: 12) // 调整图标大小
+                                        .frame(width: 16, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
                                     Image(systemName: "computermouse.fill")
                                         .resizable()
-                                        .frame(width: 10, height: 12) // 调整图标大小
+                                        .frame(width: 10, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
+                        }
+                        // Add serial port information display
+                        ToolbarItem(placement: .automatic) {
+                            SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate)
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
@@ -318,6 +326,10 @@ struct openterfaceApp: App {
                         _isMouseConnected = AppStatus.isMouseConnected
                         _isSwitchToggleOn = AppStatus.isSwitchToggleOn
                         _hasHdmiSignal = AppStatus.hasHdmiSignal
+                        
+                        // 更新串口信息
+                        _serialPortName = AppStatus.serialPortName
+                        _serialPortBaudRate = AppStatus.serialPortBaudRate
                         
                         if _hasHdmiSignal == nil {
                             _resolution.width = "-"

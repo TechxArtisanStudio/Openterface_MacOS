@@ -211,7 +211,7 @@ struct ResetFactoryView: View {
                 // Post-completion guidance
                 if isCompleted {
                     VStack(alignment: .leading, spacing: 15) {
-                        Text("Next Steps")
+                         Text("If the problem persists, please try the following steps:")
                             .font(.system(size: 16, weight: .medium))
                             .padding(.bottom, 5)
                         
