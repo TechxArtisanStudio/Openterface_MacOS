@@ -650,7 +650,7 @@ func showUSBDevicesWindow() {
 }
 
 func showResetFactoryWindow() {
-    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
+    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetSerialToolWindow" }) {
         // 如果窗口已存在，则使其震动并成为前台窗口
         
         // 使用系统提供的注意力请求功能（会使窗口或Dock图标弹跳）
@@ -667,7 +667,7 @@ func showResetFactoryWindow() {
     let controller = NSHostingController(rootView: resetFactoryView)
     var window = NSWindow(contentViewController: controller)
     window.title = "Reset Serial Tool"
-    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetFactoryWindow")
+    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetSerialToolWindow")
     window.setContentSize(NSSize(width: 400, height: 760))
     window.styleMask = [.titled, .closable]
     window.center()
