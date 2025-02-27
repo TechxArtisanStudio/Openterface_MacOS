@@ -62,34 +62,58 @@ class PlayerViewModel: NSObject, ObservableObject {
     func startAudioSession(){
         stopAudioSession()
         
-        // Get the input node (microphone)
-        let inputNode = engine.inputNode
-        self.audioDeviceId = getAudioDeviceByName(name: "OpenterfaceA")
-        if self.audioDeviceId == nil {
-            return
-        }
-        let outputNode = engine.outputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
+        // 重新创建音频引擎，避免重用可能导致的状态问题
+        engine = AVAudioEngine()
+        
+        // 添加延迟，确保设备完全初始化
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                // Get the input node (microphone)
+                let inputNode = self.engine.inputNode
+                self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
+                if self.audioDeviceId == nil {
+                    return
+                }
+                let outputNode = self.engine.outputNode
+                let inputFormat = inputNode.outputFormat(forBus: 0)
+                let outputFormat = outputNode.inputFormat(forBus: 0)
+                
+                // 检查并适配采样率
+                var format = inputFormat
+                if inputFormat.sampleRate != outputFormat.sampleRate {
+                    // 创建一个采样率匹配的新格式
+                    format = AVAudioFormat(
+                        commonFormat: inputFormat.commonFormat,
+                        sampleRate: outputFormat.sampleRate,
+                        channels: inputFormat.channelCount,
+                        interleaved: inputFormat.isInterleaved) ?? outputFormat
+                    Logger.shared.log(content: "Adjusting sample rate from \(inputFormat.sampleRate) to \(outputFormat.sampleRate)")
+                }
 
-        var address = AudioObjectPropertyAddress(
-          mSelector: kAudioHardwarePropertyDefaultInputDevice,
-          mScope: kAudioObjectPropertyScopeGlobal,
-          mElement: kAudioObjectPropertyElementMain)
-        _ = AudioObjectSetPropertyData(
-          AudioObjectID(kAudioObjectSystemObject),
-          &address,
-          0,
-          nil,
-          UInt32(MemoryLayout<AudioDeviceID>.size),
-          &audioDeviceId
-        )
-        
-        engine.connect(inputNode, to: outputNode, format: inputFormat)
-        
-        do {
-            try engine.start()
-        } catch {
-            Logger.shared.log(content: "Error starting AVAudioEngine: \(error)")
+                var address = AudioObjectPropertyAddress(
+                  mSelector: kAudioHardwarePropertyDefaultInputDevice,
+                  mScope: kAudioObjectPropertyScopeGlobal,
+                  mElement: kAudioObjectPropertyElementMain)
+                _ = AudioObjectSetPropertyData(
+                  AudioObjectID(kAudioObjectSystemObject),
+                  &address,
+                  0,
+                  nil,
+                  UInt32(MemoryLayout<AudioDeviceID>.size),
+                  &self.audioDeviceId
+                )
+                
+                // 使用兼容的格式连接节点
+                try self.engine.connect(inputNode, to: outputNode, format: format)
+                
+                try self.engine.start()
+            } catch {
+                Logger.shared.log(content: "Error setting up audio session: \(error.localizedDescription)")
+                // 发生错误时重置引擎
+                self.stopAudioSession()
+            }
         }
     }
     
@@ -266,12 +290,15 @@ class PlayerViewModel: NSObject, ObservableObject {
     func stopAudioSession() {
         // 先检查引擎是否运行
         if engine.isRunning {
+            // 先停止引擎，避免在断开连接时出现错误
             engine.stop()
             
-            // 断开所有连接
+            // 断开所有连接前先检查节点是否有效
             let inputNode = engine.inputNode
-            let outputNode = engine.outputNode
             engine.disconnectNodeOutput(inputNode)
+            
+            // 重置引擎
+            engine.reset()
         }
         
         self.audioDeviceId = nil
@@ -363,23 +390,28 @@ class PlayerViewModel: NSObject, ObservableObject {
             }
         }
 
-        self.audioDeviceId = getAudioDeviceByName(name: "OpenterfaceA")
-        if self.audioDeviceId == nil {
-            return
-        }
-        
-        if audioDevices.count > 0 {
-            do {
-                let input = try AVCaptureDeviceInput(device:audioDevices[0])
-                addInput(input)
+        // 检查设备是否存在，使用延迟确保设备初始化完成
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            
+            self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
+            if self.audioDeviceId == nil {
+                return
             }
-            catch {
-                Logger.shared.log(content: "Something went wrong - " + error.localizedDescription)
+            
+            if audioDevices.count > 0 {
+                do {
+                    let input = try AVCaptureDeviceInput(device:audioDevices[0])
+                    self.addInput(input)
+                }
+                catch {
+                    Logger.shared.log(content: "Something went wrong - " + error.localizedDescription)
+                }
             }
-        }
-        
-        if self.audioDeviceId != nil {
-            startAudioSession()
+            
+            if self.audioDeviceId != nil {
+                self.startAudioSession()
+            }
         }
     }
 
@@ -414,32 +446,50 @@ class PlayerViewModel: NSObject, ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
         
-       let result = AudioObjectAddPropertyListenerBlock(
-           AudioObjectID(kAudioObjectSystemObject),
-           &propertyAddress,
-           nil,
-           { (numberAddresses, addresses) in
+        // 保存监听器ID以便后续移除
+        self.audioPropertyListenerID = { (numberAddresses, addresses) in
+            // 先停止当前音频会话，防止访问已断开的设备
+            DispatchQueue.main.async {
+                do {
+                    if self.getAudioDeviceByName(name: "OpenterfaceA") == nil {
+                        Logger.shared.log(content: "Audio device disconnected.")
+                        self.stopAudioSession()
+                    } else {
+                        Logger.shared.log(content: "Audio device connected.")
+                        // 确保完全停止后再准备新的音频会话
+                        self.stopAudioSession()
+                        // 短暂延迟后再准备音频，确保设备稳定
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.prepareAudio()
+                        }
+                    }
+                } catch {
+                    Logger.shared.log(content: "Error handling audio device change: \(error.localizedDescription)")
+                    self.stopAudioSession()
+                }
+            }
+        }
+        
+        let result = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            nil,
+            self.audioPropertyListenerID!
+        )
 
-               if self.getAudioDeviceByName(name: "OpenterfaceA") == nil {
-                   Logger.shared.log(content: "Audio device disconnected.")
-                   self.stopAudioSession()
-               } else {
-                   Logger.shared.log(content: "Audio device connected.")
-                   self.prepareAudio()
-               }
-           }
-       )
-
-       if result != kAudioHardwareNoError {
-           Logger.shared.log(content: "Error adding property listener: \(result)")
-       }
+        if result != kAudioHardwareNoError {
+            Logger.shared.log(content: "Error adding property listener: \(result)")
+        }
     }
     
     deinit {
         let playViewNtf = NotificationCenter.default
         playViewNtf.removeObserver(self, name: .AVCaptureDeviceWasConnected, object: nil)
+        playViewNtf.removeObserver(self, name: .AVCaptureDeviceWasDisconnected, object: nil)
+        playViewNtf.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
+        playViewNtf.removeObserver(self, name: NSWindow.didResignMainNotification, object: nil)
         
-        // 停止音频引擎
+        // 先停止音频引擎
         stopAudioSession()
         
         // 移除音频属性监听器
@@ -456,6 +506,7 @@ class PlayerViewModel: NSObject, ObservableObject {
                 nil,
                 listenerID
             )
+            audioPropertyListenerID = nil
         }
     }
 
