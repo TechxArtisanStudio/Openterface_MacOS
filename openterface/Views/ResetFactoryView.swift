@@ -36,7 +36,7 @@ struct ResetFactoryView: View {
     @State private var serialPortStatus: String = ""
     @State private var hasError: Bool = false
     @State private var stepMessages = [
-        "Preparing to reset Serial to factory settings...",
+        "Preparing to reset serial to factory settings...",
         "1. Checking serial port connection",
         "2. Starting serial to factory reset",
         "3. Enabling RTS signal",
