@@ -60,7 +60,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     var timer:Timer?
     
     var baudrate:Int = 0
-    public var ready:Bool = false
     public var isRight:Bool = false
     var isTrying:Bool = false
     
@@ -252,7 +251,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             self.baudrate = Int(baudrateInt32)
             Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
             if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
-                self.ready = true
+                self.isRight = true
                 self.getHidInfo()
             }
             else {
@@ -355,10 +354,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         if let port = self.serialPort {
             port.open()
             if port.isOpen {
-                print(port.baudRate.intValue)
                 print("The serial port has been opened")
                 
-                // 更新AppStatus中的串口信息
+                // update AppStatus info
                 AppStatus.serialPortBaudRate = port.baudRate.intValue
                 if let portPath = port.path as String? {
                     AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
@@ -430,7 +428,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         self.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO)
     }
     
-    // 添加设置 DTR 的方法
     func setDTR(_ enabled: Bool) {
         if let port = self.serialPort {
             port.dtr = enabled
@@ -440,17 +437,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
     }
     
-    // Optional: Add a shortcut method to pull down DTR
     func lowerDTR() {
         setDTR(false)
     }
     
-    // Optional: Add a shortcut method to pull up DTR
     func raiseDTR() {
         setDTR(true)
     }
 
-    // Optional: Add a shortcut method to pull up RTS
     func setRTS(_ enabled: Bool) {
         if let port = self.serialPort {
             port.rts = enabled

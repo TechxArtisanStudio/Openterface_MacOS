@@ -241,7 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
         
         // If the window is at normal size, zoom to maximum
-        print(currentFrame.size.width)
+
         if currentFrame.size.width  <= aspectRatio.width {
             
             // Calculate the maximum possible width while maintaining aspect ratio

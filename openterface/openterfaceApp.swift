@@ -441,7 +441,7 @@ struct openterfaceApp: App {
                 Button(action: {
                     showResetFactoryWindow()
                 }) {
-                    Text("Reset Serial Tool")
+                    Text("Serial Reset Tool...")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -665,8 +665,8 @@ func showResetFactoryWindow() {
     // 如果窗口不存在，则创建新窗口
     let resetFactoryView = ResetFactoryView()
     let controller = NSHostingController(rootView: resetFactoryView)
-    var window = NSWindow(contentViewController: controller)
-    window.title = "Reset Serial Tool"
+    let window = NSWindow(contentViewController: controller)
+    window.title = "Serial Reset Tool"
     window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetSerialToolWindow")
     window.setContentSize(NSSize(width: 400, height: 760))
     window.styleMask = [.titled, .closable]

@@ -1,9 +1,24 @@
-//
-//  ResetFactoryView.swift
-//  openterface
-//
-//  Created by Shawn on 2025/2/25.
-//
+/*
+* ========================================================================== *
+*                                                                            *
+*    This file is part of the Openterface Mini KVM                           *
+*                                                                            *
+*    Copyright (C) 2024   <info@openterface.com>                             *
+*                                                                            *
+*    This program is free software: you can redistribute it and/or modify    *
+*    it under the terms of the GNU General Public License as published by    *
+*    the Free Software Foundation version 3.                                 *
+*                                                                            *
+*    This program is distributed in the hope that it will be useful, but     *
+*    WITHOUT ANY WARRANTY; without even the implied warranty of              *
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU        *
+*    General Public License for more details.                                *
+*                                                                            *
+*    You should have received a copy of the GNU General Public License       *
+*    along with this program. If not, see <http://www.gnu.org/licenses/>.    *
+*                                                                            *
+* ========================================================================== *
+*/
 
 import SwiftUI
 import Foundation
@@ -23,7 +38,7 @@ struct ResetFactoryView: View {
     @State private var stepMessages = [
         "Preparing to reset Serial to factory settings...",
         "1. Checking serial port connection",
-        "2. Starting Serial to factory reset",
+        "2. Starting serial to factory reset",
         "3. Enabling RTS signal",
         "4. Disabling RTS signal",
         "5. Closing serial port",
@@ -291,13 +306,13 @@ struct ResetFactoryView: View {
                     //     }
                     // }
                 }
-                .padding(.bottom, isCompleted ? 30 : 10) // 增加底部按钮的留白，特别是在完成状态下
+                .padding(.bottom, isCompleted ? 30 : 10)
                 
                 // Spacer to maintain consistent window size
                 Spacer(minLength: isCompleted ? 120 : 80)
             }
             .padding(.horizontal, 30)
-            .padding(.bottom, isCompleted ? 20 : 0) // 增加整个VStack底部的留白
+            .padding(.bottom, isCompleted ? 20 : 0)
         }
         .frame(width: 500, height: 760) // Increased height for new buttons
     }
@@ -305,11 +320,9 @@ struct ResetFactoryView: View {
     func softRebootSerial() {
         smp.resetHidChip()
         
-        // 等待 0.5 秒后关闭串口
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             smp.closeSerialPort()
             
-            // 再等待 0.5 秒后尝试启动串口
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 smp.tryOpenSerialPort()
             }
