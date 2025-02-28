@@ -400,8 +400,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         // Record the sent data
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        Logger.shared.log(content: "Sending command: \(dataString)")
-        Logger.shared.log(content: "current baudRate: \(serialPort.baudRate)")
+
         if self.isRight || force {
             serialPort.send(data)
         } else {
