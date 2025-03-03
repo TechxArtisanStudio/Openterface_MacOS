@@ -115,13 +115,19 @@ func isKeyboardEvent(type:CGEventType) -> Bool{
     return [.keyDown, .keyUp].contains(type)
 }
 
-func scrollWheelEventDeltaMapping(delta:Int) -> UInt8 {
-    if Int(delta) == 0 {
+func scrollWheelEventDeltaMapping(delta: Int) -> UInt8 {
+    // Add slowdown factor, larger value means slower scrolling
+    let slowdownFactor = 2.5
+    
+    // Apply slowdown factor
+    let slowedDelta = Int(Double(delta) / slowdownFactor)
+    
+    if slowedDelta == 0 {
         return 0
-    } else if Int(delta) > 0 {
-        return UInt8(min(delta, 127))
+    } else if slowedDelta > 0 {
+        return UInt8(min(slowedDelta, 127))  // 上滚：0x01-0x7F
     }
-    return 0xFF -  UInt8(abs(max(Int(delta),-128))) + 1
+    return 0xFF - UInt8(abs(max(slowedDelta, -128))) + 1  // 下滚：0x81-0xFF
 }
 
 func mouseKeyMapper(hidMouseEventType:CGEventType) -> UInt8{
