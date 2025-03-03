@@ -72,13 +72,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     window.minSize = NSSize(width: aspectRatio.width / 2, height: aspectRatio.height / 2)
                     // Set maximum size to something reasonable (2x initial size)
                     window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
-                    
                     window.center()
                 }
                     
                    
             }
         }
+
+        // Disable window tabbing feature, which makes the "Show Tab Bar" menu item unavailable
+        NSWindow.allowsAutomaticWindowTabbing = false
     }
     
     func windowDidResize(_ notification: Notification) {
