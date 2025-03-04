@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
+		295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManger.swift */; };
+		295DCFB82D76B0F40034BB1E /* VideoManeger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB72D76B0F40034BB1E /* VideoManeger.swift */; };
+		295DCFBA2D76C2370034BB1E /* DeviceNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB92D76C2370034BB1E /* DeviceNotificationManager.swift */; };
 		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
 		5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43B2B5A1A3800BADF35 /* UserSetting.swift */; };
 		5308F43E2B5A674E00BADF35 /* MouseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43D2B5A674E00BADF35 /* MouseManager.swift */; };
@@ -62,6 +65,9 @@
 
 /* Begin PBXFileReference section */
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
+		295DCFB52D76A8A20034BB1E /* AudioManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManger.swift; sourceTree = "<group>"; };
+		295DCFB72D76B0F40034BB1E /* VideoManeger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoManeger.swift; sourceTree = "<group>"; };
+		295DCFB92D76C2370034BB1E /* DeviceNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceNotificationManager.swift; sourceTree = "<group>"; };
 		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
 		5308F43B2B5A1A3800BADF35 /* UserSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSetting.swift; sourceTree = "<group>"; };
 		5308F43D2B5A674E00BADF35 /* MouseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseManager.swift; sourceTree = "<group>"; };
@@ -240,6 +246,9 @@
 				53CC66092B8EDB390081F927 /* LoggerManager.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */,
+				295DCFB52D76A8A20034BB1E /* AudioManger.swift */,
+				295DCFB72D76B0F40034BB1E /* VideoManeger.swift */,
+				295DCFB92D76C2370034BB1E /* DeviceNotificationManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -404,6 +413,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				295DCFBA2D76C2370034BB1E /* DeviceNotificationManager.swift in Sources */,
+				295DCFB82D76B0F40034BB1E /* VideoManeger.swift in Sources */,
+				295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */,
 				5384629B2BFF1778002966FE /* AreaSeletor.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */,
