@@ -25,178 +25,64 @@ import AVFoundation
 import Combine
 import CoreAudio
 
-
+/// ViewModel for handling audio and video capture and playback
 class PlayerViewModel: NSObject, ObservableObject {
-
+    
+    // MARK: - Published Properties
+    
+    /// Indicates if camera permission is granted
     @Published var isVideoGranted: Bool = false
+    
+    /// Indicates if microphone permission is granted
     @Published var isAudioGranted: Bool = false
+    
+    /// Current video dimensions
     @Published var dimensions = CMVideoDimensions()
     
-    var audioDeviceId:AudioDeviceID? = nil
+    // MARK: - Properties
     
+    /// ID of the audio device being used
+    var audioDeviceId: AudioDeviceID? = nil
+    
+    /// Session for capturing video and audio
     var captureSession: AVCaptureSession!
+    
+    /// Audio engine for processing audio
     private var engine: AVAudioEngine!
+    
+    /// Set of cancellables for managing publishers
     private var cancellables = Set<AnyCancellable>()
-    // 添加变量保存监听器ID
+    
+    /// Audio property listener ID for observing audio device changes
     private var audioPropertyListenerID: AudioObjectPropertyListenerBlock?
     
+    /// Flag to prevent adding observers multiple times
     var hasObserverBeenAdded = false
+    
+    // MARK: - Initialization
     
     override init() {
         captureSession = AVCaptureSession()
         engine = AVAudioEngine()
         super.init()
+        
         self.setupBindings()
-
         setupSession()
         
         if AppStatus.isFristRun == false {
-            // Add observe event
+            // Add device notification observers
             self.observeDeviceNotifications()
-            
             AppStatus.isFristRun = true
         }
-        
-    }
-
-    func startAudioSession(){
-        stopAudioSession()
-        
-        // 重新创建音频引擎，避免重用可能导致的状态问题
-        engine = AVAudioEngine()
-        
-        // 添加延迟，确保设备完全初始化
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self = self else { return }
-            
-            do {
-                // Get the input node (microphone)
-                let inputNode = self.engine.inputNode
-                self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
-                if self.audioDeviceId == nil {
-                    return
-                }
-                let outputNode = self.engine.outputNode
-                let inputFormat = inputNode.outputFormat(forBus: 0)
-                let outputFormat = outputNode.inputFormat(forBus: 0)
-                
-                // 检查并适配采样率
-                var format = inputFormat
-                if inputFormat.sampleRate != outputFormat.sampleRate {
-                    // 创建一个采样率匹配的新格式
-                    format = AVAudioFormat(
-                        commonFormat: inputFormat.commonFormat,
-                        sampleRate: outputFormat.sampleRate,
-                        channels: inputFormat.channelCount,
-                        interleaved: inputFormat.isInterleaved) ?? outputFormat
-                    Logger.shared.log(content: "Adjusting sample rate from \(inputFormat.sampleRate) to \(outputFormat.sampleRate)")
-                }
-
-                var address = AudioObjectPropertyAddress(
-                  mSelector: kAudioHardwarePropertyDefaultInputDevice,
-                  mScope: kAudioObjectPropertyScopeGlobal,
-                  mElement: kAudioObjectPropertyElementMain)
-                _ = AudioObjectSetPropertyData(
-                  AudioObjectID(kAudioObjectSystemObject),
-                  &address,
-                  0,
-                  nil,
-                  UInt32(MemoryLayout<AudioDeviceID>.size),
-                  &self.audioDeviceId
-                )
-                
-                // 使用兼容的格式连接节点
-                try self.engine.connect(inputNode, to: outputNode, format: format)
-                
-                try self.engine.start()
-            } catch {
-                Logger.shared.log(content: "Error setting up audio session: \(error.localizedDescription)")
-                // 发生错误时重置引擎
-                self.stopAudioSession()
-            }
-        }
     }
     
-    func getAudioDeviceByName(name: String) -> AudioDeviceID? {
-        var propSize: UInt32 = 0
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain)
-
-        var result = AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &propSize)
-        guard result == noErr else {
-            Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyDataSize")
-            return nil
-        }
-
-        let deviceCount = Int(propSize) / MemoryLayout<AudioDeviceID>.size
-        var deviceIDs = Array<AudioDeviceID>(repeating: 0, count: deviceCount)
-
-        result = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &propSize, &deviceIDs)
-        guard result == noErr else {
-            Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyData")
-            return nil
-        }
-
-        for deviceID in deviceIDs {
-            var nameSize = UInt32(MemoryLayout<CFString>.size)
-            var nameAddress = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyDeviceNameCFString,
-                mScope: kAudioObjectPropertyScopeGlobal,
-                mElement: kAudioObjectPropertyElementMain
-            )
-
-            result = AudioObjectGetPropertyDataSize(deviceID, &nameAddress, 0, nil, &nameSize)
-            guard result == noErr else {
-                Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyDataSize")
-                continue
-            }
-
-            var deviceName: Unmanaged<CFString>?
-            result = AudioObjectGetPropertyData(
-                deviceID,
-                &nameAddress,
-                0,
-                nil,
-                &nameSize,
-                &deviceName
-            )
-            guard result == noErr else {
-                Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyData")
-                continue
-            }
-            
-            if let cfString = deviceName?.takeRetainedValue() as String?, cfString == name {
-                return deviceID
-            }
-        }
-
-        return nil
-    }
-
-    func setupBindings() {
-        $isVideoGranted
-            .sink { [weak self] isVideoGranted in
-                if isVideoGranted {
-                    self?.prepareVideo()
-                } else {
-                    self?.stopVideoSession()
-                }
-            }
-            .store(in: &cancellables)
-        
-        $isAudioGranted
-            .sink { [weak self] isAudioGranted in
-                if isAudioGranted {
-                    self?.prepareAudio()
-                } else {
-                    self?.stopAudioSession()
-                }
-            }
-            .store(in: &cancellables)
+    deinit {
+        cleanupObservers()
     }
     
+    // MARK: - Setup Methods
+    
+    /// Sets up the capture session with outputs
     func setupSession() {
         let videoDataOutput = AVCaptureVideoDataOutput()
         if captureSession.canAddOutput(videoDataOutput) {
@@ -208,247 +94,66 @@ class PlayerViewModel: NSObject, ObservableObject {
             captureSession.addOutput(audioDataOutput)
         }
     }
-
-    func checkAuthorization() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-            case .authorized: // The user has previously granted access to the camera.
-                self.isVideoGranted = true
-
-            case .notDetermined: // The user has not yet been asked for camera access.
-                AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                    if granted {
-                        DispatchQueue.main.async {
-                            self?.isVideoGranted = granted
-                        }
-                    }
-                }
-            case .denied: // The user has previously denied access.
-                alertToEncourageCameraAccessInitially()
-                self.isVideoGranted = false
-                // exit application
-                // NSApplication.shared.terminate(self)
-                // exit(0)
-                return
-
-            case .restricted: // The user can't grant access due to restrictions.
-                self.isVideoGranted = false
-                return
-        @unknown default:
-            fatalError()
-        }
-
-        // Check audio permission
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: // The user has previously granted access to the camera.
-            self.isAudioGranted = true
-            
-        case .notDetermined: // The user has not yet been asked for camera access.
-            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-                if granted {
-                    DispatchQueue.main.async {
-                        self?.isAudioGranted = granted
-                    }
+    
+    /// Configures data bindings between published properties and actions
+    func setupBindings() {
+        // When video permission changes, update video session
+        $isVideoGranted
+            .sink { [weak self] isVideoGranted in
+                if isVideoGranted {
+                    self?.prepareVideo()
+                } else {
+                    self?.stopVideoSession()
                 }
             }
-        case .denied: // The user has previously denied access.
-            alertToEncourageCameraAccessInitially()
-            self.isAudioGranted = false
-            // exit application
-            // NSApplication.shared.terminate(self)
-            // exit(0)
-            return
-            
-        case .restricted: // The user can't grant access due to restrictions.
-            self.isAudioGranted = false
-            return
-        @unknown default:
-            fatalError()
-        }
-    }
-    
-    func alertToEncourageCameraAccessInitially() {
-        let alert = NSAlert()
-        alert.messageText = "Camera Access Required"
-        alert.informativeText = "⚠️This application does not have permission to access your camera.\n\nYou can enable it in \"System Preferences\" -> \"Privacy\" -> \"Camera\"."
-        alert.addButton(withTitle: "OK")
-        alert.alertStyle = .warning
-        alert.runModal()
-    }
-
-    func startVideoSession() {
-        Logger.shared.log(content: "Start video session...")
-        guard !captureSession.isRunning else { return }
-        captureSession.startRunning()
-    }
-
-    func stopVideoSession() {
-        guard captureSession.isRunning else { return }
-        captureSession.stopRunning()
-        AppStatus.isHDMIConnected = false
-    }
-    
-    func stopAudioSession() {
-        // 先检查引擎是否运行
-        if engine.isRunning {
-            // 先停止引擎，避免在断开连接时出现错误
-            engine.stop()
-            
-            // 断开所有连接前先检查节点是否有效
-            let inputNode = engine.inputNode
-            engine.disconnectNodeOutput(inputNode)
-            
-            // 重置引擎
-            engine.reset()
-        }
+            .store(in: &cancellables)
         
-        self.audioDeviceId = nil
-    }
-    
-    func prepareVideo() {
-        
-        if #available(macOS 12.0, *) {
-            USBDeivcesManager.shared.update()
-        } else {
-            Logger.shared.log(content: "Warning: USB device management requires macOS 12.0 or later. Current device status cannot be updated.")
-        }
-        
-        captureSession.sessionPreset = .high // A preset value that indicates the quality level or bit rate of the output.
-        // get devices
-        let videioDeviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera,
-                                                         .externalUnknown]
-        let videoDiscoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: videioDeviceTypes,
-                                                                mediaType: .video,
-                                                                position: .unspecified)
-                                                             
-        var videoDevices = [AVCaptureDevice]()
-        // Add only specified input device
-        for device in videoDiscoverySession.devices {
-            // 0x
-            if let _v = AppStatus.DefaultVideoDevice {
-                if(matchesLocalID(device.uniqueID, _v.locationID)){
-                    videoDevices.append(device)
-                    AppStatus.isMatchVideoDevice = true
+        // When audio permission changes, update audio session
+        $isAudioGranted
+            .sink { [weak self] isAudioGranted in
+                if isAudioGranted {
+                    self?.prepareAudio()
+                } else {
+                    self?.stopAudioSession()
                 }
             }
-        }
-
-        if videoDevices.count > 0 {
-            do {
-                let input = try AVCaptureDeviceInput(device:videoDevices[0])
-                addInput(input)
-            }
-            catch {
-                Logger.shared.log(content: "Something went wrong - " + error.localizedDescription)
-            }
-            // Get the Camera video resolution
-            let formatDescription = videoDevices[0].activeFormat.formatDescription
-            dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
-            AppStatus.videoDimensions.width = CGFloat(dimensions.width)
-            AppStatus.videoDimensions.height = CGFloat(dimensions.height)
-            // Logger.shared.log(content: "Resolution: \(dimensions.width) x \(dimensions.height)")
- 
-            startVideoSession()
-            AppStatus.isHDMIConnected = true
-        }
+            .store(in: &cancellables)
     }
     
-    func matchesLocalID(_ uniqueID: String, _ locationID: String) -> Bool {
-        func hexToInt64(_ hex: String) -> UInt64 {
-            return UInt64(hex.replacingOccurrences(of: "0x", with: ""), radix: 16) ?? 0
-        }
-
-        let uniqueIDValue = hexToInt64(uniqueID)
-        
-        let locationIDValue = hexToInt64(locationID)
-        
-        let maskedUniqueID = uniqueIDValue >> 32
-        
-        if(maskedUniqueID == locationIDValue) {
-            return true
-        } else {
-            return false
-        }
-    }
-
-    func prepareAudio() {
-        if self.audioDeviceId != nil {
-            return
-        }
-        Logger.shared.log(content: "Prepare audio ...")
-        
-        let audioDeviceTypes: [AVCaptureDevice.DeviceType] = [.builtInMicrophone,
-                                                         .externalUnknown]
-        let audioDiscoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: audioDeviceTypes,
-                                                                mediaType: .audio,
-                                                                position: .unspecified)
-        var audioDevices = [AVCaptureDevice]()
-        // Add only specified input device
-        for device in audioDiscoverySession.devices {
-            // 0x
-            if device.uniqueID.contains(AppStatus.DefaultVideoDevice?.locationID ?? "nil"), !audioDevices.contains(where: { $0.localizedName == device.localizedName }) {
-                audioDevices.append(device)
-            }
-        }
-
-        // 检查设备是否存在，使用延迟确保设备初始化完成
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self = self else { return }
-            
-            self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
-            if self.audioDeviceId == nil {
-                return
-            }
-            
-            if audioDevices.count > 0 {
-                do {
-                    let input = try AVCaptureDeviceInput(device:audioDevices[0])
-                    self.addInput(input)
-                }
-                catch {
-                    Logger.shared.log(content: "Something went wrong - " + error.localizedDescription)
-                }
-            }
-            
-            if self.audioDeviceId != nil {
-                self.startAudioSession()
-            }
-        }
-    }
-
-    func addInput(_ input: AVCaptureInput) {
-        guard captureSession.canAddInput(input) == true else {
-            return
-        }
-        captureSession.addInput(input)
-    }
-    
+    /// Sets up notification observers for device connections and window events
     func observeDeviceNotifications() {
-        let playViewNtf = NotificationCenter.default
+        let notificationCenter = NotificationCenter.default
         
         guard !hasObserverBeenAdded else { return }
         
-        // get video source event
-        playViewNtf.addObserver(self, selector: #selector(videoWasConnected), name: .AVCaptureDeviceWasConnected, object: nil)
-        playViewNtf.addObserver(self, selector: #selector(videoWasDisconnected), name: .AVCaptureDeviceWasDisconnected, object: nil)
+        // Video device connection events
+        notificationCenter.addObserver(self, selector: #selector(videoWasConnected), 
+                                     name: .AVCaptureDeviceWasConnected, object: nil)
+        notificationCenter.addObserver(self, selector: #selector(videoWasDisconnected), 
+                                     name: .AVCaptureDeviceWasDisconnected, object: nil)
         
-        // focus windows event
-        playViewNtf.addObserver(self, selector: #selector(windowDidBecomeMain(_:)), name: NSWindow.didBecomeMainNotification, object: nil)
-        playViewNtf.addObserver(self, selector: #selector(windowdidResignMain(_:)), name: NSWindow.didResignMainNotification, object: nil)
-        
-        // observer full Screen Nootification
-        // playViewNtf.addObserver(self, selector: #selector(handleDidEnterFullScreenNotification(_:)), name: NSWindow.didEnterFullScreenNotification, object: nil)
+        // Window focus events
+        notificationCenter.addObserver(self, selector: #selector(windowDidBecomeMain(_:)), 
+                                     name: NSWindow.didBecomeMainNotification, object: nil)
+        notificationCenter.addObserver(self, selector: #selector(windowdidResignMain(_:)), 
+                                     name: NSWindow.didResignMainNotification, object: nil)
         
         self.hasObserverBeenAdded = true
-        // Handle audio device disconnected
+        
+        // Setup audio device change monitoring
+        setupAudioDeviceChangeListener()
+    }
+    
+    /// Sets up a listener for audio device changes
+    private func setupAudioDeviceChangeListener() {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
         
-        // 保存监听器ID以便后续移除
+        // Save listener ID for later removal
         self.audioPropertyListenerID = { (numberAddresses, addresses) in
-            // 先停止当前音频会话，防止访问已断开的设备
             DispatchQueue.main.async {
                 do {
                     if self.getAudioDeviceByName(name: "OpenterfaceA") == nil {
@@ -456,9 +161,9 @@ class PlayerViewModel: NSObject, ObservableObject {
                         self.stopAudioSession()
                     } else {
                         Logger.shared.log(content: "Audio device connected.")
-                        // 确保完全停止后再准备新的音频会话
+                        // Ensure complete stop before preparing new audio session
                         self.stopAudioSession()
-                        // 短暂延迟后再准备音频，确保设备稳定
+                        // Brief delay before preparing audio to ensure device stability
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                             self.prepareAudio()
                         }
@@ -482,17 +187,18 @@ class PlayerViewModel: NSObject, ObservableObject {
         }
     }
     
-    deinit {
-        let playViewNtf = NotificationCenter.default
-        playViewNtf.removeObserver(self, name: .AVCaptureDeviceWasConnected, object: nil)
-        playViewNtf.removeObserver(self, name: .AVCaptureDeviceWasDisconnected, object: nil)
-        playViewNtf.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
-        playViewNtf.removeObserver(self, name: NSWindow.didResignMainNotification, object: nil)
+    /// Removes all observers and listeners
+    private func cleanupObservers() {
+        let notificationCenter = NotificationCenter.default
+        notificationCenter.removeObserver(self, name: .AVCaptureDeviceWasConnected, object: nil)
+        notificationCenter.removeObserver(self, name: .AVCaptureDeviceWasDisconnected, object: nil)
+        notificationCenter.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
+        notificationCenter.removeObserver(self, name: NSWindow.didResignMainNotification, object: nil)
         
-        // 先停止音频引擎
+        // Stop audio engine
         stopAudioSession()
         
-        // 移除音频属性监听器
+        // Remove audio property listener
         if let listenerID = audioPropertyListenerID {
             var propertyAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioHardwarePropertyDevices,
@@ -509,17 +215,493 @@ class PlayerViewModel: NSObject, ObservableObject {
             audioPropertyListenerID = nil
         }
     }
+    
+    // MARK: - Authorization
+    
+    /// Checks and requests camera and microphone permissions
+    func checkAuthorization() {
+        checkVideoAuthorization()
+        checkAudioAuthorization()
+    }
+    
+    /// Checks video capture authorization
+    private func checkVideoAuthorization() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized:
+                self.isVideoGranted = true
+                
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                    if granted {
+                        DispatchQueue.main.async {
+                            self?.isVideoGranted = granted
+                        }
+                    }
+                }
+                
+            case .denied:
+                alertToEncourageAccessInitially(for: "Camera")
+                self.isVideoGranted = false
+                return
+                
+            case .restricted:
+                self.isVideoGranted = false
+                return
+                
+            @unknown default:
+                fatalError("Unknown authorization status for video capture")
+        }
+    }
+    
+    /// Checks audio capture authorization
+    private func checkAudioAuthorization() {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized:
+                self.isAudioGranted = true
+                
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                    if granted {
+                        DispatchQueue.main.async {
+                            self?.isAudioGranted = granted
+                        }
+                    }
+                }
+                
+            case .denied:
+                alertToEncourageAccessInitially(for: "Microphone")
+                self.isAudioGranted = false
+                return
+                
+            case .restricted:
+                self.isAudioGranted = false
+                return
+                
+            @unknown default:
+                fatalError("Unknown authorization status for audio capture")
+        }
+    }
+    
+    /// Shows an alert encouraging the user to enable camera or microphone access
+    func alertToEncourageAccessInitially(for device: String) {
+        let alert = NSAlert()
+        alert.messageText = "\(device) Access Required"
+        alert.informativeText = "⚠️ This application does not have permission to access your \(device.lowercased()).\n\nYou can enable it in \"System Preferences\" -> \"Privacy\" -> \"\(device)\"."
+        alert.addButton(withTitle: "OK")
+        alert.alertStyle = .warning
+        alert.runModal()
+    }
+    
+    // MARK: - Video Handling
+    
+    /// Prepares and starts video capture
+    func prepareVideo() {
+        // Update USB devices if available
+        updateUSBDevices()
+        
+        // Configure capture session quality
+        captureSession.sessionPreset = .high
+        
+        // Get available video devices
+        let videoDeviceTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInWideAngleCamera,
+            .externalUnknown
+        ]
+        
+        let videoDiscoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: videoDeviceTypes,
+            mediaType: .video,
+            position: .unspecified
+        )
+                                                             
+        // Find matching video device
+        var videoDevices = findMatchingVideoDevices(from: videoDiscoverySession.devices)
 
-    @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
-        if let window = notification.object as? NSWindow {
-            if window.styleMask.contains(.fullScreen) {
-                Logger.shared.log(content: "The window just entered full screen mode.")
-            } else {
-                Logger.shared.log(content: "The window just exited full screen mode.")
+        // Set up video capture if device found
+        if !videoDevices.isEmpty {
+            setupVideoCapture(with: videoDevices[0])
+        }
+    }
+    
+    /// Updates USB device manager if available on macOS 12.0+
+    private func updateUSBDevices() {
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        } else {
+            Logger.shared.log(content: "Warning: USB device management requires macOS 12.0 or later. Current device status cannot be updated.")
+        }
+    }
+    
+    /// Finds video devices that match the default video device
+    private func findMatchingVideoDevices(from devices: [AVCaptureDevice]) -> [AVCaptureDevice] {
+        var matchingDevices = [AVCaptureDevice]()
+        
+        for device in devices {
+            if let defaultDevice = AppStatus.DefaultVideoDevice {
+                if matchesLocalID(device.uniqueID, defaultDevice.locationID) {
+                    matchingDevices.append(device)
+                    AppStatus.isMatchVideoDevice = true
+                }
+            }
+        }
+        
+        return matchingDevices
+    }
+    
+    /// Sets up video capture with the specified device
+    private func setupVideoCapture(with device: AVCaptureDevice) {
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            addInput(input)
+            
+            // Get the Camera video resolution
+            let formatDescription = device.activeFormat.formatDescription
+            dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
+            AppStatus.videoDimensions.width = CGFloat(dimensions.width)
+            AppStatus.videoDimensions.height = CGFloat(dimensions.height)
+ 
+            startVideoSession()
+            AppStatus.isHDMIConnected = true
+        } catch {
+            Logger.shared.log(content: "Failed to set up video capture: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Starts video capture session
+    func startVideoSession() {
+        Logger.shared.log(content: "Starting video session...")
+        guard !captureSession.isRunning else { return }
+        captureSession.startRunning()
+    }
+
+    /// Stops video capture session
+    func stopVideoSession() {
+        guard captureSession.isRunning else { return }
+        captureSession.stopRunning()
+        AppStatus.isHDMIConnected = false
+    }
+    
+    /// Adds an input to the capture session if possible
+    func addInput(_ input: AVCaptureInput) {
+        guard captureSession.canAddInput(input) else {
+            return
+        }
+        captureSession.addInput(input)
+    }
+    
+    /// Checks if a device unique ID matches a location ID
+    func matchesLocalID(_ uniqueID: String, _ locationID: String) -> Bool {
+        func hexToInt64(_ hex: String) -> UInt64 {
+            return UInt64(hex.replacingOccurrences(of: "0x", with: ""), radix: 16) ?? 0
+        }
+
+        let uniqueIDValue = hexToInt64(uniqueID)
+        let locationIDValue = hexToInt64(locationID)
+        let maskedUniqueID = uniqueIDValue >> 32
+        
+        return maskedUniqueID == locationIDValue
+    }
+    
+    // MARK: - Audio Handling
+    
+    /// Prepares and starts audio capture and playback
+    func prepareAudio() {
+        if self.audioDeviceId != nil {
+            return
+        }
+        
+        Logger.shared.log(content: "Preparing audio...")
+        
+        // Find available audio devices
+        let audioDevices = findMatchingAudioDevices()
+        
+        // Check if Openterface audio device exists with a slight delay to ensure device initialization
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            
+            self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
+            if self.audioDeviceId == nil {
+                return
+            }
+            
+            // Set up audio capture if device found
+            if !audioDevices.isEmpty {
+                self.setupAudioCapture(with: audioDevices[0])
+            }
+            
+            // Start audio session if device ID is available
+            if self.audioDeviceId != nil {
+                self.startAudioSession()
             }
         }
     }
     
+    /// Finds audio devices that match the default video device
+    private func findMatchingAudioDevices() -> [AVCaptureDevice] {
+        let audioDeviceTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInMicrophone,
+            .externalUnknown
+        ]
+        
+        let audioDiscoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: audioDeviceTypes,
+            mediaType: .audio,
+            position: .unspecified
+        )
+        
+        var matchingAudioDevices = [AVCaptureDevice]()
+        
+        for device in audioDiscoverySession.devices {
+            if device.uniqueID.contains(AppStatus.DefaultVideoDevice?.locationID ?? "nil"), 
+               !matchingAudioDevices.contains(where: { $0.localizedName == device.localizedName }) {
+                matchingAudioDevices.append(device)
+            }
+        }
+        
+        return matchingAudioDevices
+    }
+    
+    /// Sets up audio capture with the specified device
+    private func setupAudioCapture(with device: AVCaptureDevice) {
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            self.addInput(input)
+        } catch {
+            Logger.shared.log(content: "Failed to set up audio capture: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Starts audio processing session
+    func startAudioSession() {
+        stopAudioSession()
+        
+        // Recreate audio engine to avoid potential state issues from reuse
+        engine = AVAudioEngine()
+        
+        // Add delay to ensure device is fully initialized
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                // Get the input node (microphone)
+                let inputNode = self.engine.inputNode
+                self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
+                if self.audioDeviceId == nil {
+                    return
+                }
+                
+                let outputNode = self.engine.outputNode
+                let inputFormat = inputNode.outputFormat(forBus: 0)
+                let outputFormat = outputNode.inputFormat(forBus: 0)
+                
+                // Check and adapt sample rate if needed
+                let format = self.createCompatibleAudioFormat(inputFormat: inputFormat, outputFormat: outputFormat)
+
+                // Set the audio device as default input device
+                self.setDefaultAudioInputDevice()
+                
+                // Connect nodes with compatible format
+                try self.engine.connect(inputNode, to: outputNode, format: format)
+                
+                try self.engine.start()
+            } catch {
+                Logger.shared.log(content: "Error setting up audio session: \(error.localizedDescription)")
+                self.stopAudioSession()
+            }
+        }
+    }
+    
+    /// Creates an audio format compatible with both input and output
+    private func createCompatibleAudioFormat(inputFormat: AVAudioFormat, outputFormat: AVAudioFormat) -> AVAudioFormat {
+        var format = inputFormat
+        
+        if inputFormat.sampleRate != outputFormat.sampleRate {
+            // Create a new format with matching sample rate
+            format = AVAudioFormat(
+                commonFormat: inputFormat.commonFormat,
+                sampleRate: outputFormat.sampleRate,
+                channels: inputFormat.channelCount,
+                interleaved: inputFormat.isInterleaved) ?? outputFormat
+            
+            Logger.shared.log(content: "Adjusting sample rate from \(inputFormat.sampleRate) to \(outputFormat.sampleRate)")
+        }
+        
+        return format
+    }
+    
+    /// Sets the current audio device as the default input device
+    private func setDefaultAudioInputDevice() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        _ = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size),
+            &self.audioDeviceId
+        )
+    }
+    
+    /// Stops audio processing session
+    func stopAudioSession() {
+        // Check if engine is running
+        if engine.isRunning {
+            // Stop engine first to avoid errors when disconnecting
+            engine.stop()
+            
+            // Disconnect all connections before checking if node is valid
+            let inputNode = engine.inputNode
+            engine.disconnectNodeOutput(inputNode)
+            
+            // Reset engine
+            engine.reset()
+        }
+        
+        self.audioDeviceId = nil
+    }
+    
+    /// Gets an audio device by its name
+    func getAudioDeviceByName(name: String) -> AudioDeviceID? {
+        var propSize: UInt32 = 0
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        // Get the size of the property data
+        var result = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject), 
+            &address, 
+            0, 
+            nil, 
+            &propSize
+        )
+        
+        guard result == noErr else {
+            Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyDataSize")
+            return nil
+        }
+
+        // Calculate device count and prepare array
+        let deviceCount = Int(propSize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = Array<AudioDeviceID>(repeating: 0, count: deviceCount)
+
+        // Get the device IDs
+        result = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), 
+            &address, 
+            0, 
+            nil, 
+            &propSize, 
+            &deviceIDs
+        )
+        
+        guard result == noErr else {
+            Logger.shared.log(content: "Error \(result) in AudioObjectGetPropertyData")
+            return nil
+        }
+
+        // Search for device with matching name
+        for deviceID in deviceIDs {
+            let deviceName = getAudioDeviceName(for: deviceID)
+            
+            if deviceName == name {
+                return deviceID
+            }
+        }
+
+        return nil
+    }
+    
+    /// Gets the name of an audio device
+    private func getAudioDeviceName(for deviceID: AudioDeviceID) -> String? {
+        var nameSize = UInt32(MemoryLayout<CFString>.size)
+        var nameAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceNameCFString,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        // Get the size of the name property
+        let result = AudioObjectGetPropertyDataSize(
+            deviceID, 
+            &nameAddress, 
+            0, 
+            nil, 
+            &nameSize
+        )
+        
+        guard result == noErr else {
+            Logger.shared.log(content: "Error \(result) getting audio device name size")
+            return nil
+        }
+
+        // Get the device name
+        var deviceName: Unmanaged<CFString>?
+        let nameResult = AudioObjectGetPropertyData(
+            deviceID,
+            &nameAddress,
+            0,
+            nil,
+            &nameSize,
+            &deviceName
+        )
+        
+        guard nameResult == noErr else {
+            Logger.shared.log(content: "Error \(nameResult) getting audio device name")
+            return nil
+        }
+        
+        return deviceName?.takeRetainedValue() as String?
+    }
+    
+    // MARK: - Notification Handlers
+    
+    /// Handles when a video device is connected
+    @objc func videoWasConnected(notification: NSNotification) {
+        if #available(macOS 12.0, *) {
+           USBDeivcesManager.shared.update()
+        }
+        
+        if let defaultDevice = AppStatus.DefaultVideoDevice, 
+           let device = notification.object as? AVCaptureDevice, 
+           matchesLocalID(device.uniqueID, defaultDevice.locationID) {
+            
+            let hidManager = HIDManager.shared
+            self.prepareVideo()
+            hidManager.startHID()
+        }
+    }
+    
+    /// Handles when a video device is disconnected
+    @objc func videoWasDisconnected(notification: NSNotification) {
+        if let defaultDevice = AppStatus.DefaultVideoDevice, 
+           let device = notification.object as? AVCaptureDevice, 
+           matchesLocalID(device.uniqueID, defaultDevice.locationID) {
+            
+            self.stopVideoSession()
+            
+            // Remove all existing video inputs
+            let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
+            videoInputs.forEach { self.captureSession.removeInput($0) }
+            self.captureSession.commitConfiguration()
+            
+            let hidManager = HIDManager.shared
+            hidManager.closeHID()
+        }
+            
+        if #available(macOS 12.0, *) {
+           USBDeivcesManager.shared.update()
+        }
+    }
+    
+    /// Handles when window becomes main
     @objc func windowDidBecomeMain(_ notification: Notification) {
         if UserSettings.shared.MouseControl == MouseControlMode.relative && AppStatus.isExit == false {
             NSCursor.hide()
@@ -528,45 +710,25 @@ class PlayerViewModel: NSObject, ObservableObject {
         AppStatus.isFouceWindow = true
     }
     
+    /// Handles when window resigns main
     @objc func windowdidResignMain(_ notification: Notification) {
         AppStatus.isFouceWindow = false
         AppStatus.isMouseInView = false
         if let handler = AppStatus.eventHandler {
-            Logger.shared.log(content: "removeMonitor handler")
+            Logger.shared.log(content: "Removing monitor handler")
             NSEvent.removeMonitor(handler)
             AppStatus.eventHandler = nil
         }
-        // NSCursor.unhide()
-    }
-
-    @objc func videoWasConnected(notification: NSNotification) {
-        if #available(macOS 12.0, *) {
-           USBDeivcesManager.shared.update()
-        }
-
-        
-        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
-            let hid = HIDManager.shared
-            self.prepareVideo()
-            hid.startHID()
-        }
     }
     
-    @objc func videoWasDisconnected(notification: NSNotification) {
-        if let _v = AppStatus.DefaultVideoDevice, let device = notification.object as? AVCaptureDevice, matchesLocalID(device.uniqueID, _v.locationID) {
-            self.stopVideoSession()
-            
-            // Remove all existing video input
-            let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
-            videoInputs.forEach { self.captureSession.removeInput($0) }
-            self.captureSession.commitConfiguration()
-            
-            let hid = HIDManager.shared
-            hid.closeHID()
-        }
-            
-        if #available(macOS 12.0, *) {
-           USBDeivcesManager.shared.update()
+    /// Handles fullscreen mode changes
+    @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            if window.styleMask.contains(.fullScreen) {
+                Logger.shared.log(content: "The window just entered full screen mode.")
+            } else {
+                Logger.shared.log(content: "The window just exited full screen mode.")
+            }
         }
     }
 }
