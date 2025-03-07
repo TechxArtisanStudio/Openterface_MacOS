@@ -24,7 +24,7 @@ import SwiftUI
 
 struct ContentView: View {
     var viewModel:PlayerViewModel
-    
+    @ObservedObject private var audioManager = AudioManager()
     @Environment(\.controlActiveState) var controlActiveState
     
     init() {
@@ -42,6 +42,11 @@ struct ContentView: View {
                     }
                 }
                 
+        }
+        .onAppear {
+            if audioManager.microphonePermissionGranted {
+                audioManager.prepareAudio()
+            }
         }
     }
 
