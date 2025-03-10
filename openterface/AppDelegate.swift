@@ -84,9 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NSWindow.allowsAutomaticWindowTabbing = false
         
         // start audio
-        if audioManager.microphonePermissionGranted {
-            audioManager.prepareAudio()
-        }
+        // if audioManager.microphonePermissionGranted {
+        //     audioManager.prepareAudio()
+        // }
     }
     
     func windowDidResize(_ notification: Notification) {
