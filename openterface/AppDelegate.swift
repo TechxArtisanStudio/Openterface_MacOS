@@ -23,6 +23,7 @@
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+    @ObservedObject private var audioManager = AudioManager()
     
     var statusBarManager = StatusBarManager()
     var hostmanager = HostManager()
@@ -81,6 +82,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
         // Disable window tabbing feature, which makes the "Show Tab Bar" menu item unavailable
         NSWindow.allowsAutomaticWindowTabbing = false
+        
+        // start audio
+        if audioManager.microphonePermissionGranted {
+            audioManager.prepareAudio()
+        }
     }
     
     func windowDidResize(_ notification: Notification) {

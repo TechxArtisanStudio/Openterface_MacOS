@@ -47,7 +47,7 @@ class AudioManager: ObservableObject {
     // 检查麦克风权限
     func checkMicrophonePermission() {
         // 创建一个临时的AVCaptureDevice会话来触发权限请求
-        _ = AVCaptureSession()
+        // _ = AVCaptureSession()
         
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
