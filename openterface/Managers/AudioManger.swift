@@ -10,30 +10,30 @@ import AVFoundation
 import CoreAudio
 import Combine
 
-// 管理音频功能的类
+// Audio management class
 class AudioManager: ObservableObject {
-    // 发布属性，用于在UI中显示状态
+    // Published properties for UI status display
     @Published var isAudioDeviceConnected: Bool = false
     @Published var isAudioPlaying: Bool = false
-    @Published var statusMessage: String = "正在检查音频设备..."
+    @Published var statusMessage: String = "Checking audio devices..."
     @Published var microphonePermissionGranted: Bool = false
     @Published var showingPermissionAlert: Bool = false
     
-    // 音频引擎
+    // Audio engine
     private var engine: AVAudioEngine!
-    // 音频设备ID
+    // Audio device ID
     private var audioDeviceId: AudioDeviceID? = nil
-    // 取消订阅存储
+    // Cancellable storage
     private var cancellables = Set<AnyCancellable>()
-    // 音频属性监听器ID
+    // Audio property listener ID
     private var audioPropertyListenerID: AudioObjectPropertyListenerBlock?
     
     init() {
         engine = AVAudioEngine()
-        // 先检查麦克风权限
+        // Check microphone permission first
         checkMicrophonePermission()
         
-        // 确保应用出现在权限列表中
+        // Ensure the app appears in the permission list
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             AVCaptureDevice.requestAccess(for: .audio) { _ in }
         }
@@ -44,43 +44,43 @@ class AudioManager: ObservableObject {
         cleanupListeners()
     }
     
-    // 检查麦克风权限
+    // Check microphone permission
     func checkMicrophonePermission() {
-        // 创建一个临时的AVCaptureDevice会话来触发权限请求
+        // Create a temporary AVCaptureDevice session to trigger permission request
         // _ = AVCaptureSession()
         
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
-            // 已经有权限，可以继续
+            // Already have permission, can proceed
             self.microphonePermissionGranted = true
             DispatchQueue.main.async {
-                self.statusMessage = "麦克风权限已获取"
+                self.statusMessage = "Microphone permission granted"
             }
             setupAudioDeviceChangeListener()
             prepareAudio()
             
         case .notDetermined:
-            // 还没有请求过权限，需要请求
+            // Haven't requested permission yet, need to request
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
                 DispatchQueue.main.async {
                     if granted {
                         self?.microphonePermissionGranted = true
-                        self?.statusMessage = "麦克风权限已获取"
+                        self?.statusMessage = "Microphone permission granted"
                         self?.setupAudioDeviceChangeListener()
                         self?.prepareAudio()
                     } else {
                         self?.microphonePermissionGranted = false
-                        self?.statusMessage = "需要麦克风权限才能播放音频"
+                        self?.statusMessage = "Microphone permission needed to play audio"
                         self?.showingPermissionAlert = true
                     }
                 }
             }
             
         case .denied, .restricted:
-            // 权限被拒绝或受到限制
+            // Permission denied or restricted
             self.microphonePermissionGranted = false
             DispatchQueue.main.async {
-                self.statusMessage = "需要麦克风权限才能播放音频"
+                self.statusMessage = "Microphone permission needed to play audio"
                 self.showingPermissionAlert = true
             }
             
@@ -89,73 +89,73 @@ class AudioManager: ObservableObject {
         }
     }
     
-    // 打开系统设置
+    // Open system preferences
     func openSystemPreferences() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
             NSWorkspace.shared.open(url)
         }
     }
     
-    // 准备音频处理
+    // Prepare audio processing
     func prepareAudio() {
-        // 如果没有麦克风权限，不继续处理
+        // Don't proceed without microphone permission
         if !microphonePermissionGranted {
             DispatchQueue.main.async {
-                self.statusMessage = "需要麦克风权限才能播放音频"
+                self.statusMessage = "Microphone permission needed to play audio"
                 self.showingPermissionAlert = true
             }
             return
         }
         
         DispatchQueue.main.async {
-            self.statusMessage = "正在查找音频设备..."
+            self.statusMessage = "Searching for audio devices..."
         }
         
         if self.audioDeviceId != nil {
             return
         }
         
-        // 查找音频设备并稍作延迟以确保设备初始化
+        // Search for audio devices with a slight delay to ensure device initialization
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self else { return }
             
             self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
             if self.audioDeviceId == nil {
                 DispatchQueue.main.async {
-                    self.statusMessage = "未找到音频设备 'OpenterfaceA'"
+                    self.statusMessage = "Audio device 'OpenterfaceA' not found"
                     self.isAudioDeviceConnected = false
                 }
                 return
             }
             
             DispatchQueue.main.async {
-                self.statusMessage = "已找到音频设备 'OpenterfaceA'"
+                self.statusMessage = "Audio device 'OpenterfaceA' found"
                 self.isAudioDeviceConnected = true
             }
             
-            // 如果找到设备ID，开始音频会话
+            // If device ID is found, start audio session
             self.startAudioSession()
         }
     }
     
-    // 启动音频会话
+    // Start audio session
     func startAudioSession() {
         stopAudioSession()
         
-        // 重新创建音频引擎以避免重用潜在的状态问题
+        // Recreate audio engine to avoid potential state reuse issues
         engine = AVAudioEngine()
         
-        // 添加延迟以确保设备完全初始化
+        // Add delay to ensure device is fully initialized
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             
             do {
-                // 获取输入节点（麦克风）
+                // Get input node (microphone)
                 let inputNode = self.engine.inputNode
                 self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
                 if self.audioDeviceId == nil {
                     DispatchQueue.main.async {
-                        self.statusMessage = "无法访问音频设备"
+                        self.statusMessage = "Cannot access audio device"
                         self.isAudioPlaying = false
                     }
                     return
@@ -165,23 +165,23 @@ class AudioManager: ObservableObject {
                 let inputFormat = inputNode.outputFormat(forBus: 0)
                 let outputFormat = outputNode.inputFormat(forBus: 0)
                 
-                // 检查并适配采样率
+                // Check and adapt sample rate
                 let format = self.createCompatibleAudioFormat(inputFormat: inputFormat, outputFormat: outputFormat)
 
-                // 将音频设备设置为默认输入设备
+                // Set audio device as default input device
                 self.setDefaultAudioInputDevice()
                 
-                // 使用兼容格式连接节点
+                // Connect nodes using compatible format
                 try self.engine.connect(inputNode, to: outputNode, format: format)
                 
                 try self.engine.start()
                 DispatchQueue.main.async {
-                    self.statusMessage = "音频播放中..."
+                    self.statusMessage = "Audio playing..."
                     self.isAudioPlaying = true
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.statusMessage = "启动音频时出错: \(error.localizedDescription)"
+                    self.statusMessage = "Error starting audio: \(error.localizedDescription)"
                     self.isAudioPlaying = false
                 }
                 self.stopAudioSession()
@@ -189,18 +189,18 @@ class AudioManager: ObservableObject {
         }
     }
     
-    // 停止音频会话
+    // Stop audio session
     func stopAudioSession() {
-        // 检查引擎是否运行
+        // Check if engine is running
         if engine.isRunning {
-            // 先停止引擎以避免断开连接时出错
+            // Stop engine first to avoid errors when disconnecting
             engine.stop()
             
-            // 断开所有连接
+            // Disconnect all connections
             let inputNode = engine.inputNode
             engine.disconnectNodeOutput(inputNode)
             
-            // 重置引擎
+            // Reset engine
             engine.reset()
         }
         
@@ -210,12 +210,12 @@ class AudioManager: ObservableObject {
         }
     }
     
-    // 创建兼容的音频格式
+    // Create compatible audio format
     private func createCompatibleAudioFormat(inputFormat: AVAudioFormat, outputFormat: AVAudioFormat) -> AVAudioFormat {
         var format = inputFormat
         
         if inputFormat.sampleRate != outputFormat.sampleRate {
-            // 创建匹配采样率的新格式
+            // Create new format with matching sample rate
             format = AVAudioFormat(
                 commonFormat: inputFormat.commonFormat,
                 sampleRate: outputFormat.sampleRate,
@@ -226,7 +226,7 @@ class AudioManager: ObservableObject {
         return format
     }
     
-    // 设置当前音频设备为默认输入设备
+    // Set current audio device as default input device
     private func setDefaultAudioInputDevice() {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultInputDevice,
@@ -244,7 +244,7 @@ class AudioManager: ObservableObject {
         )
     }
     
-    // 通过名称获取音频设备
+    // Get audio device by name
     func getAudioDeviceByName(name: String) -> AudioDeviceID? {
         var propSize: UInt32 = 0
         var address = AudioObjectPropertyAddress(
@@ -253,7 +253,7 @@ class AudioManager: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        // 获取属性数据大小
+        // Get property data size
         var result = AudioObjectGetPropertyDataSize(
             AudioObjectID(kAudioObjectSystemObject),
             &address,
@@ -266,11 +266,11 @@ class AudioManager: ObservableObject {
             return nil
         }
 
-        // 计算设备数量并准备数组
+        // Calculate device count and prepare array
         let deviceCount = Int(propSize) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = Array<AudioDeviceID>(repeating: 0, count: deviceCount)
 
-        // 获取设备ID
+        // Get device IDs
         result = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
             &address,
@@ -284,7 +284,7 @@ class AudioManager: ObservableObject {
             return nil
         }
 
-        // 搜索匹配名称的设备
+        // Search for device with matching name
         for deviceID in deviceIDs {
             let deviceName = getAudioDeviceName(for: deviceID)
             
@@ -296,7 +296,7 @@ class AudioManager: ObservableObject {
         return nil
     }
     
-    // 获取音频设备名称
+    // Get audio device name
     private func getAudioDeviceName(for deviceID: AudioDeviceID) -> String? {
         var nameSize = UInt32(MemoryLayout<CFString>.size)
         var nameAddress = AudioObjectPropertyAddress(
@@ -305,7 +305,7 @@ class AudioManager: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        // 获取名称属性的大小
+        // Get size of name property
         let result = AudioObjectGetPropertyDataSize(
             deviceID,
             &nameAddress,
@@ -318,7 +318,7 @@ class AudioManager: ObservableObject {
             return nil
         }
 
-        // 获取设备名称
+        // Get device name
         var deviceName: Unmanaged<CFString>?
         let nameResult = AudioObjectGetPropertyData(
             deviceID,
@@ -336,7 +336,7 @@ class AudioManager: ObservableObject {
         return deviceName?.takeRetainedValue() as String?
     }
     
-    // 设置音频设备变更监听器
+    // Set up audio device change listener
     private func setupAudioDeviceChangeListener() {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
@@ -344,23 +344,23 @@ class AudioManager: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
         
-        // 保存监听器ID以便稍后移除
+        // Save listener ID for later removal
         self.audioPropertyListenerID = { (numberAddresses, addresses) in
             DispatchQueue.main.async {
                 if self.getAudioDeviceByName(name: "OpenterfaceA") == nil {
                     DispatchQueue.main.async {
-                        self.statusMessage = "音频设备已断开连接"
+                        self.statusMessage = "Audio device disconnected"
                         self.isAudioDeviceConnected = false
                     }
                     self.stopAudioSession()
                 } else {
                     DispatchQueue.main.async {
-                        self.statusMessage = "音频设备已连接"
+                        self.statusMessage = "Audio device connected"
                         self.isAudioDeviceConnected = true
                     }
-                    // 在准备新的音频会话之前确保完全停止
+                    // Ensure complete stop before preparing new audio session
                     self.stopAudioSession()
-                    // 准备音频之前稍作延迟，以确保设备稳定性
+                    // Slight delay before preparing audio to ensure device stability
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         self.prepareAudio()
                     }
@@ -376,9 +376,9 @@ class AudioManager: ObservableObject {
         )
     }
     
-    // 清理所有监听器
+    // Clean up all listeners
     private func cleanupListeners() {
-        // 移除音频属性监听器
+        // Remove audio property listener
         if let listenerID = audioPropertyListenerID {
             var propertyAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioHardwarePropertyDevices,
