@@ -41,14 +41,8 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     // MARK: - Properties
     
-    /// ID of the audio device being used
-    // var audioDeviceId: AudioDeviceID? = nil
-    
     /// Session for capturing video and audio
     var captureSession: AVCaptureSession!
-    
-    /// Audio engine for processing audio
-    // private var engine: AVAudioEngine!
     
     /// Set of cancellables for managing publishers
     private var cancellables = Set<AnyCancellable>()
@@ -89,10 +83,6 @@ class PlayerViewModel: NSObject, ObservableObject {
             captureSession.addOutput(videoDataOutput)
         }
 
-//        let audioDataOutput = AVCaptureAudioDataOutput()
-//        if captureSession.canAddOutput(audioDataOutput) {
-//            captureSession.addOutput(audioDataOutput)
-//        }
     }
     
     /// Configures data bindings between published properties and actions
@@ -108,16 +98,6 @@ class PlayerViewModel: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
         
-        // When audio permission changes, update audio session
-//        $isAudioGranted
-//            .sink { [weak self] isAudioGranted in
-//                if isAudioGranted {
-//                    self?.prepareAudio()
-//                } else {
-//                    self?.stopAudioSession()
-//                }
-//            }
-//            .store(in: &cancellables)
     }
     
     /// Sets up notification observers for device connections and window events
@@ -152,45 +132,39 @@ class PlayerViewModel: NSObject, ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
         
-        // Save listener ID for later removal
+        // IMPORTANT: This audio device listener affects video hot-plugging functionality.
+        // Do not remove this code as it indirectly helps with video device reconnection.
         self.audioPropertyListenerID = { (numberAddresses, addresses) in
-            // *************** ToDo **************
-            self.getAudioDeviceByName(name: "OpenterfaceA")
-//            DispatchQueue.main.async {
-
-//                do {
-//                    self.getAudioDeviceByName(name: "OpenterfaceA")
-//                    
-////                    if self.getAudioDeviceByName(name: "OpenterfaceA") == nil {
-////                        Logger.shared.log(content: "Audio device disconnected.")
-////                        //self.stopAudioSession()
-////                    }
-////                    else {
-////                        Logger.shared.log(content: "Audio device connected.")
-////                        // Ensure complete stop before preparing new audio session
-////                        //self.stopAudioSession()
-////                        // Brief delay before preparing audio to ensure device stability
-//////                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-//////                            //self.prepareAudio()
-//////                        }
-////                    }
-//                } catch {
-//                    Logger.shared.log(content: "Error handling audio device change: \(error.localizedDescription)")
-////                    self.stopAudioSession()
-//                }
-//            }
+            // Check for the presence of our audio device
+            // This call seems to trigger system device refresh which helps with video reconnection
+            let audioDevice = self.getAudioDeviceByName(name: "OpenterfaceA")
+            
+            // Log the detection for debugging purposes
+            Logger.shared.log(content: "Audio device change detected: OpenterfaceA \(audioDevice != nil ? "connected" : "not found")")
+            
+            // When audio device changes are detected, check if we need to refresh video
+            if AppStatus.isHDMIConnected == false {
+                // If video is disconnected, try to prepare video again
+                // This helps with automatic reconnection
+                DispatchQueue.main.async {
+                    self.prepareVideo()
+                }
+            }
         }
         
-//        let result = AudioObjectAddPropertyListenerBlock(
-//            AudioObjectID(kAudioObjectSystemObject),
-//            &propertyAddress,
-//            nil,
-//            self.audioPropertyListenerID!
-//        )
-//
-//        if result != kAudioHardwareNoError {
-//            Logger.shared.log(content: "Error adding property listener: \(result)")
-//        }
+        // Register the audio property listener with the system
+        let result = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            nil,
+            self.audioPropertyListenerID!
+        )
+
+        if result != kAudioHardwareNoError {
+            Logger.shared.log(content: "Error adding audio property listener: \(result)")
+        } else {
+            Logger.shared.log(content: "Audio device change listener registered successfully")
+        }
     }
     
     /// Removes all observers and listeners
@@ -258,35 +232,6 @@ class PlayerViewModel: NSObject, ObservableObject {
                 fatalError("Unknown authorization status for video capture")
         }
     }
-    
-    /// Checks audio capture authorization
-//    private func checkAudioAuthorization() {
-//        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-//            case .authorized:
-//                self.isAudioGranted = true
-//                
-//            case .notDetermined:
-//                AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-//                    if granted {
-//                        DispatchQueue.main.async {
-//                            self?.isAudioGranted = granted
-//                        }
-//                    }
-//                }
-//                
-//            case .denied:
-//                alertToEncourageAccessInitially(for: "Microphone")
-//                self.isAudioGranted = false
-//                return
-//                
-//            case .restricted:
-//                self.isAudioGranted = false
-//                return
-//                
-//            @unknown default:
-//                fatalError("Unknown authorization status for audio capture")
-//        }
-//    }
     
     /// Shows an alert encouraging the user to enable camera or microphone access
     func alertToEncourageAccessInitially(for device: String) {
@@ -408,39 +353,6 @@ class PlayerViewModel: NSObject, ObservableObject {
         return maskedUniqueID == locationIDValue
     }
     
-    // MARK: - Audio Handling
-    
-//    /// Prepares and starts audio capture and playback
-//    func prepareAudio() {
-//        if self.audioDeviceId != nil {
-//            return
-//        }
-//        
-//        Logger.shared.log(content: "Preparing audio...")
-//        
-//        // Find available audio devices
-//        let audioDevices = findMatchingAudioDevices()
-//        
-//        // Check if Openterface audio device exists with a slight delay to ensure device initialization
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-//            guard let self = self else { return }
-//            
-//            self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
-//            if self.audioDeviceId == nil {
-//                return
-//            }
-//            
-//            // Set up audio capture if device found
-//            if !audioDevices.isEmpty {
-//                self.setupAudioCapture(with: audioDevices[0])
-//            }
-//            
-//            // Start audio session if device ID is available
-//            if self.audioDeviceId != nil {
-//                self.startAudioSession()
-//            }
-//        }
-//    }
     
     /// Finds audio devices that match the default video device
     private func findMatchingAudioDevices() -> [AVCaptureDevice] {
@@ -477,46 +389,6 @@ class PlayerViewModel: NSObject, ObservableObject {
         }
     }
     
-//    /// Starts audio processing session
-//    func startAudioSession() {
-//        stopAudioSession()
-//        
-//        // Recreate audio engine to avoid potential state issues from reuse
-//        engine = AVAudioEngine()
-//        
-//        // Add delay to ensure device is fully initialized
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-//            guard let self = self else { return }
-//            
-//            do {
-//                // Get the input node (microphone)
-//                let inputNode = self.engine.inputNode
-//                self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
-//                if self.audioDeviceId == nil {
-//                    return
-//                }
-//                
-//                let outputNode = self.engine.outputNode
-//                let inputFormat = inputNode.outputFormat(forBus: 0)
-//                let outputFormat = outputNode.inputFormat(forBus: 0)
-//                
-//                // Check and adapt sample rate if needed
-//                let format = self.createCompatibleAudioFormat(inputFormat: inputFormat, outputFormat: outputFormat)
-//
-//                // Set the audio device as default input device
-//                self.setDefaultAudioInputDevice()
-//                
-//                // Connect nodes with compatible format
-//                try self.engine.connect(inputNode, to: outputNode, format: format)
-//                
-//                try self.engine.start()
-//            } catch {
-//                Logger.shared.log(content: "Error setting up audio session: \(error.localizedDescription)")
-//                self.stopAudioSession()
-//            }
-//        }
-//    }
-    
     /// Creates an audio format compatible with both input and output
     private func createCompatibleAudioFormat(inputFormat: AVAudioFormat, outputFormat: AVAudioFormat) -> AVAudioFormat {
         var format = inputFormat
@@ -534,42 +406,6 @@ class PlayerViewModel: NSObject, ObservableObject {
         
         return format
     }
-    
-//    /// Sets the current audio device as the default input device
-//    private func setDefaultAudioInputDevice() {
-//        var address = AudioObjectPropertyAddress(
-//            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-//            mScope: kAudioObjectPropertyScopeGlobal,
-//            mElement: kAudioObjectPropertyElementMain
-//        )
-//        
-//        _ = AudioObjectSetPropertyData(
-//            AudioObjectID(kAudioObjectSystemObject),
-//            &address,
-//            0,
-//            nil,
-//            UInt32(MemoryLayout<AudioDeviceID>.size),
-//            &self.audioDeviceId
-//        )
-//    }
-    
-    /// Stops audio processing session
-//    func stopAudioSession() {
-//        // Check if engine is running
-//        if engine.isRunning {
-//            // Stop engine first to avoid errors when disconnecting
-//            engine.stop()
-//            
-//            // Disconnect all connections before checking if node is valid
-//            let inputNode = engine.inputNode
-//            engine.disconnectNodeOutput(inputNode)
-//            
-//            // Reset engine
-//            engine.reset()
-//        }
-//        
-//        self.audioDeviceId = nil
-//    }
     
     /// Gets an audio device by its name
     func getAudioDeviceByName(name: String) -> AudioDeviceID? {
