@@ -41,6 +41,20 @@ class PlayerView: NSView, NSWindowDelegate {
         self.previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
         setupLayer()
         observe()
+        
+        // 添加通知监听器，在会话开始/停止时更新视图
+        NotificationCenter.default.addObserver(
+            self, 
+            selector: #selector(captureSessionDidStartRunning), 
+            name: .AVCaptureSessionDidStartRunning, 
+            object: captureSession
+        )
+        NotificationCenter.default.addObserver(
+            self, 
+            selector: #selector(captureSessionDidStopRunning), 
+            name: .AVCaptureSessionDidStopRunning, 
+            object: captureSession
+        )
     }
 
     func setupLayer() {
@@ -101,6 +115,39 @@ class PlayerView: NSView, NSWindowDelegate {
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // 会话开始运行时调用
+    @objc func captureSessionDidStartRunning(_ notification: Notification) {
+        Logger.shared.log(content: "Capture session started running, updating view")
+        DispatchQueue.main.async {
+            self.needsLayout = true
+            self.needsDisplay = true
+        }
+    }
+    
+    // 会话停止运行时调用
+    @objc func captureSessionDidStopRunning(_ notification: Notification) {
+        Logger.shared.log(content: "Capture session stopped running, updating view")
+        DispatchQueue.main.async {
+            self.needsLayout = true
+            self.needsDisplay = true
+        }
+    }
+    
+    // 重写布局方法，确保预览层总是覆盖整个视图
+    override func layout() {
+        super.layout()
+        
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        self.previewLayer?.frame = self.bounds
+        self.playerBackgroundImage.frame = self.bounds
+        CATransaction.commit()
     }
     
     override func updateTrackingAreas() {

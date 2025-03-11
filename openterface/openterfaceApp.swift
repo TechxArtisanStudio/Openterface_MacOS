@@ -42,6 +42,10 @@ struct openterfaceApp: App {
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
     
+    // 添加状态防抖动缓存变量
+    @State private var lastUpdateTime: Date = Date()
+    @State private var updateDebounceInterval: TimeInterval = 0.5 // 500毫秒防抖动时间
+    
     @State private var showButtons = false
     
     @State private var _resolution = (width: "", height: "")
@@ -323,27 +327,72 @@ struct openterfaceApp: App {
                         }
                     }
                     .onReceive(timer) { _ in
-                        _isKeyboardConnected = AppStatus.isKeyboardConnected
-                        _isMouseConnected = AppStatus.isMouseConnected
-                        _isSwitchToggleOn = AppStatus.isSwitchToggleOn
-                        _hasHdmiSignal = AppStatus.hasHdmiSignal
+                        // 添加防抖动机制，避免频繁更新状态
+                        let now = Date()
+                        guard now.timeIntervalSince(lastUpdateTime) >= updateDebounceInterval else {
+                            return // 如果距离上次更新时间不足防抖动间隔，则跳过本次更新
+                        }
                         
-                        // 更新串口信息
-                        _serialPortName = AppStatus.serialPortName
-                        _serialPortBaudRate = AppStatus.serialPortBaudRate
+                        // 只在状态真正变化时才更新UI变量
+                        let newKeyboardConnected = AppStatus.isKeyboardConnected
+                        let newMouseConnected = AppStatus.isMouseConnected
+                        let newSwitchToggleOn = AppStatus.isSwitchToggleOn
+                        let newHdmiSignal = AppStatus.hasHdmiSignal
+                        let newSerialPortName = AppStatus.serialPortName
+                        let newSerialPortBaudRate = AppStatus.serialPortBaudRate
                         
-                        if _hasHdmiSignal == nil {
-                            _resolution.width = "-"
-                            _resolution.height = "-"
-                            _fps = "-"
-                        }else if _hasHdmiSignal == false {
-                            _resolution.width = "?"
-                            _resolution.height = "?"
-                            _fps = "?"
-                        }else {
-                            _resolution.width = "\( AppStatus.hidReadResolusion.width)"
-                            _resolution.height = "\( AppStatus.hidReadResolusion.height)"
-                            _fps = "\(AppStatus.hidReadFps)Hz"
+                        var stateChanged = false
+                        
+                        if _isKeyboardConnected != newKeyboardConnected {
+                            _isKeyboardConnected = newKeyboardConnected
+                            stateChanged = true
+                        }
+                        
+                        if _isMouseConnected != newMouseConnected {
+                            _isMouseConnected = newMouseConnected
+                            stateChanged = true
+                        }
+                        
+                        if _isSwitchToggleOn != newSwitchToggleOn {
+                            _isSwitchToggleOn = newSwitchToggleOn
+                            stateChanged = true
+                        }
+                        
+                        if _hasHdmiSignal != newHdmiSignal {
+                            _hasHdmiSignal = newHdmiSignal
+                            stateChanged = true
+                        }
+                        
+                        if _serialPortName != newSerialPortName {
+                            _serialPortName = newSerialPortName
+                            stateChanged = true
+                        }
+                        
+                        if _serialPortBaudRate != newSerialPortBaudRate {
+                            _serialPortBaudRate = newSerialPortBaudRate
+                            stateChanged = true
+                        }
+                        
+                        // 只在状态变化或分辨率显示需要更新时更新分辨率显示
+                        if stateChanged || _hasHdmiSignal != nil {
+                            if _hasHdmiSignal == nil {
+                                _resolution.width = "-"
+                                _resolution.height = "-"
+                                _fps = "-"
+                            } else if _hasHdmiSignal == false {
+                                _resolution.width = "?"
+                                _resolution.height = "?"
+                                _fps = "?"
+                            } else {
+                                _resolution.width = "\(AppStatus.hidReadResolusion.width)"
+                                _resolution.height = "\(AppStatus.hidReadResolusion.height)"
+                                _fps = "\(AppStatus.hidReadFps)Hz"
+                            }
+                        }
+                        
+                        // 如果状态有变化，更新最后更新时间
+                        if stateChanged {
+                            lastUpdateTime = now
                         }
                     }
             }
@@ -472,7 +521,6 @@ struct openterfaceApp: App {
     }
     
     private func colorForConnectionStatus(_ isConnected: Bool?) -> Color {
-        Logger.shared.log(content: "colorForConnectionStatus")
         switch isConnected {
         case .some(true):
             return Color(red: 124 / 255.0, green: 205 / 255.0, blue: 124 / 255.0)
@@ -484,15 +532,10 @@ struct openterfaceApp: App {
     }
     
     private func handleSwitchToggle(isOn: Bool) {
-        Logger.shared.log(content: "handleSwitchToggle")
-
-
         if isOn {
-            Logger.shared.log(content: "Switching USB connection to Target device")
             let hid = HIDManager.shared
             hid.setUSBtoTrager()
         } else {
-            Logger.shared.log(content: "Switching USB connection to Host device")
             let hid = HIDManager.shared
             hid.setUSBtoHost()
         }
