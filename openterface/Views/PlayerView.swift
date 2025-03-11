@@ -42,7 +42,7 @@ class PlayerView: NSView, NSWindowDelegate {
         setupLayer()
         observe()
         
-        // 添加通知监听器，在会话开始/停止时更新视图
+        // Add notification listener to update view when session starts/stops
         NotificationCenter.default.addObserver(
             self, 
             selector: #selector(captureSessionDidStartRunning), 
@@ -121,7 +121,7 @@ class PlayerView: NSView, NSWindowDelegate {
         NotificationCenter.default.removeObserver(self)
     }
     
-    // 会话开始运行时调用
+    // When the capture session starts running, call this method
     @objc func captureSessionDidStartRunning(_ notification: Notification) {
         Logger.shared.log(content: "Capture session started running, updating view")
         DispatchQueue.main.async {
@@ -130,7 +130,7 @@ class PlayerView: NSView, NSWindowDelegate {
         }
     }
     
-    // 会话停止运行时调用
+    // When the capture session stops running, call this method
     @objc func captureSessionDidStopRunning(_ notification: Notification) {
         Logger.shared.log(content: "Capture session stopped running, updating view")
         DispatchQueue.main.async {
@@ -139,7 +139,7 @@ class PlayerView: NSView, NSWindowDelegate {
         }
     }
     
-    // 重写布局方法，确保预览层总是覆盖整个视图
+    // Override layout method to ensure preview layer covers entire view
     override func layout() {
         super.layout()
         

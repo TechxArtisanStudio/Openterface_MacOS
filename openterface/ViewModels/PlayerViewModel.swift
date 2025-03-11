@@ -56,10 +56,10 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// Flag to prevent multiple simultaneous starts of video session
     private var isVideoSessionStarting = false
     
-    /// 最后一次启动视频会话的时间
+    /// Last video session start time
     private var lastVideoSessionStartTime = Date(timeIntervalSince1970: 0)
     
-    /// 视频会话启动的最小间隔时间 (1秒)
+    /// Minimum interval for video session start (1 second)
     private let videoSessionStartMinInterval: TimeInterval = 1.0
     
     // MARK: - Initialization
@@ -256,35 +256,35 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Prepares and starts video capture
     func prepareVideo() {
-        // 降低防抖时间间隔，避免错过合法的启动请求
+        // Reduce debounce interval to avoid missing valid start requests
         let now = Date()
-        if now.timeIntervalSince(lastVideoSessionStartTime) < 0.3 { // 从1秒降低到0.3秒
+        if now.timeIntervalSince(lastVideoSessionStartTime) < 0.3 { // Reduced from 1 second to 0.3 seconds
             Logger.shared.log(content: "Video preparation ignored - too frequent")
             return
         }
         
-        // 如果视频会话已在运行，直接返回，但不检查isVideoSessionStarting
-        // 这样可以让新的启动请求有机会覆盖可能卡住的启动过程
+        // If video session is already running, return directly, but don't check isVideoSessionStarting
+        // This allows new start requests to potentially override a stuck startup process
         if captureSession.isRunning {
             Logger.shared.log(content: "Video already running, skipping preparation")
             return
         }
         
-        // 更新最后启动时间
+        // Update last start time
         lastVideoSessionStartTime = now
         
-        // 标记正在启动
+        // Mark as starting
         isVideoSessionStarting = true
         
         Logger.shared.log(content: "Preparing video capture...")
         
-        // 更新USB设备 - 在主线程上执行整个过程，避免线程同步问题
+        // Update USB devices - execute the entire process on the main thread to avoid thread synchronization issues
         updateUSBDevices()
         
-        // 配置捕获会话质量
+        // Configure capture session quality
         captureSession.sessionPreset = .high
         
-        // 获取可用视频设备
+        // Get available video devices
         let videoDeviceTypes: [AVCaptureDevice.DeviceType] = [
             .builtInWideAngleCamera,
             .externalUnknown
@@ -296,10 +296,10 @@ class PlayerViewModel: NSObject, ObservableObject {
             position: .unspecified
         )
                                                              
-        // 找到匹配的视频设备
+        // Find matching video devices
         let videoDevices = findMatchingVideoDevices(from: videoDiscoverySession.devices)
 
-        // 如果找到设备则设置视频捕获
+        // If devices found, set up video capture
         if !videoDevices.isEmpty {
             setupVideoCapture(with: videoDevices[0])
         } else {
@@ -335,14 +335,14 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Sets up video capture with the specified device
     private func setupVideoCapture(with device: AVCaptureDevice) {
-        // 再次检查会话状态
+        // Check session status again
         if captureSession.isRunning {
             Logger.shared.log(content: "Video session already running, skipping setup")
             isVideoSessionStarting = false
             return
         }
         
-        // 防止设备为空或无效
+        // Prevent device from being empty or invalid
         guard device.hasMediaType(.video) else {
             Logger.shared.log(content: "Invalid video device provided")
             isVideoSessionStarting = false
@@ -350,14 +350,14 @@ class PlayerViewModel: NSObject, ObservableObject {
         }
         
         do {
-            // 使用beginConfiguration和commitConfiguration确保原子性操作
+            // Use beginConfiguration and commitConfiguration to ensure atomic operations
             captureSession.beginConfiguration()
             
-            // 清除现有输入，防止重复添加
+            // Clear existing inputs to prevent duplicate additions
             let existingInputs = captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
             existingInputs.forEach { captureSession.removeInput($0) }
             
-            // 创建并添加新的设备输入
+            // Create and add new device input
             let input = try AVCaptureDeviceInput(device: device)
             
             guard captureSession.canAddInput(input) else {
@@ -369,30 +369,30 @@ class PlayerViewModel: NSObject, ObservableObject {
             
             captureSession.addInput(input)
             
-            // 提交配置变更
+            // Commit configuration changes
             captureSession.commitConfiguration()
             
-            // 获取摄像头视频分辨率
+            // Get camera video resolution
             if let formatDescription = device.activeFormat.formatDescription as CMFormatDescription? {
                 dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
                 AppStatus.videoDimensions.width = CGFloat(dimensions.width)
                 AppStatus.videoDimensions.height = CGFloat(dimensions.height)
             }
  
-            // 启动视频会话
+            // Start video session
             Logger.shared.log(content: "Video device setup successful, starting session...")
             startVideoSession()
             AppStatus.isHDMIConnected = true
         } catch {
             Logger.shared.log(content: "Failed to set up video capture: \(error.localizedDescription)")
-            // 出错时重置启动标志
+            // Reset start flag when error occurs
             isVideoSessionStarting = false
         }
     }
     
     /// Starts video capture session
     func startVideoSession() {
-        // 状态检查：如果会话已在运行，直接返回
+        // Status check: if session is already running, return directly
         if captureSession.isRunning {
             Logger.shared.log(content: "Video session already running, skipping start...")
             isVideoSessionStarting = false
@@ -401,13 +401,13 @@ class PlayerViewModel: NSObject, ObservableObject {
         
         Logger.shared.log(content: "Starting video session...")
         
-        // 直接在当前线程启动会话，避免额外的异步操作
+        // Start session directly in current thread, avoiding extra asynchronous operations
         captureSession.startRunning()
         
-        // 记录日志
+        // Log record
         Logger.shared.log(content: "Video session started successfully")
         
-        // 重置启动标志
+        // Reset start flag
         isVideoSessionStarting = false
     }
 
@@ -420,39 +420,38 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Adds an input to the capture session if possible
     func addInput(_ input: AVCaptureInput) {
-        // 确保在添加输入前检查会话是否在运行中，如果在运行则需要停止
+        // Ensure checking if session is running before adding input, if running it needs to be stopped
         let wasRunning = captureSession.isRunning
         if wasRunning {
             captureSession.stopRunning()
         }
         
-        // 使用beginConfiguration和commitConfiguration确保原子性操作
+        // Use beginConfiguration and commitConfiguration to ensure atomic operations
         captureSession.beginConfiguration()
         
-        // 检查是否可以添加输入
+        // Check if input can be added
         guard captureSession.canAddInput(input) else {
             Logger.shared.log(content: "Cannot add input to capture session")
             captureSession.commitConfiguration()
             
-            // 如果之前在运行，则恢复运行状态
+            // If it was running before, restore running state
             if wasRunning {
                 captureSession.startRunning()
             }
             return
         }
         
-        // 添加输入并提交配置
+        // Add input and commit configuration
         captureSession.addInput(input)
         captureSession.commitConfiguration()
         
-        // 如果之前在运行，则恢复运行状态
+        // If it was running before, restore running state
         if wasRunning {
             captureSession.startRunning()
         }
         
         Logger.shared.log(content: "Input added successfully to capture session")
     }
-    
     /// Checks if a device unique ID matches a location ID
     func matchesLocalID(_ uniqueID: String, _ locationID: String) -> Bool {
         func hexToInt64(_ hex: String) -> UInt64 {
@@ -630,7 +629,7 @@ class PlayerViewModel: NSObject, ObservableObject {
             
             Logger.shared.log(content: "Matching video device connected, preparing video")
             
-            // 添加延迟以确保设备完全初始化
+            // Add delay to ensure device is fully initialized
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 let hidManager = HIDManager.shared
                 self?.prepareVideo()
@@ -647,25 +646,25 @@ class PlayerViewModel: NSObject, ObservableObject {
             
             Logger.shared.log(content: "Matching video device disconnected, stopping session")
             
-            // 重置标志，确保可以重新启动
+            // Reset flag to ensure we can restart
             isVideoSessionStarting = false
             
-            // 确保在主线程中执行UI相关操作
+            // Ensure UI-related operations are executed on the main thread
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 
                 self.stopVideoSession()
                 
-                // 使用beginConfiguration和commitConfiguration确保原子性操作
+                // Use beginConfiguration and commitConfiguration to ensure atomic operations
                 self.captureSession.beginConfiguration()
                 
-                // 移除所有现有视频输入
+                // Remove all existing video inputs
                 let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
                 videoInputs.forEach { self.captureSession.removeInput($0) }
                 
                 self.captureSession.commitConfiguration()
                 
-                // 关闭HID管理器
+                // Close HID manager
                 let hidManager = HIDManager.shared
                 hidManager.closeHID()
                 

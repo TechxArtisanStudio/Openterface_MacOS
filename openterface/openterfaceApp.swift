@@ -42,9 +42,9 @@ struct openterfaceApp: App {
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
     
-    // 添加状态防抖动缓存变量
+    // Add state debounce cache variables
     @State private var lastUpdateTime: Date = Date()
-    @State private var updateDebounceInterval: TimeInterval = 0.5 // 500毫秒防抖动时间
+    @State private var updateDebounceInterval: TimeInterval = 0.5 // 500ms debounce time
     
     @State private var showButtons = false
     
@@ -52,7 +52,7 @@ struct openterfaceApp: App {
     @State private var _fps = ""
     @State private var _ms2109version = ""
     
-    // 添加串口信息状态变量
+    // Add serial port information state variables
     @State private var _serialPortName: String = "N/A"
     @State private var _serialPortBaudRate: Int = 0
 
@@ -327,13 +327,13 @@ struct openterfaceApp: App {
                         }
                     }
                     .onReceive(timer) { _ in
-                        // 添加防抖动机制，避免频繁更新状态
+                        // Add debounce mechanism to avoid frequent status updates
                         let now = Date()
                         guard now.timeIntervalSince(lastUpdateTime) >= updateDebounceInterval else {
-                            return // 如果距离上次更新时间不足防抖动间隔，则跳过本次更新
+                            return // Skip this update if not enough time has passed since last update
                         }
                         
-                        // 只在状态真正变化时才更新UI变量
+                        // Only update UI variables when status actually changes
                         let newKeyboardConnected = AppStatus.isKeyboardConnected
                         let newMouseConnected = AppStatus.isMouseConnected
                         let newSwitchToggleOn = AppStatus.isSwitchToggleOn
@@ -373,7 +373,7 @@ struct openterfaceApp: App {
                             stateChanged = true
                         }
                         
-                        // 只在状态变化或分辨率显示需要更新时更新分辨率显示
+                        // Only update resolution display when state changes or HDMI signal status needs updating
                         if stateChanged || _hasHdmiSignal != nil {
                             if _hasHdmiSignal == nil {
                                 _resolution.width = "-"
@@ -390,7 +390,7 @@ struct openterfaceApp: App {
                             }
                         }
                         
-                        // 如果状态有变化，更新最后更新时间
+                        // If state has changed, update the last update time
                         if stateChanged {
                             lastUpdateTime = now
                         }
@@ -695,18 +695,18 @@ func showUSBDevicesWindow() {
 
 func showResetFactoryWindow() {
     if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetSerialToolWindow" }) {
-        // 如果窗口已存在，则使其震动并成为前台窗口
+        // If window already exists, make it shake and bring to front
         
-        // 使用系统提供的注意力请求功能（会使窗口或Dock图标弹跳）
+        // Use system-provided attention request (will make window or Dock icon bounce)
         NSApp.requestUserAttention(.criticalRequest)
         
-        // 将窗口带到前台
+        // Bring window to front
         existingWindow.makeKeyAndOrderFront(nil)
         existingWindow.orderFrontRegardless()
         return
     }
     
-    // 如果窗口不存在，则创建新窗口
+    // If window doesn't exist, create a new one
     let resetFactoryView = ResetFactoryView()
     let controller = NSHostingController(rootView: resetFactoryView)
     let window = NSWindow(contentViewController: controller)
@@ -717,7 +717,7 @@ func showResetFactoryWindow() {
     window.center()
     window.makeKeyAndOrderFront(nil)
     
-    // 设置窗口关闭时的回调，以清除引用
+    // Set callback when window closes to clear references
     window.isReleasedWhenClosed = false
     NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { _ in
         // aboutWindow = nil
@@ -726,7 +726,7 @@ func showResetFactoryWindow() {
 //        }
     }
     
-    // 保存窗口引用
+    // Save window reference
     // aboutWindow = window
     NSApp.activate(ignoringOtherApps: true)
 }
