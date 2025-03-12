@@ -23,122 +23,90 @@
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+    // MARK: - 属性
+    
     @ObservedObject private var audioManager = AudioManager()
     
-    var statusBarManager = StatusBarManager()
-    var hostmanager = HostManager()
-    var keyboardManager = KeyboardManager.shared
-
-    let spm = SerialPortManager.shared
-
-    // var observation: NSKeyValueObservation?
-    var log = Logger.shared
+    private let statusBarManager = StatusBarManager()
+    private let hostManager = HostManager()
+    private let keyboardManager = KeyboardManager.shared
+    private let serialPortManager = SerialPortManager.shared
+    private let logger = Logger.shared
     
-    let aspectRatio = CGSize(width: 1080, height: 659)
+    private let defaultAspectRatio = CGSize(width: 1080, height: 659)
+    
+    // MARK: - 计算属性
     
     var isDarkMode: Bool {
         if #available(macOS 10.14, *) {
-            if NSApp.effectiveAppearance.name == .darkAqua {
-                return true
-            }
+            return NSApp.effectiveAppearance.name == .darkAqua
         }
         return false
     }
     
-    func applicationDidFinishLaunching(_ aNotification: Notification) {
-        NSApp.mainMenu?.delegate = self
-        // spm.tryOpenSerialPort()
-        if #available(macOS 12.0, *) {
-            USBDeivcesManager.shared.update()
-        } else {
-            Logger.shared.log(content: "USB device management requires macOS 12.0 or later. Current functionality is limited.")
-        }
-
-        // init HIDManager after USB device manager updated
-        _ = HIDManager.shared
-        
-        NSApplication.shared.windows.forEach { window in
-            if let windownName = window.identifier?.rawValue {
-                if windownName.contains(UserSettings.shared.mainWindownName) {
-                    window.delegate = self
-                    window.backgroundColor = NSColor.fromHex("#000000")
-                    
-                    // Allow window resizing but maintain aspect ratio
-                    window.styleMask.insert(.resizable)
-                    
-                    let initialSize = aspectRatio
-                    window.setContentSize(initialSize)
-                    
-                    // Set minimum size to prevent too small windows
-                    window.minSize = NSSize(width: aspectRatio.width / 2, height: aspectRatio.height / 2)
-                    // Set maximum size to something reasonable (2x initial size)
-                    window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
-                    window.center()
-                }
-                    
-                   
-            }
-        }
-
-        // Disable window tabbing feature, which makes the "Show Tab Bar" menu item unavailable
-        NSWindow.allowsAutomaticWindowTabbing = false
-        
-        // start audio
-        // if audioManager.microphonePermissionGranted {
-        //     audioManager.prepareAudio()
-        // }
+    // MARK: - NSApplicationDelegate 方法
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupMenuDelegate()
+        initializeDeviceManagers()
+        configureMainWindow()
+        disableWindowTabbing()
     }
     
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
+    }
+    
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        return .terminateNow
+    }
+    
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // 未来可能需要实现的功能
+    }
+    
+    func applicationWillUpdate(_ notification: Notification) {
+        // 未来可能需要实现的功能
+    }
+    
+    // MARK: - NSWindowDelegate 方法
+    
     func windowDidResize(_ notification: Notification) {
-        if let window = NSApplication.shared.mainWindow {
-            if let toolbar = window.toolbar, toolbar.isVisible {
-                let windowHeight = window.frame.height
-                let contentLayoutRect = window.contentLayoutRect
-                _ = windowHeight - contentLayoutRect.height
-                AppStatus.currentView = contentLayoutRect
-                AppStatus.currentWindow = window.frame
-            }
-        }
+        guard let window = NSApplication.shared.mainWindow,
+              let toolbar = window.toolbar, toolbar.isVisible else { return }
+        
+        let contentLayoutRect = window.contentLayoutRect
+        AppStatus.currentView = contentLayoutRect
+        AppStatus.currentWindow = window.frame
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        // Get the height of the toolbar (if visible)
-        let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
+        let toolbarHeight = getToolbarHeight(for: sender)
+        let aspectRatioToUse = getAspectRatioToUse()
         
-        // Calculate the target aspect ratio
-        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-        
-        let defaultAspectRatio = aspectRatio.width / aspectRatio.height
-        
-        
-        // Get the screen containing the window
         guard let screen = sender.screen ?? NSScreen.main else { return targetFrameSize }
         let screenFrame = screen.visibleFrame
         
-        // Calculate new size maintaining content area aspect ratio
+        // 计算保持宽高比的新尺寸
         var newSize = targetFrameSize
-        
-        // Adjust height calculation to account for the toolbar
         let contentHeight = targetFrameSize.height - toolbarHeight
         let contentWidth = targetFrameSize.width
         
-        // Calculate content size based on aspect ratio
-        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
-        let heightFromWidth = (contentWidth / CGFloat(aspectRatioToUse))
-        let widthFromHeight = (contentHeight * CGFloat(aspectRatioToUse))
+        let heightFromWidth = contentWidth / aspectRatioToUse
+        let widthFromHeight = contentHeight * aspectRatioToUse
         
-        // Choose the smaller size to ensure the window fits the screen
+        // 选择较小的尺寸以确保窗口适合屏幕
         if heightFromWidth + toolbarHeight <= screenFrame.height {
             newSize.height = heightFromWidth + toolbarHeight
         } else {
             newSize.width = widthFromHeight
         }
 
-        // Ensure the size does not exceed screen boundaries
-        newSize.width = min(newSize.width, screenFrame.width * 1)
-        newSize.height = min(newSize.height, screenFrame.height * 1)
+        // 确保尺寸不超过屏幕边界
+        newSize.width = min(newSize.width, screenFrame.width)
+        newSize.height = min(newSize.height, screenFrame.height)
         
-        // Ensure the size is not below the minimum (considering the toolbar)
+        // 确保尺寸不低于最小值
         let minContentHeight = sender.minSize.height - toolbarHeight
         let minContentWidth = sender.minSize.width
         newSize.width = max(newSize.width, minContentWidth)
@@ -148,14 +116,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillStartLiveResize(_ notification: Notification) {
-
+        // 未来可能需要实现的功能
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
-         
+        // 未来可能需要实现的功能
     }
 
-    // Handle window moving between screens
     func windowDidChangeScreen(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               let screen = window.screen else { return }
@@ -163,171 +130,192 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let screenFrame = screen.visibleFrame
         let currentFrame = window.frame
         
-        // Calculate the current aspect ratio of the window
+        // 计算窗口当前宽高比
         let currentAspectRatio = currentFrame.width / currentFrame.height
-        let targetAspectRatio = aspectRatio.width / aspectRatio.height
+        let targetAspectRatio = defaultAspectRatio.width / defaultAspectRatio.height
         
-        // Check if aspect ratio is significantly different (allowing for small floating point differences)
+        // 检查宽高比是否明显不同（允许小的浮点差异）
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
-            // Calculate new size that fits the screen while maintaining aspect ratio
             let maxPossibleWidth = screenFrame.width * 0.9
             let maxPossibleHeight = screenFrame.height * 0.9
             
-            let newSize: NSSize
-            if maxPossibleWidth / targetAspectRatio <= maxPossibleHeight {
-                // Width is the limiting factor
-                newSize = NSSize(
-                    width: maxPossibleWidth,
-                    height: maxPossibleWidth / targetAspectRatio
-                )
-            } else {
-                // Height is the limiting factor
-                newSize = NSSize(
-                    width: maxPossibleHeight * targetAspectRatio,
-                    height: maxPossibleHeight
-                )
-            }
+            let newSize = calculateSizeWithAspectRatio(
+                maxWidth: maxPossibleWidth,
+                maxHeight: maxPossibleHeight,
+                aspectRatio: targetAspectRatio
+            )
             
-            // Ensure the new size is not smaller than minimum allowed
+            // 确保新尺寸不小于允许的最小值
             let finalSize = NSSize(
                 width: max(newSize.width, window.minSize.width),
                 height: max(newSize.height, window.minSize.height)
             )
             
-            // Calculate center position on new screen
-            let newX = screenFrame.origin.x + (screenFrame.width - finalSize.width) / 2
-            let newY = screenFrame.origin.y + (screenFrame.height - finalSize.height) / 2
-            
-            let newFrame = NSRect(
-                x: newX,
-                y: newY,
-                width: finalSize.width,
-                height: finalSize.height
+            // 计算新屏幕上的中心位置
+            let newFrame = calculateCenteredFrame(
+                in: screenFrame,
+                size: finalSize
             )
             
             window.setFrame(newFrame, display: true, animate: true)
         }
     }
-
-    // click on window close button to exit the programme
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
-    }
     
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        return .terminateNow
-    }
-    
-    func applicationWillFinishLaunching(_ notification: Notification) {
-        
-    }
-    
-    func applicationWillUpdate(_ notification: Notification) {
-        
-    }
-    
-    // Add window zoom control
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
-        // Print debug information
-        
-        // Get the current window frame
         let currentFrame = sender.frame
-        
-        // Get the screen containing the window, return false if none
         guard let screen = sender.screen ?? NSScreen.main else { return false }
         
-        // Get the visible frame of the screen
         let screenFrame = screen.visibleFrame
+        let toolbarHeight = getToolbarHeight(for: sender)
+        let aspectRatioToUse = getAspectRatioToUse()
         
-        // Get the height of the toolbar if visible
-        let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
-        
-        // Calculate target aspect ratio
-        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-        let defaultAspectRatio = aspectRatio.width / aspectRatio.height
-        // Calculate content size based on aspect ratio
-        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
-        
-        // If the window is at normal size, zoom to maximum
-
-        if currentFrame.size.width  <= aspectRatio.width {
+        if currentFrame.size.width <= defaultAspectRatio.width {
+            // 放大到最大尺寸
+            let maxPossibleWidth = screenFrame.width
+            let maxPossibleHeight = screenFrame.height - toolbarHeight
             
-            // Calculate the maximum possible width while maintaining aspect ratio
-            let maxPossibleWidth = screenFrame.width * 1
-            // Calculate the maximum possible height while maintaining aspect ratio
-            let maxPossibleHeight = (screenFrame.height - toolbarHeight) * 1
-            
-            // Calculate maximum size
-            let maxSize: NSSize
-            
-            // Determine if width is the limiting factor
-            if maxPossibleWidth / aspectRatioToUse <= maxPossibleHeight {
-                // Width is the limiting factor
-                maxSize = NSSize(
-                    width: maxPossibleWidth,
-                    height: (maxPossibleWidth / aspectRatioToUse) + toolbarHeight
-                )
-            } else {
-                // Height is the limiting factor
-                maxSize = NSSize(
-                    width: maxPossibleHeight * aspectRatioToUse,
-                    height: maxPossibleHeight + toolbarHeight
-                )
-            }
-            
-            // Calculate center position
-            let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
-            let newY = screenFrame.origin.y + (screenFrame.height - maxSize.height) / 2
-            
-            // Set the maximum frame of the window
-            let maxFrame = NSRect(
-                x: newX,
-                y: newY,
-                width: maxSize.width,
-                height: maxSize.height
+            let maxSize = calculateSizeWithAspectRatio(
+                maxWidth: maxPossibleWidth,
+                maxHeight: maxPossibleHeight,
+                aspectRatio: aspectRatioToUse,
+                toolbarHeight: toolbarHeight
             )
+            
+            let maxFrame = calculateCenteredFrame(
+                in: screenFrame,
+                size: maxSize
+            )
+            
             sender.setFrame(maxFrame, display: true, animate: true)
         } else {
-            // Return to normal size
-            // Calculate center position for normal size
-            let normalSize: NSSize
-            if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                normalSize = NSSize(
-                    width: CGFloat(AppStatus.hidReadResolusion.width) / 2,
-                    height: CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
-                )
-            } else {
-                normalSize = NSSize(
-                    width: aspectRatio.width,
-                    height: aspectRatio.height + toolbarHeight
-                )
-            }
+            // 恢复到正常尺寸
+            let normalSize = calculateNormalSize(toolbarHeight: toolbarHeight)
             
-            let newX = screenFrame.origin.x + (screenFrame.width - normalSize.width) / 2
-            let newY = screenFrame.origin.y + (screenFrame.height - normalSize.height) / 2
-            
-            // Set the normal frame of the window
-            let normalFrame = NSRect(
-                x: newX,
-                y: newY,
-                width: normalSize.width,
-                height: normalSize.height
+            let normalFrame = calculateCenteredFrame(
+                in: screenFrame,
+                size: normalSize
             )
+            
             sender.setFrame(normalFrame, display: true, animate: true)
         }
         
-        // Return false to indicate not using the default zoom behavior
+        // 返回false表示不使用默认缩放行为
         return false
+    }
+    
+    // MARK: - 私有辅助方法
+    
+    private func setupMenuDelegate() {
+        NSApp.mainMenu?.delegate = self
+    }
+    
+    private func initializeDeviceManagers() {
+        if #available(macOS 12.0, *) {
+            USBDeivcesManager.shared.update()
+        } else {
+            logger.log(content: "USB设备管理需要macOS 12.0或更高版本。当前功能受限。")
+        }
+        
+        // 在USB设备管理器更新后初始化HIDManager
+        _ = HIDManager.shared
+    }
+    
+    private func configureMainWindow() {
+        NSApplication.shared.windows.forEach { window in
+            guard let windowName = window.identifier?.rawValue,
+                  windowName.contains(UserSettings.shared.mainWindownName) else { return }
+            
+            window.delegate = self
+            window.backgroundColor = NSColor.fromHex("#000000")
+            
+            // 允许窗口调整大小但保持宽高比
+            window.styleMask.insert(.resizable)
+            
+            window.setContentSize(defaultAspectRatio)
+            
+            // 设置最小尺寸以防止窗口过小
+            window.minSize = NSSize(width: defaultAspectRatio.width / 2, height: defaultAspectRatio.height / 2)
+            // 设置最大尺寸为合理值（初始尺寸的2倍）
+            window.maxSize = NSSize(width: defaultAspectRatio.width * 2, height: defaultAspectRatio.height * 2)
+            window.center()
+        }
+    }
+    
+    private func disableWindowTabbing() {
+        // 禁用窗口标签功能，使"显示标签栏"菜单项不可用
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+    
+    private func getToolbarHeight(for window: NSWindow) -> CGFloat {
+        return (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
+    }
+    
+    private func getAspectRatioToUse() -> CGFloat {
+        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+        let defaultAspectRatio = self.defaultAspectRatio.width / self.defaultAspectRatio.height
+        
+        return (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? 
+               hidAspectRatio : defaultAspectRatio
+    }
+    
+    private func calculateSizeWithAspectRatio(
+        maxWidth: CGFloat,
+        maxHeight: CGFloat,
+        aspectRatio: CGFloat,
+        toolbarHeight: CGFloat = 0
+    ) -> NSSize {
+        if maxWidth / aspectRatio <= maxHeight {
+            // 宽度是限制因素
+            return NSSize(
+                width: maxWidth,
+                height: (maxWidth / aspectRatio) + toolbarHeight
+            )
+        } else {
+            // 高度是限制因素
+            return NSSize(
+                width: maxHeight * aspectRatio,
+                height: maxHeight + toolbarHeight
+            )
+        }
+    }
+    
+    private func calculateCenteredFrame(in screenFrame: NSRect, size: NSSize) -> NSRect {
+        let newX = screenFrame.origin.x + (screenFrame.width - size.width) / 2
+        let newY = screenFrame.origin.y + (screenFrame.height - size.height) / 2
+        
+        return NSRect(
+            x: newX,
+            y: newY,
+            width: size.width,
+            height: size.height
+        )
+    }
+    
+    private func calculateNormalSize(toolbarHeight: CGFloat) -> NSSize {
+        if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+            return NSSize(
+                width: CGFloat(AppStatus.hidReadResolusion.width) / 2,
+                height: CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
+            )
+        } else {
+            return NSSize(
+                width: defaultAspectRatio.width,
+                height: defaultAspectRatio.height + toolbarHeight
+            )
+        }
     }
 }
 
+// MARK: - NSColor 扩展
+
 extension NSColor {
     static func fromHex(_ hex: String) -> NSColor {
-        let hexFormatted: String = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        let hexFormatted = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         
         var int: UInt64 = 0
         Scanner(string: hexFormatted).scanHexInt64(&int)
         let a, r, g, b: UInt64
+        
         switch hexFormatted.count {
         case 3: // RGB (12-bit)
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
@@ -339,7 +327,12 @@ extension NSColor {
             (a, r, g, b) = (255, 0, 0, 0)
         }
         
-        return NSColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: CGFloat(a) / 255)
+        return NSColor(
+            red: CGFloat(r) / 255,
+            green: CGFloat(g) / 255,
+            blue: CGFloat(b) / 255,
+            alpha: CGFloat(a) / 255
+        )
     }
 }
 
