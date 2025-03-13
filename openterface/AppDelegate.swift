@@ -127,12 +127,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         guard let window = notification.object as? NSWindow,
               let screen = window.screen else { return }
         
+        // 检查是否处于全屏模式
+        let isFullScreen = window.styleMask.contains(.fullScreen)
+        
+        // 如果是全屏模式，让PlayerView处理
+        if isFullScreen {
+            Logger.shared.log(content: "🔄 窗口切换屏幕（全屏模式）- 交由PlayerView处理")
+            return
+        }
+        
         let screenFrame = screen.visibleFrame
         let currentFrame = window.frame
         
         // 计算窗口当前宽高比
         let currentAspectRatio = currentFrame.width / currentFrame.height
         let targetAspectRatio = defaultAspectRatio.width / defaultAspectRatio.height
+        
+        Logger.shared.log(content: "🖥️ 窗口切换到新屏幕 - 屏幕尺寸: \(screenFrame.size), 当前宽高比: \(currentAspectRatio), 目标宽高比: \(targetAspectRatio)")
         
         // 检查宽高比是否明显不同（允许小的浮点差异）
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
@@ -157,7 +168,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 size: finalSize
             )
             
+            Logger.shared.log(content: "📏 调整窗口大小以保持宽高比 - 新尺寸: \(finalSize)")
+            
             window.setFrame(newFrame, display: true, animate: true)
+            
+            // 更新AppStatus中的视图和窗口信息
+            if let contentView = window.contentView {
+                AppStatus.currentView = contentView.bounds
+            }
+            AppStatus.currentWindow = window.frame
+        } else {
+            Logger.shared.log(content: "✅ 窗口宽高比正确，无需调整")
         }
     }
     

@@ -25,16 +25,27 @@ import AVFoundation
 
 struct PlayerContainerView: NSViewRepresentable {
     let captureSession: AVCaptureSession
+    @ObservedObject private var userSettings = UserSettings.shared
     
     init(captureSession: AVCaptureSession) {
         self.captureSession = captureSession
     }
 
     func makeNSView(context: Context) -> PlayerView {
+        Logger.shared.log(content: "🏗️ 创建PlayerView")
         return PlayerView(captureSession: captureSession)
     }
 
     func updateNSView(_ nsView: PlayerView, context: Context) {
+        // 当全屏状态变化时，更新视图布局
+        if context.transaction.animation != nil {
+            Logger.shared.log(content: "🔄 PlayerContainerView更新 - 全屏状态: \(userSettings.isFullScreen)")
+            
+            // 使用私有方法更新视图布局
+            if let updateMethod = nsView.value(forKey: "updateViewLayout") as? () -> Void {
+                updateMethod()
+            }
+        }
     }
 }
 

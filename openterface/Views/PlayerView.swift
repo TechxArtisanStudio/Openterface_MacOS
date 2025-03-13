@@ -61,8 +61,8 @@ class PlayerView: NSView, NSWindowDelegate {
         Logger.shared.log(content: "Setup layer start")
     
         self.previewLayer?.frame = self.frame
-        self.previewLayer?.contentsGravity = .resizeAspectFill
-        self.previewLayer?.videoGravity = .resizeAspectFill
+        self.previewLayer?.contentsGravity = .resizeAspect
+        self.previewLayer?.videoGravity = .resizeAspect
         self.previewLayer?.connection?.automaticallyAdjustsVideoMirroring = false
         
         if let image = NSImage(named: "content_dark_eng"), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
@@ -83,6 +83,7 @@ class PlayerView: NSView, NSWindowDelegate {
         
         // observer full Screen Nootification
         playViewNtf.addObserver(self, selector: #selector(handleDidEnterFullScreenNotification(_:)), name: NSWindow.didEnterFullScreenNotification, object: nil)
+        playViewNtf.addObserver(self, selector: #selector(handleDidExitFullScreenNotification(_:)), name: NSWindow.didExitFullScreenNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(promptUserHowToExitRelativeMode(_:)), name: .enableRelativeModeNotification, object: nil)
     }
     
@@ -109,7 +110,85 @@ class PlayerView: NSView, NSWindowDelegate {
                     yOffset: 6.0,
                     window: window
                 )
+                
+                // 更新UserSettings中的全屏状态
+                UserSettings.shared.isFullScreen = true
+                
+                Logger.shared.log(content: "🖥️ 窗口进入全屏模式 - 窗口尺寸: \(window.frame.size)")
             }
+        }
+    }
+    
+    @objc func handleDidExitFullScreenNotification(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            Logger.shared.log(content: "🖥️ 窗口退出全屏模式 - 窗口尺寸: \(window.frame.size)")
+            
+            // 更新UserSettings中的全屏状态
+            UserSettings.shared.isFullScreen = false
+            
+            // 确保视图布局正确
+            DispatchQueue.main.async {
+                self.updateViewLayout()
+            }
+        }
+    }
+    
+    // 实现NSWindowDelegate方法来处理全屏模式变化
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            Logger.shared.log(content: "📺 窗口完成进入全屏模式 - 窗口尺寸: \(window.frame.size), 内容区域: \(window.contentLayoutRect.size)")
+            
+            // 确保视图布局正确
+            DispatchQueue.main.async {
+                self.updateViewLayout()
+            }
+        }
+    }
+    
+    func windowDidExitFullScreen(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            Logger.shared.log(content: "📺 窗口完成退出全屏模式 - 窗口尺寸: \(window.frame.size), 内容区域: \(window.contentLayoutRect.size)")
+            
+            // 确保视图布局正确
+            DispatchQueue.main.async {
+                self.updateViewLayout()
+            }
+        }
+    }
+    
+    // 更新视图布局的辅助方法
+    private func updateViewLayout() {
+        if let window = self.window {
+            let isFullScreen = window.styleMask.contains(.fullScreen)
+            let contentRect = window.contentLayoutRect
+            
+            Logger.shared.log(content: "🔄 更新视图布局 - 全屏: \(isFullScreen), 内容区域: \(contentRect.size)")
+            
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            
+            // 更新预览层和背景图层的框架
+            self.previewLayer?.frame = self.bounds
+            self.playerBackgroundImage.frame = self.bounds
+            
+            // 根据全屏状态调整内容缩放方式
+            if isFullScreen {
+                self.previewLayer?.videoGravity = .resizeAspect
+                self.playerBackgroundImage.contentsGravity = .resizeAspect
+            } else {
+                self.previewLayer?.videoGravity = .resizeAspect
+                self.playerBackgroundImage.contentsGravity = .resizeAspect
+            }
+            
+            CATransaction.commit()
+            
+            // 更新AppStatus中的视图和窗口信息
+            AppStatus.currentView = self.bounds
+            AppStatus.currentWindow = window.frame
+            
+            // 记录视图尺寸到UserSettings
+            UserSettings.shared.viewWidth = Float(self.bounds.width)
+            UserSettings.shared.viewHigh = Float(self.bounds.height)
         }
     }
     
@@ -123,16 +202,17 @@ class PlayerView: NSView, NSWindowDelegate {
     
     // When the capture session starts running, call this method
     @objc func captureSessionDidStartRunning(_ notification: Notification) {
-        Logger.shared.log(content: "Capture session started running, updating view")
+        Logger.shared.log(content: "🎬 捕获会话开始运行，更新视图")
         DispatchQueue.main.async {
             self.needsLayout = true
             self.needsDisplay = true
+            self.updateViewLayout()
         }
     }
     
     // When the capture session stops running, call this method
     @objc func captureSessionDidStopRunning(_ notification: Notification) {
-        Logger.shared.log(content: "Capture session stopped running, updating view")
+        Logger.shared.log(content: "⏹️ 捕获会话停止运行，更新视图")
         DispatchQueue.main.async {
             self.needsLayout = true
             self.needsDisplay = true
@@ -148,6 +228,9 @@ class PlayerView: NSView, NSWindowDelegate {
         self.previewLayer?.frame = self.bounds
         self.playerBackgroundImage.frame = self.bounds
         CATransaction.commit()
+        
+        // 记录布局变化
+        Logger.shared.log(content: "📐 视图布局更新 - 视图尺寸: \(self.bounds.size)")
     }
     
     override func updateTrackingAreas() {
@@ -343,8 +426,10 @@ class PlayerView: NSView, NSWindowDelegate {
             
             // Update the frame of playerBackgroundImage
             playerBackgroundImage.frame = self.bounds
+            
+            Logger.shared.log(content: "🪟 视图移动到新窗口 - 窗口尺寸: \(windowSize)")
         } else {
-            Logger.shared.log(content: "The view is not in a window yet.")
+            Logger.shared.log(content: "⚠️ 视图尚未在窗口中")
         }
     }
     
@@ -352,17 +437,41 @@ class PlayerView: NSView, NSWindowDelegate {
         super.resize(withOldSuperviewSize: oldSize)
 
         playerBackgroundImage.frame = self.bounds
+        Logger.shared.log(content: "↔️ 视图调整大小 - 旧尺寸: \(oldSize), 新尺寸: \(self.bounds.size)")
     }
 
     override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
 
         playerBackgroundImage.frame = self.bounds
+        Logger.shared.log(content: "✅ 视图完成实时调整大小 - 最终尺寸: \(self.bounds.size)")
     }
     
     func windowDidResize(_ notification: Notification) {
         if let window = self.window {
-            playerBackgroundImage.frame = NSRect(origin: .zero, size: window.frame.size)
+            playerBackgroundImage.frame = self.bounds
+            Logger.shared.log(content: "🔄 窗口调整大小 - 窗口尺寸: \(window.frame.size), 视图尺寸: \(self.bounds.size)")
+        }
+    }
+    
+    // 添加屏幕变化处理
+    func windowDidChangeScreen(_ notification: Notification) {
+        if let window = notification.object as? NSWindow, let screen = window.screen {
+            let screenFrame = screen.frame
+            let isFullScreen = window.styleMask.contains(.fullScreen)
+            
+            Logger.shared.log(content: "🖥️ 窗口切换到新屏幕 - 屏幕尺寸: \(screenFrame.size), 全屏: \(isFullScreen)")
+            
+            // 如果不是全屏模式，让AppDelegate处理窗口大小调整
+            if !isFullScreen {
+                // AppDelegate会处理窗口大小调整
+                return
+            }
+            
+            // 在全屏模式下，我们需要确保内容正确显示
+            DispatchQueue.main.async {
+                self.updateViewLayout()
+            }
         }
     }
 }
