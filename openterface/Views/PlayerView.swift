@@ -420,8 +420,8 @@ class PlayerView: NSView, NSWindowDelegate {
         
         if let window = self.window {
             let windowSize = window.frame.size
-            UserSettings.shared.viewWidth = Float(windowSize.width)
-            UserSettings.shared.viewHigh = Float(windowSize.height)
+//            UserSettings.shared.viewWidth = Float(windowSize.width)
+//            UserSettings.shared.viewHigh = Float(windowSize.height)
             window.center()
             
             // Update the frame of playerBackgroundImage

@@ -301,14 +301,22 @@ class KeyboardManager {
     func sendTextToKeyboard(text:String) {
         // sent the text to keyboard
         let textArray = Array(text.utf8)
+        // 遍历文本中的每个字符
         for charString in textArray {
+            // 将UTF-8字符转换为对应的键盘按键码
             let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString)))
+            // 将UTF-8字符转换为Character类型以便检查是否需要Shift键
             let char = Character(String(UnicodeScalar(charString)))
+            // 判断是否需要按下Shift键（大写字母或特殊符号）
             let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : []
+            // 模拟按下键盘按键
             kbm.pressKey(keys: [key], modifiers: modifiers)
-            Thread.sleep(forTimeInterval: 0.005) // 1 ms
+            // 短暂延迟5毫秒，模拟真实按键时间
+            Thread.sleep(forTimeInterval: 0.005) // 5 毫秒
+            // 释放所有按下的键
             kbm.releaseKey(keys: self.pressedKeys)
-            Thread.sleep(forTimeInterval: 0.01) // 5 ms
+            // 在按键之间等待10毫秒，避免输入过快
+            Thread.sleep(forTimeInterval: 0.01) // 10 毫秒
         }
     }
 
