@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		294113C72D87F24000E5B09A /* qwerty_us.json in Resources */ = {isa = PBXBuildFile; fileRef = 294113C62D87F23A00E5B09A /* qwerty_us.json */; };
 		294113CC2D88183400E5B09A /* qwertz_de.json in Resources */ = {isa = PBXBuildFile; fileRef = 294113CB2D88182B00E5B09A /* qwertz_de.json */; };
+		294113CE2D881B4100E5B09A /* azerty_fr.json in Resources */ = {isa = PBXBuildFile; fileRef = 294113CD2D881B4100E5B09A /* azerty_fr.json */; };
+		294113D02D881B4900E5B09A /* qwerty_jp.json in Resources */ = {isa = PBXBuildFile; fileRef = 294113CF2D881B4900E5B09A /* qwerty_jp.json */; };
+		294113D62D881B6400E5B09A /* qwerty_uk.json in Resources */ = {isa = PBXBuildFile; fileRef = 294113D52D881B6400E5B09A /* qwerty_uk.json */; };
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
 		295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManger.swift */; };
 		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
@@ -66,6 +69,9 @@
 /* Begin PBXFileReference section */
 		294113C62D87F23A00E5B09A /* qwerty_us.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwerty_us.json; sourceTree = "<group>"; };
 		294113CB2D88182B00E5B09A /* qwertz_de.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwertz_de.json; sourceTree = "<group>"; };
+		294113CD2D881B4100E5B09A /* azerty_fr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = azerty_fr.json; sourceTree = "<group>"; };
+		294113CF2D881B4900E5B09A /* qwerty_jp.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwerty_jp.json; sourceTree = "<group>"; };
+		294113D52D881B6400E5B09A /* qwerty_uk.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwerty_uk.json; sourceTree = "<group>"; };
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
 		295DCFB52D76A8A20034BB1E /* AudioManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManger.swift; sourceTree = "<group>"; };
 		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
@@ -144,6 +150,9 @@
 		294113CA2D87F9E600E5B09A /* keyboards */ = {
 			isa = PBXGroup;
 			children = (
+				294113D52D881B6400E5B09A /* qwerty_uk.json */,
+				294113CF2D881B4900E5B09A /* qwerty_jp.json */,
+				294113CD2D881B4100E5B09A /* azerty_fr.json */,
 				294113CB2D88182B00E5B09A /* qwertz_de.json */,
 				294113C62D87F23A00E5B09A /* qwerty_us.json */,
 			);
@@ -404,9 +413,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				294113CC2D88183400E5B09A /* qwertz_de.json in Resources */,
+				294113D62D881B6400E5B09A /* qwerty_uk.json in Resources */,
+				294113D02D881B4900E5B09A /* qwerty_jp.json in Resources */,
 				294113C72D87F24000E5B09A /* qwerty_us.json in Resources */,
 				53FBE7B52B3D66D6007785B0 /* Preview Assets.xcassets in Resources */,
 				53FBE7B22B3D66D6007785B0 /* Assets.xcassets in Resources */,
+				294113CE2D881B4100E5B09A /* azerty_fr.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

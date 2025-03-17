@@ -280,7 +280,7 @@ class KeyboardMapper {
     /// - Returns: 解析后的键盘配置，如果加载失败则返回nil
     private func loadKeyboardConfig() -> KeyboardConfig? {
         // 构建文件路径
-        let configFileName = "qwerty_us.json"
+        let configFileName = currentLayout.configFileName
         
         // 输出Bundle路径以便调试
         logger.log(content: "📁 Bundle路径: \(Bundle.main.bundlePath)")
@@ -454,8 +454,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case german = "DE"
     case french = "FR"
     case uk = "UK"
-    case spanish = "ES"
-    case italian = "IT"
+//    case spanish = "ES"
+//    case italian = "IT"
     case japanese = "JP"
     
     var id: String { self.rawValue }
@@ -466,9 +466,22 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
         case .german: return "德式键盘 (DE)"
         case .french: return "法式键盘 (FR)"
         case .uk: return "英国键盘 (UK)"
-        case .spanish: return "西班牙键盘 (ES)"
-        case .italian: return "意大利键盘 (IT)"
+//        case .spanish: return "西班牙键盘 (ES)"
+//        case .italian: return "意大利键盘 (IT)"
         case .japanese: return "日本键盘 (JP)"
+        }
+    }
+    
+    // 获取对应的JSON配置文件名
+    var configFileName: String {
+        switch self {
+        case .us: return "qwerty_us.json"
+        case .german: return "qwertz_de.json"
+        case .french: return "azerty_fr.json"
+        case .uk: return "qwerty_uk.json"
+//        case .spanish: return "qwerty_es.json"
+//        case .italian: return "qwerty_it.json"
+        case .japanese: return "qwerty_jp.json"
         }
     }
     
