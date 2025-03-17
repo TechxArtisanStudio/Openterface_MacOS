@@ -63,6 +63,12 @@ struct openterfaceApp: App {
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    init() {
+        // 从UserDefaults加载用户之前选择的键盘类型
+        if let savedKeyboardType = UserDefaults.standard.string(forKey: "selectedKeyboardType") {
+            _selectedKeyboardType = State(initialValue: savedKeyboardType)
+        }
+    }
     
     var body: some Scene {
         WindowGroup(id: UserSettings.shared.mainWindownName) {
@@ -421,6 +427,12 @@ struct openterfaceApp: App {
                             lastUpdateTime = now
                         }
                     }
+            }
+            .onAppear {
+                // 应用保存的键盘类型设置
+                if selectedKeyboardType != "US" {
+                    KeyboardManager.shared.keyboardMapper.setKeyboardLayout(type: selectedKeyboardType)
+                }
             }
         }
         .commands { 
