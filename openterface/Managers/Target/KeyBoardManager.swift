@@ -31,6 +31,11 @@ class KeyboardManager {
     
     let kbm = KeyboardMapper()
     
+    // 添加一个属性，用于从外部访问KeyboardMapper实例
+    var keyboardMapper: KeyboardMapper {
+        return kbm
+    }
+    
     // 新增一个数组用于存储同时按下的键
     var pressedKeys: [UInt16] = [255,255,255,255,255,255]
     

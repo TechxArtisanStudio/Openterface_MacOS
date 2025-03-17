@@ -58,7 +58,7 @@ struct openterfaceApp: App {
 
     // Add keyboard type selection state
     @State private var selectedKeyboardType = "US"
-    @State private var keyboardTypes = ["US", "DE", "FR", "UK", "ES", "IT", "JP"]
+    @State private var keyboardTypes = KeyboardLayout.allCases.map { $0.rawValue }
 
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -579,11 +579,11 @@ struct openterfaceApp: App {
     
     // Add keyboard layout switching function
     private func changeKeyboardLayout(to type: String) {
-        Logger.shared.log(content: "Switching keyboard layout to: \(type)")
-        // Implement the logic to switch keyboard layout
-        // For example: KeyboardManager.shared.setKeyboardLayout(type: type)
+        Logger.shared.log(content: "切换键盘布局为: \(type)")
+        // 使用KeyboardMapper中的方法
+        KeyboardManager.shared.keyboardMapper.setKeyboardLayout(type: type)
         
-        // Save user selection
+        // 保存用户选择
         UserDefaults.standard.set(type, forKey: "selectedKeyboardType")
     }
 }

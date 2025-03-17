@@ -31,8 +31,26 @@ class KeyboardMapper {
 
     // 用于保存键盘布局的 UserDefaults key
     private let keyboardLayoutKey = "selectedKeyboardLayout"
+    
+    // 添加静态属性，提供所有可用的键盘类型
+    static let availableKeyboardTypes: [String] = KeyboardLayout.allCases.map { $0.rawValue }
+    
+    // 添加方法用于从字符串设置键盘布局
+    func setKeyboardLayout(type: String) {
+        if let layout = KeyboardLayout(rawValue: type) {
+            currentLayout = layout
+            logger.log(content: "键盘布局已切换为: \(layout.displayName)")
+        } else {
+            logger.log(content: "无效的键盘布局类型: \(type)")
+        }
+    }
+    
+    // 获取当前键盘布局的原始值
+    func getCurrentLayoutRawValue() -> String {
+        return currentLayout.rawValue
+    }
 
-     // 当前键盘布局的属性
+    // 当前键盘布局的属性
     private(set) var currentLayout: KeyboardLayout {
         didSet {
             // 保存到 UserDefaults
@@ -433,19 +451,24 @@ class KeyboardMapper {
 
 enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case us = "US"
-    case german = "German"
-    case french = "French"
-    case spanish = "Spanish"
-    // 可以添加更多键盘类型
+    case german = "DE"
+    case french = "FR"
+    case uk = "UK"
+    case spanish = "ES"
+    case italian = "IT"
+    case japanese = "JP"
     
     var id: String { self.rawValue }
     
     var displayName: String {
         switch self {
         case .us: return "美式键盘 (US)"
-        case .german: return "德式键盘 (German)"
-        case .french: return "法式键盘 (French)"
-        case .spanish: return "西班牙键盘 (Spanish)"
+        case .german: return "德式键盘 (DE)"
+        case .french: return "法式键盘 (FR)"
+        case .uk: return "英国键盘 (UK)"
+        case .spanish: return "西班牙键盘 (ES)"
+        case .italian: return "意大利键盘 (IT)"
+        case .japanese: return "日本键盘 (JP)"
         }
     }
     
