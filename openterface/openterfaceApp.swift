@@ -56,6 +56,10 @@ struct openterfaceApp: App {
     @State private var _serialPortName: String = "N/A"
     @State private var _serialPortBaudRate: Int = 0
 
+    // Add keyboard type selection state
+    @State private var selectedKeyboardType = "US"
+    @State private var keyboardTypes = ["US", "DE", "FR", "UK", "ES", "IT", "JP"]
+
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -304,6 +308,28 @@ struct openterfaceApp: App {
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
+                        }// Add keyboard type selection dropdown
+                        ToolbarItem(placement: .automatic) {
+                            Menu {
+                                ForEach(keyboardTypes, id: \.self) { keyboardType in
+                                    Button(action: {
+                                        selectedKeyboardType = keyboardType
+                                        changeKeyboardLayout(to: keyboardType)
+                                    }) {
+                                        HStack {
+                                            Text(keyboardType)
+                                            if selectedKeyboardType == keyboardType {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "keyboard")
+                                    Text(selectedKeyboardType)
+                                }
+                            }
                         }
                         // Add serial port information display
                         ToolbarItem(placement: .automatic) {
@@ -549,6 +575,16 @@ struct openterfaceApp: App {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             ser.lowerDTR()
         }
+    }
+    
+    // Add keyboard layout switching function
+    private func changeKeyboardLayout(to type: String) {
+        Logger.shared.log(content: "Switching keyboard layout to: \(type)")
+        // Implement the logic to switch keyboard layout
+        // For example: KeyboardManager.shared.setKeyboardLayout(type: type)
+        
+        // Save user selection
+        UserDefaults.standard.set(type, forKey: "selectedKeyboardType")
     }
 }
 

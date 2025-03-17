@@ -22,14 +22,6 @@
 
 import SwiftUI
 
-// 键盘配置数据结构
-struct KeyboardConfig: Codable {
-    let name: String
-    let right_to_left: Bool
-    let key_map: [String: String]
-    let char_mapping: [String: String]
-    let need_shift_keys: [String]
-}
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     // MARK: - 属性
@@ -61,12 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         configureMainWindow()
         disableWindowTabbing()
         
-        // 测试加载键盘配置
-        if let config = loadKeyboardConfig() {
-            logger.log(content: "成功加载键盘配置: \(config.name)")
-        } else {
-            logger.log(content: "加载键盘配置失败")
-        }
+        
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -342,59 +329,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
-    /// 加载键盘配置文件
-    /// - Returns: 解析后的键盘配置，如果加载失败则返回nil
-    private func loadKeyboardConfig() -> KeyboardConfig? {
-        // 构建文件路径
-        let configFileName = "qwerty_us.json"
-        
-        // 输出Bundle路径以便调试
-        logger.log(content: "📁 Bundle路径: \(Bundle.main.bundlePath)")
-        
-        // 尝试多个可能的路径
-        var filePath: String?
-        
-        // 尝试方法1: 直接在config目录中查找
-        if let path = Bundle.main.path(forResource: configFileName, ofType: nil) {
-            logger.log(content: "✅ 找到配置文件 (方法1): \(path)")
-            filePath = path
-        }
-    
-        
-        guard let filePath = filePath else {
-            logger.log(content: "⚠️ 找不到键盘配置文件: \(configFileName)")
-            return nil
-        }
-        
-        do {
-            // 读取文件内容
-            let fileData = try Data(contentsOf: URL(fileURLWithPath: filePath))
-            
-            // 解析JSON数据
-            let decoder = JSONDecoder()
-            let config = try decoder.decode(KeyboardConfig.self, from: fileData)
-            
-            logger.log(content: "✅ 成功加载键盘配置文件: \(filePath)")
-            
-            // 输出配置内容到控制台
-            logger.log(content: "📝 键盘配置详情:")
-            logger.log(content: "  名称: \(config.name)")
-            logger.log(content: "  从右到左: \(config.right_to_left)")
-            logger.log(content: "  键映射数量: \(config.key_map.count)")
-            logger.log(content: "  字符映射数量: \(config.char_mapping.count)")
-            logger.log(content: "  需要Shift键的按键数量: \(config.need_shift_keys.count)")
-            
-            // 可选：打印更详细的映射内容，根据需要取消注释
-            // logger.log(content: "  键映射详情: \(config.key_map)")
-            // logger.log(content: "  字符映射详情: \(config.char_mapping)")
-            // logger.log(content: "  需要Shift键的按键: \(config.need_shift_keys)")
-            
-            return config
-        } catch let error {
-            logger.log(content: "❌ 加载键盘配置文件失败: \(error.localizedDescription)")
-            return nil
-        }
-    }
 }
 
 // MARK: - NSColor 扩展

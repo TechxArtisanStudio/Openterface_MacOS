@@ -24,7 +24,26 @@ import Darwin
 import AppKit
 
 class KeyboardMapper {
+
     let spm = SerialPortManager.shared
+    
+    private let logger = Logger.shared
+
+    // 用于保存键盘布局的 UserDefaults key
+    private let keyboardLayoutKey = "selectedKeyboardLayout"
+
+     // 当前键盘布局的属性
+    private(set) var currentLayout: KeyboardLayout {
+        didSet {
+            // 保存到 UserDefaults
+            UserDefaults.standard.set(currentLayout.rawValue, forKey: keyboardLayoutKey)
+            // 重新加载对应布局的键盘配置
+            if let config = loadKeyboardConfig() {
+                logger.log(content: "已切换到键盘布局: \(currentLayout.displayName)")
+                logger.log(content: "成功加载键盘配置: \(config.name)")
+            }
+        }
+    }
     
     let keyCodeMapping: [UInt16: UInt8] = [
         // First ones are **keycode** from the controlling unit
@@ -211,6 +230,27 @@ class KeyboardMapper {
     var charToKeyCode: [UInt16: UInt8] = [:]
 
     init() {
+        // 从 UserDefaults 加载键盘布局，如果不存在则使用默认值
+        if let savedLayoutRaw = UserDefaults.standard.string(forKey: "selectedKeyboardLayout"),
+           let savedLayout = KeyboardLayout(rawValue: savedLayoutRaw) {
+            self.currentLayout = savedLayout
+            logger.log(content: "从存储加载键盘布局: \(savedLayout.displayName)")
+        } else {
+            self.currentLayout = .default
+            logger.log(content: "使用默认键盘布局: \(KeyboardLayout.default.displayName)")
+        }
+        
+        
+        print("🚄🚄🚄🚄🚄🚄🚄")
+        
+        // 测试加载键盘配置
+        if let config = loadKeyboardConfig() {
+            logger.log(content: "成功加载键盘配置: \(config.name)")
+        } else {
+            logger.log(content: "加载键盘配置失败")
+        }
+        
+        
         for (key, value) in keyCodeMapping {
             if let unicodeScalar = UnicodeScalar(key) {
                 charToKeyCode[UInt16(unicodeScalar.value)] = value
@@ -218,6 +258,59 @@ class KeyboardMapper {
         }
     }
 
+    /// 加载键盘配置文件
+    /// - Returns: 解析后的键盘配置，如果加载失败则返回nil
+    private func loadKeyboardConfig() -> KeyboardConfig? {
+        // 构建文件路径
+        let configFileName = "qwerty_us.json"
+        
+        // 输出Bundle路径以便调试
+        logger.log(content: "📁 Bundle路径: \(Bundle.main.bundlePath)")
+        
+        // 尝试多个可能的路径
+        var filePath: String?
+        
+        // 尝试方法1: 直接在config目录中查找
+        if let path = Bundle.main.path(forResource: configFileName, ofType: nil) {
+            logger.log(content: "✅ 找到配置文件 (方法1): \(path)")
+            filePath = path
+        }
+    
+        
+        guard let filePath = filePath else {
+            logger.log(content: "⚠️ 找不到键盘配置文件: \(configFileName)")
+            return nil
+        }
+        
+        do {
+            // 读取文件内容
+            let fileData = try Data(contentsOf: URL(fileURLWithPath: filePath))
+            
+            // 解析JSON数据
+            let decoder = JSONDecoder()
+            let config = try decoder.decode(KeyboardConfig.self, from: fileData)
+            
+            logger.log(content: "✅ 成功加载键盘配置文件: \(filePath)")
+            
+            // 输出配置内容到控制台
+            logger.log(content: "📝 键盘配置详情:")
+            logger.log(content: "  名称: \(config.name)")
+            logger.log(content: "  从右到左: \(config.right_to_left)")
+            logger.log(content: "  键映射数量: \(config.key_map.count)")
+            logger.log(content: "  字符映射数量: \(config.char_mapping.count)")
+            logger.log(content: "  需要Shift键的按键数量: \(config.need_shift_keys.count)")
+            
+            // 可选：打印更详细的映射内容，根据需要取消注释
+            // logger.log(content: "  键映射详情: \(config.key_map)")
+            // logger.log(content: "  字符映射详情: \(config.char_mapping)")
+            // logger.log(content: "  需要Shift键的按键: \(config.need_shift_keys)")
+            
+            return config
+        } catch let error {
+            logger.log(content: "❌ 加载键盘配置文件失败: \(error.localizedDescription)")
+            return nil
+        }
+    }
     func fromCharToKeyCode(char: UInt16) -> UInt8{
         // map the char to keycode
         return charMapping[char] ?? 0x00
@@ -336,3 +429,50 @@ class KeyboardMapper {
         return nil
     }
 }
+
+
+enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
+    case us = "US"
+    case german = "German"
+    case french = "French"
+    case spanish = "Spanish"
+    // 可以添加更多键盘类型
+    
+    var id: String { self.rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .us: return "美式键盘 (US)"
+        case .german: return "德式键盘 (German)"
+        case .french: return "法式键盘 (French)"
+        case .spanish: return "西班牙键盘 (Spanish)"
+        }
+    }
+    
+    static var `default`: KeyboardLayout {
+        return .us
+    }
+}
+
+// 用于存储键盘设置的结构
+struct KeyboardSettings: Codable {
+    var selectedLayout: KeyboardLayout
+    // 可以添加其他键盘相关设置
+    
+    init(selectedLayout: KeyboardLayout = .default) {
+        self.selectedLayout = selectedLayout
+    }
+}
+
+
+// 键盘配置数据结构
+struct KeyboardConfig: Codable {
+    let name: String
+    let right_to_left: Bool
+    let key_map: [String: String]
+    let char_mapping: [String: String]
+    let need_shift_keys: [String]
+}
+
+
+
