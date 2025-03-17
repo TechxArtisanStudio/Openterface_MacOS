@@ -346,7 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// - Returns: 解析后的键盘配置，如果加载失败则返回nil
     private func loadKeyboardConfig() -> KeyboardConfig? {
         // 构建文件路径
-        let configFileName = "us.json"
+        let configFileName = "qwerty_us.json"
         
         // 输出Bundle路径以便调试
         logger.log(content: "📁 Bundle路径: \(Bundle.main.bundlePath)")
@@ -375,6 +375,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let config = try decoder.decode(KeyboardConfig.self, from: fileData)
             
             logger.log(content: "✅ 成功加载键盘配置文件: \(filePath)")
+            
+            // 输出配置内容到控制台
+            logger.log(content: "📝 键盘配置详情:")
+            logger.log(content: "  名称: \(config.name)")
+            logger.log(content: "  从右到左: \(config.right_to_left)")
+            logger.log(content: "  键映射数量: \(config.key_map.count)")
+            logger.log(content: "  字符映射数量: \(config.char_mapping.count)")
+            logger.log(content: "  需要Shift键的按键数量: \(config.need_shift_keys.count)")
+            
+            // 可选：打印更详细的映射内容，根据需要取消注释
+            // logger.log(content: "  键映射详情: \(config.key_map)")
+            // logger.log(content: "  字符映射详情: \(config.char_mapping)")
+            // logger.log(content: "  需要Shift键的按键: \(config.need_shift_keys)")
+            
             return config
         } catch let error {
             logger.log(content: "❌ 加载键盘配置文件失败: \(error.localizedDescription)")

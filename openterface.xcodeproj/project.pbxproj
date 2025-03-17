@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		294113C72D87F24000E5B09A /* qwerty_us.json in Resources */ = {isa = PBXBuildFile; fileRef = 294113C62D87F23A00E5B09A /* qwerty_us.json */; };
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
 		295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManger.swift */; };
 		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
@@ -62,6 +63,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		294113C62D87F23A00E5B09A /* qwerty_us.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwerty_us.json; sourceTree = "<group>"; };
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
 		295DCFB52D76A8A20034BB1E /* AudioManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManger.swift; sourceTree = "<group>"; };
 		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
@@ -129,6 +131,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		294113C42D87DE3900E5B09A /* config */ = {
+			isa = PBXGroup;
+			children = (
+				294113CA2D87F9E600E5B09A /* keyboards */,
+			);
+			path = config;
+			sourceTree = "<group>";
+		};
+		294113CA2D87F9E600E5B09A /* keyboards */ = {
+			isa = PBXGroup;
+			children = (
+				294113C62D87F23A00E5B09A /* qwerty_us.json */,
+			);
+			path = keyboards;
+			sourceTree = "<group>";
+		};
 		537F65D02B4E4C6100825B4F /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -191,8 +209,9 @@
 		53FBE7AC2B3D66D2007785B0 /* openterface */ = {
 			isa = PBXGroup;
 			children = (
-				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
+				294113C42D87DE3900E5B09A /* config */,
 				53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */,
+				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
 				53FBE7AF2B3D66D2007785B0 /* ContentView.swift */,
 				53FBE7D82B3D676A007785B0 /* Managers */,
 				53FBE7DB2B3D6789007785B0 /* Views */,
@@ -381,6 +400,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				294113C72D87F24000E5B09A /* qwerty_us.json in Resources */,
 				53FBE7B52B3D66D6007785B0 /* Preview Assets.xcassets in Resources */,
 				53FBE7B22B3D66D6007785B0 /* Assets.xcassets in Resources */,
 			);
