@@ -22,120 +22,122 @@
 
 import Darwin
 import AppKit
+import Carbon.HIToolbox
 
 class KeyboardMapper {
     let spm = SerialPortManager.shared
     
     let keyCodeMapping: [UInt16: UInt8] = [
-        // First ones are **keycode** from the controlling unit
-        // Second ones are for the controlled unit (to keyboard simulating chip)
-         0: 0x04, // a
-        11: 0x05, // b
-         8: 0x06, // c
-         2: 0x07, // d
-        14: 0x08, // e
-         3: 0x09, // f
-         5: 0x0A, // g
-         4: 0x0B, // h
-        34: 0x0C, // i
-        38: 0x0D, // j
-        40: 0x0E, // k
-        37: 0x0F, // l
-        46: 0x10, // m
-        45: 0x11, // n
-        31: 0x12, // o
-        35: 0x13, // p
-        12: 0x14, // q
-        15: 0x15, // r
-         1: 0x16, // s
-        17: 0x17, // t
-        32: 0x18, // u
-         9: 0x19, // v
-        13: 0x1A, // w
-         7: 0x1B, // x
-        16: 0x1C, // y
-         6: 0x1D, // z
-        18: 0x1E, 83: 0x59, // 1
-        19: 0x1F, 84: 0x5A, // 2
-        20: 0x20, 85: 0x5B, // 3
-        21: 0x21, 86: 0x5C, // 4
-        23: 0x22, 87: 0x5D, // 5
-        22: 0x23, 88: 0x5E, // 6
-        26: 0x24, 89: 0x5F, // 7
-        28: 0x25, 91: 0x60, // 8
-        25: 0x26, 92: 0x61, // 9
-        29: 0x27, 82: 0x62, // 0
-        36: 0x28, 76: 0x58, // enter
-        53: 0x29, // esc
-        51: 0x2A, // backspace
-        48: 0x2B,  // tab
-        49: 0x2C, // space
-        27: 0x2D, // -
-        24: 0x2E, // =
-        33: 0x2F, // [
-        30: 0x30, // ]
-        42: 0x31, // \
-//        ??: 0x32, // \
-        41: 0x33, // ;
-        39: 0x34, // '
-        50: 0x35, // `
-        43: 0x36, // ,
-        47: 0x37, 65: 0x37, // .
-        44: 0x38, //
-        57: 0x39, // caps lock
-        122: 0x3A, // f1
-        120: 0x3B, // f2
-        99: 0x3C, // f3
-        118: 0x3D, // f4
-        96: 0x3E, // f5
-        97: 0x3F, // f6
-        98: 0x40, // f7
-        100: 0x41, // f8
-        101: 0x42, // f9
-        109: 0x43, // f10
-        103: 0x44, // f11
-        111: 0x45, // f12
-//        "Print Scr": 0x46,
-//        "ScrollLock": 0x47,
-//        "Pause Break": 0x48,
-        114:0x49,//   "Insert": 0x49,
-        115:0x4A, // "Home": 0x4A,
-        116:0x4B,//   "Page Up": 0x4B,
-        117: 0x4C, // Right Del
-        119: 0x4D, //"End": 0x4D,
-        121: 0x4E, // "Page Down": 0x4E,
-        124: 0x4F, // Keyboard right arrow
-        123: 0x50, // Keyboard left arrow
-        125: 0x51, // Keyboard down arrow
-        126: 0x52, // Keyboard up arrow
-         71: 0x53,//        "Numlock": 0x53,
-         75:0x54, // "Numpad / divide": 0x54,
-         67:0x55, //  "Numpad * multiply": 0x55,
-         78:0x56, //"Numpad - subtract": 0x56,
-         69:0x57, //        "Numpad + add": 0x57,
-//        "Numpad enter": 0x58,
-//        "Numpad End": 0x59,
-//        "Numpad down arrow": 0x5A,
-//        "Numpad Page Down": 0x5B,
-//        "Numpad left arrow": 0x5C,
-//        "Numpad Clear": 0x5D,
-//        "Numpad right arrow": 0x5E,
-//        "Numpad Home": 0x5F,
-//        "Numpad up arrow": 0x60,
-//        "Numpad Page Up": 0x61,
-//        ??: 0x62, // Numpad Insert
-//        ??: 0x63, // Numpad Delete
-//        ??: 0x65, // Numpad Apps
-         105: 0x46, // Print Screen
-         110: 0x65, // App
-         56: 0xE1, // Left Shift
-         60: 0xE5, // Right Shift
-         59: 0xE0, // Left Ctrl
-         62: 0xE4, // Right Ctrl
-         58: 0xE2, // Left Option, Left Alt
-         61: 0xE6, // Rigth Option, Right Alt
-         55: 0xE3, // Left Command, Left Win
-         54: 0xE7  // Right Command, Right Win
+        // 字母键
+        UInt16(kVK_ANSI_A): 0x04, // a
+        UInt16(kVK_ANSI_B): 0x05, // b
+        UInt16(kVK_ANSI_C): 0x06, // c
+        UInt16(kVK_ANSI_D): 0x07, // d
+        UInt16(kVK_ANSI_E): 0x08, // e
+        UInt16(kVK_ANSI_F): 0x09, // f
+        UInt16(kVK_ANSI_G): 0x0A, // g
+        UInt16(kVK_ANSI_H): 0x0B, // h
+        UInt16(kVK_ANSI_I): 0x0C, // i
+        UInt16(kVK_ANSI_J): 0x0D, // j
+        UInt16(kVK_ANSI_K): 0x0E, // k
+        UInt16(kVK_ANSI_L): 0x0F, // l
+        UInt16(kVK_ANSI_M): 0x10, // m
+        UInt16(kVK_ANSI_N): 0x11, // n
+        UInt16(kVK_ANSI_O): 0x12, // o
+        UInt16(kVK_ANSI_P): 0x13, // p
+        UInt16(kVK_ANSI_Q): 0x14, // q
+        UInt16(kVK_ANSI_R): 0x15, // r
+        UInt16(kVK_ANSI_S): 0x16, // s
+        UInt16(kVK_ANSI_T): 0x17, // t
+        UInt16(kVK_ANSI_U): 0x18, // u
+        UInt16(kVK_ANSI_V): 0x19, // v
+        UInt16(kVK_ANSI_W): 0x1A, // w
+        UInt16(kVK_ANSI_X): 0x1B, // x
+        UInt16(kVK_ANSI_Y): 0x1C, // y
+        UInt16(kVK_ANSI_Z): 0x1D, // z
+        
+        // 数字键
+        UInt16(kVK_ANSI_1): 0x1E, UInt16(kVK_ANSI_Keypad1): 0x59, // 1
+        UInt16(kVK_ANSI_2): 0x1F, UInt16(kVK_ANSI_Keypad2): 0x5A, // 2
+        UInt16(kVK_ANSI_3): 0x20, UInt16(kVK_ANSI_Keypad3): 0x5B, // 3
+        UInt16(kVK_ANSI_4): 0x21, UInt16(kVK_ANSI_Keypad4): 0x5C, // 4
+        UInt16(kVK_ANSI_5): 0x22, UInt16(kVK_ANSI_Keypad5): 0x5D, // 5
+        UInt16(kVK_ANSI_6): 0x23, UInt16(kVK_ANSI_Keypad6): 0x5E, // 6
+        UInt16(kVK_ANSI_7): 0x24, UInt16(kVK_ANSI_Keypad7): 0x5F, // 7
+        UInt16(kVK_ANSI_8): 0x25, UInt16(kVK_ANSI_Keypad8): 0x60, // 8
+        UInt16(kVK_ANSI_9): 0x26, UInt16(kVK_ANSI_Keypad9): 0x61, // 9
+        UInt16(kVK_ANSI_0): 0x27, UInt16(kVK_ANSI_Keypad0): 0x62, // 0
+
+        
+        // 功能键和特殊键
+        UInt16(kVK_Return): 0x28, UInt16(kVK_ANSI_KeypadEnter): 0x58, // enter
+        UInt16(kVK_Escape): 0x29, // esc
+        UInt16(kVK_Delete): 0x2A, // backspace
+        UInt16(kVK_Tab): 0x2B,  // tab
+        UInt16(kVK_Space): 0x2C, // space
+        UInt16(kVK_ANSI_Minus): 0x2D, // -
+        UInt16(kVK_ANSI_Equal): 0x2E, // =
+        UInt16(kVK_ANSI_LeftBracket): 0x2F, // [
+        UInt16(kVK_ANSI_RightBracket): 0x30, // ]
+        UInt16(kVK_ANSI_Backslash): 0x31, // \
+        UInt16(kVK_ANSI_Semicolon): 0x33, // ;
+        UInt16(kVK_ANSI_Quote): 0x34, // '
+        UInt16(kVK_ANSI_Grave): 0x35, // `
+        UInt16(kVK_ANSI_Comma): 0x36, // ,
+        UInt16(kVK_ANSI_Period): 0x37, UInt16(kVK_ANSI_KeypadDecimal): 0x63, // .
+        UInt16(kVK_ANSI_Slash): 0x38, // /
+        UInt16(kVK_CapsLock): 0x39, // caps lock
+        
+        // F键
+        UInt16(kVK_F1): 0x3A, // f1
+        UInt16(kVK_F2): 0x3B, // f2
+        UInt16(kVK_F3): 0x3C, // f3
+        UInt16(kVK_F4): 0x3D, // f4
+        UInt16(kVK_F5): 0x3E, // f5
+        UInt16(kVK_F6): 0x3F, // f6
+        UInt16(kVK_F7): 0x40, // f7
+        UInt16(kVK_F8): 0x41, // f8
+        UInt16(kVK_F9): 0x42, // f9
+        UInt16(kVK_F10): 0x43, // f10
+        UInt16(kVK_F11): 0x44, // f11
+        UInt16(kVK_F12): 0x45, // f12
+        
+        // 编辑键和导航键
+        UInt16(kVK_Help): 0x49, // Insert/Help
+        UInt16(kVK_Home): 0x4A, // Home
+        UInt16(kVK_PageUp): 0x4B, // Page Up
+        UInt16(kVK_ForwardDelete): 0x4C, // Forward Delete
+        UInt16(kVK_End): 0x4D, // End
+        UInt16(kVK_PageDown): 0x4E, // Page Down
+        UInt16(kVK_RightArrow): 0x4F, // Right Arrow
+        UInt16(kVK_LeftArrow): 0x50, // Left Arrow
+        UInt16(kVK_DownArrow): 0x51, // Down Arrow
+        UInt16(kVK_UpArrow): 0x52, // Up Arrow
+        
+        // 数字键盘
+        UInt16(kVK_ANSI_KeypadClear): 0x53, // Numlock/Clear
+        UInt16(kVK_ANSI_KeypadDivide): 0x54, // Keypad /
+        UInt16(kVK_ANSI_KeypadMultiply): 0x55, // Keypad *
+        UInt16(kVK_ANSI_KeypadMinus): 0x56, // Keypad -
+        UInt16(kVK_ANSI_KeypadPlus): 0x57, // Keypad +
+        
+        // 其他功能键
+        UInt16(kVK_F13): 0x46, // Print Screen (映射到F13)
+        UInt16(kVK_F14): 0x65, // App (映射到F14)
+        
+        // 修饰键
+        UInt16(kVK_Shift): 0xE1, // Left Shift
+        UInt16(kVK_RightShift): 0xE5, // Right Shift
+        UInt16(kVK_Control): 0xE0, // Left Ctrl
+        UInt16(kVK_RightControl): 0xE4, // Right Ctrl
+        UInt16(kVK_Option): 0xE2, // Left Option, Left Alt
+        UInt16(kVK_RightOption): 0xE6, // Right Option, Right Alt
+        UInt16(kVK_Command): 0xE3, // Left Command, Left Win
+        UInt16(kVK_RightCommand): 0xE7,  // Right Command, Right Win
+        
+        //
+        UInt16(kVK_ISO_Section): 0x64, // ISO Section
+
     ]
 
     let charMapping: [UInt16: UInt8] = [
@@ -257,29 +259,47 @@ class KeyboardMapper {
 
         var combinedModifiers: UInt8 = 0
 
+        // Actual specific rawValue for left and right modifiers
+        // let leftShiftValue: UInt = 0x00020102
+        let rightShiftValue: UInt = 0x00020104
+        
+        // let leftControlValue: UInt = 0x00040101
+        let rightControlValue: UInt = 0x00042100
+        
+        // let leftCommandValue: UInt = 0x00100108
+        let rightCommandValue: UInt = 0x00100110
+        
+        // let leftOptionValue: UInt = 0x00080120
+        let rightOptionValue: UInt = 0x00080140
+        
+        let rawValue = modifiers.rawValue
+
         if modifiers.contains(.shift) {
-            if modifiers.rawValue & 0x20004 == 0x20004 {  // Right Shift
+            if (rawValue & rightShiftValue) == rightShiftValue {
                 combinedModifiers |= funcKeys["RightShift"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftShift"] ?? 0x00
             }
         }
+        
         if modifiers.contains(.control) {
-            if modifiers.rawValue & 0x20000 == 0x20000 {  // Right Control
+            if (rawValue & rightControlValue) == rightControlValue {
                 combinedModifiers |= funcKeys["RightCtrl"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftCtrl"] ?? 0x00
             }
         }
-        if modifiers.contains(.option) { // For "alt" key
-            if modifiers.rawValue & 0x20002 == 0x20002 {  // Right Option/Alt
+        
+        if modifiers.contains(.option) {
+            if (rawValue & rightOptionValue) == rightOptionValue {
                 combinedModifiers |= funcKeys["RightAlt"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftAlt"] ?? 0x00
             }
         }
-        if modifiers.contains(.command) { // For "win" key
-            if modifiers.rawValue & 0x20008 == 0x20008 {  // Right Command
+        
+        if modifiers.contains(.command) {
+            if (rawValue & rightCommandValue) == rightCommandValue {
                 combinedModifiers |= funcKeys["RightWin"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftWin"] ?? 0x00

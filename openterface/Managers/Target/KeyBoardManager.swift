@@ -299,16 +299,16 @@ class KeyboardManager {
     }
     
     func sendTextToKeyboard(text:String) {
-        // sent the text to keyboard
-        let textArray = Array(text.utf8)
-        for charString in textArray {
-            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString)))
-            let char = Character(String(UnicodeScalar(charString)))
-            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : []
-            kbm.pressKey(keys: [key], modifiers: modifiers)
-            Thread.sleep(forTimeInterval: 0.005) // 1 ms
-            kbm.releaseKey(keys: self.pressedKeys)
-            Thread.sleep(forTimeInterval: 0.01) // 5 ms
+        // Send text to keyboard
+        let textArray = Array(text.utf8) // Convert string to UTF-8 byte array
+        for charString in textArray { // Iterate through each character's UTF-8 encoding
+            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // Convert character to keyboard key code
+            let char = Character(String(UnicodeScalar(charString))) // Convert UTF-8 encoding back to character
+            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : [] // Determine if Shift key needs to be pressed
+            kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
+            Thread.sleep(forTimeInterval: 0.005) // Wait for 5 milliseconds
+            kbm.releaseKey(keys: self.pressedKeys) // Release all pressed keys
+            Thread.sleep(forTimeInterval: 0.01) // Wait for 10 milliseconds
         }
     }
 
