@@ -67,6 +67,7 @@ class KeyboardMapper {
         UInt16(kVK_ANSI_8): 0x25, UInt16(kVK_ANSI_Keypad8): 0x60, // 8
         UInt16(kVK_ANSI_9): 0x26, UInt16(kVK_ANSI_Keypad9): 0x61, // 9
         UInt16(kVK_ANSI_0): 0x27, UInt16(kVK_ANSI_Keypad0): 0x62, // 0
+
         
         // 功能键和特殊键
         UInt16(kVK_Return): 0x28, UInt16(kVK_ANSI_KeypadEnter): 0x58, // enter
@@ -83,7 +84,7 @@ class KeyboardMapper {
         UInt16(kVK_ANSI_Quote): 0x34, // '
         UInt16(kVK_ANSI_Grave): 0x35, // `
         UInt16(kVK_ANSI_Comma): 0x36, // ,
-        UInt16(kVK_ANSI_Period): 0x37, UInt16(kVK_ANSI_KeypadDecimal): 0x37, // .
+        UInt16(kVK_ANSI_Period): 0x37, UInt16(kVK_ANSI_KeypadDecimal): 0x63, // .
         UInt16(kVK_ANSI_Slash): 0x38, // /
         UInt16(kVK_CapsLock): 0x39, // caps lock
         
@@ -258,29 +259,47 @@ class KeyboardMapper {
 
         var combinedModifiers: UInt8 = 0
 
+        // Actual specific rawValue for left and right modifiers
+        // let leftShiftValue: UInt = 0x00020102
+        let rightShiftValue: UInt = 0x00020104
+        
+        // let leftControlValue: UInt = 0x00040101
+        let rightControlValue: UInt = 0x00042100
+        
+        // let leftCommandValue: UInt = 0x00100108
+        let rightCommandValue: UInt = 0x00100110
+        
+        // let leftOptionValue: UInt = 0x00080120
+        let rightOptionValue: UInt = 0x00080140
+        
+        let rawValue = modifiers.rawValue
+
         if modifiers.contains(.shift) {
-            if modifiers.rawValue & 0x20004 == 0x20004 {  // Right Shift
+            if (rawValue & rightShiftValue) == rightShiftValue {
                 combinedModifiers |= funcKeys["RightShift"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftShift"] ?? 0x00
             }
         }
+        
         if modifiers.contains(.control) {
-            if modifiers.rawValue & 0x20000 == 0x20000 {  // Right Control
+            if (rawValue & rightControlValue) == rightControlValue {
                 combinedModifiers |= funcKeys["RightCtrl"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftCtrl"] ?? 0x00
             }
         }
-        if modifiers.contains(.option) { // For "alt" key
-            if modifiers.rawValue & 0x20002 == 0x20002 {  // Right Option/Alt
+        
+        if modifiers.contains(.option) {
+            if (rawValue & rightOptionValue) == rightOptionValue {
                 combinedModifiers |= funcKeys["RightAlt"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftAlt"] ?? 0x00
             }
         }
-        if modifiers.contains(.command) { // For "win" key
-            if modifiers.rawValue & 0x20008 == 0x20008 {  // Right Command
+        
+        if modifiers.contains(.command) {
+            if (rawValue & rightCommandValue) == rightCommandValue {
                 combinedModifiers |= funcKeys["RightWin"] ?? 0x00
             } else {
                 combinedModifiers |= funcKeys["LeftWin"] ?? 0x00

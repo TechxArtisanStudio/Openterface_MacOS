@@ -299,16 +299,16 @@ class KeyboardManager {
     }
     
     func sendTextToKeyboard(text:String) {
-        // 将文本发送到键盘
-        let textArray = Array(text.utf8) // 将字符串转换为UTF-8字节数组
-        for charString in textArray { // 遍历每个字符的UTF-8编码
-            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // 将字符转换为键盘按键码
-            let char = Character(String(UnicodeScalar(charString))) // 将UTF-8编码转换回字符
-            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : [] // 判断是否需要按下Shift键
-            kbm.pressKey(keys: [key], modifiers: modifiers) // 按下对应的键和修饰键
-            Thread.sleep(forTimeInterval: 0.005) // 等待5毫秒
-            kbm.releaseKey(keys: self.pressedKeys) // 释放所有按下的键
-            Thread.sleep(forTimeInterval: 0.01) // 等待10毫秒
+        // Send text to keyboard
+        let textArray = Array(text.utf8) // Convert string to UTF-8 byte array
+        for charString in textArray { // Iterate through each character's UTF-8 encoding
+            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // Convert character to keyboard key code
+            let char = Character(String(UnicodeScalar(charString))) // Convert UTF-8 encoding back to character
+            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : [] // Determine if Shift key needs to be pressed
+            kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
+            Thread.sleep(forTimeInterval: 0.005) // Wait for 5 milliseconds
+            kbm.releaseKey(keys: self.pressedKeys) // Release all pressed keys
+            Thread.sleep(forTimeInterval: 0.01) // Wait for 10 milliseconds
         }
     }
 
