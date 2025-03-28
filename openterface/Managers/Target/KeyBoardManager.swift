@@ -299,16 +299,16 @@ class KeyboardManager {
     }
     
     func sendTextToKeyboard(text:String) {
-        // sent the text to keyboard
-        let textArray = Array(text.utf8)
-        for charString in textArray {
-            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString)))
-            let char = Character(String(UnicodeScalar(charString)))
-            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : []
-            kbm.pressKey(keys: [key], modifiers: modifiers)
-            Thread.sleep(forTimeInterval: 0.005) // 1 ms
-            kbm.releaseKey(keys: self.pressedKeys)
-            Thread.sleep(forTimeInterval: 0.01) // 5 ms
+        // 将文本发送到键盘
+        let textArray = Array(text.utf8) // 将字符串转换为UTF-8字节数组
+        for charString in textArray { // 遍历每个字符的UTF-8编码
+            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // 将字符转换为键盘按键码
+            let char = Character(String(UnicodeScalar(charString))) // 将UTF-8编码转换回字符
+            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : [] // 判断是否需要按下Shift键
+            kbm.pressKey(keys: [key], modifiers: modifiers) // 按下对应的键和修饰键
+            Thread.sleep(forTimeInterval: 0.005) // 等待5毫秒
+            kbm.releaseKey(keys: self.pressedKeys) // 释放所有按下的键
+            Thread.sleep(forTimeInterval: 0.01) // 等待10毫秒
         }
     }
 

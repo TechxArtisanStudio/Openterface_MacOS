@@ -134,8 +134,9 @@ class KeyboardMapper {
         UInt16(kVK_Command): 0xE3, // Left Command, Left Win
         UInt16(kVK_RightCommand): 0xE7,  // Right Command, Right Win
         
-        // DE
+        //
         UInt16(kVK_ISO_Section): 0x64, // ISO Section
+
     ]
 
     let charMapping: [UInt16: UInt8] = [
