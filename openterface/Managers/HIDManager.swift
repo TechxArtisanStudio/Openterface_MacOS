@@ -320,15 +320,33 @@ class HIDManager {
 
 // define HID sub commands
 enum HIDSubCommand: UInt16 {
+    // old
     // get Resolusion data  C738 C739 C73A C73B
     case resolutionWidthHigh = 0xC738
     case resolutionWidthLow = 0xC739
     case resolutionHeightHigh = 0xC73A
     case resolutionHeightLow = 0xC73B
+
+    // new
+    // get input resolution data C6AF C6B0 C6B1 C6B2
+    case inputWidthHigh = 0xC6AF
+    case inputWidthLow = 0xC6B0
+    case inputHeightHigh = 0xC6B1
+    case inputHeightLow = 0xC6B2
     
+    // old
     // get FPS data C73E C73F
     case fpsHigh = 0xC73E
     case fpsLow = 0xC73F
+
+    // new
+    // get input FPS data C6B5 C6B6
+    case inputFpsHigh = 0xC6B5
+    case inputFpsLow = 0xC6B6
+
+    // get input pixel clock data C73C C73D
+    case inputPixelClockHigh = 0xC73C
+    case inputPixelClockLow = 0xC73D    
     
     // get MS2019 version CBDC CBDD CBDE CBDF
     case version1 = 0xCBDC
