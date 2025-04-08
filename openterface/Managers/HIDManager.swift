@@ -322,17 +322,17 @@ class HIDManager {
 enum HIDSubCommand: UInt16 {
     // old
     // get Resolusion data  C738 C739 C73A C73B
-    case resolutionWidthHigh = 0xC738
-    case resolutionWidthLow = 0xC739
-    case resolutionHeightHigh = 0xC73A
-    case resolutionHeightLow = 0xC73B
+    case resolutionWidthHigh = 0xC6AF
+    case resolutionWidthLow = 0xC6B0
+    case resolutionHeightHigh = 0xC6B1
+    case resolutionHeightLow = 0xC6B2
 
     // new
     // get input resolution data C6AF C6B0 C6B1 C6B2
-    case inputWidthHigh = 0xC6AF
-    case inputWidthLow = 0xC6B0
-    case inputHeightHigh = 0xC6B1
-    case inputHeightLow = 0xC6B2
+    // case inputWidthHigh = 0xC6AF
+    // case inputWidthLow = 0xC6B0
+    // case inputHeightHigh = 0xC6B1
+    // case inputHeightLow = 0xC6B2
     
     // old
     // get FPS data C73E C73F

@@ -90,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func windowDidResize(_ notification: Notification) {
+        print("🔥🔥🔥🔥🔥🔥🔥")
         if let window = NSApplication.shared.mainWindow {
             if let toolbar = window.toolbar, toolbar.isVisible {
                 let windowHeight = window.frame.height
@@ -102,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
+        print("💦💦💦💦💦💦💦")    
         // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
@@ -117,13 +119,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Calculate new size maintaining content area aspect ratio
         var newSize = targetFrameSize
-        
+        print("1 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         // Adjust height calculation to account for the toolbar
         let contentHeight = targetFrameSize.height - toolbarHeight
         let contentWidth = targetFrameSize.width
         
         // Calculate content size based on aspect ratio
-        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
+        var aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
+        aspectRatioToUse = 1.77777
+        print("aspectRatioToUse\(aspectRatioToUse)")
         let heightFromWidth = (contentWidth / CGFloat(aspectRatioToUse))
         let widthFromHeight = (contentHeight * CGFloat(aspectRatioToUse))
         
@@ -134,16 +138,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             newSize.width = widthFromHeight
         }
 
-        // Ensure the size does not exceed screen boundaries
-        newSize.width = min(newSize.width, screenFrame.width * 1)
-        newSize.height = min(newSize.height, screenFrame.height * 1)
+//        // Ensure the size does not exceed screen boundaries
+//        newSize.width = min(newSize.width, screenFrame.width * 1)
+//        newSize.height = min(newSize.height, screenFrame.height * 1)
+//        
+//        // Ensure the size is not below the minimum (considering the toolbar)
+//        let minContentHeight = sender.minSize.height - toolbarHeight
+//        let minContentWidth = sender.minSize.width
+//        newSize.width = max(newSize.width, minContentWidth)
+//        newSize.height = max(newSize.height, minContentHeight + toolbarHeight)
         
-        // Ensure the size is not below the minimum (considering the toolbar)
-        let minContentHeight = sender.minSize.height - toolbarHeight
-        let minContentWidth = sender.minSize.width
-        newSize.width = max(newSize.width, minContentWidth)
-        newSize.height = max(newSize.height, minContentHeight + toolbarHeight)
-        
+        print("2 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         return newSize
     }
 
