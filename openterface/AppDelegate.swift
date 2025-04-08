@@ -331,6 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func windowDidResize(_ notification: Notification) {
+        print("🔥🔥🔥🔥🔥🔥🔥")
         if let window = NSApplication.shared.mainWindow {
             if let toolbar = window.toolbar, toolbar.isVisible {
                 let windowHeight = window.frame.height
@@ -391,6 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
 
         
+        print("2 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         return newSize
     }
 
