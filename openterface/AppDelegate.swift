@@ -493,7 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - maxSize.height) / 2
             
-            // Set the maximum frame of the window
+            // 设置窗口的最大框架
             let maxFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -521,7 +521,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let newX = screenFrame.origin.x + (screenFrame.width - normalSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - normalSize.height) / 2
             
-            // Set the normal frame of the window
+            // 设置窗口的正常框架
             let normalFrame = NSRect(
                 x: newX,
                 y: newY,
