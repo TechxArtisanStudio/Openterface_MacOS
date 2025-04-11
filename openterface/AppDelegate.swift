@@ -168,24 +168,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Check if aspect ratio is significantly different (allowing for small floating point differences)
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
-            // Calculate new size that fits the screen while maintaining aspect ratio
-            let maxPossibleWidth = screenFrame.width * 0.9
-            let maxPossibleHeight = screenFrame.height * 0.9
+            // 创建一个目标尺寸，基于屏幕最大尺寸的90%
+            let targetSize = NSSize(
+                width: screenFrame.width * 0.9,
+                height: screenFrame.height * 0.9
+            )
             
-            let newSize: NSSize
-            if maxPossibleWidth / targetAspectRatio <= maxPossibleHeight {
-                // Width is the limiting factor
-                newSize = NSSize(
-                    width: maxPossibleWidth,
-                    height: maxPossibleWidth / targetAspectRatio
-                )
-            } else {
-                // Height is the limiting factor
-                newSize = NSSize(
-                    width: maxPossibleHeight * targetAspectRatio,
-                    height: maxPossibleHeight
-                )
-            }
+            // 使用calculateConstrainedWindowSize函数计算新尺寸
+            let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
             
             // Ensure the new size is not smaller than minimum allowed
             let finalSize = NSSize(
@@ -227,58 +217,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // Add window zoom control
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
-        // Print debug information
-        
-        // Get the current window frame
+        // 获取当前窗口框架
         let currentFrame = sender.frame
         
-        // Get the screen containing the window, return false if none
+        // 获取包含窗口的屏幕，如果没有则返回false
         guard let screen = sender.screen ?? NSScreen.main else { return false }
         
-        // Get the visible frame of the screen
+        // 获取屏幕的可见区域
         let screenFrame = screen.visibleFrame
         
-        // Get the height of the toolbar if visible
+        // 获取工具栏高度（如果可见）
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
-        // Calculate target aspect ratio
-        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-        let defaultAspectRatio = aspectRatio.width / aspectRatio.height
-        // Calculate content size based on aspect ratio
-        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
-        
-        // If the window is at normal size, zoom to maximum
-
-        if currentFrame.size.width  <= aspectRatio.width {
+        // 如果窗口处于正常大小，则放大到最大
+        if currentFrame.size.width <= aspectRatio.width {
+            // 计算最大可能的尺寸
+            let maxWidth = screenFrame.width
+            let maxHeight = screenFrame.height
             
-            // Calculate the maximum possible width while maintaining aspect ratio
-            let maxPossibleWidth = screenFrame.width * 1
-            // Calculate the maximum possible height while maintaining aspect ratio
-            let maxPossibleHeight = (screenFrame.height - toolbarHeight) * 1
+            // 创建一个目标尺寸，代表最大化状态
+            let targetSize = NSSize(width: maxWidth, height: maxHeight)
             
-            // Calculate maximum size
-            let maxSize: NSSize
+            // 使用calculateConstrainedWindowSize来维持宽高比
+            let maxSize = calculateConstrainedWindowSize(for: sender, targetSize: targetSize, constraintToScreen: true)
             
-            // Determine if width is the limiting factor
-            if maxPossibleWidth / aspectRatioToUse <= maxPossibleHeight {
-                // Width is the limiting factor
-                maxSize = NSSize(
-                    width: maxPossibleWidth,
-                    height: (maxPossibleWidth / aspectRatioToUse) + toolbarHeight
-                )
-            } else {
-                // Height is the limiting factor
-                maxSize = NSSize(
-                    width: maxPossibleHeight * aspectRatioToUse,
-                    height: maxPossibleHeight + toolbarHeight
-                )
-            }
-            
-            // Calculate center position
+            // 计算中心位置
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - maxSize.height) / 2
             
-            // Set the maximum frame of the window
+            // 设置窗口的最大框架
             let maxFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -287,25 +254,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             )
             sender.setFrame(maxFrame, display: true, animate: true)
         } else {
-            // Return to normal size
-            // Calculate center position for normal size
+            // 返回正常大小
             let normalSize: NSSize
             if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                normalSize = NSSize(
-                    width: CGFloat(AppStatus.hidReadResolusion.width) / 2,
-                    height: CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
-                )
+                // 基于HID分辨率计算正常尺寸
+                let baseWidth = CGFloat(AppStatus.hidReadResolusion.width) / 2
+                let baseHeight = CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
+                normalSize = NSSize(width: baseWidth, height: baseHeight)
             } else {
+                // 使用默认宽高比
                 normalSize = NSSize(
                     width: aspectRatio.width,
                     height: aspectRatio.height + toolbarHeight
                 )
             }
             
+            // 计算中心位置
             let newX = screenFrame.origin.x + (screenFrame.width - normalSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - normalSize.height) / 2
             
-            // Set the normal frame of the window
+            // 设置窗口的正常框架
             let normalFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -315,7 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             sender.setFrame(normalFrame, display: true, animate: true)
         }
         
-        // Return false to indicate not using the default zoom behavior
+        // 返回false表示不使用默认缩放行为
         return false
     }
 }
