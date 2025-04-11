@@ -75,6 +75,7 @@ class HIDManager {
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
                 AppStatus.hidReadFps = self?.getFps() ?? 0
                 AppStatus.MS2109Version = self?.getVersion() ?? ""
+                AppStatus.hidReadPixelClock = self?.getPixelClock() ?? 0
             }
         }
         timer?.resume()
@@ -266,6 +267,24 @@ class HIDManager {
         return fps
     }
     
+    func getPixelClock() -> UInt32? {
+        let pixelClockHighReport = generateHIDReport(for: .pixelClockHigh)
+        let pixelClockLowReport = generateHIDReport(for: .pixelClockLow)
+        
+        guard let pixelClockHighResponse = self.sendAndReadHIDReport(pixelClockHighReport),
+              let pixelClockLowResponse = self.sendAndReadHIDReport(pixelClockLowReport) else {
+            Logger.shared.log(content: "无法从HID设备读取像素时钟数据。请检查设备是否正确连接。")
+            return nil
+        }
+        
+        let pixelClockHigh = UInt32(pixelClockHighResponse[3])
+        let pixelClockLow = UInt32(pixelClockLowResponse[3])
+        
+        let pixelClock = (pixelClockHigh << 8) | pixelClockLow
+        
+        return pixelClock
+    }
+
     func getVersion() -> String? {
         let v1 = generateHIDReport(for: .version1)
         let v2 = generateHIDReport(for: .version2)
@@ -336,17 +355,17 @@ enum HIDSubCommand: UInt16 {
     
     // old
     // get FPS data C73E C73F
-    case fpsHigh = 0xC73E
-    case fpsLow = 0xC73F
+    case fpsHigh = 0xC6B5
+    case fpsLow = 0xC6B6
 
-    // new
-    // get input FPS data C6B5 C6B6
-    case inputFpsHigh = 0xC6B5
-    case inputFpsLow = 0xC6B6
+    // // new
+    // // get input FPS data C6B5 C6B6
+    // case inputFpsHigh = 0xC6B5
+    // case inputFpsLow = 0xC6B6
 
     // get input pixel clock data C73C C73D
-    case inputPixelClockHigh = 0xC73C
-    case inputPixelClockLow = 0xC73D    
+    case pixelClockHigh = 0xC73C
+    case pixelClockLow = 0xC73D
     
     // get MS2019 version CBDC CBDD CBDE CBDF
     case version1 = 0xCBDC

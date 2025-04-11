@@ -126,7 +126,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Calculate content size based on aspect ratio
         var aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
-        aspectRatioToUse = 1.77777
         print("aspectRatioToUse\(aspectRatioToUse)")
         let heightFromWidth = (contentWidth / CGFloat(aspectRatioToUse))
         let widthFromHeight = (contentHeight * CGFloat(aspectRatioToUse))
@@ -138,15 +137,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             newSize.width = widthFromHeight
         }
 
-//        // Ensure the size does not exceed screen boundaries
-//        newSize.width = min(newSize.width, screenFrame.width * 1)
-//        newSize.height = min(newSize.height, screenFrame.height * 1)
-//        
-//        // Ensure the size is not below the minimum (considering the toolbar)
-//        let minContentHeight = sender.minSize.height - toolbarHeight
-//        let minContentWidth = sender.minSize.width
-//        newSize.width = max(newSize.width, minContentWidth)
-//        newSize.height = max(newSize.height, minContentHeight + toolbarHeight)
         
         print("2 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         return newSize
