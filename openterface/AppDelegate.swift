@@ -90,7 +90,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func windowDidResize(_ notification: Notification) {
-        print("🔥🔥🔥🔥🔥🔥🔥")
         if let window = NSApplication.shared.mainWindow {
             if let toolbar = window.toolbar, toolbar.isVisible {
                 let windowHeight = window.frame.height
@@ -103,9 +102,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        print("💦💦💦💦💦💦💦")    
+        let newSize = calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true)
+
+        return newSize
+    }
+
+    private func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, constraintToScreen: Bool) -> NSSize {
         // Get the height of the toolbar (if visible)
-        let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
+        let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
         
         // Calculate the target aspect ratio
         let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
@@ -114,18 +118,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         
         // Get the screen containing the window
-        guard let screen = sender.screen ?? NSScreen.main else { return targetFrameSize }
+        guard let screen = window.screen ?? NSScreen.main else { return targetSize }
         let screenFrame = screen.visibleFrame
         
         // Calculate new size maintaining content area aspect ratio
-        var newSize = targetFrameSize
+        var newSize = targetSize
         print("1 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         // Adjust height calculation to account for the toolbar
-        let contentHeight = targetFrameSize.height - toolbarHeight
-        let contentWidth = targetFrameSize.width
+        let contentHeight = targetSize.height - toolbarHeight
+        let contentWidth = targetSize.width
         
         // Calculate content size based on aspect ratio
-        var aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
+        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
+        
         print("aspectRatioToUse\(aspectRatioToUse)")
         let heightFromWidth = (contentWidth / CGFloat(aspectRatioToUse))
         let widthFromHeight = (contentHeight * CGFloat(aspectRatioToUse))
@@ -138,7 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
 
         
-        print("2 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         return newSize
     }
 
