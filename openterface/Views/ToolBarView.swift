@@ -41,7 +41,7 @@ struct ResolutionView: View {
 //            Text("\(pixelClock)")
 //                .font(.system(size: 16, weight: .medium))
         }
-        .frame(width: 66, alignment: .leading)
+        .frame(width: 160, alignment: .leading)
     }
 }
 
