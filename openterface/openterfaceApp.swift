@@ -233,6 +233,22 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
+                    }
+                    .buttonStyle(TransparentBackgroundButtonStyle())
+                    HStack(spacing: 20) {
+                        Button("Win", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .windowsWin)
+                        })  
+                        .buttonStyle(CustomButtonStyle())
+                        .onHover { hovering in
+                            if hovering {
+                                // Mouse entered
+                                AppStatus.isExit = true
+                            } else {
+                                // Mouse exited
+                                AppStatus.isExit = false
+                            }
+                        }
                         Button("DEL", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .del )
                         })
@@ -246,10 +262,24 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
+
+                       
                     }
-                    .buttonStyle(TransparentBackgroundButtonStyle())
                     HStack(spacing: 20) {
                         Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
+                            .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
+                        Button("⌘_", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CmdSpace )
+                        })
                             .buttonStyle(CustomButtonStyle())
                             .onHover { hovering in
                                 if hovering {

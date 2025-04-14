@@ -321,7 +321,16 @@ class KeyboardManager {
                 kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
             }
-        }else{
+        
+        } else if code == KeyboardMapper.SpecialKey.CmdSpace {
+            if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
+                kbm.pressKey(keys: [key] , modifiers: [.command])
+                Thread.sleep(forTimeInterval: 0.005) // 1 ms
+                kbm.releaseKey(keys: self.pressedKeys)
+                Thread.sleep(forTimeInterval: 0.01) // 5 ms
+            }
+        }
+        else{
             if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
                 kbm.pressKey(keys: [key], modifiers: [])
                 Thread.sleep(forTimeInterval: 0.005) // 1 ms
