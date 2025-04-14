@@ -606,38 +606,10 @@ struct openterfaceApp: App {
     }
     
     func showAspectRatioSelectionWindow() {
-        guard let window = NSApplication.shared.mainWindow else { return }
-        
-        let alert = NSAlert()
-        alert.messageText = "选择屏幕比例"
-        alert.informativeText = "请选择您希望使用的屏幕比例："
-        
-        let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 200, height: 25))
-        
-        // 添加所有预设比例选项
-        for option in AspectRatioOption.allCases {
-            aspectRatioPopup.addItem(withTitle: option.rawValue)
-        }
-        
-        // 设置当前选中的比例
-        if let index = AspectRatioOption.allCases.firstIndex(of: UserSettings.shared.customAspectRatio) {
-            aspectRatioPopup.selectItem(at: index)
-        }
-        
-        alert.accessoryView = aspectRatioPopup
-        alert.addButton(withTitle: "确定")
-        alert.addButton(withTitle: "取消")
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            let selectedIndex = aspectRatioPopup.indexOfSelectedItem
-            if selectedIndex >= 0 && selectedIndex < AspectRatioOption.allCases.count {
-                // 保存用户选择
-                UserSettings.shared.customAspectRatio = AspectRatioOption.allCases[selectedIndex]
-                UserSettings.shared.useCustomAspectRatio = true
-                
+        WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in
+            if shouldUpdateWindow {
                 // 通知AppDelegate更新窗口尺寸
-                NotificationCenter.default.post(name: Notification.Name("UpdateWindowSizeNotification"), object: nil)
+                WindowUtils.shared.updateWindowSizeThroughNotification()
             }
         }
     }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		29267D572DACB7E3006D5107 /* WindowUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29267D562DACB7E2006D5107 /* WindowUtils.swift */; };
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
 		295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManger.swift */; };
 		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
@@ -62,6 +63,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		29267D562DACB7E2006D5107 /* WindowUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowUtils.swift; sourceTree = "<group>"; };
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
 		295DCFB52D76A8A20034BB1E /* AudioManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManger.swift; sourceTree = "<group>"; };
 		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
@@ -256,6 +258,7 @@
 				538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */,
 				2950CB502CE33C8D00888267 /* USBDevicesView.swift */,
 				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
+				29267D562DACB7E2006D5107 /* WindowUtils.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -420,6 +423,7 @@
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,
 				53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */,
+				29267D572DACB7E3006D5107 /* WindowUtils.swift in Sources */,
 				53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */,
 				53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */,
 				53955CC02BF497D000FA4493 /* SettingsScreen.swift in Sources */,
