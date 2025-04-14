@@ -58,10 +58,6 @@ struct openterfaceApp: App {
     @State private var _serialPortName: String = "N/A"
     @State private var _serialPortBaudRate: Int = 0
 
-    // 添加常用分辨率下拉列表状态变量
-    @State private var selectedResolution: String = "1920×1080"
-    @State private var commonResolutions = ["640×480", "800×600", "1024×768", "1280×720", "1366×768", "1920×1080", "2560×1440", "3840×2160"]
-
     var log = Logger.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -360,37 +356,6 @@ struct openterfaceApp: App {
                         ToolbarItem(placement: .automatic) {
                             SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate)
                         }
-                        // 添加常用分辨率下拉菜单
-                        ToolbarItem(placement: .automatic) {
-                            Menu {
-                                ForEach(commonResolutions, id: \.self) { resolution in
-                                    Button(action: {
-                                        selectedResolution = resolution
-                                        // 这里之后可以添加切换分辨率的逻辑
-                                    }) {
-                                        HStack {
-                                            Text(resolution)
-                                            Spacer()
-                                            if resolution == selectedResolution {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "rectangle.dashed")
-                                    Text(selectedResolution)
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 9))
-                                }
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(Color.gray.opacity(0.2))
-                                .cornerRadius(4)
-                            }
-                        }
-
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
                         }
