@@ -246,6 +246,20 @@ class HIDManager {
         let heightLow = Int(heightLowResponse[3])
         let height = (heightHigh << 8) | heightLow
         
+        // 检查是否需要发送分辨率变化通知
+        let newResolution = (width, height)
+        let oldResolution = AppStatus.hidReadResolusion
+        
+        if newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1 {
+            // 分辨率变化时，发送通知
+            if newResolution.0 > 0 && newResolution.1 > 0 {
+                NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
+                
+                // 重置用户自定义比例设置
+                UserSettings.shared.useCustomAspectRatio = false
+            }
+        }
+        
         return (width, height)
     }
     
@@ -387,4 +401,9 @@ extension String {
         }
         return String(repeating: character, count: paddingLength) + self
     }
+}
+
+// 添加通知名称扩展
+extension Notification.Name {
+    static let hidResolutionChanged = Notification.Name("hidResolutionChanged")
 }

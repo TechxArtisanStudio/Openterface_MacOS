@@ -40,9 +40,37 @@ final class UserSettings: ObservableObject {
     @Published var isFullScreen: Bool
     @Published var isAbsoluteModeMouseHide: Bool = false
     @Published var mainWindownName: String = "main_openterface"
+    
+    // 用户自定义屏幕比例设置
+    @Published var useCustomAspectRatio: Bool = false
+    @Published var customAspectRatio: AspectRatioOption = .ratio16_9
 }
 
 enum MouseControlMode: Int {
     case relative = 0
     case absolute = 1
+}
+
+// 屏幕比例选项枚举
+enum AspectRatioOption: String, CaseIterable {
+    case ratio4_3 = "4:3"
+    case ratio16_9 = "16:9"
+    case ratio16_10 = "16:10"
+    case ratio5_3 = "5:3"
+    case ratio21_9 = "21:9"
+    
+    var widthToHeightRatio: CGFloat {
+        switch self {
+        case .ratio4_3:
+            return 4.0 / 3.0
+        case .ratio16_9:
+            return 16.0 / 9.0
+        case .ratio16_10:
+            return 16.0 / 10.0
+        case .ratio5_3:
+            return 5.0 / 3.0
+        case .ratio21_9:
+            return 21.0 / 9.0
+        }
+    }
 }
