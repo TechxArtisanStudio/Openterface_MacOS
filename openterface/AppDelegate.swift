@@ -330,6 +330,207 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         window.setFrame(newFrame, display: true, animate: true)
     }
     
+    // 处理HID分辨率变化通知
+    @objc func handleHidResolutionChanged(_ notification: Notification) {
+        // 确保UI操作在主线程上执行
+        DispatchQueue.main.async {
+            // 当HID分辨率变化时，提示用户选择比例
+            if let window = NSApplication.shared.mainWindow {
+                let alert = NSAlert()
+                alert.messageText = "显示分辨率已变更"
+                alert.informativeText = "检测到显示分辨率变化，您希望使用自定义屏幕比例吗？"
+                alert.addButton(withTitle: "是")
+                alert.addButton(withTitle: "否")
+                
+                let response = alert.runModal()
+                if response == .alertFirstButtonReturn {
+                    // 显示比例选择菜单
+                    self.showAspectRatioSelection()
+                }
+                
+                // 根据新的比例更新窗口尺寸
+                self.updateWindowSize(window: window)
+            }
+        }
+    }
+    
+    // 显示比例选择菜单
+    func showAspectRatioSelection() {
+        guard let window = NSApplication.shared.mainWindow else { return }
+        
+        let alert = NSAlert()
+        alert.messageText = "选择屏幕比例"
+        alert.informativeText = "请选择您希望使用的屏幕比例："
+        
+        let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 200, height: 25))
+        
+        // 添加所有预设比例选项
+        for option in AspectRatioOption.allCases {
+            aspectRatioPopup.addItem(withTitle: option.rawValue)
+        }
+        
+        // 设置当前选中的比例
+        if let index = AspectRatioOption.allCases.firstIndex(of: UserSettings.shared.customAspectRatio) {
+            aspectRatioPopup.selectItem(at: index)
+        }
+        
+        alert.accessoryView = aspectRatioPopup
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            let selectedIndex = aspectRatioPopup.indexOfSelectedItem
+            if selectedIndex >= 0 && selectedIndex < AspectRatioOption.allCases.count {
+                // 保存用户选择
+                UserSettings.shared.customAspectRatio = AspectRatioOption.allCases[selectedIndex]
+                UserSettings.shared.useCustomAspectRatio = true
+                
+                // 更新窗口尺寸
+                updateWindowSize(window: window)
+            }
+        }
+    }
+    
+    // 设置比例选择菜单
+    func setupAspectRatioMenu() {
+        // 获取应用程序主菜单
+        guard let mainMenu = NSApp.mainMenu else { return }
+        
+        // 查找"查看"菜单或创建一个新的
+        let viewMenuItem = mainMenu.items.first { $0.title == "查看" } ?? 
+                          mainMenu.items.first { $0.title == "View" }
+        
+        var viewMenu: NSMenu
+        
+        if let existingViewMenuItem = viewMenuItem {
+            viewMenu = existingViewMenuItem.submenu ?? NSMenu(title: "查看")
+            existingViewMenuItem.submenu = viewMenu
+        } else {
+            // 如果没有找到"查看"菜单，创建一个新的
+            viewMenu = NSMenu(title: "查看")
+            let newViewMenuItem = NSMenuItem(title: "查看", action: nil, keyEquivalent: "")
+            newViewMenuItem.submenu = viewMenu
+            
+            // 找到合适的位置插入新菜单（通常在"文件"和"编辑"之后）
+            if let editMenuIndex = mainMenu.items.firstIndex(where: { $0.title == "编辑" || $0.title == "Edit" }) {
+                mainMenu.insertItem(newViewMenuItem, at: editMenuIndex + 1)
+            } else {
+                mainMenu.addItem(newViewMenuItem)
+            }
+        }
+        
+        // 添加分隔线
+        if viewMenu.items.count > 0 {
+            viewMenu.addItem(NSMenuItem.separator())
+        }
+        
+        // 添加"屏幕比例"子菜单
+        let aspectRatioMenu = NSMenu(title: "屏幕比例")
+        let aspectRatioMenuItem = NSMenuItem(title: "屏幕比例", action: nil, keyEquivalent: "")
+        aspectRatioMenuItem.submenu = aspectRatioMenu
+        viewMenu.addItem(aspectRatioMenuItem)
+        
+        // 添加"自动检测"选项
+        let autoDetectItem = NSMenuItem(title: "自动检测", action: #selector(selectAutoDetectAspectRatio(_:)), keyEquivalent: "")
+        autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
+        aspectRatioMenu.addItem(autoDetectItem)
+        
+        aspectRatioMenu.addItem(NSMenuItem.separator())
+        
+        // 添加预设比例选项
+        for option in AspectRatioOption.allCases {
+            let menuItem = NSMenuItem(title: option.rawValue, action: #selector(selectAspectRatio(_:)), keyEquivalent: "")
+            menuItem.representedObject = option
+            if UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option {
+                menuItem.state = .on
+            }
+            aspectRatioMenu.addItem(menuItem)
+        }
+    }
+    
+    // 选择自动检测比例
+    @objc func selectAutoDetectAspectRatio(_ sender: NSMenuItem) {
+        // 关闭用户自定义比例
+        UserSettings.shared.useCustomAspectRatio = false
+        
+        // 更新菜单项状态
+        updateAspectRatioMenuItems()
+        
+        // 更新窗口尺寸
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // 选择自定义比例
+    @objc func selectAspectRatio(_ sender: NSMenuItem) {
+        guard let option = sender.representedObject as? AspectRatioOption else { return }
+        
+        // 保存用户选择
+        UserSettings.shared.customAspectRatio = option
+        UserSettings.shared.useCustomAspectRatio = true
+        
+        // 更新菜单项状态
+        updateAspectRatioMenuItems()
+        
+        // 更新窗口尺寸
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // 更新比例菜单项状态
+    func updateAspectRatioMenuItems() {
+        guard let mainMenu = NSApp.mainMenu,
+              let viewMenuItem = mainMenu.items.first(where: { $0.title == "查看" || $0.title == "View" }),
+              let viewMenu = viewMenuItem.submenu,
+              let aspectRatioMenuItem = viewMenu.items.first(where: { $0.title == "屏幕比例" }),
+              let aspectRatioMenu = aspectRatioMenuItem.submenu else { return }
+        
+        // 更新"自动检测"选项
+        if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "自动检测" }) {
+            autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
+        }
+        
+        // 更新所有预设比例选项
+        for item in aspectRatioMenu.items {
+            if let option = item.representedObject as? AspectRatioOption {
+                item.state = (UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option) ? .on : .off
+            }
+        }
+    }
+    
+    // 更新窗口尺寸
+    func updateWindowSize(window: NSWindow) {
+        // 获取屏幕尺寸
+        guard let screen = window.screen ?? NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        
+        // 计算新窗口尺寸
+        let targetSize = NSSize(
+            width: screenFrame.width * 0.9,
+            height: screenFrame.height * 0.9
+        )
+        
+        // 计算适当的尺寸
+        let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
+        
+        // 计算中心位置
+        let newX = screenFrame.origin.x + (screenFrame.width - newSize.width) / 2
+        let newY = screenFrame.origin.y + (screenFrame.height - newSize.height) / 2
+        
+        // 设置窗口尺寸和位置
+        let newFrame = NSRect(
+            x: newX,
+            y: newY,
+            width: newSize.width,
+            height: newSize.height
+        )
+        
+        window.setFrame(newFrame, display: true, animate: true)
+    }
+    
     func windowDidResize(_ notification: Notification) {
         if let window = NSApplication.shared.mainWindow {
             if let toolbar = window.toolbar, toolbar.isVisible {
