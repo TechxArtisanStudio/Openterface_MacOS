@@ -662,11 +662,13 @@ func hexStringToDecimalInt(hexString: String) -> Int? {
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {
         // Show tip before starting OCR
-        if let window = NSApplication.shared.mainWindow {
-            TipLayerManager.shared.showTip(
-                text: "Double Click to copy text from target",
-                window: window
-            )
+        DispatchQueue.main.async {
+            if let window = NSApplication.shared.mainWindow {
+                TipLayerManager.shared.showTip(
+                    text: "Double Click to copy text from target",
+                    window: window
+                )
+            }
         }
         
         // Wait a moment to let user read the tip, then start OCR

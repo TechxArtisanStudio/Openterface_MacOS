@@ -311,8 +311,10 @@ class PlayerView: NSView, NSWindowDelegate {
         if let viewFrame = self.previewLayer {
             AppStatus.currentView = viewFrame.frame
         }
-        if let window = NSApplication.shared.mainWindow {
-            AppStatus.currentWindow = window.frame
+        DispatchQueue.main.async {
+            if let window = NSApplication.shared.mainWindow {
+                AppStatus.currentWindow = window.frame
+            }
         }
     }
     
