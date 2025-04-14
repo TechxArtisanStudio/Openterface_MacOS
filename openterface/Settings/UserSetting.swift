@@ -44,6 +44,9 @@ final class UserSettings: ObservableObject {
     // 用户自定义屏幕比例设置
     @Published var useCustomAspectRatio: Bool = false
     @Published var customAspectRatio: AspectRatioOption = .ratio16_9
+    
+    // 是否显示HID分辨率变化提示
+    @Published var doNotShowHidResolutionAlert: Bool = false
 }
 
 enum MouseControlMode: Int {

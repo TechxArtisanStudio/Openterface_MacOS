@@ -45,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return false
     }
     
+    // 添加一个标志来跟踪应用是否刚启动
+    private var isInitialLaunch = true
+    
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApp.mainMenu?.delegate = self
         // spm.tryOpenSerialPort()
@@ -107,27 +110,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // if audioManager.microphonePermissionGranted {
         //     audioManager.prepareAudio()
         // }
+        
+        // 设置延迟，在应用完全启动后将初始启动标志设置为false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.isInitialLaunch = false
+        }
     }
     
     // 处理HID分辨率变化通知
     @objc func handleHidResolutionChanged(_ notification: Notification) {
+        // 如果是初始启动，忽略此通知
+        if isInitialLaunch {
+            // 仅静默更新窗口尺寸，不显示提示
+            if let window = NSApplication.shared.mainWindow {
+                self.updateWindowSize(window: window)
+            }
+            return
+        }
+        
         // 确保UI操作在主线程上执行
         DispatchQueue.main.async {
-            // 当HID分辨率变化时，提示用户选择比例
+            // 检查用户是否选择了不再显示提示
+            if UserSettings.shared.doNotShowHidResolutionAlert {
+                // 直接更新窗口尺寸
+                if let window = NSApplication.shared.mainWindow {
+                    self.updateWindowSize(window: window)
+                }
+                return
+            }
+            
+            // Prompt user to choose aspect ratio when HID resolution changes
             if let window = NSApplication.shared.mainWindow {
                 let alert = NSAlert()
-                alert.messageText = "显示分辨率已变更"
-                alert.informativeText = "检测到显示分辨率变化，您希望使用自定义屏幕比例吗？"
-                alert.addButton(withTitle: "是")
-                alert.addButton(withTitle: "否")
+                alert.messageText = "Display Resolution Changed"
+                alert.informativeText = "Display resolution change detected. Would you like to use a custom screen aspect ratio?"
+                alert.addButton(withTitle: "Yes")
+                alert.addButton(withTitle: "No")
+                
+                // Add "Don't show again" checkbox
+                let doNotShowCheckbox = NSButton(checkboxWithTitle: "Don't show this prompt again", target: nil, action: nil)
+                doNotShowCheckbox.state = .off
+                alert.accessoryView = doNotShowCheckbox
                 
                 let response = alert.runModal()
+                
+                // Save user's "Don't show again" preference
+                if doNotShowCheckbox.state == .on {
+                    UserSettings.shared.doNotShowHidResolutionAlert = true
+                }
+                
                 if response == .alertFirstButtonReturn {
-                    // 显示比例选择菜单
+                    // Show aspect ratio selection menu
                     self.showAspectRatioSelection()
                 }
                 
-                // 根据新的比例更新窗口尺寸
+                // Update window size based on new aspect ratio
                 self.updateWindowSize(window: window)
             }
         }
@@ -200,6 +237,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             }
             aspectRatioMenu.addItem(menuItem)
         }
+        
+        // 添加分隔线
+        viewMenu.addItem(NSMenuItem.separator())
+        
+        // 添加HID分辨率变化提示设置菜单项
+        let hidAlertMenuItem = NSMenuItem(title: "HID分辨率变化提示设置", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
+        viewMenu.addItem(hidAlertMenuItem)
     }
     
     // 选择自动检测比例
@@ -498,6 +542,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if let window = NSApplication.shared.mainWindow {
             updateWindowSize(window: window)
         }
+    }
+    
+    // 显示HID分辨率变化提示设置
+    @objc func showHidResolutionAlertSettings(_ sender: NSMenuItem) {
+        WindowUtils.shared.showHidResolutionAlertSettings()
     }
 }
 

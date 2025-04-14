@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 // 窗口工具类，提供窗口相关的通用功能
@@ -17,34 +16,54 @@ final class WindowUtils {
         }
         
         let alert = NSAlert()
-        alert.messageText = "选择屏幕比例"
-        alert.informativeText = "请选择您希望使用的屏幕比例："
+        alert.messageText = "Select Aspect Ratio"
+        alert.informativeText = "Please select your preferred aspect ratio:"
         
-        let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 200, height: 25))
+        // Create vertical stack view container
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 65))
         
-        // 添加所有预设比例选项
+        // Add aspect ratio dropdown menu
+        let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 30, width: 200, height: 25))
+        
+        // Add all preset ratio options
         for option in AspectRatioOption.allCases {
             aspectRatioPopup.addItem(withTitle: option.rawValue)
         }
         
-        // 设置当前选中的比例
+        // Set currently selected ratio
         if let index = AspectRatioOption.allCases.firstIndex(of: UserSettings.shared.customAspectRatio) {
             aspectRatioPopup.selectItem(at: index)
         }
         
-        alert.accessoryView = aspectRatioPopup
-        alert.addButton(withTitle: "确定")
-        alert.addButton(withTitle: "取消")
+        // Add checkbox for HID resolution change alerts
+        let showHidAlertCheckbox = NSButton(checkboxWithTitle: "Show HID resolution change alerts", target: nil, action: nil)
+        showHidAlertCheckbox.state = UserSettings.shared.doNotShowHidResolutionAlert ? .off : .on
+        showHidAlertCheckbox.frame = NSRect(x: 0, y: 0, width: 200, height: 20)
+        
+        // Add controls to container view
+        containerView.addSubview(aspectRatioPopup)
+        containerView.addSubview(showHidAlertCheckbox)
+        
+        alert.accessoryView = containerView
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             let selectedIndex = aspectRatioPopup.indexOfSelectedItem
             if selectedIndex >= 0 && selectedIndex < AspectRatioOption.allCases.count {
-                // 保存用户选择
+                // Save user's aspect ratio selection
                 UserSettings.shared.customAspectRatio = AspectRatioOption.allCases[selectedIndex]
                 UserSettings.shared.useCustomAspectRatio = true
                 
-                // 通知调用方更新窗口尺寸
+                // Save user's choice for HID resolution change alerts
+                UserSettings.shared.doNotShowHidResolutionAlert = (showHidAlertCheckbox.state == .off)
+                
+                // Log settings changes
+                Logger.shared.log(content: "User selected aspect ratio: \(UserSettings.shared.customAspectRatio.rawValue)")
+                Logger.shared.log(content: "User \(UserSettings.shared.doNotShowHidResolutionAlert ? "disabled" : "enabled") HID resolution change alerts")
+                
+                // Notify caller to update window size
                 completion(true)
             } else {
                 completion(false)
@@ -57,6 +76,34 @@ final class WindowUtils {
     /// 直接调用系统通知更新窗口大小
     func updateWindowSizeThroughNotification() {
         NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+    }
+    
+    /// 显示HID分辨率变化提示设置对话框
+    /// - Parameter completion: 设置完成后的回调
+    func showHidResolutionAlertSettings(completion: @escaping () -> Void = {}) {
+        let alert = NSAlert()
+        alert.messageText = "HID Resolution Change Alert Settings"
+        alert.informativeText = "Do you want to show alerts when HID resolution changes?"
+        
+        // Add checkbox
+        let showAlertCheckbox = NSButton(checkboxWithTitle: "Show HID resolution change alerts", target: nil, action: nil)
+        // Set checkbox state based on current settings
+        showAlertCheckbox.state = UserSettings.shared.doNotShowHidResolutionAlert ? .off : .on
+        alert.accessoryView = showAlertCheckbox
+        
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Save user choice
+            UserSettings.shared.doNotShowHidResolutionAlert = (showAlertCheckbox.state == .off)
+            
+            // Log settings change
+            Logger.shared.log(content: "User \(UserSettings.shared.doNotShowHidResolutionAlert ? "disabled" : "enabled") HID resolution change alerts")
+            
+            completion()
+        }
     }
 }
 
