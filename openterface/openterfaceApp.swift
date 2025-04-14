@@ -286,8 +286,15 @@ struct openterfaceApp: App {
                             Image(systemName: "poweron") // spacer
                         }
                         ToolbarItem(placement: .automatic) {
-                            Image(systemName: "display")
-                                .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
+                            Button(action: {
+                                showAspectRatioSelectionWindow()
+                            }) {
+                                Image(systemName: "display")
+                                    .resizable()
+                                    .frame(width: 14, height: 14)
+                                    .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
+                            }
+                            .help("Resolution: \(_resolution.width)x\(_resolution.height)\nRefresh Rate: \(_fps) Hz\nPixel Clock: \(_pixelClock)\n \nClick to view Target Aspect Ratio...")
                         }
                         ToolbarItem(placement: .primaryAction) {
                             ResolutionView(
@@ -314,6 +321,7 @@ struct openterfaceApp: App {
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
+                            .help("KeyBoard: \(_isKeyboardConnected == true ? "Connected" : _isKeyboardConnected == false ? "Not found" : "Unkown") \nMouse: \(_isMouseConnected == true ? "Connected" : _isMouseConnected == false ? "Not found" : "Unkown")\n\nClick to view USB device details")
                         }
                         
                         // Add serial port information display
@@ -351,6 +359,7 @@ struct openterfaceApp: App {
                         let newHdmiSignal = AppStatus.hasHdmiSignal
                         let newSerialPortName = AppStatus.serialPortName
                         let newSerialPortBaudRate = AppStatus.serialPortBaudRate
+
                         
                         var stateChanged = false
                         

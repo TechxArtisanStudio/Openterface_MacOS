@@ -38,10 +38,10 @@ struct ResolutionView: View {
             }
             Text("\(height)")
                 .font(.system(size: 16, weight: .medium))
-            Text("\(pixelClock)")
-                .font(.system(size: 16, weight: .medium))
+//            Text("\(pixelClock)")
+//                .font(.system(size: 16, weight: .medium))
         }
-        .frame(width: 160, alignment: .leading)
+        .frame(width: 66, alignment: .leading)
     }
 }
 
