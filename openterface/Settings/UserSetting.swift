@@ -60,6 +60,7 @@ enum AspectRatioOption: String, CaseIterable {
     case ratio16_9 = "16:9"
     case ratio16_10 = "16:10"
     case ratio5_3 = "5:3"
+    case ratio5_4 = "5:4"
     case ratio21_9 = "21:9"
     
     var widthToHeightRatio: CGFloat {
@@ -72,6 +73,8 @@ enum AspectRatioOption: String, CaseIterable {
             return 16.0 / 10.0
         case .ratio5_3:
             return 5.0 / 3.0
+        case .ratio5_4:
+            return 5.0 / 4.0
         case .ratio21_9:
             return 21.0 / 9.0
         }
