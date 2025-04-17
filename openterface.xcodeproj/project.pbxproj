@@ -604,7 +604,7 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"openterface/Preview Content\"";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
@@ -639,7 +639,7 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"openterface/Preview Content\"";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;

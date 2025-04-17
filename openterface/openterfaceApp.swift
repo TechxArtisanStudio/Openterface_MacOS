@@ -23,8 +23,6 @@
 import SwiftUI
 import KeyboardShortcuts
 
-// 导入AspectRatioOption枚举
-// 由于它定义在UserSetting.swift中，我们不需要导入额外模块，只需确保它能被访问到
 
 @main
 struct openterfaceApp: App {
@@ -324,7 +322,7 @@ struct openterfaceApp: App {
                                     .frame(width: 14, height: 14)
                                     .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
                             }
-                            .help("Resolution: \(_resolution.width)x\(_resolution.height)\nRefresh Rate: \(_fps) Hz\nPixel Clock: \(_pixelClock)\n \nClick to view Target Aspect Ratio...")
+                            .help("Resolution: \(_resolution.width)x\(_resolution.height)\nRefresh Rate: \(_fps) Hz\nPixel Clock: \(_pixelClock) MHz\n \nClick to view Target Aspect Ratio...")
                         }
                         ToolbarItem(placement: .primaryAction) {
                             ResolutionView(
@@ -436,11 +434,12 @@ struct openterfaceApp: App {
                             } else {
                                 _resolution.width = "\(AppStatus.hidReadResolusion.width)"
                                 _resolution.height = "\(AppStatus.hidReadResolusion.height)"
-                                _fps = "\(AppStatus.hidReadFps)Hz"
+                                _fps = "\(AppStatus.hidReadFps)"
                             }
                         }
                         
-                        _pixelClock = "\(AppStatus.hidReadPixelClock)"
+                        let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
+                        _pixelClock = String(format: "%.2f", pixelClockValue)
                         // If state has changed, update the last update time
                         if stateChanged {
                             lastUpdateTime = now
@@ -612,7 +611,7 @@ struct openterfaceApp: App {
     func showAspectRatioSelectionWindow() {
         WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in
             if shouldUpdateWindow {
-                // 通知AppDelegate更新窗口尺寸
+                // Notify AppDelegate to update window size
                 WindowUtils.shared.updateWindowSizeThroughNotification()
             }
         }

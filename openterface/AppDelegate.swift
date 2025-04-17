@@ -45,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return false
     }
     
-    // 添加一个标志来跟踪应用是否刚启动
+    // Add a flag to track if the application has just launched
     private var isInitialLaunch = true
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Disable window tabbing feature, which makes the "Show Tab Bar" menu item unavailable
         NSWindow.allowsAutomaticWindowTabbing = false
         
-        // 注册HID分辨率变化通知
+        // Register for HID resolution change notifications
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleHidResolutionChanged(_:)),
@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             object: nil
         )
         
-        // 监听窗口大小更新通知
+        // Listen for window size update notifications
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleWindowSizeUpdateRequest(_:)),
@@ -103,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             object: nil
         )
         
-        // 初始化窗口菜单项
+        // Initialize window menu items
         setupAspectRatioMenu()
         
         // start audio
@@ -111,28 +111,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         //     audioManager.prepareAudio()
         // }
         
-        // 设置延迟，在应用完全启动后将初始启动标志设置为false
+        // Set a delay to set the initial launch flag to false after the application has fully started
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.isInitialLaunch = false
         }
     }
     
-    // 处理HID分辨率变化通知
+    // Handle HID resolution change notifications
     @objc func handleHidResolutionChanged(_ notification: Notification) {
-        // 如果是初始启动，忽略此通知
+        // If this is the initial launch, ignore this notification
         if isInitialLaunch {
-            // 仅静默更新窗口尺寸，不显示提示
+            // Only update window size silently without showing a prompt
             if let window = NSApplication.shared.mainWindow {
                 self.updateWindowSize(window: window)
             }
             return
         }
         
-        // 确保UI操作在主线程上执行
+        // Ensure UI operations are performed on the main thread
         DispatchQueue.main.async {
-            // 检查用户是否选择了不再显示提示
+            // Check if the user has selected to not show the prompt again
             if UserSettings.shared.doNotShowHidResolutionAlert {
-                // 直接更新窗口尺寸
+                // Update window size directly without showing a prompt
                 if let window = NSApplication.shared.mainWindow {
                     self.updateWindowSize(window: window)
                 }
@@ -170,11 +170,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
-    // 显示比例选择菜单
+    // Show aspect ratio selection menu
     func showAspectRatioSelection() {
         WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in
             if shouldUpdateWindow {
-                // 更新窗口尺寸
+                // Update window size
                 if let window = NSApplication.shared.mainWindow {
                     self.updateWindowSize(window: window)
                 }
@@ -182,53 +182,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
-    // 设置比例选择菜单
+    // Setup aspect ratio selection menu
     func setupAspectRatioMenu() {
-        // 获取应用程序主菜单
+        // Get the main menu of the application
         guard let mainMenu = NSApp.mainMenu else { return }
         
-        // 查找"查看"菜单或创建一个新的
-        let viewMenuItem = mainMenu.items.first { $0.title == "查看" } ?? 
+        // Find the "View" menu or create a new one
+        let viewMenuItem = mainMenu.items.first { $0.title == "View" } ?? 
                           mainMenu.items.first { $0.title == "View" }
         
         var viewMenu: NSMenu
         
         if let existingViewMenuItem = viewMenuItem {
-            viewMenu = existingViewMenuItem.submenu ?? NSMenu(title: "查看")
+            viewMenu = existingViewMenuItem.submenu ?? NSMenu(title: "View")
             existingViewMenuItem.submenu = viewMenu
         } else {
-            // 如果没有找到"查看"菜单，创建一个新的
-            viewMenu = NSMenu(title: "查看")
-            let newViewMenuItem = NSMenuItem(title: "查看", action: nil, keyEquivalent: "")
+            // If the "View" menu is not found, create a new one
+            viewMenu = NSMenu(title: "View")
+            let newViewMenuItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
             newViewMenuItem.submenu = viewMenu
             
-            // 找到合适的位置插入新菜单（通常在"文件"和"编辑"之后）
-            if let editMenuIndex = mainMenu.items.firstIndex(where: { $0.title == "编辑" || $0.title == "Edit" }) {
+            // Find a suitable position to insert the new menu (usually after "File" and "Edit")
+            if let editMenuIndex = mainMenu.items.firstIndex(where: { $0.title == "Edit" || $0.title == "Edit" }) {
                 mainMenu.insertItem(newViewMenuItem, at: editMenuIndex + 1)
             } else {
                 mainMenu.addItem(newViewMenuItem)
             }
         }
         
-        // 添加分隔线
+        // Add a separator
         if viewMenu.items.count > 0 {
             viewMenu.addItem(NSMenuItem.separator())
         }
         
-        // 添加"屏幕比例"子菜单
-        let aspectRatioMenu = NSMenu(title: "屏幕比例")
-        let aspectRatioMenuItem = NSMenuItem(title: "屏幕比例", action: nil, keyEquivalent: "")
+        // Add a "Screen Ratio" submenu
+        let aspectRatioMenu = NSMenu(title: "Screen Ratio")
+        let aspectRatioMenuItem = NSMenuItem(title: "Screen Ratio", action: nil, keyEquivalent: "")
         aspectRatioMenuItem.submenu = aspectRatioMenu
         viewMenu.addItem(aspectRatioMenuItem)
         
-        // 添加"自动检测"选项
-        let autoDetectItem = NSMenuItem(title: "自动检测", action: #selector(selectAutoDetectAspectRatio(_:)), keyEquivalent: "")
+        // Add "Auto Detect" option
+        let autoDetectItem = NSMenuItem(title: "Auto Detect", action: #selector(selectAutoDetectAspectRatio(_:)), keyEquivalent: "")
         autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
         aspectRatioMenu.addItem(autoDetectItem)
         
         aspectRatioMenu.addItem(NSMenuItem.separator())
         
-        // 添加预设比例选项
+        // Add preset aspect ratio options
         for option in AspectRatioOption.allCases {
             let menuItem = NSMenuItem(title: option.rawValue, action: #selector(selectAspectRatio(_:)), keyEquivalent: "")
             menuItem.representedObject = option
@@ -238,59 +238,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             aspectRatioMenu.addItem(menuItem)
         }
         
-        // 添加分隔线
+        // Add a separator
         viewMenu.addItem(NSMenuItem.separator())
         
-        // 添加HID分辨率变化提示设置菜单项
-        let hidAlertMenuItem = NSMenuItem(title: "HID分辨率变化提示设置", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
+        // Add a "HID Resolution Change Alert Settings" menu item
+        let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
         viewMenu.addItem(hidAlertMenuItem)
     }
     
-    // 选择自动检测比例
+    // Select auto detect aspect ratio
     @objc func selectAutoDetectAspectRatio(_ sender: NSMenuItem) {
-        // 关闭用户自定义比例
+        // Close user custom aspect ratio
         UserSettings.shared.useCustomAspectRatio = false
         
-        // 更新菜单项状态
+        // Update menu items status
         updateAspectRatioMenuItems()
         
-        // 更新窗口尺寸
+        // Update window size
         if let window = NSApplication.shared.mainWindow {
             updateWindowSize(window: window)
         }
     }
     
-    // 选择自定义比例
+    // Select custom aspect ratio
     @objc func selectAspectRatio(_ sender: NSMenuItem) {
         guard let option = sender.representedObject as? AspectRatioOption else { return }
         
-        // 保存用户选择
+        // Save user selection
         UserSettings.shared.customAspectRatio = option
         UserSettings.shared.useCustomAspectRatio = true
         
-        // 更新菜单项状态
+        // Update menu items status
         updateAspectRatioMenuItems()
         
-        // 更新窗口尺寸
+        // Update window size
         if let window = NSApplication.shared.mainWindow {
             updateWindowSize(window: window)
         }
     }
     
-    // 更新比例菜单项状态
+    // Update aspect ratio menu items status
     func updateAspectRatioMenuItems() {
         guard let mainMenu = NSApp.mainMenu,
-              let viewMenuItem = mainMenu.items.first(where: { $0.title == "查看" || $0.title == "View" }),
+              let viewMenuItem = mainMenu.items.first(where: { $0.title == "View" || $0.title == "View" }),
               let viewMenu = viewMenuItem.submenu,
-              let aspectRatioMenuItem = viewMenu.items.first(where: { $0.title == "屏幕比例" }),
+              let aspectRatioMenuItem = viewMenu.items.first(where: { $0.title == "Screen Ratio" }),
               let aspectRatioMenu = aspectRatioMenuItem.submenu else { return }
         
-        // 更新"自动检测"选项
-        if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "自动检测" }) {
+        // Update "Auto Detect" option
+        if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "Auto Detect" }) {
             autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
         }
         
-        // 更新所有预设比例选项
+        // Update all preset aspect ratio options
         for item in aspectRatioMenu.items {
             if let option = item.representedObject as? AspectRatioOption {
                 item.state = (UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option) ? .on : .off
@@ -298,26 +298,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
-    // 更新窗口尺寸
+    // Update window size
     func updateWindowSize(window: NSWindow) {
-        // 获取屏幕尺寸
+        // Get screen size
         guard let screen = window.screen ?? NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
         
-        // 计算新窗口尺寸
+        // Calculate new window size
         let targetSize = NSSize(
             width: screenFrame.width * 0.9,
             height: screenFrame.height * 0.9
         )
         
-        // 计算适当的尺寸
+        // Calculate appropriate size
         let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
         
-        // 计算中心位置
+        // Calculate center position
         let newX = screenFrame.origin.x + (screenFrame.width - newSize.width) / 2
         let newY = screenFrame.origin.y + (screenFrame.height - newSize.height) / 2
         
-        // 设置窗口尺寸和位置
+        // Set window size and position
         let newFrame = NSRect(
             x: newX,
             y: newY,
@@ -350,24 +350,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
         
-        // 确定要使用的宽高比
+        // Determine the aspect ratio to use
         let aspectRatioToUse: CGFloat
         
-        // 优先级：1. 用户自定义比例 2. HID获取的比例 3. 默认比例
+        // Priority: 1. User custom ratio 2. HID ratio 3. Default ratio
         if UserSettings.shared.useCustomAspectRatio {
-            // 使用用户自定义比例
+            // Use user custom ratio
             aspectRatioToUse = UserSettings.shared.customAspectRatio.widthToHeightRatio
-            Logger.shared.log(content: "使用用户自定义比例: \(UserSettings.shared.customAspectRatio.rawValue), 比例值: \(aspectRatioToUse)")
         } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-            // 使用HID获取的比例
+            // Use HID ratio
             let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
             aspectRatioToUse = hidAspectRatio
-            Logger.shared.log(content: "使用HID获取的比例: \(AppStatus.hidReadResolusion.width):\(AppStatus.hidReadResolusion.height), 比例值: \(aspectRatioToUse)")
         } else {
-            // 使用默认比例
+            // Use default ratio
             let defaultAspectRatio = aspectRatio.width / aspectRatio.height
             aspectRatioToUse = defaultAspectRatio
-            Logger.shared.log(content: "使用默认比例: \(aspectRatio.width):\(aspectRatio.height), 比例值: \(aspectRatioToUse)")
         }
         
         // Get the screen containing the window
@@ -376,7 +373,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Calculate new size maintaining content area aspect ratio
         var newSize = targetSize
-        print("1 - newSize: \(newSize), ratio: \(newSize.width/newSize.height)")
         // Adjust height calculation to account for the toolbar
         let contentHeight = targetSize.height - toolbarHeight
         let contentWidth = targetSize.width
@@ -418,13 +414,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Check if aspect ratio is significantly different (allowing for small floating point differences)
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
-            // 创建一个目标尺寸，基于屏幕最大尺寸的90%
+            // Create a target size based on 90% of the screen's maximum size
             let targetSize = NSSize(
                 width: screenFrame.width * 0.9,
                 height: screenFrame.height * 0.9
             )
             
-            // 使用calculateConstrainedWindowSize函数计算新尺寸
+            // Use calculateConstrainedWindowSize function to calculate new size
             let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
             
             // Ensure the new size is not smaller than minimum allowed
@@ -467,35 +463,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // Add window zoom control
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
-        // 获取当前窗口框架
+        // Get current window frame
         let currentFrame = sender.frame
         
-        // 获取包含窗口的屏幕，如果没有则返回false
+        // Get the screen containing the window, if none then return false
         guard let screen = sender.screen ?? NSScreen.main else { return false }
         
-        // 获取屏幕的可见区域
+        // Get the visible area of the screen
         let screenFrame = screen.visibleFrame
         
-        // 获取工具栏高度（如果可见）
+        // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
-        // 如果窗口处于正常大小，则放大到最大
+        // If the window is in normal size, then zoom to max
         if currentFrame.size.width <= aspectRatio.width {
-            // 计算最大可能的尺寸
+            // Calculate the maximum possible size
             let maxWidth = screenFrame.width
             let maxHeight = screenFrame.height
             
-            // 创建一个目标尺寸，代表最大化状态
+            // Create a target size, representing the maximized state
             let targetSize = NSSize(width: maxWidth, height: maxHeight)
             
-            // 使用calculateConstrainedWindowSize来维持宽高比
+            // Use calculateConstrainedWindowSize to maintain the aspect ratio
             let maxSize = calculateConstrainedWindowSize(for: sender, targetSize: targetSize, constraintToScreen: true)
             
-            // 计算中心位置
+            // Calculate center position
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - maxSize.height) / 2
             
-            // 设置窗口的最大框架
+            // Set the maximum frame of the window
             let maxFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -504,26 +500,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             )
             sender.setFrame(maxFrame, display: true, animate: true)
         } else {
-            // 返回正常大小
+            // Return to normal size
             let normalSize: NSSize
             if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                // 基于HID分辨率计算正常尺寸
+                // Calculate normal size based on HID resolution
                 let baseWidth = CGFloat(AppStatus.hidReadResolusion.width) / 2
                 let baseHeight = CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
                 normalSize = NSSize(width: baseWidth, height: baseHeight)
             } else {
-                // 使用默认宽高比
+                // Use default aspect ratio
                 normalSize = NSSize(
                     width: aspectRatio.width,
                     height: aspectRatio.height + toolbarHeight
                 )
             }
             
-            // 计算中心位置
+            // Calculate center position
             let newX = screenFrame.origin.x + (screenFrame.width - normalSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - normalSize.height) / 2
             
-            // 设置窗口的正常框架
+            // Set the normal frame of the window
             let normalFrame = NSRect(
                 x: newX,
                 y: newY,
@@ -533,18 +529,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             sender.setFrame(normalFrame, display: true, animate: true)
         }
         
-        // 返回false表示不使用默认缩放行为
+        // Return false to indicate not to use default zoom behavior
         return false
     }
     
-    // 处理窗口大小更新请求
+    // Handle window size update request
     @objc func handleWindowSizeUpdateRequest(_ notification: Notification) {
         if let window = NSApplication.shared.mainWindow {
             updateWindowSize(window: window)
         }
     }
     
-    // 显示HID分辨率变化提示设置
+    // Show HID resolution change alert settings
     @objc func showHidResolutionAlertSettings(_ sender: NSMenuItem) {
         WindowUtils.shared.showHidResolutionAlertSettings()
     }

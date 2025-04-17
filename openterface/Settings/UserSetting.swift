@@ -41,11 +41,11 @@ final class UserSettings: ObservableObject {
     @Published var isAbsoluteModeMouseHide: Bool = false
     @Published var mainWindownName: String = "main_openterface"
     
-    // 用户自定义屏幕比例设置
+    // User custom screen ratio settings
     @Published var useCustomAspectRatio: Bool = false
     @Published var customAspectRatio: AspectRatioOption = .ratio16_9
     
-    // 是否显示HID分辨率变化提示
+    // Whether to show HID resolution change alert
     @Published var doNotShowHidResolutionAlert: Bool = false
 }
 
@@ -54,7 +54,7 @@ enum MouseControlMode: Int {
     case absolute = 1
 }
 
-// 屏幕比例选项枚举
+// Screen ratio option enumeration
 enum AspectRatioOption: String, CaseIterable {
     case ratio4_3 = "4:3"
     case ratio16_9 = "16:9"
