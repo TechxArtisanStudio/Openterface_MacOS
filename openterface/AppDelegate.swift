@@ -122,8 +122,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // If this is the initial launch, ignore this notification
         if isInitialLaunch {
             // Only update window size silently without showing a prompt
-            if let window = NSApplication.shared.mainWindow {
-                self.updateWindowSize(window: window)
+            DispatchQueue.main.async {
+                if let window = NSApplication.shared.mainWindow {
+                    self.updateWindowSize(window: window)
+                }
             }
             return
         }
