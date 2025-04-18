@@ -26,7 +26,7 @@ struct USBDevicesView: View {
         VStack {
             Text("USB Devices")
                 .font(.headline)
-            List(AppStatus.USBDevices, id: \.productName) { device in
+            List(AppStatus.USBDevices, id: \.locationID) { device in
                 VStack(alignment: .leading) {
                     Text("Product Name: \(device.productName)")
                     Text("Vendor ID: \(device.vendorID)")
@@ -38,7 +38,7 @@ struct USBDevicesView: View {
             Text("Group Openterface Devices")
                 .font(.headline)
             List(AppStatus.groupOpenterfaceDevices, id: \.first?.productName) { group in
-                ForEach(group, id: \.productName) { device in
+                ForEach(group, id: \ .locationID) { device in
                     VStack(alignment: .leading) {
                         Text("Product Name: \(device.productName)")
                         Text("Vendor ID: \(device.vendorID)")

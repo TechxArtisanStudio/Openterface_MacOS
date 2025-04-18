@@ -71,7 +71,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func initializeSerialPort(){
-
     }
     
     private func observerSerialPortNotifications() {
@@ -252,7 +251,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
             if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
                 self.isRight = true
-                self.getHidInfo()
+                self.getHidInfo()  
             }
             else {
                 Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")

@@ -45,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return false
     }
     
+    // Add a flag to track if the application has just launched
+    private var isInitialLaunch = true
+    
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApp.mainMenu?.delegate = self
         // spm.tryOpenSerialPort()
@@ -83,10 +86,248 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Disable window tabbing feature, which makes the "Show Tab Bar" menu item unavailable
         NSWindow.allowsAutomaticWindowTabbing = false
         
+        // Register for HID resolution change notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHidResolutionChanged(_:)),
+            name: .hidResolutionChanged,
+            object: nil
+        )
+        
+        // Listen for window size update notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowSizeUpdateRequest(_:)),
+            // name: Notification.Name("UpdateWindowSizeNotification"),
+            name: Notification.Name.updateWindowSize,
+            object: nil
+        )
+        
+        // Initialize window menu items
+        setupAspectRatioMenu()
+        
         // start audio
         // if audioManager.microphonePermissionGranted {
         //     audioManager.prepareAudio()
         // }
+        
+        // Set a delay to set the initial launch flag to false after the application has fully started
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.isInitialLaunch = false
+        }
+    }
+    
+    // Handle HID resolution change notifications
+    @objc func handleHidResolutionChanged(_ notification: Notification) {
+        // If this is the initial launch, ignore this notification
+        if isInitialLaunch {
+            // Only update window size silently without showing a prompt
+            DispatchQueue.main.async {
+                if let window = NSApplication.shared.mainWindow {
+                    self.updateWindowSize(window: window)
+                }
+            }
+            return
+        }
+        
+        // Ensure UI operations are performed on the main thread
+        DispatchQueue.main.async {
+            // Check if the user has selected to not show the prompt again
+            if UserSettings.shared.doNotShowHidResolutionAlert {
+                // Update window size directly without showing a prompt
+                if let window = NSApplication.shared.mainWindow {
+                    self.updateWindowSize(window: window)
+                }
+                return
+            }
+            
+            // Prompt user to choose aspect ratio when HID resolution changes
+            if let window = NSApplication.shared.mainWindow {
+                let alert = NSAlert()
+                alert.messageText = "Display Resolution Changed"
+                alert.informativeText = "Display resolution change detected. Would you like to use a custom screen aspect ratio?"
+                alert.addButton(withTitle: "Yes")
+                alert.addButton(withTitle: "No")
+                
+                // Add "Don't show again" checkbox
+                let doNotShowCheckbox = NSButton(checkboxWithTitle: "Don't show this prompt again", target: nil, action: nil)
+                doNotShowCheckbox.state = .off
+                alert.accessoryView = doNotShowCheckbox
+                
+                let response = alert.runModal()
+                
+                // Save user's "Don't show again" preference
+                if doNotShowCheckbox.state == .on {
+                    UserSettings.shared.doNotShowHidResolutionAlert = true
+                }
+                
+                if response == .alertFirstButtonReturn {
+                    // Show aspect ratio selection menu
+                    self.showAspectRatioSelection()
+                }
+                
+                // Update window size based on new aspect ratio
+                self.updateWindowSize(window: window)
+            }
+        }
+    }
+    
+    // Show aspect ratio selection menu
+    func showAspectRatioSelection() {
+        WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in
+            if shouldUpdateWindow {
+                // Update window size
+                if let window = NSApplication.shared.mainWindow {
+                    self.updateWindowSize(window: window)
+                }
+            }
+        }
+    }
+    
+    // Setup aspect ratio selection menu
+    func setupAspectRatioMenu() {
+        // Get the main menu of the application
+        guard let mainMenu = NSApp.mainMenu else { return }
+        
+        // Find the "View" menu or create a new one
+        let viewMenuItem = mainMenu.items.first { $0.title == "View" } ?? 
+                          mainMenu.items.first { $0.title == "View" }
+        
+        var viewMenu: NSMenu
+        
+        if let existingViewMenuItem = viewMenuItem {
+            viewMenu = existingViewMenuItem.submenu ?? NSMenu(title: "View")
+            existingViewMenuItem.submenu = viewMenu
+        } else {
+            // If the "View" menu is not found, create a new one
+            viewMenu = NSMenu(title: "View")
+            let newViewMenuItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
+            newViewMenuItem.submenu = viewMenu
+            
+            // Find a suitable position to insert the new menu (usually after "File" and "Edit")
+            if let editMenuIndex = mainMenu.items.firstIndex(where: { $0.title == "Edit" || $0.title == "Edit" }) {
+                mainMenu.insertItem(newViewMenuItem, at: editMenuIndex + 1)
+            } else {
+                mainMenu.addItem(newViewMenuItem)
+            }
+        }
+        
+        // Add a separator
+        if viewMenu.items.count > 0 {
+            viewMenu.addItem(NSMenuItem.separator())
+        }
+        
+        // Add a "Screen Ratio" submenu
+        let aspectRatioMenu = NSMenu(title: "Screen Ratio")
+        let aspectRatioMenuItem = NSMenuItem(title: "Screen Ratio", action: nil, keyEquivalent: "")
+        aspectRatioMenuItem.submenu = aspectRatioMenu
+        viewMenu.addItem(aspectRatioMenuItem)
+        
+        // Add "Auto Detect" option
+        let autoDetectItem = NSMenuItem(title: "Auto Detect", action: #selector(selectAutoDetectAspectRatio(_:)), keyEquivalent: "")
+        autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
+        aspectRatioMenu.addItem(autoDetectItem)
+        
+        aspectRatioMenu.addItem(NSMenuItem.separator())
+        
+        // Add preset aspect ratio options
+        for option in AspectRatioOption.allCases {
+            let menuItem = NSMenuItem(title: option.rawValue, action: #selector(selectAspectRatio(_:)), keyEquivalent: "")
+            menuItem.representedObject = option
+            if UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option {
+                menuItem.state = .on
+            }
+            aspectRatioMenu.addItem(menuItem)
+        }
+        
+        // Add a separator
+        viewMenu.addItem(NSMenuItem.separator())
+        
+        // Add a "HID Resolution Change Alert Settings" menu item
+        let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
+        viewMenu.addItem(hidAlertMenuItem)
+    }
+    
+    // Select auto detect aspect ratio
+    @objc func selectAutoDetectAspectRatio(_ sender: NSMenuItem) {
+        // Close user custom aspect ratio
+        UserSettings.shared.useCustomAspectRatio = false
+        
+        // Update menu items status
+        updateAspectRatioMenuItems()
+        
+        // Update window size
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // Select custom aspect ratio
+    @objc func selectAspectRatio(_ sender: NSMenuItem) {
+        guard let option = sender.representedObject as? AspectRatioOption else { return }
+        
+        // Save user selection
+        UserSettings.shared.customAspectRatio = option
+        UserSettings.shared.useCustomAspectRatio = true
+        
+        // Update menu items status
+        updateAspectRatioMenuItems()
+        
+        // Update window size
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // Update aspect ratio menu items status
+    func updateAspectRatioMenuItems() {
+        guard let mainMenu = NSApp.mainMenu,
+              let viewMenuItem = mainMenu.items.first(where: { $0.title == "View" || $0.title == "View" }),
+              let viewMenu = viewMenuItem.submenu,
+              let aspectRatioMenuItem = viewMenu.items.first(where: { $0.title == "Screen Ratio" }),
+              let aspectRatioMenu = aspectRatioMenuItem.submenu else { return }
+        
+        // Update "Auto Detect" option
+        if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "Auto Detect" }) {
+            autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
+        }
+        
+        // Update all preset aspect ratio options
+        for item in aspectRatioMenu.items {
+            if let option = item.representedObject as? AspectRatioOption {
+                item.state = (UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option) ? .on : .off
+            }
+        }
+    }
+    
+    // Update window size
+    func updateWindowSize(window: NSWindow) {
+        // Get screen size
+        guard let screen = window.screen ?? NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        
+        // Calculate new window size
+        let targetSize = NSSize(
+            width: screenFrame.width * 0.9,
+            height: screenFrame.height * 0.9
+        )
+        
+        // Calculate appropriate size
+        let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
+        
+        // Calculate center position
+        let newX = screenFrame.origin.x + (screenFrame.width - newSize.width) / 2
+        let newY = screenFrame.origin.y + (screenFrame.height - newSize.height) / 2
+        
+        // Set window size and position
+        let newFrame = NSRect(
+            x: newX,
+            y: newY,
+            width: newSize.width,
+            height: newSize.height
+        )
+        
+        window.setFrame(newFrame, display: true, animate: true)
     }
     
     func windowDidResize(_ notification: Notification) {
@@ -102,30 +343,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
+        let newSize = calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true)
+
+        return newSize
+    }
+
+    private func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, constraintToScreen: Bool) -> NSSize {
         // Get the height of the toolbar (if visible)
-        let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
+        let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
         
-        // Calculate the target aspect ratio
-        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+        // Determine the aspect ratio to use
+        let aspectRatioToUse: CGFloat
         
-        let defaultAspectRatio = aspectRatio.width / aspectRatio.height
-        
+        // Priority: 1. User custom ratio 2. HID ratio 3. Default ratio
+        if UserSettings.shared.useCustomAspectRatio {
+            // Use user custom ratio
+            aspectRatioToUse = UserSettings.shared.customAspectRatio.widthToHeightRatio
+        } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+            // Use HID ratio
+            let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+            aspectRatioToUse = hidAspectRatio
+        } else {
+            // Use default ratio
+            let defaultAspectRatio = aspectRatio.width / aspectRatio.height
+            aspectRatioToUse = defaultAspectRatio
+        }
         
         // Get the screen containing the window
-        guard let screen = sender.screen ?? NSScreen.main else { return targetFrameSize }
+        guard let screen = window.screen ?? NSScreen.main else { return targetSize }
         let screenFrame = screen.visibleFrame
         
         // Calculate new size maintaining content area aspect ratio
-        var newSize = targetFrameSize
-        
+        var newSize = targetSize
         // Adjust height calculation to account for the toolbar
-        let contentHeight = targetFrameSize.height - toolbarHeight
-        let contentWidth = targetFrameSize.width
+        let contentHeight = targetSize.height - toolbarHeight
+        let contentWidth = targetSize.width
         
         // Calculate content size based on aspect ratio
-        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
-        let heightFromWidth = (contentWidth / CGFloat(aspectRatioToUse))
-        let widthFromHeight = (contentHeight * CGFloat(aspectRatioToUse))
+        let heightFromWidth = (contentWidth / aspectRatioToUse)
+        let widthFromHeight = (contentHeight * aspectRatioToUse)
         
         // Choose the smaller size to ensure the window fits the screen
         if heightFromWidth + toolbarHeight <= screenFrame.height {
@@ -134,15 +390,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             newSize.width = widthFromHeight
         }
 
-        // Ensure the size does not exceed screen boundaries
-        newSize.width = min(newSize.width, screenFrame.width * 1)
-        newSize.height = min(newSize.height, screenFrame.height * 1)
-        
-        // Ensure the size is not below the minimum (considering the toolbar)
-        let minContentHeight = sender.minSize.height - toolbarHeight
-        let minContentWidth = sender.minSize.width
-        newSize.width = max(newSize.width, minContentWidth)
-        newSize.height = max(newSize.height, minContentHeight + toolbarHeight)
         
         return newSize
     }
@@ -169,24 +416,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Check if aspect ratio is significantly different (allowing for small floating point differences)
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
-            // Calculate new size that fits the screen while maintaining aspect ratio
-            let maxPossibleWidth = screenFrame.width * 0.9
-            let maxPossibleHeight = screenFrame.height * 0.9
+            // Create a target size based on 90% of the screen's maximum size
+            let targetSize = NSSize(
+                width: screenFrame.width * 0.9,
+                height: screenFrame.height * 0.9
+            )
             
-            let newSize: NSSize
-            if maxPossibleWidth / targetAspectRatio <= maxPossibleHeight {
-                // Width is the limiting factor
-                newSize = NSSize(
-                    width: maxPossibleWidth,
-                    height: maxPossibleWidth / targetAspectRatio
-                )
-            } else {
-                // Height is the limiting factor
-                newSize = NSSize(
-                    width: maxPossibleHeight * targetAspectRatio,
-                    height: maxPossibleHeight
-                )
-            }
+            // Use calculateConstrainedWindowSize function to calculate new size
+            let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
             
             // Ensure the new size is not smaller than minimum allowed
             let finalSize = NSSize(
@@ -228,52 +465,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // Add window zoom control
     func windowShouldZoom(_ sender: NSWindow, toFrame newFrame: NSRect) -> Bool {
-        // Print debug information
-        
-        // Get the current window frame
+        // Get current window frame
         let currentFrame = sender.frame
         
-        // Get the screen containing the window, return false if none
+        // Get the screen containing the window, if none then return false
         guard let screen = sender.screen ?? NSScreen.main else { return false }
         
-        // Get the visible frame of the screen
+        // Get the visible area of the screen
         let screenFrame = screen.visibleFrame
         
-        // Get the height of the toolbar if visible
+        // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
-        // Calculate target aspect ratio
-        let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-        let defaultAspectRatio = aspectRatio.width / aspectRatio.height
-        // Calculate content size based on aspect ratio
-        let aspectRatioToUse = (AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0) ? hidAspectRatio : defaultAspectRatio
-        
-        // If the window is at normal size, zoom to maximum
-
-        if currentFrame.size.width  <= aspectRatio.width {
+        // If the window is in normal size, then zoom to max
+        if currentFrame.size.width <= aspectRatio.width {
+            // Calculate the maximum possible size
+            let maxWidth = screenFrame.width
+            let maxHeight = screenFrame.height
             
-            // Calculate the maximum possible width while maintaining aspect ratio
-            let maxPossibleWidth = screenFrame.width * 1
-            // Calculate the maximum possible height while maintaining aspect ratio
-            let maxPossibleHeight = (screenFrame.height - toolbarHeight) * 1
+            // Create a target size, representing the maximized state
+            let targetSize = NSSize(width: maxWidth, height: maxHeight)
             
-            // Calculate maximum size
-            let maxSize: NSSize
-            
-            // Determine if width is the limiting factor
-            if maxPossibleWidth / aspectRatioToUse <= maxPossibleHeight {
-                // Width is the limiting factor
-                maxSize = NSSize(
-                    width: maxPossibleWidth,
-                    height: (maxPossibleWidth / aspectRatioToUse) + toolbarHeight
-                )
-            } else {
-                // Height is the limiting factor
-                maxSize = NSSize(
-                    width: maxPossibleHeight * aspectRatioToUse,
-                    height: maxPossibleHeight + toolbarHeight
-                )
-            }
+            // Use calculateConstrainedWindowSize to maintain the aspect ratio
+            let maxSize = calculateConstrainedWindowSize(for: sender, targetSize: targetSize, constraintToScreen: true)
             
             // Calculate center position
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2
@@ -289,20 +503,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             sender.setFrame(maxFrame, display: true, animate: true)
         } else {
             // Return to normal size
-            // Calculate center position for normal size
             let normalSize: NSSize
             if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                normalSize = NSSize(
-                    width: CGFloat(AppStatus.hidReadResolusion.width) / 2,
-                    height: CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
-                )
+                // Calculate normal size based on HID resolution
+                let baseWidth = CGFloat(AppStatus.hidReadResolusion.width) / 2
+                let baseHeight = CGFloat(AppStatus.hidReadResolusion.height) / 2 + toolbarHeight
+                normalSize = NSSize(width: baseWidth, height: baseHeight)
             } else {
+                // Use default aspect ratio
                 normalSize = NSSize(
                     width: aspectRatio.width,
                     height: aspectRatio.height + toolbarHeight
                 )
             }
             
+            // Calculate center position
             let newX = screenFrame.origin.x + (screenFrame.width - normalSize.width) / 2
             let newY = screenFrame.origin.y + (screenFrame.height - normalSize.height) / 2
             
@@ -316,8 +531,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             sender.setFrame(normalFrame, display: true, animate: true)
         }
         
-        // Return false to indicate not using the default zoom behavior
+        // Return false to indicate not to use default zoom behavior
         return false
+    }
+    
+    // Handle window size update request
+    @objc func handleWindowSizeUpdateRequest(_ notification: Notification) {
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // Show HID resolution change alert settings
+    @objc func showHidResolutionAlertSettings(_ sender: NSMenuItem) {
+        WindowUtils.shared.showHidResolutionAlertSettings()
     }
 }
 

@@ -40,9 +40,43 @@ final class UserSettings: ObservableObject {
     @Published var isFullScreen: Bool
     @Published var isAbsoluteModeMouseHide: Bool = false
     @Published var mainWindownName: String = "main_openterface"
+    
+    // User custom screen ratio settings
+    @Published var useCustomAspectRatio: Bool = false
+    @Published var customAspectRatio: AspectRatioOption = .ratio16_9
+    
+    // Whether to show HID resolution change alert
+    @Published var doNotShowHidResolutionAlert: Bool = false
 }
 
 enum MouseControlMode: Int {
     case relative = 0
     case absolute = 1
+}
+
+// Screen ratio option enumeration
+enum AspectRatioOption: String, CaseIterable {
+    case ratio4_3 = "4:3"
+    case ratio16_9 = "16:9"
+    case ratio16_10 = "16:10"
+    case ratio5_3 = "5:3"
+    case ratio5_4 = "5:4"
+    case ratio21_9 = "21:9"
+    
+    var widthToHeightRatio: CGFloat {
+        switch self {
+        case .ratio4_3:
+            return 4.0 / 3.0
+        case .ratio16_9:
+            return 16.0 / 9.0
+        case .ratio16_10:
+            return 16.0 / 10.0
+        case .ratio5_3:
+            return 5.0 / 3.0
+        case .ratio5_4:
+            return 5.0 / 4.0
+        case .ratio21_9:
+            return 21.0 / 9.0
+        }
+    }
 }

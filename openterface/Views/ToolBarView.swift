@@ -26,6 +26,7 @@ struct ResolutionView: View {
     let width: String
     let height: String
     let fps: String
+    let pixelClock: String
     
     var body: some View {
         HStack(spacing: 4) {
@@ -37,6 +38,8 @@ struct ResolutionView: View {
             }
             Text("\(height)")
                 .font(.system(size: 16, weight: .medium))
+//            Text("\(pixelClock)")
+//                .font(.system(size: 16, weight: .medium))
         }
         .frame(width: 66, alignment: .leading)
     }
