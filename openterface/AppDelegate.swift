@@ -184,6 +184,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
+    // Select auto detect aspect ratio
+    @objc func selectAutoDetectAspectRatio(_ sender: NSMenuItem) {
+        // Close user custom aspect ratio
+        UserSettings.shared.useCustomAspectRatio = false
+        
+        // Update menu items status
+        updateAspectRatioMenuItems()
+        
+        // Update window size
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // Select custom aspect ratio
+    @objc func selectAspectRatio(_ sender: NSMenuItem) {
+        guard let option = sender.representedObject as? AspectRatioOption else { return }
+        
+        // Save user selection
+        UserSettings.shared.customAspectRatio = option
+        UserSettings.shared.useCustomAspectRatio = true
+        
+        // Update menu items status
+        updateAspectRatioMenuItems()
+        
+        // Update window size
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // Update aspect ratio menu items status
+    func updateAspectRatioMenuItems() {
+        guard let mainMenu = NSApp.mainMenu,
+              let viewMenuItem = mainMenu.items.first(where: { $0.title == "View" || $0.title == "View" }),
+              let viewMenu = viewMenuItem.submenu,
+              let aspectRatioMenuItem = viewMenu.items.first(where: { $0.title == "Screen Ratio" }),
+              let aspectRatioMenu = aspectRatioMenuItem.submenu else { return }
+        
+        // Update "Auto Detect" option
+        if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "Auto Detect" }) {
+            autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
+        }
+        
+        // Update all preset aspect ratio options
+        for item in aspectRatioMenu.items {
+            if let option = item.representedObject as? AspectRatioOption {
+                item.state = (UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option) ? .on : .off
+            }
+        }
+    }
+    
+    
     // Setup aspect ratio selection menu
     func setupAspectRatioMenu() {
         // Get the main menu of the application
@@ -246,58 +299,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Add a "HID Resolution Change Alert Settings" menu item
         let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
         viewMenu.addItem(hidAlertMenuItem)
-    }
-    
-    // Select auto detect aspect ratio
-    @objc func selectAutoDetectAspectRatio(_ sender: NSMenuItem) {
-        // Close user custom aspect ratio
-        UserSettings.shared.useCustomAspectRatio = false
-        
-        // Update menu items status
-        updateAspectRatioMenuItems()
-        
-        // Update window size
-        if let window = NSApplication.shared.mainWindow {
-            updateWindowSize(window: window)
-        }
-    }
-    
-    // Select custom aspect ratio
-    @objc func selectAspectRatio(_ sender: NSMenuItem) {
-        guard let option = sender.representedObject as? AspectRatioOption else { return }
-        
-        // Save user selection
-        UserSettings.shared.customAspectRatio = option
-        UserSettings.shared.useCustomAspectRatio = true
-        
-        // Update menu items status
-        updateAspectRatioMenuItems()
-        
-        // Update window size
-        if let window = NSApplication.shared.mainWindow {
-            updateWindowSize(window: window)
-        }
-    }
-    
-    // Update aspect ratio menu items status
-    func updateAspectRatioMenuItems() {
-        guard let mainMenu = NSApp.mainMenu,
-              let viewMenuItem = mainMenu.items.first(where: { $0.title == "View" || $0.title == "View" }),
-              let viewMenu = viewMenuItem.submenu,
-              let aspectRatioMenuItem = viewMenu.items.first(where: { $0.title == "Screen Ratio" }),
-              let aspectRatioMenu = aspectRatioMenuItem.submenu else { return }
-        
-        // Update "Auto Detect" option
-        if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "Auto Detect" }) {
-            autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
-        }
-        
-        // Update all preset aspect ratio options
-        for item in aspectRatioMenu.items {
-            if let option = item.representedObject as? AspectRatioOption {
-                item.state = (UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option) ? .on : .off
-            }
-        }
     }
     
     // Update window size

@@ -353,7 +353,6 @@ class HIDManager {
 
 // define HID sub commands
 enum HIDSubCommand: UInt16 {
-
     case resolutionWidthHigh = 0xC6AF
     case resolutionWidthLow = 0xC6B0
     case resolutionHeightHigh = 0xC6B1
