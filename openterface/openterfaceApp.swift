@@ -23,6 +23,7 @@
 import SwiftUI
 import KeyboardShortcuts
 
+
 @main
 struct openterfaceApp: App {
     
@@ -51,6 +52,7 @@ struct openterfaceApp: App {
     @State private var _resolution = (width: "", height: "")
     @State private var _fps = ""
     @State private var _ms2109version = ""
+    @State private var _pixelClock = ""
     
     // Add serial port information state variables
     @State private var _serialPortName: String = "N/A"
@@ -229,6 +231,22 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
+                    }
+                    .buttonStyle(TransparentBackgroundButtonStyle())
+                    HStack(spacing: 20) {
+                        Button("Win", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .windowsWin)
+                        })  
+                        .buttonStyle(CustomButtonStyle())
+                        .onHover { hovering in
+                            if hovering {
+                                // Mouse entered
+                                AppStatus.isExit = true
+                            } else {
+                                // Mouse exited
+                                AppStatus.isExit = false
+                            }
+                        }
                         Button("DEL", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .del )
                         })
@@ -242,10 +260,24 @@ struct openterfaceApp: App {
                                     AppStatus.isExit = false
                                 }
                             }
+
+                       
                     }
-                    .buttonStyle(TransparentBackgroundButtonStyle())
                     HStack(spacing: 20) {
                         Button("Ctrl + Alt + Del", action: { KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CtrlAltDel ) })
+                            .buttonStyle(CustomButtonStyle())
+                            .onHover { hovering in
+                                if hovering {
+                                    // Mouse entered
+                                    AppStatus.isExit = true
+                                } else {
+                                    // Mouse exited
+                                    AppStatus.isExit = false
+                                }
+                            }
+                        Button("⌘_", action: {
+                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .CmdSpace )
+                        })
                             .buttonStyle(CustomButtonStyle())
                             .onHover { hovering in
                                 if hovering {
@@ -282,12 +314,25 @@ struct openterfaceApp: App {
                             Image(systemName: "poweron") // spacer
                         }
                         ToolbarItem(placement: .automatic) {
-                            Image(systemName: "display")
-                                .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
+                            Button(action: {
+                                showAspectRatioSelectionWindow()
+                            }) {
+                                Image(systemName: "display")
+                                    .resizable()
+                                    .frame(width: 14, height: 14)
+                                    .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
+                            }
+                            .help("Resolution: \(_resolution.width)x\(_resolution.height)\nRefresh Rate: \(_fps) Hz\nPixel Clock: \(_pixelClock) MHz\n \nClick to view Target Aspect Ratio...")
                         }
                         ToolbarItem(placement: .primaryAction) {
-                            ResolutionView(width: _resolution.width, height: _resolution.height, fps: _fps)
+                            ResolutionView(
+                                width: _resolution.width, 
+                                height: _resolution.height,
+                                fps: _fps,
+                                pixelClock: _pixelClock
+                            )
                         }
+                        
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
                                 // Add your code to execute when the button is clicked, e.g., open a window
@@ -304,7 +349,9 @@ struct openterfaceApp: App {
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
+                            .help("KeyBoard: \(_isKeyboardConnected == true ? "Connected" : _isKeyboardConnected == false ? "Not found" : "Unkown") \nMouse: \(_isMouseConnected == true ? "Connected" : _isMouseConnected == false ? "Not found" : "Unkown")\n\nClick to view USB device details")
                         }
+                        
                         // Add serial port information display
                         ToolbarItem(placement: .automatic) {
                             SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate)
@@ -340,6 +387,7 @@ struct openterfaceApp: App {
                         let newHdmiSignal = AppStatus.hasHdmiSignal
                         let newSerialPortName = AppStatus.serialPortName
                         let newSerialPortBaudRate = AppStatus.serialPortBaudRate
+
                         
                         var stateChanged = false
                         
@@ -386,10 +434,12 @@ struct openterfaceApp: App {
                             } else {
                                 _resolution.width = "\(AppStatus.hidReadResolusion.width)"
                                 _resolution.height = "\(AppStatus.hidReadResolusion.height)"
-                                _fps = "\(AppStatus.hidReadFps)Hz"
+                                _fps = "\(AppStatus.hidReadFps)"
                             }
                         }
                         
+                        let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
+                        _pixelClock = String(format: "%.2f", pixelClockValue)
                         // If state has changed, update the last update time
                         if stateChanged {
                             lastUpdateTime = now
@@ -486,8 +536,15 @@ struct openterfaceApp: App {
                 }) {
                     Text("USB Info")
                 }
-                Divider()
                 
+                Divider()
+                Button(action: {
+                    print("App Delegate Type: \(type(of: NSApp.delegate))")
+                    print("Can cast to AppDelegate: \(NSApp.delegate is AppDelegate)")
+                    showAspectRatioSelectionWindow()
+                }) {
+                    Text("Target Aspect Ratio...")
+                }
                 Button(action: {
                     showResetFactoryWindow()
                 }) {
@@ -550,6 +607,15 @@ struct openterfaceApp: App {
             ser.lowerDTR()
         }
     }
+    
+    func showAspectRatioSelectionWindow() {
+        WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in
+            if shouldUpdateWindow {
+                // Notify AppDelegate to update window size
+                WindowUtils.shared.updateWindowSizeThroughNotification()
+            }
+        }
+    }
 }
 
 
@@ -595,11 +661,13 @@ func hexStringToDecimalInt(hexString: String) -> Int? {
 func takeAreaOCRing() {
     if AppStatus.isAreaOCRing == false {
         // Show tip before starting OCR
-        if let window = NSApplication.shared.mainWindow {
-            TipLayerManager.shared.showTip(
-                text: "Double Click to copy text from target",
-                window: window
-            )
+        DispatchQueue.main.async {
+            if let window = NSApplication.shared.mainWindow {
+                TipLayerManager.shared.showTip(
+                    text: "Double Click to copy text from target",
+                    window: window
+                )
+            }
         }
         
         // Wait a moment to let user read the tip, then start OCR

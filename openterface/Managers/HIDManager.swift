@@ -75,6 +75,7 @@ class HIDManager {
                 AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
                 AppStatus.hidReadFps = self?.getFps() ?? 0
                 AppStatus.MS2109Version = self?.getVersion() ?? ""
+                AppStatus.hidReadPixelClock = self?.getPixelClock() ?? 0
             }
         }
         timer?.resume()
@@ -245,6 +246,20 @@ class HIDManager {
         let heightLow = Int(heightLowResponse[3])
         let height = (heightHigh << 8) | heightLow
         
+        // 检查是否需要发送分辨率变化通知
+        let newResolution = (width, height)
+        let oldResolution = AppStatus.hidReadResolusion
+        
+        if newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1 {
+            // 分辨率变化时，发送通知
+            if newResolution.0 > 0 && newResolution.1 > 0 {
+                NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
+                
+                // 重置用户自定义比例设置
+                UserSettings.shared.useCustomAspectRatio = false
+            }
+        }
+        
         return (width, height)
     }
     
@@ -266,6 +281,24 @@ class HIDManager {
         return fps
     }
     
+    func getPixelClock() -> UInt32? {
+        let pixelClockHighReport = generateHIDReport(for: .pixelClockHigh)
+        let pixelClockLowReport = generateHIDReport(for: .pixelClockLow)
+        
+        guard let pixelClockHighResponse = self.sendAndReadHIDReport(pixelClockHighReport),
+              let pixelClockLowResponse = self.sendAndReadHIDReport(pixelClockLowReport) else {
+            Logger.shared.log(content: "无法从HID设备读取像素时钟数据。请检查设备是否正确连接。")
+            return nil
+        }
+        
+        let pixelClockHigh = UInt32(pixelClockHighResponse[3])
+        let pixelClockLow = UInt32(pixelClockLowResponse[3])
+        
+        let pixelClock = (pixelClockHigh << 8) | pixelClockLow
+        
+        return pixelClock
+    }
+
     func getVersion() -> String? {
         let v1 = generateHIDReport(for: .version1)
         let v2 = generateHIDReport(for: .version2)
@@ -322,31 +355,31 @@ class HIDManager {
 enum HIDSubCommand: UInt16 {
     // old
     // get Resolusion data  C738 C739 C73A C73B
-    case resolutionWidthHigh = 0xC738
-    case resolutionWidthLow = 0xC739
-    case resolutionHeightHigh = 0xC73A
-    case resolutionHeightLow = 0xC73B
+    case resolutionWidthHigh = 0xC6AF
+    case resolutionWidthLow = 0xC6B0
+    case resolutionHeightHigh = 0xC6B1
+    case resolutionHeightLow = 0xC6B2
 
     // new
     // get input resolution data C6AF C6B0 C6B1 C6B2
-    case inputWidthHigh = 0xC6AF
-    case inputWidthLow = 0xC6B0
-    case inputHeightHigh = 0xC6B1
-    case inputHeightLow = 0xC6B2
+    // case inputWidthHigh = 0xC6AF
+    // case inputWidthLow = 0xC6B0
+    // case inputHeightHigh = 0xC6B1
+    // case inputHeightLow = 0xC6B2
     
     // old
     // get FPS data C73E C73F
-    case fpsHigh = 0xC73E
-    case fpsLow = 0xC73F
+    case fpsHigh = 0xC6B5
+    case fpsLow = 0xC6B6
 
-    // new
-    // get input FPS data C6B5 C6B6
-    case inputFpsHigh = 0xC6B5
-    case inputFpsLow = 0xC6B6
+    // // new
+    // // get input FPS data C6B5 C6B6
+    // case inputFpsHigh = 0xC6B5
+    // case inputFpsLow = 0xC6B6
 
     // get input pixel clock data C73C C73D
-    case inputPixelClockHigh = 0xC73C
-    case inputPixelClockLow = 0xC73D    
+    case pixelClockHigh = 0xC73C
+    case pixelClockLow = 0xC73D
     
     // get MS2019 version CBDC CBDD CBDE CBDF
     case version1 = 0xCBDC
@@ -368,4 +401,9 @@ extension String {
         }
         return String(repeating: character, count: paddingLength) + self
     }
+}
+
+// 添加通知名称扩展
+extension Notification.Name {
+    static let hidResolutionChanged = Notification.Name("hidResolutionChanged")
 }

@@ -226,10 +226,12 @@ class ScreenshotOverlayView: NSView {
            if let rect = selectionRect, rect.contains(pointInView) {
                takeScreenshot(of: SCContext.screenArea!)
     
-               for w in NSApplication.shared.windows {
-                   if w.title == "Area Selector" {
-                       w.close()
-                       AppStatus.isAreaOCRing = false
+               DispatchQueue.main.async {
+                   for w in NSApplication.shared.windows {
+                       if w.title == "Area Selector" {
+                           w.close()
+                           AppStatus.isAreaOCRing = false
+                       }
                    }
                }
            }
