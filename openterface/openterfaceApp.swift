@@ -33,14 +33,14 @@ struct openterfaceApp: App {
     @StateObject private var appState = AppState()
     
     init() {
-        // 设置日志记录
-        Logger.shared.log(content: "App 正在初始化，音频设置为关闭状态")
+        // Setup logging
+        Logger.shared.log(content: "App is initializing, audio is set to disabled")
         
-        // 初始化时设置音频状态，默认不开启音频
-        // 先设置音频管理器的启用状态，然后再初始化
+        // Set audio status when initializing, default is disabled
+        // First set the enabled state of the audio manager, then initialize
         AudioManager.shared.setAudioEnabled(false)
         
-        // 显式调用音频初始化（但不会自动启动播放，因为已设置autoStartEnabled为false）
+        // Explicitly call audio initialization (but will not automatically start playback, because autoStartEnabled is set to false)
         AudioManager.shared.initializeAudio()
     }
     
