@@ -56,6 +56,8 @@ struct AppStatus {
     static var MS2109Version: String = ""
     static var hasHdmiSignal: Bool?
     
+    static var isAudioEnabled: Bool = false
+    
     static var eventHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)
     static var currentWindow: NSRect = NSRect(x:0,y:0,width:0,height:0)

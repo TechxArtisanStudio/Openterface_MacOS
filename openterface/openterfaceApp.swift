@@ -22,6 +22,8 @@
 
 import SwiftUI
 import KeyboardShortcuts
+import AVFoundation
+import CoreAudio
 
 
 @main
@@ -30,6 +32,18 @@ struct openterfaceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
     
+    init() {
+        // 设置日志记录
+        Logger.shared.log(content: "App 正在初始化，音频设置为关闭状态")
+        
+        // 初始化时设置音频状态，默认不开启音频
+        // 先设置音频管理器的启用状态，然后再初始化
+        AudioManager.shared.setAudioEnabled(false)
+        
+        // 显式调用音频初始化（但不会自动启动播放，因为已设置autoStartEnabled为false）
+        AudioManager.shared.initializeAudio()
+    }
+    
     @State private var relativeTitle = "Relative"
     @State private var absoluteTitle = "Absolute ✓"
     @State private var logModeTitle = "No logging ✓"
@@ -37,6 +51,7 @@ struct openterfaceApp: App {
     
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
+    @State private var _isAudioEnabled = false
     
     @State private var  _hasHdmiSignal: Bool?
     @State private var  _isKeyboardConnected: Bool?
@@ -315,6 +330,18 @@ struct openterfaceApp: App {
                         }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
+                                toggleAudio(isEnabled: !_isAudioEnabled)
+                            }) {
+                                Image(systemName: _isAudioEnabled ? "speaker.wave.3.fill" : "speaker.slash.fill")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 16, height: 16)
+                                    .foregroundColor(_isAudioEnabled ? .green : .red)
+                            }
+                            .help(_isAudioEnabled ? "Close audio" : "Open audio")
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Button(action: {
                                 showAspectRatioSelectionWindow()
                             }) {
                                 Image(systemName: "display")
@@ -387,6 +414,7 @@ struct openterfaceApp: App {
                         let newHdmiSignal = AppStatus.hasHdmiSignal
                         let newSerialPortName = AppStatus.serialPortName
                         let newSerialPortBaudRate = AppStatus.serialPortBaudRate
+                        let newAudioEnabled = AppStatus.isAudioEnabled
 
                         
                         var stateChanged = false
@@ -418,6 +446,11 @@ struct openterfaceApp: App {
                         
                         if _serialPortBaudRate != newSerialPortBaudRate {
                             _serialPortBaudRate = newSerialPortBaudRate
+                            stateChanged = true
+                        }
+                        
+                        if _isAudioEnabled != newAudioEnabled {
+                            _isAudioEnabled = newAudioEnabled
                             stateChanged = true
                         }
                         
@@ -480,6 +513,21 @@ struct openterfaceApp: App {
                     }) {
                         Text(absoluteTitle)
                     }
+                }                         
+                Menu("Audio Control") {
+                    Button(action: {
+                        toggleAudio(isEnabled: true)
+                    }) {
+                        Text("Enable Audio")
+                    }
+                    .disabled(_isAudioEnabled)
+                    
+                    Button(action: {
+                        toggleAudio(isEnabled: false)
+                    }) {
+                        Text("Disable Audio")
+                    }
+                    .disabled(!_isAudioEnabled)
                 }
                 Menu("Logging Setting"){
                     Button(action: {
@@ -536,7 +584,6 @@ struct openterfaceApp: App {
                 }) {
                     Text("USB Info")
                 }
-                
                 Divider()
                 Button(action: {
                     print("App Delegate Type: \(type(of: NSApp.delegate))")
@@ -606,6 +653,13 @@ struct openterfaceApp: App {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             ser.lowerDTR()
         }
+    }
+    
+    private func toggleAudio(isEnabled: Bool) {
+        // Update audio status
+        _isAudioEnabled = isEnabled
+        AppStatus.isAudioEnabled = isEnabled
+        AudioManager.shared.setAudioEnabled(isEnabled)
     }
     
     func showAspectRatioSelectionWindow() {
