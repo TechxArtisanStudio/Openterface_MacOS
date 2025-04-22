@@ -62,6 +62,7 @@ struct openterfaceApp: App {
     @State private var  _isKeyboardConnected: Bool?
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
+    @State private var  _isMouseLoopRunning: Bool = false
     
     // Add state debounce cache variables
     @State private var lastUpdateTime: Date = Date()
@@ -375,9 +376,9 @@ struct openterfaceApp: App {
                                         .resizable()
                                         .frame(width: 16, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
-                                    Image(systemName: "computermouse.fill")
+                                    Image(systemName: _isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
                                         .resizable()
-                                        .frame(width: 10, height: 12)
+                                        .frame(width: _isMouseLoopRunning ? 14 : 10, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
@@ -456,6 +457,13 @@ struct openterfaceApp: App {
                         
                         if _isAudioEnabled != newAudioEnabled {
                             _isAudioEnabled = newAudioEnabled
+                            stateChanged = true
+                        }
+                        
+                        // 检查鼠标循环状态
+                        let isMouseRunning = MouseManager.shared.getMouseLoopRunning()
+                        if _isMouseLoopRunning != isMouseRunning {
+                            _isMouseLoopRunning = isMouseRunning
                             stateChanged = true
                         }
                         

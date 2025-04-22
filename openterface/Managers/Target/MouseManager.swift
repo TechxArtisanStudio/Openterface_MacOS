@@ -42,6 +42,11 @@ class MouseManager {
     init() {
     }
     
+    // 添加公共方法来获取鼠标循环状态
+    func getMouseLoopRunning() -> Bool {
+        return isMouseLoopRunning
+    }
+    
     func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
         mouserMapper.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
     }
