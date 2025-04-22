@@ -21,10 +21,15 @@
 */
 
 import SwiftUI
+import Foundation
+import Vision
+import AppKit
+import WebKit
+import PDFKit
 import KeyboardShortcuts
+import CoreTransferable
 import AVFoundation
 import CoreAudio
-
 
 @main
 struct openterfaceApp: App {
@@ -611,6 +616,21 @@ struct openterfaceApp: App {
                     Text("Paste")
                 }
                 .keyboardShortcut("v", modifiers: .command)
+                Button(action: {
+                    // 使用MouseManager的共享实例
+                    MouseManager.shared.runMouseLoop()
+                }) {
+                    Text("Mouse shake")
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                
+                Button(action: {
+                    // 使用MouseManager的共享实例
+                    MouseManager.shared.stopMouseLoop()
+                }) {
+                    Text("Stop mouse shake")
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
             }
         }
     }
