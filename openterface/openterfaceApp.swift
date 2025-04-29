@@ -21,14 +21,33 @@
 */
 
 import SwiftUI
+import Foundation
+import Vision
+import AppKit
+import WebKit
+import PDFKit
 import KeyboardShortcuts
-
+import CoreTransferable
+import AVFoundation
+import CoreAudio
 
 @main
 struct openterfaceApp: App {
     
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
+    
+    init() {
+        // Setup logging
+        Logger.shared.log(content: "App is initializing, audio is set to disabled")
+        
+        // Set audio status when initializing, default is disabled
+        // First set the enabled state of the audio manager, then initialize
+        AudioManager.shared.setAudioEnabled(false)
+        
+        // Explicitly call audio initialization (but will not automatically start playback, because autoStartEnabled is set to false)
+        AudioManager.shared.initializeAudio()
+    }
     
     @State private var relativeTitle = "Relative"
     @State private var absoluteTitle = "Absolute ✓"
@@ -37,11 +56,13 @@ struct openterfaceApp: App {
     
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
+    @State private var _isAudioEnabled = false
     
     @State private var  _hasHdmiSignal: Bool?
     @State private var  _isKeyboardConnected: Bool?
     @State private var  _isMouseConnected: Bool?
     @State private var  _isSwitchToHost: Bool?
+    @State private var  _isMouseLoopRunning: Bool = false
     
     // Add state debounce cache variables
     @State private var lastUpdateTime: Date = Date()
@@ -315,6 +336,18 @@ struct openterfaceApp: App {
                         }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
+                                toggleAudio(isEnabled: !_isAudioEnabled)
+                            }) {
+                                Image(systemName: _isAudioEnabled ? "speaker.wave.3.fill" : "speaker.slash.fill")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 16, height: 16)
+                                    .foregroundColor(_isAudioEnabled ? .green : .red)
+                            }
+                            .help(_isAudioEnabled ? "Close audio" : "Open audio")
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Button(action: {
                                 showAspectRatioSelectionWindow()
                             }) {
                                 Image(systemName: "display")
@@ -343,9 +376,9 @@ struct openterfaceApp: App {
                                         .resizable()
                                         .frame(width: 16, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
-                                    Image(systemName: "computermouse.fill")
+                                    Image(systemName: _isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
                                         .resizable()
-                                        .frame(width: 10, height: 12)
+                                        .frame(width: _isMouseLoopRunning ? 14 : 10, height: 12)
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
@@ -387,6 +420,7 @@ struct openterfaceApp: App {
                         let newHdmiSignal = AppStatus.hasHdmiSignal
                         let newSerialPortName = AppStatus.serialPortName
                         let newSerialPortBaudRate = AppStatus.serialPortBaudRate
+                        let newAudioEnabled = AppStatus.isAudioEnabled
 
                         
                         var stateChanged = false
@@ -418,6 +452,18 @@ struct openterfaceApp: App {
                         
                         if _serialPortBaudRate != newSerialPortBaudRate {
                             _serialPortBaudRate = newSerialPortBaudRate
+                            stateChanged = true
+                        }
+                        
+                        if _isAudioEnabled != newAudioEnabled {
+                            _isAudioEnabled = newAudioEnabled
+                            stateChanged = true
+                        }
+                        
+                        // Check mouse loop status
+                        let isMouseRunning = MouseManager.shared.getMouseLoopRunning()
+                        if _isMouseLoopRunning != isMouseRunning {
+                            _isMouseLoopRunning = isMouseRunning
                             stateChanged = true
                         }
                         
@@ -480,6 +526,21 @@ struct openterfaceApp: App {
                     }) {
                         Text(absoluteTitle)
                     }
+                }                         
+                Menu("Audio Control") {
+                    Button(action: {
+                        toggleAudio(isEnabled: true)
+                    }) {
+                        Text("Enable Audio")
+                    }
+                    .disabled(_isAudioEnabled)
+                    
+                    Button(action: {
+                        toggleAudio(isEnabled: false)
+                    }) {
+                        Text("Disable Audio")
+                    }
+                    .disabled(!_isAudioEnabled)
                 }
                 Menu("Logging Setting"){
                     Button(action: {
@@ -536,7 +597,6 @@ struct openterfaceApp: App {
                 }) {
                     Text("USB Info")
                 }
-                
                 Divider()
                 Button(action: {
                     print("App Delegate Type: \(type(of: NSApp.delegate))")
@@ -564,6 +624,21 @@ struct openterfaceApp: App {
                     Text("Paste")
                 }
                 .keyboardShortcut("v", modifiers: .command)
+                Button(action: {
+                    // 使用MouseManager的共享实例
+                    MouseManager.shared.runMouseLoop()
+                }) {
+                    Text("Mouse shake")
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                
+                Button(action: {
+                    // 使用MouseManager的共享实例
+                    MouseManager.shared.stopMouseLoop()
+                }) {
+                    Text("Stop mouse shake")
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
             }
         }
     }
@@ -606,6 +681,13 @@ struct openterfaceApp: App {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             ser.lowerDTR()
         }
+    }
+    
+    private func toggleAudio(isEnabled: Bool) {
+        // Update audio status
+        _isAudioEnabled = isEnabled
+        AppStatus.isAudioEnabled = isEnabled
+        AudioManager.shared.setAudioEnabled(isEnabled)
     }
     
     func showAspectRatioSelectionWindow() {

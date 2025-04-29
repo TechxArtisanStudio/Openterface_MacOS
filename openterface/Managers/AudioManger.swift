@@ -36,6 +36,9 @@ class AudioManager: ObservableObject {
     @Published var microphonePermissionGranted: Bool = false
     @Published var showingPermissionAlert: Bool = false
     
+    // Singleton instance
+    static let shared = AudioManager()
+    
     // Audio engine
     private var engine: AVAudioEngine!
     // Audio device ID
@@ -44,12 +47,13 @@ class AudioManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     // Audio property listener ID
     private var audioPropertyListenerID: AudioObjectPropertyListenerBlock?
+    // Flag to control auto-start behavior
+    private var autoStartEnabled: Bool = false
     
     init() {
         engine = AVAudioEngine()
-        // Check microphone permission first
-        checkMicrophonePermission()
         
+        // Ensure not to automatically check microphone permission and start audio at initialization, wait for external explicit call
         // Ensure the app appears in the permission list
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             AVCaptureDevice.requestAccess(for: .audio) { _ in }
@@ -59,6 +63,12 @@ class AudioManager: ObservableObject {
     deinit {
         stopAudioSession()
         cleanupListeners()
+    }
+    
+    // Explicitly separate initialization and audio check, requiring external call
+    func initializeAudio() {
+        // Check microphone permission first
+        checkMicrophonePermission()
     }
     
     // Check microphone permission
@@ -74,7 +84,9 @@ class AudioManager: ObservableObject {
                 self.statusMessage = "Microphone permission granted"
             }
             setupAudioDeviceChangeListener()
-            prepareAudio()
+            if autoStartEnabled {
+                prepareAudio()
+            }
             
         case .notDetermined:
             // Haven't requested permission yet, need to request
@@ -84,7 +96,9 @@ class AudioManager: ObservableObject {
                         self?.microphonePermissionGranted = true
                         self?.statusMessage = "Microphone permission granted"
                         self?.setupAudioDeviceChangeListener()
-                        self?.prepareAudio()
+                        if self?.autoStartEnabled == true {
+                            self?.prepareAudio()
+                        }
                     } else {
                         self?.microphonePermissionGranted = false
                         self?.statusMessage = "Microphone permission needed to play audio"
@@ -150,8 +164,11 @@ class AudioManager: ObservableObject {
                 self.isAudioDeviceConnected = true
             }
             
-            // If device ID is found, start audio session
-            self.startAudioSession()
+            // Only start audio session if auto-start is enabled
+            if self.autoStartEnabled {
+                // If device ID is found, start audio session
+                self.startAudioSession()
+            }
         }
     }
     
@@ -208,8 +225,12 @@ class AudioManager: ObservableObject {
     
     // Stop audio session
     func stopAudioSession() {
+
         // Check if engine is running
         if engine.isRunning {
+            // Log the operation
+            Logger.shared.log(content: "Engine is running, stopping...")
+            
             // Stop engine first to avoid errors when disconnecting
             engine.stop()
             
@@ -219,10 +240,18 @@ class AudioManager: ObservableObject {
             
             // Reset engine
             engine.reset()
+            
+            Logger.shared.log(content: "Audio engine stopped and reset")
+        } else {
+            Logger.shared.log(content: "Audio engine not running, no need to stop")
         }
         
+        // Reset audio device ID
         self.audioDeviceId = nil
+        
+        // Update UI status
         DispatchQueue.main.async {
+            self.statusMessage = "Audio stopped"
             self.isAudioPlaying = false
         }
     }
@@ -377,9 +406,12 @@ class AudioManager: ObservableObject {
                     }
                     // Ensure complete stop before preparing new audio session
                     self.stopAudioSession()
-                    // Slight delay before preparing audio to ensure device stability
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        self.prepareAudio()
+                    // Only auto-start if feature is enabled
+                    if self.autoStartEnabled {
+                        // Slight delay before preparing audio to ensure device stability
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.prepareAudio()
+                        }
                     }
                 }
             }
@@ -410,6 +442,33 @@ class AudioManager: ObservableObject {
                 listenerID
             )
             audioPropertyListenerID = nil
+        }
+    }
+    
+    // Set audio enabled
+    func setAudioEnabled(_ enabled: Bool) {
+        // Update auto-start flag
+        self.autoStartEnabled = enabled
+        Logger.shared.log(content: "Audio auto-start set to: \(enabled)")
+        
+        if enabled {
+            // If we're enabling audio, start it
+            Logger.shared.log(content: "Starting audio session explicitly")
+            // First ensure the device is discovered
+            let deviceID = getAudioDeviceByName(name: "OpenterfaceA")
+            if deviceID != nil {
+                self.audioDeviceId = deviceID
+                // If the device exists, start the session directly
+                startAudioSession()
+            } else {
+                // If the device does not exist, attempt to initialize the audio process
+                Logger.shared.log(content: "Audio device not found, attempting to initialize")
+                prepareAudio()
+            }
+        } else {
+            // If we're disabling audio, stop it
+            Logger.shared.log(content: "Stopping audio session explicitly")
+            stopAudioSession()
         }
     }
 }

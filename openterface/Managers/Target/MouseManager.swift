@@ -24,6 +24,9 @@ import Foundation
 
 class MouseManager {
 
+    // 添加共享单例实例
+    static let shared = MouseManager()
+    
     let mouserMapper = MouseMapper()
     
     var isRelativeMouseControlEnabled: Bool = false
@@ -33,7 +36,15 @@ class MouseManager {
     var dragging = false
     var skipMoveBack = false
     
+    // 控制鼠标循环的变量
+    private var isMouseLoopRunning = false
+    
     init() {
+    }
+    
+    // Add a public method to get the mouse loop status
+    func getMouseLoopRunning() -> Bool {
+        return isMouseLoopRunning
     }
     
     func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
@@ -83,5 +94,156 @@ class MouseManager {
     
     func relativeMouse2BottomRight() {
         mouserMapper.relativeMouse2BottomRight()
+    }
+    
+    func runMouseLoop() {
+        // If already running, do not start again
+        guard !isMouseLoopRunning else {
+            Logger.shared.log(content: "Mouse loop already running")
+            return
+        }
+        
+        isMouseLoopRunning = true
+        Logger.shared.log(content: "鼠标循环开始运行")
+        
+        DispatchQueue.global().async {
+            
+            // Stop current loop
+            self.isMouseLoopRunning = false
+            
+            // Call appropriate loop function
+            if UserSettings.shared.MouseControl == .relative {
+                self.isMouseLoopRunning = true
+                DispatchQueue.global().async {
+                    while self.isMouseLoopRunning {
+                        // Move in relative mode
+                        // Move up
+                        self.handleRelativeMouseAction(dx: 0, dy: -50)
+                        Thread.sleep(forTimeInterval: 1.0)
+                        if !self.isMouseLoopRunning { break }
+                        
+                        // Move down
+                        self.handleRelativeMouseAction(dx: 0, dy: 50)
+                        Thread.sleep(forTimeInterval: 1.0)
+                        if !self.isMouseLoopRunning { break }
+                        
+                        // Move left
+                        self.handleRelativeMouseAction(dx: -50, dy: 0)
+                        Thread.sleep(forTimeInterval: 1.0)
+                        if !self.isMouseLoopRunning { break }
+                        
+                        // Move right
+                        self.handleRelativeMouseAction(dx: 50, dy: 0)
+                        Thread.sleep(forTimeInterval: 1.0)
+                    }
+                    
+                    Logger.shared.log(content: "Mouse loop in relative mode stopped")
+                }
+            } else {
+                // Start the bouncing ball mouse loop in absolute mode
+                self.runBouncingBallMouseLoop()
+            }
+        }
+    }
+    
+    func stopMouseLoop() {
+        isMouseLoopRunning = false
+        Logger.shared.log(content: "Request to stop mouse loop")
+    }
+    
+    // Run the bouncing ball mouse movement
+    func runBouncingBallMouseLoop() {
+        // If already running, do not start again
+        guard !isMouseLoopRunning else {
+            Logger.shared.log(content: "Mouse loop already running")
+            return
+        }
+        
+        isMouseLoopRunning = true
+        Logger.shared.log(content: "Start the bouncing ball mouse loop")
+        
+        DispatchQueue.global().async {
+            // The boundary of absolute mode
+            let maxX = 4096
+            let maxY = 4096
+            
+            // Initial position and movement parameters
+            var x = 50
+            var y = 50
+            var velocityX = 40
+            var velocityY = 0
+            let gravity = 5
+            let energyLoss = 0.9 // Energy loss coefficient when colliding
+            let framerate = 0.05 // 50ms per frame
+            
+            // Energy recovery parameters
+            let minEnergyThreshold = 15  // When the vertical velocity is less than this value, it is considered that the energy is insufficient
+            let boostVelocity = 500       // The additional上升速度
+            let horizontalBoost = 1000     // The additional horizontal speed
+            var lowEnergyCount = 0       // The counter of low energy state
+            var boostDirection = 1       // The direction of horizontal boost (1 or -1)
+            
+            while self.isMouseLoopRunning {
+                // Calculate new position
+                x += velocityX
+                velocityY += gravity
+                y += velocityY
+                
+                // Detect energy state
+                _ = abs(velocityX) + abs(velocityY)
+                let isLowEnergy = abs(velocityY) < minEnergyThreshold && y > maxY * Int(0.8)
+                
+                if isLowEnergy {
+                    lowEnergyCount += 1
+                } else {
+                    lowEnergyCount = 0
+                }
+                
+                // If the continuous multiple frames are in the low energy state, give additional boost force
+                if lowEnergyCount > 10 {
+                    velocityY = -boostVelocity
+                    boostDirection = (velocityX > 0) ? -1 : 1
+                    velocityX = boostDirection * horizontalBoost
+                    lowEnergyCount = 0
+                    Logger.shared.log(content: "提供额外动力，垂直速度: \(velocityY), 水平速度: \(velocityX)")
+                }
+                
+                // Detect collision
+                if x <= 0 {
+                    x = 0
+                    velocityX = Int(Double(-velocityX) * energyLoss)
+                } else if x >= maxX {
+                    x = maxX
+                    velocityX = Int(Double(-velocityX) * energyLoss)
+                }
+                
+                if y <= 0 {
+                    y = 0
+                    velocityY = Int(Double(-velocityY) * energyLoss)
+                } else if y >= maxY {
+                    y = maxY
+                    velocityY = Int(Double(-velocityY) * energyLoss)
+                    
+                    // If the velocity is low after the collision at the bottom, give additional upward force
+                    if abs(velocityY) < minEnergyThreshold {
+                        velocityY = -boostVelocity
+                        // Give a random horizontal push, making the movement more variable
+                        velocityX += Int.random(in: -15...15)
+                        Logger.shared.log(content: "底部碰撞后提供额外动力，新垂直速度: \(velocityY)")
+                    }
+                }
+                
+                // Update mouse position
+                self.handleAbsoluteMouseAction(x: x, y: y)
+                
+                // Wait for the next frame
+                Thread.sleep(forTimeInterval: framerate)
+                
+                // Check if the loop should terminate
+                if !self.isMouseLoopRunning { break }
+            }
+            
+            Logger.shared.log(content: "Bouncing ball mouse loop stopped")
+        }
     }
 }

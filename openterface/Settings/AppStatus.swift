@@ -56,6 +56,8 @@ struct AppStatus {
     static var MS2109Version: String = ""
     static var hasHdmiSignal: Bool?
     
+    static var isAudioEnabled: Bool = false
+    
     static var eventHandler: Any?
     static var currentView: CGRect = CGRect(x:0,y:0,width:0,height:0)
     static var currentWindow: NSRect = NSRect(x:0,y:0,width:0,height:0)
@@ -76,7 +78,7 @@ struct AppStatus {
     static var isHardwareSwitchOn: Bool = false {
         didSet {
             if oldValue != isHardwareSwitchOn {
-                // 值发生变化时执行的代码
+                // Code to be executed when the value changes
                 handleHardwareSwitchChange()
             }
         }
@@ -85,7 +87,7 @@ struct AppStatus {
     static var isSoftwareSwitchOn: Bool = false {
         didSet {
             if oldValue != isSoftwareSwitchOn {
-                // 值发生变化时执行的代码
+                // Code to be executed when the value changes
                 handleSoftwareSwitchChange()
             }
         }

@@ -39,7 +39,6 @@ class USBDeivcesManager {
             AppStatus.USBDevices = _d
         } else {
             Logger.shared.log(content: "USB device scan completed: No USB devices detected on the system")
-            // 处理无设备情况，例如记录日志或显示错误提示
             Logger.shared.log(content: "No USB devices found")
         }
         groundByOpenterface()
@@ -135,7 +134,7 @@ class USBDeivcesManager {
     
     func removeTrailingZeros(from hexString: String) -> String {
         guard hexString.hasPrefix("0x") else {
-            return hexString // 保持原样，如果字符串不以 "0x" 开头
+            return hexString
         }
 
         let hexPrefix = "0x"
@@ -150,7 +149,7 @@ class USBDeivcesManager {
     
     func trimHexString(_ hexString: String) -> String {
         guard hexString.hasPrefix("0x") else {
-            return hexString  // 保持原样，如果字符串不以 "0x" 开头
+            return hexString
         }
         
         let hexPrefix = "0x"
