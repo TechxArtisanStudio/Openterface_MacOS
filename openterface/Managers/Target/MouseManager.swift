@@ -42,7 +42,7 @@ class MouseManager {
     init() {
     }
     
-    // 添加公共方法来获取鼠标循环状态
+    // Add a public method to get the mouse loop status
     func getMouseLoopRunning() -> Bool {
         return isMouseLoopRunning
     }
@@ -97,9 +97,9 @@ class MouseManager {
     }
     
     func runMouseLoop() {
-        // 如果已经在运行，不要重复启动
+        // If already running, do not start again
         guard !isMouseLoopRunning else {
-            Logger.shared.log(content: "鼠标循环已经在运行中")
+            Logger.shared.log(content: "Mouse loop already running")
             return
         }
         
@@ -108,39 +108,39 @@ class MouseManager {
         
         DispatchQueue.global().async {
             
-            // 停止当前循环
+            // Stop current loop
             self.isMouseLoopRunning = false
             
-            // 调用适当的循环函数
+            // Call appropriate loop function
             if UserSettings.shared.MouseControl == .relative {
                 self.isMouseLoopRunning = true
                 DispatchQueue.global().async {
                     while self.isMouseLoopRunning {
-                        // 相对模式移动
-                        // 向上移动
+                        // Move in relative mode
+                        // Move up
                         self.handleRelativeMouseAction(dx: 0, dy: -50)
                         Thread.sleep(forTimeInterval: 1.0)
                         if !self.isMouseLoopRunning { break }
                         
-                        // 向下移动
+                        // Move down
                         self.handleRelativeMouseAction(dx: 0, dy: 50)
                         Thread.sleep(forTimeInterval: 1.0)
                         if !self.isMouseLoopRunning { break }
                         
-                        // 向左移动
+                        // Move left
                         self.handleRelativeMouseAction(dx: -50, dy: 0)
                         Thread.sleep(forTimeInterval: 1.0)
                         if !self.isMouseLoopRunning { break }
                         
-                        // 向右移动
+                        // Move right
                         self.handleRelativeMouseAction(dx: 50, dy: 0)
                         Thread.sleep(forTimeInterval: 1.0)
                     }
                     
-                    Logger.shared.log(content: "相对模式鼠标循环已停止")
+                    Logger.shared.log(content: "Mouse loop in relative mode stopped")
                 }
             } else {
-                // 启动绝对模式的弹球循环
+                // Start the bouncing ball mouse loop in absolute mode
                 self.runBouncingBallMouseLoop()
             }
         }
@@ -148,48 +148,48 @@ class MouseManager {
     
     func stopMouseLoop() {
         isMouseLoopRunning = false
-        Logger.shared.log(content: "请求停止鼠标循环")
+        Logger.shared.log(content: "Request to stop mouse loop")
     }
     
-    // 运行弹球式鼠标运动
+    // Run the bouncing ball mouse movement
     func runBouncingBallMouseLoop() {
-        // 如果已经在运行，不要重复启动
+        // If already running, do not start again
         guard !isMouseLoopRunning else {
-            Logger.shared.log(content: "鼠标循环已经在运行中")
+            Logger.shared.log(content: "Mouse loop already running")
             return
         }
         
         isMouseLoopRunning = true
-        Logger.shared.log(content: "弹球式鼠标循环开始运行")
+        Logger.shared.log(content: "Start the bouncing ball mouse loop")
         
         DispatchQueue.global().async {
-            // 绝对定位模式的边界
+            // The boundary of absolute mode
             let maxX = 4096
             let maxY = 4096
             
-            // 初始位置和运动参数
+            // Initial position and movement parameters
             var x = 50
             var y = 50
             var velocityX = 40
             var velocityY = 0
             let gravity = 5
-            let energyLoss = 0.9 // 碰撞时的能量损失系数
-            let framerate = 0.05 // 50ms每帧
+            let energyLoss = 0.9 // Energy loss coefficient when colliding
+            let framerate = 0.05 // 50ms per frame
             
-            // 能量恢复参数
-            let minEnergyThreshold = 15  // 垂直速度小于这个值时认为能量不足
-            let boostVelocity = 500       // 提供的额外上升速度
-            let horizontalBoost = 1000     // 提供的额外水平速度
-            var lowEnergyCount = 0       // 低能量状态计数器
-            var boostDirection = 1       // 水平提升方向 (1 或 -1)
+            // Energy recovery parameters
+            let minEnergyThreshold = 15  // When the vertical velocity is less than this value, it is considered that the energy is insufficient
+            let boostVelocity = 500       // The additional上升速度
+            let horizontalBoost = 1000     // The additional horizontal speed
+            var lowEnergyCount = 0       // The counter of low energy state
+            var boostDirection = 1       // The direction of horizontal boost (1 or -1)
             
             while self.isMouseLoopRunning {
-                // 计算新位置
+                // Calculate new position
                 x += velocityX
                 velocityY += gravity
                 y += velocityY
                 
-                // 检测能量状态
+                // Detect energy state
                 _ = abs(velocityX) + abs(velocityY)
                 let isLowEnergy = abs(velocityY) < minEnergyThreshold && y > maxY * Int(0.8)
                 
@@ -199,7 +199,7 @@ class MouseManager {
                     lowEnergyCount = 0
                 }
                 
-                // 如果连续多帧处于低能量状态，给予额外提升力
+                // If the continuous multiple frames are in the low energy state, give additional boost force
                 if lowEnergyCount > 10 {
                     velocityY = -boostVelocity
                     boostDirection = (velocityX > 0) ? -1 : 1
@@ -208,7 +208,7 @@ class MouseManager {
                     Logger.shared.log(content: "提供额外动力，垂直速度: \(velocityY), 水平速度: \(velocityX)")
                 }
                 
-                // 检测碰撞
+                // Detect collision
                 if x <= 0 {
                     x = 0
                     velocityX = Int(Double(-velocityX) * energyLoss)
@@ -224,26 +224,26 @@ class MouseManager {
                     y = maxY
                     velocityY = Int(Double(-velocityY) * energyLoss)
                     
-                    // 如果在底部碰撞后速度很低，给予额外的上升动力
+                    // If the velocity is low after the collision at the bottom, give additional upward force
                     if abs(velocityY) < minEnergyThreshold {
                         velocityY = -boostVelocity
-                        // 同时给一个随机的水平推力，让运动更有变化
+                        // Give a random horizontal push, making the movement more variable
                         velocityX += Int.random(in: -15...15)
                         Logger.shared.log(content: "底部碰撞后提供额外动力，新垂直速度: \(velocityY)")
                     }
                 }
                 
-                // 更新鼠标位置
+                // Update mouse position
                 self.handleAbsoluteMouseAction(x: x, y: y)
                 
-                // 等待下一帧
+                // Wait for the next frame
                 Thread.sleep(forTimeInterval: framerate)
                 
-                // 检查循环是否应该终止
+                // Check if the loop should terminate
                 if !self.isMouseLoopRunning { break }
             }
             
-            Logger.shared.log(content: "弹球式鼠标循环已停止")
+            Logger.shared.log(content: "Bouncing ball mouse loop stopped")
         }
     }
 }

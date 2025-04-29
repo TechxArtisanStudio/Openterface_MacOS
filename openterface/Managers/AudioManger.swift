@@ -53,7 +53,7 @@ class AudioManager: ObservableObject {
     init() {
         engine = AVAudioEngine()
         
-        // 确保不要在初始化时自动检查麦克风权限和启动音频，等待外部显式调用
+        // Ensure not to automatically check microphone permission and start audio at initialization, wait for external explicit call
         // Ensure the app appears in the permission list
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             AVCaptureDevice.requestAccess(for: .audio) { _ in }
@@ -65,7 +65,7 @@ class AudioManager: ObservableObject {
         cleanupListeners()
     }
     
-    // 明确分离初始化和音频检查，要求外部调用
+    // Explicitly separate initialization and audio check, requiring external call
     func initializeAudio() {
         // Check microphone permission first
         checkMicrophonePermission()

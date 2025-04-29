@@ -22,15 +22,15 @@
 
 import SwiftUI
 
-// 窗口工具类，提供窗口相关的通用功能
+// Window utility class, providing common window functions
 final class WindowUtils {
-    // 单例模式
+    // Singleton mode
     static let shared = WindowUtils()
     
     private init() {}
     
-    /// 显示屏幕比例选择器窗口
-    /// - Parameter completion: 选择完成后的回调，传入是否需要更新窗口
+    /// Display the screen ratio selector window
+    /// - Parameter completion: The callback after selection, passing in whether to update the window
     func showAspectRatioSelector(completion: @escaping (Bool) -> Void) {
         guard let window = NSApplication.shared.mainWindow else {
             completion(false)
@@ -95,13 +95,13 @@ final class WindowUtils {
         }
     }
     
-    /// 直接调用系统通知更新窗口大小
+    /// Directly call the system notification to update the window size
     func updateWindowSizeThroughNotification() {
         NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
     }
     
-    /// 显示HID分辨率变化提示设置对话框
-    /// - Parameter completion: 设置完成后的回调
+    /// Display the HID resolution change alert settings dialog
+    /// - Parameter completion: The callback after setting, passing in whether to update the window
     func showHidResolutionAlertSettings(completion: @escaping () -> Void = {}) {
         let alert = NSAlert()
         alert.messageText = "HID Resolution Change Alert Settings"
@@ -129,7 +129,7 @@ final class WindowUtils {
     }
 }
 
-// 扩展通知名称，便于全局访问
+// Extension notification name
 extension Notification.Name {
     static let updateWindowSize = Notification.Name("UpdateWindowSizeNotification")
 } 

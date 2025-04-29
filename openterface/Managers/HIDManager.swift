@@ -246,16 +246,16 @@ class HIDManager {
         let heightLow = Int(heightLowResponse[3])
         let height = (heightHigh << 8) | heightLow
         
-        // 检查是否需要发送分辨率变化通知
+        // Check if a resolution change notification needs to be sent
         let newResolution = (width, height)
         let oldResolution = AppStatus.hidReadResolusion
         
         if newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1 {
-            // 分辨率变化时，发送通知
+            // When the resolution changes, send a notification
             if newResolution.0 > 0 && newResolution.1 > 0 {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
                 
-                // 重置用户自定义比例设置
+                // Reset user custom aspect ratio settings
                 UserSettings.shared.useCustomAspectRatio = false
             }
         }
@@ -287,7 +287,7 @@ class HIDManager {
         
         guard let pixelClockHighResponse = self.sendAndReadHIDReport(pixelClockHighReport),
               let pixelClockLowResponse = self.sendAndReadHIDReport(pixelClockLowReport) else {
-            Logger.shared.log(content: "无法从HID设备读取像素时钟数据。请检查设备是否正确连接。")
+            Logger.shared.log(content: "Failed to read pixel clock data from HID device. Check if device is properly connected.")
             return nil
         }
         
@@ -401,7 +401,7 @@ extension String {
     }
 }
 
-// 添加通知名称扩展
+// Add notification name extension
 extension Notification.Name {
     static let hidResolutionChanged = Notification.Name("hidResolutionChanged")
 }

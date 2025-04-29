@@ -460,7 +460,7 @@ struct openterfaceApp: App {
                             stateChanged = true
                         }
                         
-                        // 检查鼠标循环状态
+                        // Check mouse loop status
                         let isMouseRunning = MouseManager.shared.getMouseLoopRunning()
                         if _isMouseLoopRunning != isMouseRunning {
                             _isMouseLoopRunning = isMouseRunning

@@ -78,7 +78,7 @@ struct AppStatus {
     static var isHardwareSwitchOn: Bool = false {
         didSet {
             if oldValue != isHardwareSwitchOn {
-                // 值发生变化时执行的代码
+                // Code to be executed when the value changes
                 handleHardwareSwitchChange()
             }
         }
@@ -87,7 +87,7 @@ struct AppStatus {
     static var isSoftwareSwitchOn: Bool = false {
         didSet {
             if oldValue != isSoftwareSwitchOn {
-                // 值发生变化时执行的代码
+                // Code to be executed when the value changes
                 handleSoftwareSwitchChange()
             }
         }
