@@ -123,7 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // If this is the initial launch, ignore this notification
         if isInitialLaunch {
             // Only update window size silently without showing a prompt
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
                 if let window = NSApplication.shared.mainWindow {
                     self.updateWindowSize(window: window)
                 }
@@ -132,7 +133,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         
         // Ensure UI operations are performed on the main thread
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             // Check if the user has selected to not show the prompt again
             if UserSettings.shared.doNotShowHidResolutionAlert {
                 // Update window size directly without showing a prompt
@@ -143,7 +146,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             }
             
             // Prompt user to choose aspect ratio when HID resolution changes
-            if let window = NSApplication.shared.mainWindow {
+            guard let window = NSApplication.shared.mainWindow else { return }
+            
+            do {
                 let alert = NSAlert()
                 alert.messageText = "Display Resolution Changed"
                 alert.informativeText = "Display resolution change detected. Would you like to use a custom screen aspect ratio?"
@@ -168,6 +173,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 }
                 
                 // Update window size based on new aspect ratio
+                self.updateWindowSize(window: window)
+            } catch {
+                Logger.shared.log(content: "Error showing resolution change alert: \(error.localizedDescription)")
+                // Fallback to just updating the window size
                 self.updateWindowSize(window: window)
             }
         }
