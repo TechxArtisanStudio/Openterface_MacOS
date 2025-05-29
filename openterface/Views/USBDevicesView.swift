@@ -22,15 +22,20 @@
 import SwiftUI
 
 struct USBDevicesView: View {
+    // Helper function to convert integers to hexadecimal strings
+    func hexString(from value: Int) -> String {
+        return String(format: "%X", value)
+    }
+
     var body: some View {
         VStack {
             Text("USB Devices")
                 .font(.headline)
-            List(AppStatus.USBDevices, id: \.locationID) { device in
+            List(AppStatus.USBDevices, id: \.productName) { device in
                 VStack(alignment: .leading) {
                     Text("Product Name: \(device.productName)")
                     Text("Vendor ID: \(device.vendorID)")
-                    Text("Product ID: \(device.productID)")
+                    Text("Product ID: \(hexString(from: Int(device.productID)))")
                     Text("Location ID: \(device.locationID)")
                 }
             }
@@ -38,11 +43,11 @@ struct USBDevicesView: View {
             Text("Group Openterface Devices")
                 .font(.headline)
             List(AppStatus.groupOpenterfaceDevices, id: \.first?.productName) { group in
-                ForEach(group, id: \ .locationID) { device in
+                ForEach(group, id: \.productName) { device in
                     VStack(alignment: .leading) {
                         Text("Product Name: \(device.productName)")
-                        Text("Vendor ID: \(device.vendorID)")
-                        Text("Product ID: \(device.productID)")
+                        Text("Vendor ID: \(hexString(from: Int(device.vendorID)))")
+                        Text("Product ID: \(hexString(from: Int(device.productID)))")
                         Text("Location ID: \(device.locationID)")
                     }
                 }
@@ -52,8 +57,8 @@ struct USBDevicesView: View {
             if let defaultDevice = AppStatus.DefaultVideoDevice {
                 VStack(alignment: .leading) {
                     Text("Product Name: \(defaultDevice.productName)")
-                    Text("Vendor ID: \(defaultDevice.vendorID)")
-                    Text("Product ID: \(defaultDevice.productID)")
+                    Text("Vendor ID: \(hexString(from: Int(defaultDevice.vendorID)))")
+                    Text("Product ID: \(hexString(from: Int(defaultDevice.productID) ?? 0))")
                     Text("Location ID: \(defaultDevice.locationID)")
                     Text("Is Match Video: \(String(AppStatus.isMatchVideoDevice))")
                 }
