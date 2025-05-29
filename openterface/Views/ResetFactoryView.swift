@@ -39,11 +39,11 @@ struct ResetFactoryView: View {
         "Preparing to reset serial to factory settings...",
         "1. Checking serial port connection",
         "2. Starting serial to factory reset",
-        "3. Enabling RTS signal",
-        "4. Disabling RTS signal",
+        "3. Pull down Factory Reset signal (RTS) and waiting for 3 seconds",
+        "4. Pulling up Factory Reset signal (RTS)",
         "5. Closing serial port",
         "6. Reopening serial port",
-        "7, ReBoot serial port",
+        "7. Restart the serial port",
         "Factory reset completed!"
     ]
     
