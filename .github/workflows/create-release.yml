@@ -92,7 +92,7 @@ jobs:
         with:
           workflow: build-dmg.yml
           workflow_conclusion: success
-          name: Openterface-connect.zip
+          name: Openterface-connect
           path: artifacts/windows
           
       - name: Create source archives
