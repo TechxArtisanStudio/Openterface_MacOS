@@ -99,6 +99,7 @@ jobs:
         run: |
           # Create directory for source archives
           mkdir -p artifacts/source
+          SOURCE_PKG_NAME="source"
           
           # Create a temp directory for preparing the source
           TEMP_SRC_DIR=$(mktemp -d)
