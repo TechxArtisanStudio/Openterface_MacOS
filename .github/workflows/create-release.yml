@@ -106,7 +106,7 @@ jobs:
           echo "Created temp directory: $TEMP_SRC_DIR"
           
           # Copy source to temp directory, excluding unwanted files
-          rsync -a --exclude=".git" --exclude="build" --exclude="debug" \
+          rsync -a --exclude=".git" --exclude="docs" --exclude="artifacts" \
                    . $TEMP_SRC_DIR/
           
           # Create source code zip from the temp directory
