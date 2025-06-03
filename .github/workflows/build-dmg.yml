@@ -96,12 +96,12 @@ jobs:
           --team-id "$DEVELOPMENT_TEAM"
         
         # Submit app for notarization
-        xcrun notarytool submit "build/export/Openterface.app" \
+        xcrun notarytool submit "build/export/OpenterfaceConnect.app" \
           --keychain-profile "notarytool-profile" \
           --wait
         
         # Staple the notarization ticket
-        xcrun stapler staple "build/export/Openterface.app"
+        xcrun stapler staple "build/export/OpenterfaceConnect.app"
 
     # Create DMG using create-dmg
     - name: Install create-dmg
@@ -114,17 +114,17 @@ jobs:
           --window-pos 200 120 \
           --window-size 800 400 \
           --icon-size 100 \
-          --icon "Openterface.app" 200 190 \
-          --hide-extension "Openterface.app" \
+          --icon "OpenterfaceConnect.app" 200 190 \
+          --hide-extension "OpenterfaceConnect.app" \
           --app-drop-link 600 185 \
           "build/Openterface.dmg" \
-          "build/export/Openterface.app"
+          "build/export/OpenterfaceConnect.app"
         
     # Upload DMG as artifact
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Openterface-dmg
+        name: Openterface-connect
         path: build/*.dmg
         
     # Create a release if tagged
