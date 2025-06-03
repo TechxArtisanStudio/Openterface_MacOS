@@ -46,7 +46,7 @@ jobs:
       run: |
         xcodebuild -scheme "openterface" \
           -configuration Release \
-          -archivePath "build/OpenterfaceConnect.xcarchive" \
+          -archivePath "build/Openterface.xcarchive" \
           archive \
           CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
           CODE_SIGN_STYLE="Manual" \
@@ -76,7 +76,7 @@ jobs:
         # Use the export options plist created above as the export options
         # Leaves the original one in the repository untouched
         xcodebuild -exportArchive \
-          -archivePath "build/OpenterfaceConnect.xcarchive" \
+          -archivePath "build/Openterface.xcarchive" \
           -exportPath "build/export" \
           -exportOptionsPlist "$CI_EXPORT_OPTIONS_PLIST"
 
@@ -96,12 +96,12 @@ jobs:
           --team-id "$DEVELOPMENT_TEAM"
         
         # Submit app for notarization
-        xcrun notarytool submit "build/export/OpenterfaceConnect.app" \
+        xcrun notarytool submit "build/export/Openterface.app" \
           --keychain-profile "notarytool-profile" \
           --wait
         
         # Staple the notarization ticket
-        xcrun stapler staple "build/export/OpenterfaceConnect.app"
+        xcrun stapler staple "build/export/Openterface.app"
 
     # Create DMG using create-dmg
     - name: Install create-dmg
@@ -114,11 +114,11 @@ jobs:
           --window-pos 200 120 \
           --window-size 800 400 \
           --icon-size 100 \
-          --icon "OpenterfaceConnect.app" 200 190 \
-          --hide-extension "OpenterfaceConnect.app" \
+          --icon "Openterface.app" 200 190 \
+          --hide-extension "Openterface.app" \
           --app-drop-link 600 185 \
-          "build/OpenterfaceConnect.dmg" \
-          "build/export/OpenterfaceConnect.app"
+          "build/Openterface.dmg" \
+          "build/export/Openterface.app"
         
     # Upload DMG as artifact
     - name: Upload DMG artifact
