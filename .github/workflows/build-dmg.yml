@@ -95,12 +95,15 @@ jobs:
           --password "$APPLE_APP_SPECIFIC_PASSWORD" \
           --team-id "$DEVELOPMENT_TEAM"
         
-        # Submit app for notarization
-        xcrun notarytool submit "build/export/Openterface.app" \
+        # Zip the .app bundle for notarization
+        ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface.app" "build/export/Openterface.zip"
+        
+        # Submit zipped app for notarization
+        xcrun notarytool submit "build/export/Openterface.zip" \
           --keychain-profile "notarytool-profile" \
           --wait
         
-        # Staple the notarization ticket
+        # Staple the notarization ticket to the .app
         xcrun stapler staple "build/export/Openterface.app"
 
     # Create DMG using create-dmg
