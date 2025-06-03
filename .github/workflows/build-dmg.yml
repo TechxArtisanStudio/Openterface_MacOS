@@ -5,8 +5,13 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Allows manual trigger from the Actions tab
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub Release with auto-generated notes'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   build:
@@ -96,32 +101,23 @@ jobs:
           --team-id "$DEVELOPMENT_TEAM"
         
         # Zip the .app bundle for notarization
-        ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface.app" "build/export/Openterface.zip"
-        
-        # Submit zipped app for notarization
-        xcrun notarytool submit "build/export/Openterface.zip" \
-          --keychain-profile "notarytool-profile" \
-          --wait
+        ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface Connect.app" "build/export/Openterface.zip"
         
         # Staple the notarization ticket to the .app
-        xcrun stapler staple "build/export/Openterface.app"
-
-    # Create DMG using create-dmg
-    - name: Install create-dmg
-      run: brew install create-dmg
+        xcrun stapler staple "build/export/Openterface Connect.app"
 
     - name: Create DMG
       run: |
         create-dmg \
-          --volname "Openterface" \
+          --volname "Openterface Connect" \
           --window-pos 200 120 \
           --window-size 800 400 \
           --icon-size 100 \
-          --icon "Openterface.app" 200 190 \
-          --hide-extension "Openterface.app" \
+          --icon "Openterface Connect.app" 200 190 \
+          --hide-extension "Openterface Connect.app" \
           --app-drop-link 600 185 \
           "build/Openterface.dmg" \
-          "build/export/Openterface.app"
+          "build/export/Openterface Connect.app"
         xcrun notarytool submit "build/Openterface.dmg" --keychain-profile "notarytool-profile" --wait
         xcrun stapler staple "build/Openterface.dmg"
 
@@ -132,14 +128,58 @@ jobs:
         name: Openterface-connect
         path: build/*.dmg
         
-    # Create a release if tagged
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+    # Create a release if tagged or if manually requested
+    - name: Create Release with Notes and DMG Hash
+      if: (startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true')
+      uses: actions/github-script@v7
       with:
-        files: build/*.dmg
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { execSync } = require('child_process');
+          const { owner, repo } = context.repo;
+
+          // Compute SHA256 hash of the DMG
+          let hash = '';
+          try {
+            hash = execSync('shasum -a 256 build/Openterface.dmg').toString().split(' ')[0];
+          } catch (e) {
+            hash = 'Failed to compute hash';
+          }
+
+          // Get commit messages since last tag or last release
+          let changes = '';
+          try {
+            const latestTag = execSync('git describe --tags --abbrev=0').toString().trim();
+            changes = execSync(`git log ${latestTag}..HEAD --pretty=format:"- %s"`).toString();
+          } catch (e) {
+            changes = execSync('git log --pretty=format:"- %s" -n 20').toString();
+          }
+
+          const body = `
+### Changes
+
+${changes || 'No recent changes found.'}
+
+---
+
+### SHA256 for \`Openterface.dmg\`
+
+\`\`\`
+${hash}
+\`\`\`
+`;
+
+          // Create the release
+          const tag = context.ref.startsWith('refs/tags/') ? context.ref.replace('refs/tags/', '') : `manual-${Date.now()}`;
+          await github.rest.repos.createRelease({
+            owner,
+            repo,
+            tag_name: tag,
+            name: `Openterface ${tag}`,
+            body,
+            draft: false,
+            prerelease: false,
+          });
 
     - name: Cache node modules
       uses: actions/cache@v3
