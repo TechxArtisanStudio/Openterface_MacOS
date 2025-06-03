@@ -99,10 +99,13 @@ jobs:
           --apple-id "$APPLE_ID" \
           --password "$APPLE_APP_SPECIFIC_PASSWORD" \
           --team-id "$DEVELOPMENT_TEAM"
-        
+
         # Zip the .app bundle for notarization
         ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface.app" "build/export/Openterface.zip"
-        
+
+        # Submit for notarization and wait for result
+        xcrun notarytool submit "build/export/Openterface.zip" --keychain-profile "notarytool-profile" --wait
+
         # Staple the notarization ticket to the .app
         xcrun stapler staple "build/export/Openterface.app"
 
