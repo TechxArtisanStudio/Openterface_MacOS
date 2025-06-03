@@ -88,7 +88,7 @@ jobs:
     # Rename exported app bundle
     - name: Rename exported app bundle
       run: |
-        mv "build/export/Openterface.app" "build/export/Openterface Connect.app"
+        mv "build/export/Openterface.app" "build/export/Openterface.app"
 
     # Notarize the app
     - name: Notarize App
@@ -106,10 +106,10 @@ jobs:
           --team-id "$DEVELOPMENT_TEAM"
         
         # Zip the .app bundle for notarization
-        ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface Connect.app" "build/export/Openterface.zip"
+        ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface.app" "build/export/Openterface.zip"
         
         # Staple the notarization ticket to the .app
-        xcrun stapler staple "build/export/Openterface Connect.app"
+        xcrun stapler staple "build/export/Openterface.app"
 
     - name: Create DMG
       run: |
@@ -118,11 +118,11 @@ jobs:
           --window-pos 200 120 \
           --window-size 800 400 \
           --icon-size 100 \
-          --icon "Openterface Connect.app" 200 190 \
-          --hide-extension "Openterface Connect.app" \
+          --icon "Openterface.app" 200 190 \
+          --hide-extension "Openterface.app" \
           --app-drop-link 600 185 \
           "build/Openterface.dmg" \
-          "build/export/Openterface Connect.app"
+          "build/export/Openterface.app"
         xcrun notarytool submit "build/Openterface.dmg" --keychain-profile "notarytool-profile" --wait
         xcrun stapler staple "build/Openterface.dmg"
 
