@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # Allows manual trigger from the Actions tab
   workflow_dispatch:
     inputs:
       create_release:
@@ -30,15 +31,11 @@ jobs:
         security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
         security default-keychain -s build.keychain
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-
         echo "$MACOS_CERTIFICATE_P12" | base64 --decode > certificate.p12
-
         security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-
         security set-keychain-settings -t 3600 -l ~/Library/Keychains/build.keychain
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-
         security find-identity -v -p codesigning build.keychain
     
     # Build the macOS app using xcodebuild
@@ -56,7 +53,6 @@ jobs:
           CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
           CODE_SIGN_STYLE="Manual" \
           DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
-
         # Create a new export options plist with values from GitHub Action variables since
         # these parameters cannot be overwritten in the command line
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" > "$CI_EXPORT_OPTIONS_PLIST"
@@ -73,18 +69,15 @@ jobs:
         echo "    <string>$CODE_SIGN_IDENTITY</string>" >> "$CI_EXPORT_OPTIONS_PLIST"
         echo "</dict>" >> "$CI_EXPORT_OPTIONS_PLIST"
         echo "</plist>" >> "$CI_EXPORT_OPTIONS_PLIST"
-
         echo "--- Export options for CI ---"
         cat "$CI_EXPORT_OPTIONS_PLIST"
         echo "-----------------------------"
-
         # Use the export options plist created above as the export options
         # Leaves the original one in the repository untouched
         xcodebuild -exportArchive \
           -archivePath "build/Openterface.xcarchive" \
           -exportPath "build/export" \
           -exportOptionsPlist "$CI_EXPORT_OPTIONS_PLIST"
-
     # Notarize the app
     - name: Notarize App
       # main branch only
@@ -99,20 +92,25 @@ jobs:
           --apple-id "$APPLE_ID" \
           --password "$APPLE_APP_SPECIFIC_PASSWORD" \
           --team-id "$DEVELOPMENT_TEAM"
-
+        
         # Zip the .app bundle for notarization
         ditto -c -k --sequesterRsrc --keepParent "build/export/Openterface.app" "build/export/Openterface.zip"
-
-        # Submit for notarization and wait for result
-        xcrun notarytool submit "build/export/Openterface.zip" --keychain-profile "notarytool-profile" --wait
-
+        
+        # Submit zipped app for notarization
+        xcrun notarytool submit "build/export/Openterface.zip" \
+          --keychain-profile "notarytool-profile" \
+          --wait
+        
         # Staple the notarization ticket to the .app
         xcrun stapler staple "build/export/Openterface.app"
+    # Create DMG using create-dmg
+    - name: Install create-dmg
+      run: brew install create-dmg
 
     - name: Create DMG
       run: |
         create-dmg \
-          --volname "Openterface Connect" \
+          --volname "Openterface" \
           --window-pos 200 120 \
           --window-size 800 400 \
           --icon-size 100 \
@@ -123,7 +121,6 @@ jobs:
           "build/export/Openterface.app"
         xcrun notarytool submit "build/Openterface.dmg" --keychain-profile "notarytool-profile" --wait
         xcrun stapler staple "build/Openterface.dmg"
-
     # Upload DMG as artifact
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v4
@@ -131,13 +128,14 @@ jobs:
         name: Openterface-connect
         path: build/*.dmg
         
-    # Create a release if tagged or if manually requested
+    # Create a release if tagged
     - name: Create Release
-      if: (startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true')
-      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
       with:
-        files: build/Openterface.dmg
-        generate_release_notes: true
+        files: build/*.dmg
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
 
     - name: Cache node modules
       uses: actions/cache@v3
@@ -146,7 +144,6 @@ jobs:
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node- 
-
     - name: Debug Certificates
       run: |
         security find-identity -v -p codesigning
