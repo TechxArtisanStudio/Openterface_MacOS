@@ -18,40 +18,22 @@ jobs:
     # Install the Apple certificate and provisioning profile
     - name: Install Apple Certificate
       env:
-        CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
-        PRIVATE_KEY_BASE64: ${{ secrets.PRIVATE_KEY_BASE64 }}
+        MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+        MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       run: |
-        # Create keychain
         security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
         security default-keychain -s build.keychain
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-        
-        # Import certificate and private key
-        echo $CERTIFICATE_BASE64 | base64 --decode > certificate.pem
-        echo $PRIVATE_KEY_BASE64 | base64 --decode > private_key.pem
-        
-        # Convert PEM to P12
-        openssl pkcs12 -export \
-          -in certificate.pem \
-          -inkey private_key.pem \
-          -out certificate.p12 \
-          -passout pass:temp_password
-        
-        # Import into keychain
-        security import certificate.p12 \
-          -k build.keychain \
-          -P temp_password \
-          -T /usr/bin/codesign
-        
-        # Set keychain settings
+
+        echo "$MACOS_CERTIFICATE_P12" | base64 --decode > certificate.p12
+
+        security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
         security set-keychain-settings -t 3600 -l ~/Library/Keychains/build.keychain
-        
-        # Unlock keychain and allow codesign to access it
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-        
-        # Verify certificate
+
         security find-identity -v -p codesigning build.keychain
     
     # Build the macOS app using xcodebuild
@@ -137,15 +119,14 @@ jobs:
           --app-drop-link 600 185 \
           "build/Openterface.dmg" \
           "build/export/Openterface.app"
-        
         xcrun notarytool submit "build/Openterface.dmg" --keychain-profile "notarytool-profile" --wait
         xcrun stapler staple "build/Openterface.dmg"
-        
+
     # Upload DMG as artifact
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Openterface-dmg
+        name: Openterface-connect
         path: build/*.dmg
         
     # Create a release if tagged
@@ -169,4 +150,4 @@ jobs:
       run: |
         security find-identity -v -p codesigning
         security list-keychains
-        security show-keychain-info build.keychain 
+        security show-keychain-info build.keychain
