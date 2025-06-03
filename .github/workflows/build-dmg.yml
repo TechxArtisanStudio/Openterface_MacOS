@@ -85,11 +85,6 @@ jobs:
           -exportPath "build/export" \
           -exportOptionsPlist "$CI_EXPORT_OPTIONS_PLIST"
 
-    # Rename exported app bundle
-    - name: Rename exported app bundle
-      run: |
-        mv "build/export/Openterface.app" "build/export/Openterface.app"
-
     # Notarize the app
     - name: Notarize App
       # main branch only
