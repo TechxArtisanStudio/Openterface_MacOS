@@ -24,7 +24,7 @@ jobs:
       - name: Wait for required workflows
         run: |
           # Fixed list of workflows to wait for
-          WORKFLOWS=("build-dmg.yaml")
+          WORKFLOWS=("build-dmg.yml")
           
           echo "Workflows to wait for:"
           for workflow in "${WORKFLOWS[@]}"; do
@@ -90,7 +90,7 @@ jobs:
       - name: Download DMG artifacts
         uses: dawidd6/action-download-artifact@v2
         with:
-          workflow: build-dmg.yaml
+          workflow: build-dmg.yml
           workflow_conclusion: success
           name: Openterface-connect.dmg
           path: artifacts/windows
