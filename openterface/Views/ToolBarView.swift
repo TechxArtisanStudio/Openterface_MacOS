@@ -23,25 +23,39 @@
 import SwiftUI
 
 struct ResolutionView: View {
+    @ObservedObject var userSettings = UserSettings.shared
+    
     let width: String
     let height: String
     let fps: String
     let pixelClock: String
+    let helpText: String
     
     var body: some View {
         HStack(spacing: 4) {
             VStack(alignment: .leading, spacing: -2) {
-                Text("\(width)")
-                    .font(.system(size: 8, weight: .medium))
-                Text("\(fps)")
-                    .font(.system(size: 8, weight: .medium))
+                Text("\(width)x\(height)").font(.system(size: 10, weight: .medium))
+                HStack(spacing: 2) {
+                    Text("\(fps)Hz").font(.system(size: 8, weight: .medium))
+                    Text(userSettings.customAspectRatio.toString)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(
+                            isAspectRatioMismatch ? .red : .primary // Conditional color
+                        )
+                }
             }
-            Text("\(height)")
-                .font(.system(size: 16, weight: .medium))
-//            Text("\(pixelClock)")
-//                .font(.system(size: 16, weight: .medium))
         }
         .frame(width: 66, alignment: .leading)
+        .help(helpText)
+    }
+    
+    private var isAspectRatioMismatch: Bool {
+        guard let widthValue = Double(width),
+              let heightValue = Double(height) else {
+            return false
+        }
+        let calculatedAspectRatio = widthValue / heightValue
+        return abs(calculatedAspectRatio - userSettings.customAspectRatio.widthToHeightRatio) > 0.01
     }
 }
 
