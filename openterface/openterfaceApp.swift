@@ -355,14 +355,18 @@ struct openterfaceApp: App {
                                     .frame(width: 14, height: 14)
                                     .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
                             }
-                            .help("Resolution: \(_resolution.width)x\(_resolution.height)\nRefresh Rate: \(_fps) Hz\nPixel Clock: \(_pixelClock) MHz\n \nClick to view Target Aspect Ratio...")
+                            .help("Click to view Target Aspect Ratio...")
                         }
                         ToolbarItem(placement: .primaryAction) {
                             ResolutionView(
                                 width: _resolution.width, 
                                 height: _resolution.height,
                                 fps: _fps,
-                                pixelClock: _pixelClock
+                                pixelClock: _pixelClock,
+                                helpText:   "Input Resolution: \(_resolution.width)x\(_resolution.height)\n" +
+                                            "Capture Resolution: 1920x1080\n" +
+                                            "Refresh Rate: \(_fps) Hz\n" +
+                                            "Pixel Clock: \(_pixelClock) MHz"
                             )
                         }
                         
@@ -486,6 +490,11 @@ struct openterfaceApp: App {
                         
                         let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
                         _pixelClock = String(format: "%.2f", pixelClockValue)
+
+                        if (pixelClockValue > 185.0){ // The magic value for MS2109 4K resolution correction
+                           _resolution.width = "\(AppStatus.hidReadResolusion.width*2)"
+                        } 
+                        
                         // If state has changed, update the last update time
                         if stateChanged {
                             lastUpdateTime = now
@@ -628,7 +637,7 @@ struct openterfaceApp: App {
                     // 使用MouseManager的共享实例
                     MouseManager.shared.runMouseLoop()
                 }) {
-                    Text("Mouse shake")
+                    Text("Prevent screen saver")
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 

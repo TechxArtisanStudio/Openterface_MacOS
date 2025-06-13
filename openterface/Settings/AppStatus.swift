@@ -42,7 +42,7 @@ struct AppStatus {
     static var isSwitchToHost: Bool?
     
     static var hidReadResolusion = (width: 0, height: 0)
-    static var hidReadFps = 0
+    static var hidReadFps:Float = 0.0
     static var hidReadPixelClock: UInt32 = 0
     
     static var chipVersion: Int8 = 0

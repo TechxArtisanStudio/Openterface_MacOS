@@ -57,9 +57,18 @@ final class WindowUtils {
             // Add aspect ratio dropdown menu
             let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 30, width: 200, height: 25))
             
+            // Get the current resolution value
+            let currentResolution = AppStatus.hidReadResolusion.width > 0 ? Float(AppStatus.hidReadResolusion.width) / Float(AppStatus.hidReadResolusion.height) : 0.0
+            
             // Add all preset ratio options
             for option in AspectRatioOption.allCases {
-                aspectRatioPopup.addItem(withTitle: option.rawValue)
+                var title = option.rawValue
+                Logger.shared.log(content: "Adding aspect ratio option: \(title) with ratio \(option.widthToHeightRatio)")
+                Logger.shared.log(content: "Current resolution ratio: \(currentResolution)")
+                if Float(CGFloat(option.widthToHeightRatio)) == Float(currentResolution) {
+                    title += " (Input Resolution)"
+                }
+                aspectRatioPopup.addItem(withTitle: title)
             }
             
             // Set currently selected ratio
@@ -160,4 +169,4 @@ final class WindowUtils {
 // Extension notification name
 extension Notification.Name {
     static let updateWindowSize = Notification.Name("UpdateWindowSizeNotification")
-} 
+}

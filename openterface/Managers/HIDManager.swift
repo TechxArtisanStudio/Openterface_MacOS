@@ -223,10 +223,10 @@ class HIDManager {
     }
     
     func getResolution() -> (width: Int, height: Int)? {
-        let widthHighReport = generateHIDReport(for: .resolutionWidthHigh)
-        let widthLowReport = generateHIDReport(for: .resolutionWidthLow)
-        let heightHighReport = generateHIDReport(for: .resolutionHeightHigh)
-        let heightLowReport = generateHIDReport(for: .resolutionHeightLow)
+        let widthHighReport = generateHIDReport(for: .inputResolutionWidthHigh)
+        let widthLowReport = generateHIDReport(for: .inputResolutionWidthLow)
+        let heightHighReport = generateHIDReport(for: .inputResolutionHeightHigh)
+        let heightLowReport = generateHIDReport(for: .inputResolutionHeightLow)
         
         guard let widthHighResponse = self.sendAndReadHIDReport(widthHighReport),
               let widthLowResponse = self.sendAndReadHIDReport(widthLowReport),
@@ -250,7 +250,9 @@ class HIDManager {
         let newResolution = (width, height)
         let oldResolution = AppStatus.hidReadResolusion
         
-        if newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1 {
+        if (oldResolution.0 != 0 && oldResolution.1 != 0) && (newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1) {
+            Logger.shared.log(content: "HID input resolution changed: \(newResolution.0)x\(newResolution.1)")
+            Logger.shared.log(content: "Old input resolution: \(oldResolution.0)x\(oldResolution.1)")
             // When the resolution changes, send a notification
             if newResolution.0 > 0 && newResolution.1 > 0 {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
@@ -263,7 +265,7 @@ class HIDManager {
         return (width, height)
     }
     
-    func getFps() -> Int? {
+    func getFps() -> Float? {
         let fpsHighReport = generateHIDReport(for: .fpsHigh)
         let fpsLowReport = generateHIDReport(for: .fpsLow)
         
@@ -276,9 +278,16 @@ class HIDManager {
         let fpsHigh = Int(fpsHighResponse[3])
         let fpsLow = Int(fpsLowResponse[3])
         
-        let fps = ((fpsHigh << 8) | fpsLow) / 100
+        let rawFps = (fpsHigh << 8) | fpsLow
+        let fps = Float(rawFps) / 100.0
         
-        return fps
+        // Round to 2 decimal places
+        let roundedFps = Float(String(format: "%.2f", fps)) ?? fps
+        if roundedFps == 59.99 {
+            // Special case for 59.99 FPS, round to 60
+            return 60.0
+        }
+        return roundedFps
     }
     
     func getPixelClock() -> UInt32? {
@@ -353,10 +362,10 @@ class HIDManager {
 
 // define HID sub commands
 enum HIDSubCommand: UInt16 {
-    case resolutionWidthHigh = 0xC6AF
-    case resolutionWidthLow = 0xC6B0
-    case resolutionHeightHigh = 0xC6B1
-    case resolutionHeightLow = 0xC6B2
+    case inputResolutionWidthHigh = 0xC6AF
+    case inputResolutionWidthLow = 0xC6B0
+    case inputResolutionHeightHigh = 0xC6B1
+    case inputResolutionHeightLow = 0xC6B2
 
     // new
     // get input resolution data C6AF C6B0 C6B1 C6B2
