@@ -28,7 +28,6 @@ struct ResolutionView: View {
     let width: String
     let height: String
     let fps: String
-    let pixelClock: String
     let helpText: String
     
     var body: some View {

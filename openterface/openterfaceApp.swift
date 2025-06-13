@@ -362,11 +362,16 @@ struct openterfaceApp: App {
                                 width: _resolution.width, 
                                 height: _resolution.height,
                                 fps: _fps,
-                                pixelClock: _pixelClock,
                                 helpText:   "Input Resolution: \(_resolution.width)x\(_resolution.height)\n" +
                                             "Capture Resolution: 1920x1080\n" +
                                             "Refresh Rate: \(_fps) Hz\n" +
-                                            "Pixel Clock: \(_pixelClock) MHz"
+                                            "Pixel Clock: \(_pixelClock) MHz\n" +
+                                            "HTotal: \(AppStatus.hidInputHTotal)\n" + 
+                                            "VTotal: \(AppStatus.hidInputVTotal)\n" +
+                                            "Hst: \(AppStatus.hidInputHst)\n" +
+                                            "Vst: \(AppStatus.hidInputVst)\n" +
+                                            "Hsync Width: \(AppStatus.hidInputHsyncWidth)\n" +
+                                            "Vsync Width: \(AppStatus.hidInputVsyncWidth)"
                             )
                         }
                         
@@ -491,7 +496,14 @@ struct openterfaceApp: App {
                         let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
                         _pixelClock = String(format: "%.2f", pixelClockValue)
 
-                        if (pixelClockValue > 185.0){ // The magic value for MS2109 4K resolution correction
+                        let inputHTotal = AppStatus.hidInputHTotal
+                        let inputVTotal = AppStatus.hidInputVTotal
+                        let inputHst = AppStatus.hidInputHst
+                        let inputVst = AppStatus.hidInputVst
+                        let inputHsyncWidth = AppStatus.hidInputHsyncWidth
+                        let inputVsyncWidth = AppStatus.hidInputVsyncWidth
+
+                        if (pixelClockValue > 189.0){ // The magic value for MS2109 4K resolution correction
                            _resolution.width = "\(AppStatus.hidReadResolusion.width*2)"
                            _resolution.height = "\(AppStatus.hidReadResolusion.height*2)"
                         } 

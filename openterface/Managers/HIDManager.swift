@@ -76,6 +76,12 @@ class HIDManager {
                 AppStatus.hidReadFps = self?.getFps() ?? 0
                 AppStatus.MS2109Version = self?.getVersion() ?? ""
                 AppStatus.hidReadPixelClock = self?.getPixelClock() ?? 0
+                AppStatus.hidInputHTotal = UInt32(self?.getInputHTotal() ?? 0)
+                AppStatus.hidInputVTotal = UInt32(self?.getInputVTotal() ?? 0)
+                AppStatus.hidInputHst = UInt32(self?.getInputHst() ?? 0)
+                AppStatus.hidInputVst = UInt32(self?.getInputVst() ?? 0)
+                AppStatus.hidInputHsyncWidth = UInt32(self?.getInputHsyncWidth() ?? 0)
+                AppStatus.hidInputVsyncWidth = UInt32(self?.getInputVsyncWidth() ?? 0)
             }
         }
         timer?.resume()
@@ -308,6 +314,102 @@ class HIDManager {
         return pixelClock
     }
 
+    func getInputHTotal() -> Int? {
+        let hTotalHighReport = generateHIDReport(for: .inputHTotalHigh)
+        let hTotalLowReport = generateHIDReport(for: .inputHTotalLow)
+
+        guard let hTotalHighResponse = self.sendAndReadHIDReport(hTotalHighReport),
+              let hTotalLowResponse = self.sendAndReadHIDReport(hTotalLowReport) else {
+            Logger.shared.log(content: "Failed to read HTotal data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        let hTotalHigh = Int(hTotalHighResponse[3])
+        let hTotalLow = Int(hTotalLowResponse[3])
+
+        return (hTotalHigh << 8) | hTotalLow
+    }
+
+    func getInputVTotal() -> Int? {
+        let vTotalHighReport = generateHIDReport(for: .inputResolutionHeightHigh)
+        let vTotalLowReport = generateHIDReport(for: .inputResolutionHeightLow)
+
+        guard let vTotalHighResponse = self.sendAndReadHIDReport(vTotalHighReport),
+              let vTotalLowResponse = self.sendAndReadHIDReport(vTotalLowReport) else {
+            Logger.shared.log(content: "Failed to read VTotal data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        let vTotalHigh = Int(vTotalHighResponse[3])
+        let vTotalLow = Int(vTotalLowResponse[3])
+
+        return (vTotalHigh << 8) | vTotalLow
+    }
+
+    func getInputHst() -> Int? {
+        let hstHighReport = generateHIDReport(for: .inputHstHigh)
+        let hstLowReport = generateHIDReport(for: .inputHstLow)
+
+        guard let hstHighResponse = self.sendAndReadHIDReport(hstHighReport),
+              let hstLowResponse = self.sendAndReadHIDReport(hstLowReport) else {
+            Logger.shared.log(content: "Failed to read HST data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        let hstHigh = Int(hstHighResponse[3])
+        let hstLow = Int(hstLowResponse[3])
+
+        return (hstHigh << 8) | hstLow
+    }
+
+    func getInputVst() -> Int? {
+        let vstHighReport = generateHIDReport(for: .inputVstHigh)
+        let vstLowReport = generateHIDReport(for: .inputVstLow)
+
+        guard let vstHighResponse = self.sendAndReadHIDReport(vstHighReport),
+              let vstLowResponse = self.sendAndReadHIDReport(vstLowReport) else {
+            Logger.shared.log(content: "Failed to read VST data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        let vstHigh = Int(vstHighResponse[3])
+        let vstLow = Int(vstLowResponse[3])
+
+        return (vstHigh << 8) | vstLow
+    }
+
+    func getInputHsyncWidth() -> Int? {
+        let hwHighReport = generateHIDReport(for: .inputHwHigh)
+        let hwLowReport = generateHIDReport(for: .inputHwLow)
+
+        guard let hwHighResponse = self.sendAndReadHIDReport(hwHighReport),
+              let hwLowResponse = self.sendAndReadHIDReport(hwLowReport) else {
+            Logger.shared.log(content: "Failed to read HW data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        let hwHigh = Int(hwHighResponse[3])
+        let hwLow = Int(hwLowResponse[3])
+
+        return (hwHigh << 8) | hwLow
+    }
+
+    func getInputVsyncWidth() -> Int? {
+        let vwHighReport = generateHIDReport(for: .inputVwHigh)
+        let vwLowReport = generateHIDReport(for: .inputVwLow)
+
+        guard let vwHighResponse = self.sendAndReadHIDReport(vwHighReport),
+              let vwLowResponse = self.sendAndReadHIDReport(vwLowReport) else {
+            Logger.shared.log(content: "Failed to read VW data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        let vwHigh = Int(vwHighResponse[3])
+        let vwLow = Int(vwLowResponse[3])
+
+        return (vwHigh << 8) | vwLow
+    }
+
     func getVersion() -> String? {
         let v1 = generateHIDReport(for: .version1)
         let v2 = generateHIDReport(for: .version2)
@@ -387,7 +489,22 @@ enum HIDSubCommand: UInt16 {
     // get input pixel clock data C73C C73D
     case pixelClockHigh = 0xC73C
     case pixelClockLow = 0xC73D
-    
+
+    case inputHTotalHigh = 0xC734 // Total Horizontal pixels per line (inclcuding active and blanking pixels)
+    case inputHTotalLow = 0xC735
+    case inputVTotalHigh = 0xC736 // Total Vertical lines per frame (inclcuding active and blanking lines)
+    case inputVTotalLow = 0xC737
+
+    case inputHstHigh = 0xC740 // Horizontal Sync Start Offset — how many pixels from line start until sync begins.
+    case inputHstLow = 0xC741
+    case inputVstHigh = 0xC742 // Vertical Sync Start Offset — how many lines from frame start until vertical sync begins.
+    case inputVstLow = 0xC743
+    case inputHwHigh = 0xC744 // Horizontal Sync Width in pixels.
+    case inputHwLow = 0xC745
+    case inputVwHigh = 0xC746 // Vertical Sync Width in lines.
+    case inputVwLow = 0xC747
+
+
     // get MS2019 version CBDC CBDD CBDE CBDF
     case version1 = 0xCBDC
     case version2 = 0xCBDD
