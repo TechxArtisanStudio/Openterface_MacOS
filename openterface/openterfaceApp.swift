@@ -493,6 +493,7 @@ struct openterfaceApp: App {
 
                         if (pixelClockValue > 185.0){ // The magic value for MS2109 4K resolution correction
                            _resolution.width = "\(AppStatus.hidReadResolusion.width*2)"
+                           _resolution.height = "\(AppStatus.hidReadResolusion.height*2)"
                         } 
                         
                         // If state has changed, update the last update time
