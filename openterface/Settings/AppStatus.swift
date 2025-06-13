@@ -45,6 +45,13 @@ struct AppStatus {
     static var hidReadFps:Float = 0.0
     static var hidReadPixelClock: UInt32 = 0
     
+    static var hidInputHTotal: UInt32 = 0
+    static var hidInputVTotal: UInt32 = 0
+    static var hidInputHst: UInt32 = 0
+    static var hidInputVst: UInt32 = 0
+    static var hidInputHsyncWidth: UInt32 = 0
+    static var hidInputVsyncWidth: UInt32 = 0
+
     static var chipVersion: Int8 = 0
     static var isTargetConnected: Bool = false
     static var isNumLockOn: Bool = false
