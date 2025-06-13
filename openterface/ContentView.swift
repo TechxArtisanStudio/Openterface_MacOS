@@ -23,17 +23,15 @@
 import SwiftUI
 
 struct ContentView: View {
-    var viewModel:PlayerViewModel
+    @StateObject var viewModel = PlayerViewModel() // Ensures the view model is initialized once
     
     @Environment(\.controlActiveState) var controlActiveState
     
     init() {
-        self.viewModel = PlayerViewModel()
-        viewModel.checkAuthorization()
     }
 
     var body: some View {
-        VStack{
+        VStack {
             PlayerContainerView(captureSession: viewModel.captureSession)
                 .onTapGesture {
                     // click in windows
@@ -41,8 +39,9 @@ struct ContentView: View {
                         AppStatus.isExit = false
                     }
                 }
-                
+        }
+        .onAppear {
+            viewModel.checkAuthorization() // Perform authorization check when the view appears
         }
     }
-
 }

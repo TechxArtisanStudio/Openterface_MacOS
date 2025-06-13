@@ -57,6 +57,7 @@ enum MouseControlMode: Int {
 // Screen ratio option enumeration
 enum AspectRatioOption: String, CaseIterable {
     case ratio21_9 = "21:9"     //2.33333333
+    case ratio256_135 = "256:135"   //1.8962963  (eg: 2560x1350)
     case ratio9_5 = "9:5"       //1.8       (eg: 4096x2160)
     case ratio16_9 = "16:9"     //1.77778   (eg: 1920x1080, 3840x2160)
     case ratio16_10 = "16:10"   //1.6       (eg: 2560x1600, 1920x1200)
@@ -92,6 +93,8 @@ enum AspectRatioOption: String, CaseIterable {
             return 9.0 / 21.0
         case .ratio9_5:
             return 9.0 / 5.0
+        case .ratio256_135:
+            return 256.0 / 135.0
         }
     }
     
