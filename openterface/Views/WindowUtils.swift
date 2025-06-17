@@ -58,8 +58,15 @@ final class WindowUtils {
             let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 30, width: 200, height: 25))
             
             // Get the current resolution value
-            let currentResolution = AppStatus.hidReadResolusion.width > 0 ? Float(AppStatus.hidReadResolusion.width) / Float(AppStatus.hidReadResolusion.height) : 0.0
+            var currentResolution = AppStatus.hidReadResolusion.width > 0 ? Float(AppStatus.hidReadResolusion.width) / Float(AppStatus.hidReadResolusion.height) : 0.0
             
+            // Special case for 4096x2160 resolution
+            if currentResolution == 4096.0 / 2160.0 {
+                Logger.shared.log(content: "Detected special resolution 4096x2160, setting aspect ratio to 9:5")
+                currentResolution = 1.8 // Set to 9:5 aspect ratio
+            }
+
+
             // Add all preset ratio options
             for option in AspectRatioOption.allCases {
                 var title = option.rawValue

@@ -476,6 +476,9 @@ struct openterfaceApp: App {
                             stateChanged = true
                         }
                         
+                        let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
+                        _pixelClock = String(format: "%.2f", pixelClockValue)
+
                         // Only update resolution display when state changes or HDMI signal status needs updating
                         if stateChanged || _hasHdmiSignal != nil {
                             if _hasHdmiSignal == nil {
@@ -487,26 +490,16 @@ struct openterfaceApp: App {
                                 _resolution.height = "?"
                                 _fps = "?"
                             } else {
-                                _resolution.width = "\(AppStatus.hidReadResolusion.width)"
-                                _resolution.height = "\(AppStatus.hidReadResolusion.height)"
+                                if (pixelClockValue > 189.0){ // The magic value for MS2109 4K resolution correction
+                                    _resolution.width = "\(AppStatus.hidReadResolusion.width*2)"
+                                    _resolution.height = "\(AppStatus.hidReadResolusion.height*2)"
+                                }else{
+                                    _resolution.width = "\(AppStatus.hidReadResolusion.width)"
+                                    _resolution.height = "\(AppStatus.hidReadResolusion.height)"
+                                }
                                 _fps = "\(AppStatus.hidReadFps)"
                             }
                         }
-                        
-                        let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
-                        _pixelClock = String(format: "%.2f", pixelClockValue)
-
-                        let inputHTotal = AppStatus.hidInputHTotal
-                        let inputVTotal = AppStatus.hidInputVTotal
-                        let inputHst = AppStatus.hidInputHst
-                        let inputVst = AppStatus.hidInputVst
-                        let inputHsyncWidth = AppStatus.hidInputHsyncWidth
-                        let inputVsyncWidth = AppStatus.hidInputVsyncWidth
-
-                        if (pixelClockValue > 189.0){ // The magic value for MS2109 4K resolution correction
-                           _resolution.width = "\(AppStatus.hidReadResolusion.width*2)"
-                           _resolution.height = "\(AppStatus.hidReadResolusion.height*2)"
-                        } 
                         
                         // If state has changed, update the last update time
                         if stateChanged {
