@@ -53,7 +53,11 @@ struct ResolutionView: View {
               let heightValue = Double(height) else {
             return false
         }
-        let calculatedAspectRatio = widthValue / heightValue
+        var calculatedAspectRatio = widthValue / heightValue
+        // Special case for 4096x2160 aspect ratio, it should be 9:5 (1.8)
+        if widthValue == 4096 && heightValue == 2160 {
+            calculatedAspectRatio = 1.8
+        }
         return abs(calculatedAspectRatio - userSettings.customAspectRatio.widthToHeightRatio) > 0.01
     }
 }
