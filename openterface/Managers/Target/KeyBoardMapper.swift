@@ -207,9 +207,33 @@ class KeyboardMapper {
         case F11 = "F11"
         case F12 = "F12"
         case CtrlAltDel = "CAD"
-        case del = "del"
+        case delete = "delete"
         case windowsWin = "Win"
         case CmdSpace = "CmdSpace"
+        case esc = "esc"
+        case space = "space"
+        case enter = "enter"
+        case leftShift = "leftShift"
+        case rightShift = "rightShift"
+        case leftCtrl = "leftCtrl"
+        case rightCtrl = "rightCtrl"
+        case leftAlt = "leftAlt"
+        case rightAlt = "rightAlt"
+        case win = "win"
+        case tab = "tab"
+        case backspace = "backspace"
+        case capsLock = "capsLock"
+        case insert = "insert"
+        case home = "home"
+        case pageUp = "pageUp"
+        case forwardDelete = "forwardDelete"
+        case end = "end"
+        case pageDown = "pageDown"
+        case arrowRight = "arrowRight"
+        case arrowLeft = "arrowLeft"
+        case arrowDown = "arrowDown"
+        case arrowUp = "arrowUp"
+        case numLock = "numLock"
     }
     
     var charToKeyCode: [UInt16: UInt8] = [:]
@@ -352,13 +376,79 @@ class KeyboardMapper {
             return 111
         } else if code == .CtrlAltDel {
             return 117
-        } else if code == .del {
+        } else if code == .delete {
             return 117
-        } else if code == .windowsWin{
+        } else if code == .windowsWin {
             return 55
-        } else if code == .CmdSpace{
+        } else if code == .CmdSpace {
             return 49
+        } else if code == .space {
+            return 49
+        } else if code == .enter {
+            return 36
+        } else if code == .leftShift {
+            return 56
+        } else if code == .rightShift {
+            return 60
+        } else if code == .leftCtrl {
+            return 59
+        } else if code == .rightCtrl {
+            return 62
+        } else if code == .leftAlt {
+            return 58
+        } else if code == .rightAlt {
+            return 61
+        } else if code == .win {
+            return 55
+        } else if code == .tab {
+            return 48
+        } else if code == .backspace {
+            return 51
+        } else if code == .capsLock {
+            return 57
+        } else if code == .insert {
+            return 114
+        } else if code == .home {
+            return 115
+        } else if code == .pageUp {
+            return 116
+        } else if code == .forwardDelete {
+            return 117
+        } else if code == .end {
+            return 119
+        } else if code == .pageDown {
+            return 121
+        } else if code == .arrowRight {
+            return 124
+        } else if code == .arrowLeft {
+            return 123
+        } else if code == .arrowDown {
+            return 125
+        } else if code == .arrowUp {
+            return 126
+        } else if code == .numLock {
+            return 71 // Num Lock key, mapped to F13 for HID compatibility
         }
         return nil
+    }
+}
+
+extension KeyboardMapper.SpecialKey {
+    static func functionKey(_ index: Int) -> KeyboardMapper.SpecialKey? {
+        switch index {
+        case 1: return .F1
+        case 2: return .F2
+        case 3: return .F3
+        case 4: return .F4
+        case 5: return .F5
+        case 6: return .F6
+        case 7: return .F7
+        case 8: return .F8
+        case 9: return .F9
+        case 10: return .F10
+        case 11: return .F11
+        case 12: return .F12
+        default: return nil
+        }
     }
 }
