@@ -62,6 +62,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// Minimum interval for video session start (1 second)
     private let videoSessionStartMinInterval: TimeInterval = 1.0
     
+    /// Delegate for handling video output
+    private var videoOutputDelegate: VideoOutputDelegate?
+    
     // MARK: - Initialization
     
     override init() {
@@ -88,6 +91,14 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// Sets up the capture session with outputs
     func setupSession() {
         let videoDataOutput = AVCaptureVideoDataOutput()
+        videoDataOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+        ]
+        videoDataOutput.alwaysDiscardsLateVideoFrames = true
+
+        self.videoOutputDelegate = VideoOutputDelegate()
+        videoDataOutput.setSampleBufferDelegate(videoOutputDelegate, queue: DispatchQueue(label: "VideoOutputQueue"))
+
         if captureSession.canAddOutput(videoDataOutput) {
             captureSession.addOutput(videoDataOutput)
         }
@@ -387,6 +398,13 @@ class PlayerViewModel: NSObject, ObservableObject {
             Logger.shared.log(content: "Failed to set up video capture: \(error.localizedDescription)")
             // Reset start flag when error occurs
             isVideoSessionStarting = false
+        }
+        
+        print("Supported pixel format--------")
+        for format in device.formats {
+            let description = format.formatDescription
+            let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
+            print("Supported pixel format: \(pixelFormat)")
         }
     }
     

@@ -32,7 +32,7 @@ final class WindowUtils {
     /// Display the screen ratio selector window
     /// - Parameter completion: The callback after selection, passing in whether to update the window
     func showAspectRatioSelector(completion: @escaping (Bool) -> Void) {
-        guard let window = NSApplication.shared.mainWindow else {
+        guard NSApplication.shared.mainWindow != nil else {
             Logger.shared.log(content: "Failed to show aspect ratio selector: No main window available")
             completion(false)
             return

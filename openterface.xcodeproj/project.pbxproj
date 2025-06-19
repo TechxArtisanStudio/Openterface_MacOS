@@ -41,6 +41,7 @@
 		53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DC2B3D6AE5007785B0 /* PlayerContainerView.swift */; };
 		53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */; };
 		53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */; };
+		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
 /* End PBXBuildFile section */
@@ -99,6 +100,8 @@
 		53FBE7DC2B3D6AE5007785B0 /* PlayerContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerContainerView.swift; sourceTree = "<group>"; };
 		53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
+		6BAFEFD52E03D04F004331F6 /* WindowAccessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAccessor.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -194,6 +197,7 @@
 			isa = PBXGroup;
 			children = (
 				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
+				6BAFEFD52E03D04F004331F6 /* WindowAccessor.swift */,
 				53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */,
 				53FBE7AF2B3D66D2007785B0 /* ContentView.swift */,
 				53FBE7D82B3D676A007785B0 /* Managers */,
@@ -266,6 +270,7 @@
 		53FBE7DE2B3D6B60007785B0 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */,
 				53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */,
 			);
 			path = ViewModels;
@@ -414,9 +419,11 @@
 				5384629B2BFF1778002966FE /* AreaSeletor.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */,
+				6BAFEFD62E03D062004331F6 /* WindowAccessor.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				538462992BFF12D2002966FE /* SCContext.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
+				6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */,
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
