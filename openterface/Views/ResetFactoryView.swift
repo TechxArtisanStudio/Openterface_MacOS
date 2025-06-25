@@ -394,7 +394,7 @@ struct ResetFactoryView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 currentStep = 3
                 
-                smp.isRight = false
+                smp.isDeviceReady = false
                 smp.raiseRTS()
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
