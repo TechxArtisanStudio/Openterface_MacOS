@@ -93,10 +93,19 @@ class Logger {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         let dateString = dateFormatter.string(from: Date())
-                            
-        print("[\(dateString)] " + content);
-        if(logToFile){
-            writeLogFile(string: content)
+
+        let thread: String
+        if Thread.isMainThread {
+            thread = "main"
+        } else if let name = Thread.current.name, !name.isEmpty {
+            thread = name
+        } else {
+            thread = String(format: "0x%llx", pthread_mach_thread_np(pthread_self()))
+        }
+
+        print("[\(dateString)] [thread: \(thread)] " + content)
+        if logToFile {
+            writeLogFile(string: "[thread: \(thread)] " + content)
         }
     }
     

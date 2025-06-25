@@ -56,13 +56,72 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     @Published var serialPorts : [ORSSerialPort] = []
     
     var lastHIDEventTime: Date?
-    var lastCts:Bool?
-    var timer:Timer?
+    
+    /// Stores the previous state of the CTS (Clear To Send) pin for change detection.
+    /// 
+    /// The CTS pin is connected to the CH340 data flip pin on the Openterface Mini KVM device.
+    /// This connection allows the system to detect HID activity from the target computer:
+    /// 
+    /// **How it works:**
+    /// - When the target computer sends HID data (keyboard/mouse input), the CH340 chip toggles its data flip pin
+    /// - This causes the CTS pin state to change, which can be monitored through the serial port
+    /// - By comparing the current CTS state with `lastCts`, we can detect when new HID events occur
+    /// 
+    /// **Usage:**
+    /// - Initially set to `nil` to indicate no previous state has been recorded
+    /// - Updated in `checkCTS()` method whenever a CTS state change is detected
+    /// - When CTS state changes, it indicates HID activity and updates connection status:
+    ///   - `AppStatus.isKeyboardConnected = true`
+    ///   - `AppStatus.isMouseConnected = true`
+    ///   - `lastHIDEventTime` is refreshed
+    /// 
+    /// This mechanism provides a hardware-level indication of target computer activity without
+    /// relying solely on software-based communication protocols.
+    var lastCts: Bool?
+    
+    var timer: Timer?
     
     var baudrate:Int = 0
-    public var isRight:Bool = false
-    var isTrying:Bool = false
     
+    /// Indicates whether the Openterface Mini KVM device is properly connected, validated, and ready for communication.
+    /// 
+    /// This flag is set to `true` when:
+    /// - The device responds with the correct protocol prefix [0x57, 0xAB, 0x00]
+    /// - The device confirms proper baudrate (115200) and mode (0x82) configuration
+    /// 
+    /// This flag is set to `false` when:
+    /// - The serial port is closed or disconnected
+    /// - Initial connection state before device validation
+    /// 
+    /// Commands will only be sent when `isDeviceReady` is true, unless the `force` parameter is used.
+    public var isDeviceReady: Bool = false
+    
+    /// Indicates whether the serial port manager is currently attempting to establish a connection.
+    /// 
+    /// This flag is used to track the connection attempt state and prevent multiple concurrent connection attempts.
+    /// 
+    /// This flag is set to `true` when:
+    /// - `tryOpenSerialPort()` method is called and connection process begins
+    /// 
+    /// This flag remains `true` during the entire connection attempt process, which includes:
+    /// - Iterating through available serial ports
+    /// - Trying different baudrates (115200 and 9600)
+    /// - Waiting for device validation responses
+    /// - Retrying connection attempts until `isDeviceReady` becomes true
+    /// 
+    /// The connection attempt loop continues until a successful connection is established
+    /// (when `isDeviceReady` becomes true), at which point the background connection process exits.
+    private let isTryingQueue = DispatchQueue(label: "com.openterface.SerialPortManager.isTryingQueue")
+    private var _isTrying: Bool = false
+    var isTrying: Bool {
+        get {
+            return isTryingQueue.sync { _isTrying }
+        }
+        set {
+            isTryingQueue.sync { _isTrying = newValue }
+        }
+    }
+
     override init(){
         super.init()
 
@@ -74,6 +133,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     private func observerSerialPortNotifications() {
+        print("observerSerialPortNotifications")
         let serialPortNtf = NotificationCenter.default
        
         serialPortNtf.addObserver(self, selector: #selector(serialPortsWereConnected(_:)), name: NSNotification.Name.ORSSerialPortsWereConnected, object: nil)
@@ -81,8 +141,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     @objc func serialPortsWereConnected(_ notification: Notification) {
-        Logger.shared.log(content: "Serial port Connected")
-        self.tryOpenSerialPort()
+        if !self.isTrying{
+            self.tryOpenSerialPort()
+        }
     }
     
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
@@ -144,7 +205,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let prefix: [UInt8] = [0x57, 0xAB, 0x00]
         let dataBytes = [UInt8](data)
         if dataBytes.starts(with: prefix) {
-            self.isRight = true
+            self.isDeviceReady = true
             // get check the following bytes
             let len = dataBytes[4]
 
@@ -250,7 +311,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             self.baudrate = Int(baudrateInt32)
             Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
             if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
-                self.isRight = true
+                self.isDeviceReady = true
                 self.getHidInfo()  
             }
             else {
@@ -291,19 +352,36 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func tryOpenSerialPort( priorityBaudrate: Int =  SerialPortManager.DEFAULT_BAUDRATE) {
+        Logger.shared.log(content: "tryOpenSerialPort")
+        
+        // Check if already trying to prevent race conditions
+        if self.isTrying {
+            Logger.shared.log(content: "Already trying to connect, returning early")
+            return
+        }
+        
         self.isTrying = true
+        
         // get all available serial ports
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
             Logger.shared.log(content: "No available serial ports found")
+            self.isTrying = false
             return
         }
         self.serialPorts = availablePorts // Get the list of available serial ports
         
-        let backgroundQueue = DispatchQueue(label: "com.example.background", qos: .background)
+        let backgroundQueue = DispatchQueue(label: "com.openterface.background", qos: .background)
         backgroundQueue.async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self else { 
+                return 
+            }
 
-            while !isRight {
+            while !self.isDeviceReady {
+                // Check if we should stop trying (in case of disconnection)
+                if !self.isTrying {
+                    break
+                }
+                
                 // Try to connect with priority baudrate first
                 let baudrates = priorityBaudrate == SerialPortManager.DEFAULT_BAUDRATE ? 
                     [SerialPortManager.DEFAULT_BAUDRATE, SerialPortManager.ORIGINAL_BAUDRATE] :
@@ -311,26 +389,41 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 
                 for baudrate in baudrates {
                     if self.tryConnectWithBaudrate(baudrate) {
+                        Logger.shared.log(content: "Connected successfully with baudrate: \(baudrate)")
+                        self.isTrying = false
                         return // Connection successful, exit the loop
+                    }
+                    
+                    // Check if we should stop trying between baudrate attempts
+                    if !self.isTrying {
+                        return
                     }
                 }
             }
+            
+            // Always set isTrying to false when exiting the background task
+            self.isTrying = false
         }
+        
+        // Remove this line - it was causing the race condition
+        // self.isTrying = false
     }
+
     
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
+        Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate)")
         self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
         if self.serialPort != nil {
             self.openSerialPort(baudrate: baudrate)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.getHidParameterCfg()
+                self.getChipParameterCfg()
             }
         }
         
         self.blockMainThreadFor2Seconds()
         
-        if isRight { return true }
+        if isDeviceReady { return true }
         
         self.closeSerialPort()
         self.blockMainThreadFor2Seconds()
@@ -353,7 +446,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         if let port = self.serialPort {
             port.open()
             if port.isOpen {
-                print("The serial port has been opened")
+                
                 
                 // update AppStatus info
                 AppStatus.serialPortBaudRate = port.baudRate.intValue
@@ -371,7 +464,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
     
     func closeSerialPort() {
-        self.isRight = false
+        self.isDeviceReady = false
         self.serialPort?.close()
         self.serialPort = nil
 
@@ -380,12 +473,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         AppStatus.isMouseConnected = false
         
         AppStatus.serialPortName = "N/A"
-        AppStatus.serialPortBaudRate = 0
+        AppStatus.serialPortBaudRate = AppStatus.serialPortBaudRate  == SerialPortManager.DEFAULT_BAUDRATE ? SerialPortManager.ORIGINAL_BAUDRATE : SerialPortManager.DEFAULT_BAUDRATE
     }
     
     func sendCommand(command: [UInt8], force: Bool = false) {
         guard let serialPort = self.serialPort , serialPort.isOpen else {
-            Logger.shared.log(content: "Serial port is not open or not selected")
+            if Logger.shared.SerialDataPrint {
+                Logger.shared.log(content: "Serial port is not open or not selected")
+            }
             return
         }
     
@@ -400,10 +495,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         // Record the sent data
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
 
-        if self.isRight || force {
+        if self.isDeviceReady || force {
             serialPort.send(data)
         } else {
-            print("is not ready")
+            Logger.shared.log(content: "Serial port is not ready")
         }
         
         
@@ -413,7 +508,29 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         return UInt8(data.reduce(0, { (sum, element) in sum + Int(element) }) & 0xFF)
     }
 
-    func getHidParameterCfg(){
+    /// Retrieves the current parameter configuration from the CH9329 HID chip.
+    /// 
+    /// This method sends a command to query the CH9329 chip's current configuration settings,
+    /// including baudrate, communication mode, and other operational parameters.
+    /// 
+    /// **What it does:**
+    /// - Sends `CMD_GET_PARA_CFG` command to the CH9329 chip
+    /// - The chip responds with current configuration data (command 0x88)
+    /// - Response includes baudrate (bytes 8-11) and mode (byte 5)
+    /// 
+    /// **When it's called:**
+    /// - After successful device connection validation in `tryConnectWithBaudrate()`
+    /// - Used to verify the chip is configured with correct settings (115200 baud, mode 0x82)
+    /// - If settings are incorrect, triggers automatic reconfiguration
+    /// 
+    /// **Expected Response:**
+    /// - Command: 0x88 (get parameter configuration)
+    /// - Baudrate: Should be 115200 (DEFAULT_BAUDRATE)
+    /// - Mode: Should be 0x82 for proper HID operation
+    /// 
+    /// **Note:** This method uses `force: true` to ensure the command is sent even if 
+    /// `isDeviceReady` is false, as it's part of the device initialization process.
+    func getChipParameterCfg(){
         self.sendCommand(command: SerialPortManager.CMD_GET_PARA_CFG, force: true)
     }
     

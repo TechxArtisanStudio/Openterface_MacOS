@@ -167,7 +167,20 @@ struct openterfaceApp: App {
                                         .foregroundColor(colorForConnectionStatus(_isMouseConnected))
                                 }
                             }
-                            .help("KeyBoard: \(_isKeyboardConnected == true ? "Connected" : _isKeyboardConnected == false ? "Not found" : "Unkown") \nMouse: \(_isMouseConnected == true ? "Connected" : _isMouseConnected == false ? "Not found" : "Unkown")\n\nClick to view USB device details")
+                            .help(
+                                """
+                                KeyBoard: \(
+                                    _isKeyboardConnected == true ? "Connected" :
+                                    _isKeyboardConnected == false ? "Not found" : "Unknown"
+                                )
+                                Mouse: \(
+                                    _isMouseConnected == true ? "Connected" :
+                                    _isMouseConnected == false ? "Not found" : "Unknown"
+                                )
+
+                                Click to view USB device details
+                                """
+                            )
                         }
                         
                         // Add serial port information display
