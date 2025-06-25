@@ -627,16 +627,6 @@ struct TransparentBackgroundButtonStyle: ButtonStyle {
     }
 }
 
-struct CustomButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundColor(.white)
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.5)))
-            .scaleEffect(configuration.isPressed ? 1.2 : 1)
-    }
-}
-
 func showUSBDevicesWindow() {
     let usbDevicesView = USBDevicesView()
     let controller = NSHostingController(rootView: usbDevicesView)
