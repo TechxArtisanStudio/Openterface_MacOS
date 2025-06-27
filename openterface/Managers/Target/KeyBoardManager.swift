@@ -174,16 +174,16 @@ class KeyboardManager: ObservableObject {
     }
     
     func toggleRightAlt() {
-        isRightAltHeld.toggle()
         if isRightAltHeld {
-            // sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.rightAlt)
+            sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.rightAlt)
         }
+        isRightAltHeld.toggle()
     }
     
     func toggleCapsLock() {
         isCapsLockOn.toggle()
         // For Caps Lock, we typically want to send the key press regardless of the state
-        // sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.capsLock)
+        sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.capsLock)
     }
     
     func modifierFlagsDescription(_ flags: NSEvent.ModifierFlags) -> String {

@@ -427,8 +427,11 @@ class KeyboardMapper {
         } else if code == .arrowUp {
             return 126
         } else if code == .numLock {
-            return 71 // Num Lock key, mapped to F13 for HID compatibility
+            return 71
+        } else if code == .esc {
+            return 53
         }
+        Logger.shared.log(content: "Warning: \(code.rawValue) is not mapped to a key code.")
         return nil
     }
 }
