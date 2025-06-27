@@ -29,7 +29,10 @@ import IOKit.hid
 class USBDeivcesManager {
     // Singleton instance
     static let shared = USBDeivcesManager()
-    
+    let MS2019_VID = 0x534D
+    let MS2019_PID = 0x2109
+
+
     func update() {
         // get usb devices info
         let _d: [USBDeviceInfo] = getUSBDevices()
@@ -63,7 +66,7 @@ class USBDeivcesManager {
             }
            
             // USB Product Name
-            let productName = IORegistryEntryCreateCFProperty(usbDevice, "USB Product Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknow"
+            var productName = IORegistryEntryCreateCFProperty(usbDevice, "USB Product Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknow"
 
             // VendorID
             let vendorID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBVendorID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int) ?? 0
@@ -71,6 +74,10 @@ class USBDeivcesManager {
             // ProductID
             let productID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBProductID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int) ?? 0
 
+            if isOpenterfaceChipset(vendorId: vendorID, productId: productID) && !productName.contains("Openterface") {
+                productName = "Unknown Capture Card"
+            }
+                
             // LocationID
             let locationID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertyLocationID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.uint32Value ?? 0
             let locationIDString = String(format: "0x%08x", locationID)
@@ -83,12 +90,16 @@ class USBDeivcesManager {
         return devices
     }
     
+    func isOpenterfaceChipset(vendorId:Int, productId:Int) -> Bool{
+        return vendorId == MS2019_VID && productId == MS2019_PID
+    }
+    
     func groundByOpenterface() {
         var groupedDevices: [[USBDeviceInfo]] = []
         var tempGroup: [USBDeviceInfo]?
         
         for device in AppStatus.USBDevices {
-            if device.productName.contains("Openterface") {
+            if isOpenterfaceChipset(vendorId: device.vendorID, productId: device.productID)  {
                 if tempGroup == nil {
                     tempGroup = []
                 }
@@ -120,8 +131,9 @@ class USBDeivcesManager {
             //setting default video and serial device
             if !groupedDevices.isEmpty {
                 if let defaultGroup = groupedDevices.first {
-                    let defaultVideoDevice = defaultGroup.first { $0.productName.contains("Openterface") }
+                    let defaultVideoDevice = defaultGroup.first { $0.productName.contains("Openterface") || $0.productName.contains("Capture Card")}
                     let defaultSerialDevice = defaultGroup.first { $0.productName.contains("Serial") }
+                    
                     
                     AppStatus.DefaultVideoDevice = defaultVideoDevice
                     AppStatus.DefaultUSBSerial = defaultSerialDevice
