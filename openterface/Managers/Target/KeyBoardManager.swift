@@ -21,8 +21,9 @@
 */
 
 import Cocoa
+import SwiftUI
 
-class KeyboardManager {
+class KeyboardManager: ObservableObject {
     static let SHIFT_KEYS = ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+", "{", "}", "|", ":", "\"", "<", ">", "?"]
     static let shared = KeyboardManager()
 
@@ -34,8 +35,155 @@ class KeyboardManager {
     // 新增一个数组用于存储同时按下的键
     var pressedKeys: [UInt16] = [255,255,255,255,255,255]
     
+    // State variables for modifier keys
+    @Published var isLeftShiftHeld = false
+    @Published var isRightShiftHeld = false
+    @Published var isLeftCtrlHeld = false
+    @Published var isRightCtrlHeld = false
+    @Published var isLeftAltHeld = false
+    @Published var isRightAltHeld = false
+    @Published var isCapsLockOn = false
+    
+    // MARK: - Keyboard Layout Management
+    
+    // Keyboard layout enumeration for modifier key behavior
+    enum KeyboardLayout: String, CaseIterable {
+        case windows = "windows"
+        case mac = "mac"
+    }
+    
+    // Current keyboard layout
+    @Published var currentKeyboardLayout: KeyboardLayout = .mac
+    
+    // Function to toggle between Windows and Mac keyboard layouts
+    func toggleKeyboardLayout() {
+        switch currentKeyboardLayout {
+        case .mac:
+            currentKeyboardLayout = .windows
+        case .windows:
+            currentKeyboardLayout = .mac
+        }
+        Logger.shared.log(content: "Keyboard layout switched to: \(currentKeyboardLayout.rawValue)")
+    }
+    
+    // Function to get modifier key labels based on layout
+    func getModifierKeyLabel() -> String {
+        switch currentKeyboardLayout {
+        case .windows:
+            return "Ctrl"
+        case .mac:
+            return "⌘"
+        }
+    }
+
+    // Computed property to check if any shift key is held
+    var isShiftHeld: Bool {
+        return isLeftShiftHeld || isRightShiftHeld
+    }
+    
+    // Computed property to check if letters should be uppercase 
+    // (Shift XOR Caps Lock - they cancel each other when both are active)
+    var shouldShowUppercase: Bool {
+        return isShiftHeld != isCapsLockOn  // XOR logic: uppercase when exactly one is active
+    }
+    
+    // Function to get the shifted version of symbols and numbers
+    func getShiftedKey(for key: String) -> String {
+        guard isShiftHeld else { return key }
+        
+        let shiftMapping: [String: String] = [
+            "~": "~",  // ~ is already shifted, ` when not shifted
+            "`": "~",
+            "1": "!",
+            "2": "@", 
+            "3": "#",
+            "4": "$",
+            "5": "%",
+            "6": "^",
+            "7": "&",
+            "8": "*",
+            "9": "(",
+            "0": ")",
+            "-": "_",
+            "=": "+",
+            "[": "{",
+            "]": "}",
+            "\\": "|",
+            ";": ":",
+            "'": "\"",
+            ",": "<",
+            ".": ">",
+            "/": "?"
+        ]
+        
+        return shiftMapping[key] ?? key
+    }
+    
+    // Function to get the unshifted version of a key (for displaying on UI)
+    func getDisplayKey(for originalKey: String) -> String {
+        // Map shifted keys to their unshifted versions for display
+        let unshiftedMapping: [String: String] = [
+            "~": "`"  // Show ` instead of ~ when shift is not held
+        ]
+        
+        if isShiftHeld {
+            return getShiftedKey(for: originalKey)
+        } else {
+            return unshiftedMapping[originalKey] ?? originalKey
+        }
+    }
+    
     init() {
         monitorKeyboardEvents()
+    }
+    
+    // MARK: - Modifier Key State Management
+    func toggleLeftShift() {
+        if isLeftShiftHeld {
+            sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.leftShift)
+        }
+        isLeftShiftHeld.toggle()
+    }
+    
+    func toggleRightShift() {
+        if isRightShiftHeld {
+            sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.rightShift)
+        }
+        isRightShiftHeld.toggle()
+    }
+    
+    func toggleLeftCtrl() {
+        if isLeftCtrlHeld {
+            sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.leftCtrl)
+        }
+        isLeftCtrlHeld.toggle()
+    }
+    
+    func toggleRightCtrl() {
+        if isRightCtrlHeld {
+            sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.rightCtrl)
+        }
+        isRightCtrlHeld.toggle()
+    }
+    
+    func toggleLeftAlt() {
+        if isLeftAltHeld {
+            sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.leftAlt)
+        }
+        isLeftAltHeld.toggle()
+    }
+    
+    func toggleRightAlt() {
+        isRightAltHeld.toggle()
+        if isRightAltHeld {
+            // sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.rightAlt)
+        }
+    }
+    
+    func toggleCapsLock() {
+        isCapsLockOn.toggle()
+        // For Caps Lock, we typically want to send the key press regardless of the state
+        // sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.capsLock)
     }
     
     func modifierFlagsDescription(_ flags: NSEvent.ModifierFlags) -> String {
@@ -294,17 +442,62 @@ class KeyboardManager {
         }
     }
     
-    func needShiftWhenPaste(char:Character) -> Bool {
-        return char.isUppercase || KeyboardManager.SHIFT_KEYS.contains(String(char))
+    // Helper function to get all currently active modifiers for a character
+    // Includes held Ctrl/Alt keys and adds shift if the character requires it
+    func getCurrentModifiersForCharacter(_ char: Character) -> NSEvent.ModifierFlags {
+        var modifiers: NSEvent.ModifierFlags = []
+        
+        // Add Ctrl modifiers if held
+        if isLeftCtrlHeld || isRightCtrlHeld {
+            modifiers.insert(.control)
+        }
+        
+        // Add Alt modifiers if held
+        if isLeftAltHeld || isRightAltHeld {
+            modifiers.insert(.option)
+        }
+        
+        // Add shift modifier if needed for character (uppercase letters or special shifted symbols)
+        if char.isUppercase || KeyboardManager.SHIFT_KEYS.contains(String(char)) {
+            modifiers.insert(.shift)
+        }
+        
+        return modifiers
+    }
+    
+    // Helper function to get currently held modifier keys for special keys
+    func getCurrentModifiersForSpecialKey() -> NSEvent.ModifierFlags {
+        var modifiers: NSEvent.ModifierFlags = []
+        
+        // Add Ctrl modifiers if held
+        if isLeftCtrlHeld || isRightCtrlHeld {
+            modifiers.insert(.control)
+        }
+        
+        // Add Alt modifiers if held
+        if isLeftAltHeld || isRightAltHeld {
+            modifiers.insert(.option)
+        }
+        
+        // Add Shift modifiers if held
+        if isLeftShiftHeld || isRightShiftHeld {
+            modifiers.insert(.shift)
+        }
+        
+        return modifiers
     }
     
     func sendTextToKeyboard(text:String) {
+        Logger.shared.log(content: "Sending text to keyboard: \(text)")
         // Send text to keyboard
         let textArray = Array(text.utf8) // Convert string to UTF-8 byte array
         for charString in textArray { // Iterate through each character's UTF-8 encoding
             let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // Convert character to keyboard key code
             let char = Character(String(UnicodeScalar(charString))) // Convert UTF-8 encoding back to character
-            let modifiers: NSEvent.ModifierFlags = needShiftWhenPaste(char: char) ? [.shift] : [] // Determine if Shift key needs to be pressed
+            
+            // Get modifiers for character including currently held Ctrl/Alt and shift if needed
+            let modifiers = getCurrentModifiersForCharacter(char)
+            
             kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
             Thread.sleep(forTimeInterval: 0.005) // Wait for 5 milliseconds
             kbm.releaseKey(keys: self.pressedKeys) // Release all pressed keys
@@ -332,7 +525,9 @@ class KeyboardManager {
         }
         else{
             if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
-                kbm.pressKey(keys: [key], modifiers: [])
+                // Get currently held modifier keys for special keys
+                let modifiers = getCurrentModifiersForSpecialKey()
+                kbm.pressKey(keys: [key], modifiers: modifiers)
                 Thread.sleep(forTimeInterval: 0.005) // 1 ms
                 kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms

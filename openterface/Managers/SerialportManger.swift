@@ -414,7 +414,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
         Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate)")
         self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+
         if self.serialPort != nil {
+            Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate), path: \(self.serialPort?.path ?? "Unknown")")
             self.openSerialPort(baudrate: baudrate)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.getChipParameterCfg()
@@ -496,11 +498,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
 
         if self.isDeviceReady || force {
+            if Logger.shared.SerialDataPrint {
+                Logger.shared.log(content: "Sending command: \(dataString)")
+            }
             serialPort.send(data)
         } else {
             Logger.shared.log(content: "Serial port is not ready")
         }
-        
         
     }
     

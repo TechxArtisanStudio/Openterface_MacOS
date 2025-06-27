@@ -1,9 +1,12 @@
 import SwiftUI
 import AppKit
 
+// Add a new parameter to CustomButtonStyle to allow programmatic pressed state
 struct CustomButtonStyle: ButtonStyle {
+    var programmaticPressed: Bool = false
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        let isPressed = configuration.isPressed || programmaticPressed
+        return configuration.label
             .foregroundColor(.white)
             .font(.system(size: 14, weight: .medium))
             .padding(.vertical, 12)
@@ -12,12 +15,12 @@ struct CustomButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(
                         LinearGradient(
-                            gradient: Gradient(colors: configuration.isPressed ? [
-                                Color(red: 1.0, green: 0.6, blue: 0.2),  // Orange when pressed
-                                Color(red: 0.9, green: 0.4, blue: 0.1)   // Darker orange
+                            gradient: Gradient(colors: isPressed ? [
+                                Color(red: 1.0, green: 0.6, blue: 0.2),
+                                Color(red: 0.9, green: 0.4, blue: 0.1)
                             ] : [
-                                Color(red: 0.35, green: 0.35, blue: 0.35), // Normal grey
-                                Color(red: 0.25, green: 0.25, blue: 0.25)  // Darker grey
+                                Color(red: 0.35, green: 0.35, blue: 0.35),
+                                Color(red: 0.25, green: 0.25, blue: 0.25)
                             ]),
                             startPoint: .top,
                             endPoint: .bottom
@@ -25,15 +28,15 @@ struct CustomButtonStyle: ButtonStyle {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(configuration.isPressed ? 
-                                   Color(red: 1.0, green: 0.7, blue: 0.3) : 
-                                   Color(red: 0.45, green: 0.45, blue: 0.45), 
+                            .stroke(isPressed ?
+                                   Color(red: 1.0, green: 0.7, blue: 0.3) :
+                                   Color(red: 0.45, green: 0.45, blue: 0.45),
                                    lineWidth: 0.5)
                     )
                     .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 1)
             )
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isPressed)
     }
 }
 
@@ -41,6 +44,8 @@ final class FloatingKeyboardManager {
     static let shared = FloatingKeyboardManager()
     private var floatingKeyboardWindow: NSWindow?
     private var mainWindowObserver: NSObjectProtocol?
+    private var focusLostObserver: NSObjectProtocol?
+
 
     init() {
         setupMainWindowObserver()
@@ -60,10 +65,27 @@ final class FloatingKeyboardManager {
                 self?.closeFloatingKeysWindow()
             }
         }
+ 
+        // Observe main window focus loss notifications
+        focusLostObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignMainNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            // Check if the window losing focus is the main window
+            if let window = notification.object as? NSWindow,
+               let identifier = window.identifier?.rawValue,
+               identifier.contains("main_openterface") {
+                self?.closeFloatingKeysWindow()
+            }
+        }
     }
     
     deinit {
         if let observer = mainWindowObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = focusLostObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -103,8 +125,10 @@ final class FloatingKeyboardManager {
 }
 
 struct FloatingKeysWindow: View {
+    @ObservedObject private var keyboardManager = KeyboardManager.shared
+    
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             VStack(spacing: 12) {
                 // Function keys row
                 HStack(spacing: 6) {
@@ -131,8 +155,9 @@ struct FloatingKeysWindow: View {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
                         ForEach(["~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="], id: \ .self) { key in
-                            Button(key, action: {
-                                KeyboardManager.shared.sendTextToKeyboard(text: key)
+                            let displayKey = keyboardManager.getDisplayKey(for: key)
+                            Button(displayKey, action: {
+                                KeyboardManager.shared.sendTextToKeyboard(text: displayKey)
                             })
                             .buttonStyle(CustomButtonStyle())
                         }
@@ -157,24 +182,28 @@ struct FloatingKeysWindow: View {
                         .buttonStyle(CustomButtonStyle())
                         
                         ForEach(["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"], id: \ .self) { letter in
-                            Button(letter, action: {
-                                KeyboardManager.shared.sendTextToKeyboard(text: letter.lowercased())
+                            let key = keyboardManager.shouldShowUppercase ? letter : letter.lowercased()
+                            Button(key, action: {
+                                KeyboardManager.shared.sendTextToKeyboard(text: key)
                             })
                             .buttonStyle(CustomButtonStyle())
                         }
                         
-                        Button("[", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: "[")
+                        let leftBracketKey = keyboardManager.getDisplayKey(for: "[")
+                        Button(leftBracketKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: leftBracketKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button("]", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: "]")
+                        let rightBracketKey = keyboardManager.getDisplayKey(for: "]")
+                        Button(rightBracketKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: rightBracketKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button("\\", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: "\\")
+                        let backslashKey = keyboardManager.getDisplayKey(for: "\\")
+                        Button(backslashKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: backslashKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
@@ -186,24 +215,27 @@ struct FloatingKeysWindow: View {
                     
                     HStack(spacing: 6) {
                         Button("Caps Lock", action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .capsLock)
+                            keyboardManager.toggleCapsLock()
                         })
-                        .buttonStyle(CustomButtonStyle())
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isCapsLockOn))
                         
                         ForEach(["A", "S", "D", "F", "G", "H", "J", "K", "L"], id: \ .self) { letter in
-                            Button(letter, action: {
-                                KeyboardManager.shared.sendTextToKeyboard(text: letter.lowercased())
+                            let key = keyboardManager.shouldShowUppercase ? letter : letter.lowercased()
+                            Button(key, action: {
+                                KeyboardManager.shared.sendTextToKeyboard(text: key)
                             })
                             .buttonStyle(CustomButtonStyle())
                         }
                         
-                        Button(";", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: ";")
+                        let semicolonKey = keyboardManager.getDisplayKey(for: ";")
+                        Button(semicolonKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: semicolonKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button("'", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: "'")
+                        let apostropheKey = keyboardManager.getDisplayKey(for: "'")
+                        Button(apostropheKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: apostropheKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
@@ -223,42 +255,48 @@ struct FloatingKeysWindow: View {
                     
                     HStack(spacing: 6) {
                         Button(action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .leftShift)
-                        }){
+                            keyboardManager.toggleLeftShift()
+                        }) {
                             Text("Shift")
                                 .padding(.horizontal, 10)
                         }
-                        .buttonStyle(CustomButtonStyle())
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftShiftHeld))
                         
                         ForEach(["Z", "X", "C", "V", "B", "N", "M"], id: \ .self) { letter in
-                            Button(letter, action: {
-                                KeyboardManager.shared.sendTextToKeyboard(text: letter.lowercased())
+                            let key = keyboardManager.shouldShowUppercase ? letter : letter.lowercased()
+                            Button(key, action: {
+                                KeyboardManager.shared.sendTextToKeyboard(text: key)
                             })
                             .buttonStyle(CustomButtonStyle())
                         }
                         
-                        Button(",", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: ",")
+                        let commaKey = keyboardManager.getDisplayKey(for: ",")
+                        Button(commaKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: commaKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button(".", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: ".")
+                        let periodKey = keyboardManager.getDisplayKey(for: ".")
+                        Button(periodKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: periodKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button("/", action: {
-                            KeyboardManager.shared.sendTextToKeyboard(text: "/")
+                        let slashKey = keyboardManager.getDisplayKey(for: "/")
+                        Button(slashKey, action: {
+                            KeyboardManager.shared.sendTextToKeyboard(text: slashKey)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
                         Button(action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .rightShift)
-                        }){
+                            keyboardManager.toggleRightShift()
+                        }) {
                             Text("Shift")
                                 .padding(.horizontal, 10)
                         }
-                        .buttonStyle(CustomButtonStyle())
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightShiftHeld))
+
+
                         Button("▲", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .arrowUp)
                         })
@@ -271,20 +309,25 @@ struct FloatingKeysWindow: View {
                     }
                     
                     HStack(spacing: 6) {
-                        Button("Ctrl", action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .leftCtrl)
-                        })
-                        .buttonStyle(CustomButtonStyle())
+                        Button(action: {
+                            keyboardManager.toggleLeftCtrl()
+                        }) {
+                            Text("Ctrl")
+                        }
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftCtrlHeld))
                         
-                        Button("Win", action: {
+                        Button(keyboardManager.currentKeyboardLayout == .windows ? "Win" : "Cmd", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .win)
                         })
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button("Alt", action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .leftAlt)
-                        })
-                        .buttonStyle(CustomButtonStyle())
+                        Button(action: {
+                            keyboardManager.toggleLeftAlt()
+                        }) {
+                            Text(keyboardManager.currentKeyboardLayout == .windows ? "Alt" : "Opt")
+                        }
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftAltHeld))
+
                         
                         Button(action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .space)
@@ -294,15 +337,19 @@ struct FloatingKeysWindow: View {
                         }
                         .buttonStyle(CustomButtonStyle())
                         
-                        Button("Alt", action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .rightAlt)
-                        })
-                        .buttonStyle(CustomButtonStyle())
+                        Button(action: {
+                            keyboardManager.toggleRightAlt()
+                        }) {
+                            Text(keyboardManager.currentKeyboardLayout == .windows ? "Alt" : "Opt")
+                        }
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightAltHeld))
                         
-                        Button("Ctrl", action: {
-                            KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .rightCtrl)
-                        })
-                        .buttonStyle(CustomButtonStyle())
+                        Button(action: {
+                            keyboardManager.toggleRightCtrl()
+                        }) {
+                            Text("Ctrl")
+                        }
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightCtrlHeld))
                         
                         Button("◀", action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .arrowLeft)
@@ -327,9 +374,13 @@ struct FloatingKeysWindow: View {
                     .fill(Color(red: 0.15, green: 0.15, blue: 0.15))
                     .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
             )
-            .padding(8)
+            .padding(.leading, 8)
+            .padding(.trailing, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
             
-            // Close button in top-right corner
+            // Close button in top-left corner
+
             Button(action: {
                 FloatingKeyboardManager.shared.closeFloatingKeysWindow()
             }) {
@@ -338,8 +389,31 @@ struct FloatingKeysWindow: View {
                     .foregroundColor(.red)
             }
             .buttonStyle(PlainButtonStyle())
-            .padding(.top, 16)
-            .padding(.trailing, 16)
+            .position(x: 32, y: 32)
+            
+            // Win/Mac toggle button in top-right corner
+            Button(action: {
+                keyboardManager.toggleKeyboardLayout()
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: keyboardManager.currentKeyboardLayout == .windows ? 
+                          "laptopcomputer" : "applelogo")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                    Text(keyboardManager.currentKeyboardLayout == .windows ? "Win" : "Mac")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(keyboardManager.currentKeyboardLayout == .windows ? 
+                              Color.blue : Color.orange)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .position(x: 748, y: 32)
         }
     }
 }

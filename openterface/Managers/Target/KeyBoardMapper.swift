@@ -262,10 +262,15 @@ class KeyboardMapper {
         "RightCtrl": 0x10,
         "RightWin": 0x80,
     ]
+    
+    // Raw values for detecting left and right modifier keys
+    private let RIGHT_SHIFT_VALUE: UInt = 0x00020104
+    private let RIGHT_CONTROL_VALUE: UInt = 0x00042100
+    private let RIGHT_COMMAND_VALUE: UInt = 0x00100110
+    private let RIGHT_OPTION_VALUE: UInt = 0x00080140
 
     func pressKey(keys: [UInt16], modifiers: NSEvent.ModifierFlags) {
         sendKeyData(keyCode: keys, isRelease: false, modifiers: modifiers)
-        Logger.shared.log(content: "Send Key Data: \(keys)")
     }
     
     func releaseKey(keys: [UInt16]) {
@@ -283,55 +288,7 @@ class KeyboardMapper {
             }
         }
 
-        var combinedModifiers: UInt8 = 0
-
-        // Actual specific rawValue for left and right modifiers
-        // let leftShiftValue: UInt = 0x00020102
-        let rightShiftValue: UInt = 0x00020104
-        
-        // let leftControlValue: UInt = 0x00040101
-        let rightControlValue: UInt = 0x00042100
-        
-        // let leftCommandValue: UInt = 0x00100108
-        let rightCommandValue: UInt = 0x00100110
-        
-        // let leftOptionValue: UInt = 0x00080120
-        let rightOptionValue: UInt = 0x00080140
-        
-        let rawValue = modifiers.rawValue
-
-        if modifiers.contains(.shift) {
-            if (rawValue & rightShiftValue) == rightShiftValue {
-                combinedModifiers |= funcKeys["RightShift"] ?? 0x00
-            } else {
-                combinedModifiers |= funcKeys["LeftShift"] ?? 0x00
-            }
-        }
-        
-        if modifiers.contains(.control) {
-            if (rawValue & rightControlValue) == rightControlValue {
-                combinedModifiers |= funcKeys["RightCtrl"] ?? 0x00
-            } else {
-                combinedModifiers |= funcKeys["LeftCtrl"] ?? 0x00
-            }
-        }
-        
-        if modifiers.contains(.option) {
-            if (rawValue & rightOptionValue) == rightOptionValue {
-                combinedModifiers |= funcKeys["RightAlt"] ?? 0x00
-            } else {
-                combinedModifiers |= funcKeys["LeftAlt"] ?? 0x00
-            }
-        }
-        
-        if modifiers.contains(.command) {
-            if (rawValue & rightCommandValue) == rightCommandValue {
-                combinedModifiers |= funcKeys["RightWin"] ?? 0x00
-            } else {
-                combinedModifiers |= funcKeys["LeftWin"] ?? 0x00
-            }
-        }
-
+        let combinedModifiers = processModifierFlags(modifiers)
         keyDat[5] = combinedModifiers
         
         //        if isRelease {
@@ -343,6 +300,49 @@ class KeyboardMapper {
         // let _ = self.spm.writeByte(data:keyDat)
         //
         let _ = spm.sendCommand(command: keyDat)
+    }
+    
+    private func processModifierFlags(_ modifiers: NSEvent.ModifierFlags) -> UInt8 {
+        var combinedModifiers: UInt8 = 0
+        let rawValue = modifiers.rawValue
+
+        // Process each modifier type using helper method
+        combinedModifiers |= processModifier(.shift, rawValue: rawValue, modifiers: modifiers, 
+                                           rightValue: RIGHT_SHIFT_VALUE, 
+                                           leftKey: "LeftShift", rightKey: "RightShift")
+        
+        combinedModifiers |= processModifier(.control, rawValue: rawValue, modifiers: modifiers,
+                                           rightValue: RIGHT_CONTROL_VALUE,
+                                           leftKey: "LeftCtrl", rightKey: "RightCtrl")
+        
+        combinedModifiers |= processModifier(.option, rawValue: rawValue, modifiers: modifiers,
+                                           rightValue: RIGHT_OPTION_VALUE,
+                                           leftKey: "LeftAlt", rightKey: "RightAlt")
+        
+        combinedModifiers |= processModifier(.command, rawValue: rawValue, modifiers: modifiers,
+                                           rightValue: RIGHT_COMMAND_VALUE,
+                                           leftKey: "LeftWin", rightKey: "RightWin")
+        
+        return combinedModifiers
+    }
+    
+    private func processModifier(_ flag: NSEvent.ModifierFlags, 
+                               rawValue: UInt, 
+                               modifiers: NSEvent.ModifierFlags,
+                               rightValue: UInt,
+                               leftKey: String,
+                               rightKey: String) -> UInt8 {
+        guard modifiers.contains(flag) else { return 0x00 }
+        
+        if isRightModifier(rawValue: rawValue, rightValue: rightValue) {
+            return funcKeys[rightKey] ?? 0x00
+        } else {
+            return funcKeys[leftKey] ?? 0x00
+        }
+    }
+    
+    private func isRightModifier(rawValue: UInt, rightValue: UInt) -> Bool {
+        return (rawValue & rightValue) == rightValue
     }
     
     func calculateChecksum(data: [UInt8]) -> UInt8 {
