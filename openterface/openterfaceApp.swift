@@ -414,6 +414,12 @@ struct openterfaceApp: App {
                 }) {
                     Text("Serial Reset Tool...")
                 }
+                Divider()
+                Button(action: {
+                    showFirmwareUpdateWindow()
+                }) {
+                    Text("Firmware Update Tool...")
+                }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
                 EmptyView()
@@ -663,14 +669,45 @@ func showResetFactoryWindow() {
     
     // Set callback when window closes to clear references
     window.isReleasedWhenClosed = false
-    NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { _ in
-        // aboutWindow = nil
-//        if let windown = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
-//            windown.close()
-//        }
-    }
+//     NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { _ in
+//         // aboutWindow = nil
+// //        if let windown = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
+// //            windown.close()
+// //        }
+//     }
     
     // Save window reference
     // aboutWindow = window
+    NSApp.activate(ignoringOtherApps: true)
+}
+
+func showFirmwareUpdateWindow() {
+    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "firmwareUpdateWindow" }) {
+        // If window already exists, make it shake and bring to front
+        
+        // Use system-provided attention request (will make window or Dock icon bounce)
+        NSApp.requestUserAttention(.criticalRequest)
+        
+        // Bring window to front
+        existingWindow.makeKeyAndOrderFront(nil)
+        existingWindow.orderFrontRegardless()
+        return
+    }
+    
+    // If window doesn't exist, create a new one
+    let firmwareUpdateView = FirmwareUpdateView()
+    let controller = NSHostingController(rootView: firmwareUpdateView)
+    let window = NSWindow(contentViewController: controller)
+    window.title = "Firmware Update Tool"
+    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "firmwareUpdateWindow")
+    window.setContentSize(NSSize(width: 400, height: 600))
+    window.styleMask = [.titled, .closable]
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+    
+    // Set callback when window closes to clear references
+    window.isReleasedWhenClosed = false
+    
+    // Save window reference
     NSApp.activate(ignoringOtherApps: true)
 }

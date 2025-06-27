@@ -140,6 +140,33 @@ class HIDManager {
         Logger.shared.log(content: "HID Manager and device connections closed successfully")
     }
     
+    /// Stops all repeating HID operations while keeping the HID connection open
+    /// This is used during firmware updates to prevent interference with EEPROM operations
+    func stopAllHIDOperations() {
+        Logger.shared.log(content: "Stopping all repeating HID operations for firmware update...")
+        
+        // Stop the timer that performs repeated HID operations
+        timer?.cancel()
+        timer = nil
+        
+        Logger.shared.log(content: "All repeating HID operations stopped. HID connection remains open for firmware update.")
+    }
+    
+    /// Restarts repeating HID operations after firmware update is complete
+    func restartHIDOperations() {
+        Logger.shared.log(content: "Restarting HID operations after firmware update...")
+        
+        // Only restart if we have a valid HID device connection
+        guard device != nil, isOpen == true else {
+            Logger.shared.log(content: "Cannot restart HID operations - no valid HID device connection")
+            return
+        }
+        
+        // Restart the communication timer
+        startCommunication()
+        Logger.shared.log(content: "HID operations restarted successfully")
+    }
+    
     // read date from HID device
     func readHIDReport() -> [UInt8]? {
         guard let device = self.device else {
@@ -458,6 +485,170 @@ class HIDManager {
         let report: [UInt8] = [commandPrefix, highByte, lowByte, 0, 0, 0, 0, 0, 0]
         
         return report
+    }
+    
+    // MARK: - EEPROM Operations for Firmware Update
+    
+    /// Writes data to EEPROM using HID commands (based on Qt implementation)
+    /// - Parameters:
+    ///   - address: The starting address in EEPROM
+    ///   - data: The data to write
+    /// - Returns: True if write was successful
+    func writeEeprom(address: UInt16, data: Data) -> Bool {
+        Logger.shared.log(content: "Writing \(data.count) bytes to EEPROM at address 0x\(String(format: "%04X", address))")
+        
+        // Write in chunks (based on C++ implementation)
+        let maxChunkSize = 16
+        var currentAddress = address
+        var offset = 0
+        var writtenSize = 0
+        
+        while offset < data.count {
+            let remainingBytes = data.count - offset
+            let currentChunkSize = min(maxChunkSize, remainingBytes)
+            
+            let chunk = data.subdata(in: offset..<(offset + currentChunkSize))
+            
+            if !writeChunk(address: currentAddress, data: chunk) {
+                Logger.shared.log(content: "Failed to write EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
+                return false
+            }
+            
+            offset += currentChunkSize
+            currentAddress += UInt16(currentChunkSize)
+            writtenSize += currentChunkSize
+            
+            // Log progress periodically
+            if writtenSize % 64 == 0 {
+                Logger.shared.log(content: "Written size: \(writtenSize)")
+            }
+            
+            // Add delay between chunks (from C++ implementation)
+            Thread.sleep(forTimeInterval: 0.1) // 100ms delay
+        }
+        
+        Logger.shared.log(content: "EEPROM write completed successfully")
+        return true
+    }
+    
+    /// Writes a single chunk to EEPROM using HID feature report
+    /// - Parameters:
+    ///   - address: The address to write to
+    ///   - data: The data chunk to write (max 1 byte per chunk based on C++ code)
+    /// - Returns: True if successful
+    private func writeChunk(address: UInt16, data: Data) -> Bool {
+        let chunkSize = 1 // Based on C++ implementation
+        let reportSize = 9
+        
+        var currentAddress = address
+        
+        for i in 0..<data.count {
+            let chunk = data.subdata(in: i..<(i + chunkSize))
+            
+            // Create HID report for EEPROM write
+            // Based on C++ code: CMD_EEPROM_WRITE = 0xB6
+            var report = [UInt8](repeating: 0, count: reportSize)
+            report[1] = 0xB6 // CMD_EEPROM_WRITE
+            report[2] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
+            report[3] = UInt8(currentAddress & 0xFF)        // Address low byte
+            
+            // Copy chunk data to report (starting at index 4)
+            let chunkBytes = [UInt8](chunk)
+            for (index, byte) in chunkBytes.enumerated() {
+                if index + 4 < reportSize {
+                    report[index + 4] = byte
+                }
+            }
+            
+            Logger.shared.log(content: "EEPROM Write Report: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            
+            // Send HID feature report (based on videohid.cpp implementation)
+            // EEPROM operations use feature reports, not output reports
+            if !sendHIDFeatureReport(report: report) {
+                Logger.shared.log(content: "Failed to send EEPROM write feature report")
+                return false
+            }
+            
+            currentAddress += UInt16(chunkSize)
+        }
+        
+        return true
+    }
+    
+    /// Reads data from EEPROM (for verification)
+    /// - Parameters:
+    ///   - address: The starting address to read from
+    ///   - length: Number of bytes to read
+    /// - Returns: The read data, or nil if failed
+    func readEeprom(address: UInt16, length: UInt8) -> Data? {
+        // This would be implemented similar to other HID read operations
+        // For now, we'll focus on the write functionality needed for firmware update
+        Logger.shared.log(content: "EEPROM read not yet implemented")
+        return nil
+    }
+    
+    // MARK: - Feature Report Methods
+    
+    /// Send HID feature report (based on videohid.cpp sendFeatureReport)
+    /// Used for EEPROM operations and other feature-based commands
+    /// - Parameter report: The report data to send
+    /// - Returns: True if successful, false otherwise
+    func sendHIDFeatureReport(report: [UInt8]) -> Bool {
+        guard let device = self.device else {
+            print("Cannot send feature report - no HID device is currently connected")
+            return false
+        }
+        
+        var mutableReport = report
+        
+        let result = IOHIDDeviceSetReport(
+            device,
+            kIOHIDReportTypeFeature,  // Feature report type for EEPROM and configuration
+            CFIndex(0),               // Report ID 0
+            &mutableReport,
+            mutableReport.count
+        )
+        
+        let success = (result == kIOReturnSuccess)
+        
+        if success {
+            print("Feature report sent successfully: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        } else {
+            print("Failed to send feature report: \(result), data: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        }
+        
+        return success
+    }
+    
+    /// Get HID feature report (based on videohid.cpp getFeatureReport)
+    /// Used for reading EEPROM data and device status
+    /// - Parameter buffer: Buffer to receive the report data
+    /// - Returns: The received report data, or nil if failed
+    func getHIDFeatureReport(bufferSize: Int = 9) -> [UInt8]? {
+        guard let device = self.device else {
+            print("Cannot get feature report - no HID device is currently connected")
+            return nil
+        }
+        
+        var report = [UInt8](repeating: 0, count: bufferSize)
+        var reportLength = report.count
+        
+        let result = IOHIDDeviceGetReport(
+            device,
+            kIOHIDReportTypeFeature,  // Feature report type
+            CFIndex(0),               // Report ID 0
+            &report,
+            &reportLength
+        )
+        
+        if result == kIOReturnSuccess {
+            let receivedData = Array(report[0..<reportLength])
+            print("Feature report received: \(receivedData.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            return receivedData
+        } else {
+            print("Failed to get feature report: \(result)")
+            return nil
+        }
     }
 }
 

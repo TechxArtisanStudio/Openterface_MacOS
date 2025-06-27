@@ -104,6 +104,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             object: nil
         )
         
+        // Listen for firmware update notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleStopAllOperationsBeforeFirmwareUpdate(_:)),
+            name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"),
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWriteFirmwareToEEPROM(_:)),
+            name: NSNotification.Name("WriteFirmwareToEEPROM"),
+            object: nil
+        )
+        
+        // Listen for firmware update completion notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleReopenContentViewAfterFirmwareUpdate(_:)),
+            name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"),
+            object: nil
+        )
+        
         // Initialize window menu items
         setupAspectRatioMenu()
         
@@ -148,37 +171,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Prompt user to choose aspect ratio when HID resolution changes
             guard let window = NSApplication.shared.mainWindow else { return }
             
-            do {
-                let alert = NSAlert()
-                alert.messageText = "Display Resolution Changed"
-                alert.informativeText = "Display resolution change detected. Would you like to use a custom screen aspect ratio?"
-                alert.addButton(withTitle: "Yes")
-                alert.addButton(withTitle: "No")
-                
-                // Add "Don't show again" checkbox
-                let doNotShowCheckbox = NSButton(checkboxWithTitle: "Don't show this prompt again", target: nil, action: nil)
-                doNotShowCheckbox.state = .off
-                alert.accessoryView = doNotShowCheckbox
-                
-                let response = alert.runModal()
-                
-                // Save user's "Don't show again" preference
-                if doNotShowCheckbox.state == .on {
-                    UserSettings.shared.doNotShowHidResolutionAlert = true
-                }
-                
-                if response == .alertFirstButtonReturn {
-                    // Show aspect ratio selection menu
-                    self.showAspectRatioSelection()
-                }
-                
-                // Update window size based on new aspect ratio
-                self.updateWindowSize(window: window)
-            } catch {
-                Logger.shared.log(content: "Error showing resolution change alert: \(error.localizedDescription)")
-                // Fallback to just updating the window size
-                self.updateWindowSize(window: window)
+            let alert = NSAlert()
+            alert.messageText = "Display Resolution Changed"
+            alert.informativeText = "Display resolution change detected. Would you like to use a custom screen aspect ratio?"
+            alert.addButton(withTitle: "Yes")
+            alert.addButton(withTitle: "No")
+            
+            // Add "Don't show again" checkbox
+            let doNotShowCheckbox = NSButton(checkboxWithTitle: "Don't show this prompt again", target: nil, action: nil)
+            doNotShowCheckbox.state = .off
+            alert.accessoryView = doNotShowCheckbox
+            
+            let response = alert.runModal()
+            
+            // Save user's "Don't show again" preference
+            if doNotShowCheckbox.state == .on {
+                UserSettings.shared.doNotShowHidResolutionAlert = true
             }
+            
+            if response == .alertFirstButtonReturn {
+                // Show aspect ratio selection menu
+                self.showAspectRatioSelection()
+            }
+            
+            // Update window size based on new aspect ratio
+            self.updateWindowSize(window: window)
         }
     }
     
@@ -309,6 +326,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Add a "HID Resolution Change Alert Settings" menu item
         let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
         viewMenu.addItem(hidAlertMenuItem)
+        
+        // Add debug menu items (only in debug builds)
+        #if DEBUG
+        viewMenu.addItem(NSMenuItem.separator())
+        
+        let debugSubMenu = NSMenu(title: "Debug")
+        let debugMenuItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
+        debugMenuItem.submenu = debugSubMenu
+        viewMenu.addItem(debugMenuItem)
+        
+        let testVideoSessionItem = NSMenuItem(title: "Test Video Session Control", action: #selector(testVideoSessionControl(_:)), keyEquivalent: "")
+        debugSubMenu.addItem(testVideoSessionItem)
+        
+        let testDirectNotificationsItem = NSMenuItem(title: "Test Direct Notifications", action: #selector(testDirectNotifications(_:)), keyEquivalent: "")
+        debugSubMenu.addItem(testDirectNotificationsItem)
+        #endif
     }
     
     // Update window size
@@ -556,6 +589,126 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // Show HID resolution change alert settings
     @objc func showHidResolutionAlertSettings(_ sender: NSMenuItem) {
         WindowUtils.shared.showHidResolutionAlertSettings()
+    }
+    
+    // MARK: - Debug Menu Actions
+    #if DEBUG
+    @objc func testVideoSessionControl(_ sender: NSMenuItem) {
+        Logger.shared.log(content: "Test Video Session Control menu item clicked")
+        testFirmwareUpdateVideoSessionControl()
+    }
+    
+    @objc func testDirectNotifications(_ sender: NSMenuItem) {
+        Logger.shared.log(content: "Test Direct Notifications menu item clicked")
+        testDirectVideoSessionNotifications()
+    }
+    
+    /// Test the firmware update notification flow
+    /// This simulates what happens during a real firmware update
+    private func testFirmwareUpdateVideoSessionControl() {
+        Logger.shared.log(content: "=== Starting Firmware Update Video Session Test ===")
+        
+        // Simulate firmware update start
+        Logger.shared.log(content: "Simulating firmware update start...")
+        NotificationCenter.default.post(name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"), object: nil)
+        
+        // Wait a moment to allow the notification to be processed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            Logger.shared.log(content: "Simulating firmware update completion...")
+            NotificationCenter.default.post(name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"), object: nil)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                Logger.shared.log(content: "=== Firmware Update Video Session Test Complete ===")
+            }
+        }
+    }
+    
+    /// Test just the video session stop/start notifications directly
+    private func testDirectVideoSessionNotifications() {
+        Logger.shared.log(content: "=== Starting Direct Video Session Notification Test ===")
+        
+        // Test stop notification
+        Logger.shared.log(content: "Sending StopVideoSession notification...")
+        NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
+        
+        // Wait and test start notification
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            Logger.shared.log(content: "Sending StartVideoSession notification...")
+            NotificationCenter.default.post(name: NSNotification.Name("StartVideoSession"), object: nil)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                Logger.shared.log(content: "=== Direct Video Session Notification Test Complete ===")
+            }
+        }
+    }
+    #endif
+    
+    // MARK: - Firmware Update Notification Handlers
+    
+    /// Handles stopping all operations before firmware update
+    @objc func handleStopAllOperationsBeforeFirmwareUpdate(_ notification: Notification) {
+        Logger.shared.log(content: "Stopping all operations for firmware update...")
+        
+        // Stop serial port connections
+        spm.closeSerialPort()
+        
+        // Stop audio operations  
+        audioManager.stopAudioSession()
+
+        // Stop repeating HID operations but keep HID connection open for firmware update
+        HIDManager.shared.stopAllHIDOperations()
+
+        // Stop video session by posting notification for PlayerViewModel to handle
+        Logger.shared.log(content: "Posting StopVideoSession notification for firmware update")
+        NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
+        Logger.shared.log(content: "Video session stop requested for firmware update")
+
+        // Note: Keep the main window open during firmware update
+        // The firmware update dialog runs in its own separate window
+        Logger.shared.log(content: "Main window remains open during firmware update")
+
+        Logger.shared.log(content: "All operations stopped for firmware update")
+    }
+    
+    /// Handles firmware write to EEPROM request
+    @objc func handleWriteFirmwareToEEPROM(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let firmwareData = userInfo["firmwareData"] as? Data,
+              let continuation = userInfo["continuation"] else {
+            Logger.shared.log(content: "Invalid firmware write request")
+            return
+        }
+        
+        Logger.shared.log(content: "Writing firmware to EEPROM...")
+        
+        // Use HIDManager to write firmware
+        DispatchQueue.global(qos: .userInitiated).async {
+            let hidManager = HIDManager.shared
+            let success = hidManager.writeEeprom(address: 0x0000, data: firmwareData)
+            
+            DispatchQueue.main.async {
+                if let cont = continuation as? CheckedContinuation<Bool, Never> {
+                    cont.resume(returning: success)
+                }
+            }
+        }
+    }
+    
+    /// Handles reopening ContentView window after firmware update completion
+    @objc func handleReopenContentViewAfterFirmwareUpdate(_ notification: Notification) {
+        Logger.shared.log(content: "Restarting operations after firmware update...")
+        
+        // Restart HID operations first
+        HIDManager.shared.restartHIDOperations()
+        
+        // Restart video session by posting notification for PlayerViewModel to handle
+        Logger.shared.log(content: "Posting StartVideoSession notification after firmware update")
+        NotificationCenter.default.post(name: NSNotification.Name("StartVideoSession"), object: nil)
+        Logger.shared.log(content: "Video session restart requested after firmware update")
+        
+        // Since we kept the main window open, just log the completion
+        // The main window should still be visible and functional
+        Logger.shared.log(content: "Firmware update completed, operations restarted")
     }
 }
 

@@ -138,6 +138,12 @@ class PlayerViewModel: NSObject, ObservableObject {
         notificationCenter.addObserver(self, selector: #selector(windowdidResignMain(_:)), 
                                      name: NSWindow.didResignMainNotification, object: nil)
         
+        // Firmware update video session control events
+        notificationCenter.addObserver(self, selector: #selector(handleStopVideoSession(_:)), 
+                                     name: NSNotification.Name("StopVideoSession"), object: nil)
+        notificationCenter.addObserver(self, selector: #selector(handleStartVideoSession(_:)), 
+                                     name: NSNotification.Name("StartVideoSession"), object: nil)
+        
         self.hasObserverBeenAdded = true
         
         // Setup audio device change monitoring
@@ -194,6 +200,8 @@ class PlayerViewModel: NSObject, ObservableObject {
         notificationCenter.removeObserver(self, name: .AVCaptureDeviceWasDisconnected, object: nil)
         notificationCenter.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
         notificationCenter.removeObserver(self, name: NSWindow.didResignMainNotification, object: nil)
+        notificationCenter.removeObserver(self, name: NSNotification.Name("StopVideoSession"), object: nil)
+        notificationCenter.removeObserver(self, name: NSNotification.Name("StartVideoSession"), object: nil)
         
 //        // Stop audio engine
 //        stopAudioSession()
@@ -722,6 +730,31 @@ class PlayerViewModel: NSObject, ObservableObject {
                 Logger.shared.log(content: "The window just entered full screen mode.")
             } else {
                 Logger.shared.log(content: "The window just exited full screen mode.")
+            }
+        }
+    }
+    
+    // MARK: - Firmware Update Video Session Control
+    
+    /// Handles notification to stop video session for firmware update
+    @objc func handleStopVideoSession(_ notification: Notification) {
+        Logger.shared.log(content: "Received request to stop video session for firmware update")
+        Logger.shared.log(content: "Current video session state: isRunning=\(self.captureSession.isRunning), isVideoSessionStarting=\(self.isVideoSessionStarting)")
+        DispatchQueue.main.async { [weak self] in
+            self?.stopVideoSession()
+            Logger.shared.log(content: "Video session stopped for firmware update. New state: isRunning=\(self?.captureSession.isRunning ?? false)")
+        }
+    }
+    
+    /// Handles notification to start video session after firmware update
+    @objc func handleStartVideoSession(_ notification: Notification) {
+        Logger.shared.log(content: "Received request to restart video session after firmware update")
+        Logger.shared.log(content: "Current video session state: isRunning=\(self.captureSession.isRunning), isVideoSessionStarting=\(self.isVideoSessionStarting)")
+        DispatchQueue.main.async { [weak self] in
+            // Add a small delay to ensure firmware update operations are completely finished
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self?.prepareVideo()
+                Logger.shared.log(content: "Video session restart initiated after firmware update. New state: isRunning=\(self?.captureSession.isRunning ?? false)")
             }
         }
     }
