@@ -29,8 +29,6 @@ struct USBDevicesView: View {
 
     var body: some View {
         VStack {
-            Text("USB Devices")
-                .font(.headline)
             List(AppStatus.USBDevices, id: \.productName) { device in
                 VStack(alignment: .leading) {
                     Text("Product Name: \(device.productName)")

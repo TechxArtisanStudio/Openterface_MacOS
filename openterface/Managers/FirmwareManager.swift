@@ -128,60 +128,32 @@ class FirmwareManager: ObservableObject {
         Logger.shared.log(content: "Writing \(data.count) bytes to EEPROM starting at address 0x\(String(format: "%04X", address))")
         
         let totalSize = data.count
-        var writtenBytes = 0
-        var currentAddress = address
         
-        // Write data in chunks
-        while writtenBytes < totalSize {
-            let remainingBytes = totalSize - writtenBytes
-            let currentChunkSize = min(chunkSize, remainingBytes)
-            
-            let startIndex = writtenBytes
-            let endIndex = startIndex + currentChunkSize
-            let chunk = data.subdata(in: startIndex..<endIndex)
-            
-            // Write chunk to EEPROM
-            let success = await writeEepromChunk(address: currentAddress, data: chunk)
-            if !success {
-                Logger.shared.log(content: "Failed to write EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
-                return false
-            }
-            
-            writtenBytes += currentChunkSize
-            currentAddress += UInt16(currentChunkSize)
-            
-            // Update progress
-            let progressPercent = (writtenBytes * 100) / totalSize
-            
+        // Use HID commands for EEPROM writing with progress tracking
+        let hidManager = HIDManager.shared
+        let success = hidManager.writeEeprom(address: address, data: data) { progress in
+            // Update the progress on main thread
             DispatchQueue.main.async {
-                self.updateProgress = Double(writtenBytes) / Double(totalSize)
+                // Map the EEPROM write progress (0.1 to 1.0 of overall progress)
+                // 0.1 is the initial progress from download, 0.9 is for EEPROM write
+                let overallProgress = 0.1 + (progress * 0.9)
+                self.updateProgress = overallProgress
+                
+                let progressPercent = Int(overallProgress * 100)
                 self.updateStatus = "Writing firmware to EEPROM... \(progressPercent)%"
                 self.firmwareWriteProgressSubject.send(progressPercent)
             }
-            
-            // Small delay to prevent overwhelming the device
-            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
         }
         
-        Logger.shared.log(content: "EEPROM write completed successfully")
-        DispatchQueue.main.async {
-            self.updateProgress = 1.0
-            self.updateStatus = "Firmware update completed successfully!"
+        if success {
+            Logger.shared.log(content: "EEPROM write completed successfully")
+        } else {
+            Logger.shared.log(content: "EEPROM write failed")
         }
-        
-        return true
-    }
-    
-    private func writeEepromChunk(address: UInt16, data: Data) async -> Bool {
-        // Use HID commands for EEPROM writing (not serial commands)
-        let hidManager = HIDManager.shared
-        let success = hidManager.writeEeprom(address: address, data: data)
-        
-        // Wait for response 
-        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms delay
         
         return success
     }
+
 }
 
 // MARK: - Error Types

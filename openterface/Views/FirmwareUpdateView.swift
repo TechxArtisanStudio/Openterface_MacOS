@@ -27,6 +27,7 @@ import IOKit
 import IOKit.hid
 import AVFoundation
 import UniformTypeIdentifiers
+import AppKit
 
 // MARK: - Error Types
 enum FirmwareError: LocalizedError {
@@ -164,7 +165,12 @@ struct FirmwareUpdateView: View {
                     // Action buttons
                     HStack {
                         Button("Cancel") {
-                            dismiss()
+                            // For standalone windows, we need to close the actual window
+                            if let window = NSApp.keyWindow {
+                                window.close()
+                            } else {
+                                dismiss()
+                            }
                         }
                         .keyboardShortcut(.escape)
                         
@@ -186,7 +192,12 @@ struct FirmwareUpdateView: View {
                         
                         if currentVersion == latestVersion && currentVersion != "Unknown" && latestVersion != "Unknown" {
                             Button("Close") {
-                                dismiss()
+                                // For standalone windows, we need to close the actual window
+                                if let window = NSApp.keyWindow {
+                                    window.close()
+                                } else {
+                                    dismiss()
+                                }
                             }
                             .buttonStyle(.borderedProminent)
                         } else {
@@ -492,17 +503,23 @@ struct FirmwareUpdateView: View {
             updateStatus = "Installing firmware to EEPROM..."
         }
         
-        // Post notification to write firmware using existing HID functionality
+        // Use HID Manager directly with progress tracking
         return await withCheckedContinuation { continuation in
-            Task {
-                // Use NotificationCenter to trigger firmware write through HIDManager
-                await MainActor.run {
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("WriteFirmwareToEEPROM"),
-                        object: nil,
-                        userInfo: ["firmwareData": data, "continuation": continuation]
-                    )
+            DispatchQueue.global(qos: .background).async {
+                let hidManager = HIDManager.shared
+                let success = hidManager.writeEeprom(address: 0x0000, data: data) { progress in
+                    // Update progress on main thread
+                    DispatchQueue.main.async {
+                        // Map progress from 0.4 to 1.0 (40% to 100%)
+                        let overallProgress = 0.4 + (progress * 0.6)
+                        self.updateProgress = overallProgress
+                        
+                        let progressPercent = Int(overallProgress * 100)
+                        self.updateStatus = "Installing firmware to EEPROM... \(progressPercent)%"
+                    }
                 }
+                
+                continuation.resume(returning: success)
             }
         }
     }
@@ -553,72 +570,58 @@ struct FirmwareUpdateView: View {
             return
         }
         
-        do {
-            await MainActor.run {
-                backupStatus = "Determining firmware size..."
-            }
-            
-            // First, try to determine the actual firmware size
-            let firmwareSize = await determineFirmwareSize()
-            
-            await MainActor.run {
-                backupStatus = "Reading \(firmwareSize) bytes of firmware from device..."
-            }
-            
-            let firmwareStartAddress: UInt16 = 0x0000 // Start from beginning of EEPROM
-            
-            // Read firmware data from EEPROM using the HIDManager
-            // Need to split large reads into smaller chunks due to UInt8 length limitation
-            var allFirmwareData = Data()
-            var currentAddress = firmwareStartAddress
-            var remainingBytes = firmwareSize
-            
-            while remainingBytes > 0 {
-                let chunkSize = min(255, remainingBytes) // Max UInt8 value
-                
-                guard let chunkData = HIDManager.shared.readEeprom(address: currentAddress, length: UInt8(chunkSize)) else {
-                    await MainActor.run {
-                        isBackupInProgress = false
-                        backupAlertMessage = "Failed to read firmware from device at address 0x\(String(format: "%04X", currentAddress)). Please ensure the device is properly connected."
-                        showingBackupAlert = true
-                    }
-                    return
-                }
-                
-                allFirmwareData.append(chunkData)
-                currentAddress += UInt16(chunkSize)
-                remainingBytes -= chunkSize
-                
-                // Update progress
-                let progress = Double(allFirmwareData.count) / Double(firmwareSize)
-                await MainActor.run {
-                    backupStatus = "Reading firmware... \(Int(progress * 100))% (\(allFirmwareData.count)/\(firmwareSize) bytes)"
-                }
-            }
-            
-            await MainActor.run {
-                backupStatus = "Saving backup file..."
-            }
-            
-            // Save firmware data to the selected file location
-            let success = await saveFirmwareBackup(data: allFirmwareData, to: backupURL)
-            
-            await MainActor.run {
+        await MainActor.run {
+            backupStatus = "Determining firmware size..."
+        }
+        
+        // First, try to determine the actual firmware size
+        let firmwareSize = await determineFirmwareSize()
+        
+        await MainActor.run {
+            backupStatus = "Reading \(firmwareSize) bytes of firmware from device..."
+        }
+        
+        let firmwareStartAddress: UInt16 = 0x0000 // Start from beginning of EEPROM
+        
+        // Read firmware data from EEPROM using the HIDManager
+        // Need to split large reads into smaller chunks due to UInt8 length limitation
+        let allFirmwareData = await readFirmwareData(
+            startAddress: firmwareStartAddress,
+            totalSize: firmwareSize,
+            onProgress: { status in
+                backupStatus = status
+            },
+            onError: { errorMessage in
                 isBackupInProgress = false
-                if success {
-                    backupAlertMessage = "Firmware backup completed successfully!\n\nFile saved as: \(backupURL.lastPathComponent)\nSize: \(allFirmwareData.count) bytes\nLocation: \(backupURL.deletingLastPathComponent().path)"
-                } else {
-                    backupAlertMessage = "Failed to save firmware backup file. Please check permissions and try again."
-                }
+                backupAlertMessage = errorMessage
                 showingBackupAlert = true
             }
-            
-        } catch {
+        )
+        
+        guard let firmwareData = allFirmwareData else {
             await MainActor.run {
                 isBackupInProgress = false
-                backupAlertMessage = "Firmware backup failed: \(error.localizedDescription)"
+                backupAlertMessage = "Failed to read firmware from device. Please ensure the device is properly connected."
                 showingBackupAlert = true
             }
+            return
+        }
+        
+        await MainActor.run {
+            backupStatus = "Saving backup file..."
+        }
+        
+        // Save firmware data to the selected file location
+        let success = await saveFirmwareBackup(data: firmwareData, to: backupURL)
+        
+        await MainActor.run {
+            isBackupInProgress = false
+            if success {
+                backupAlertMessage = "Firmware backup completed successfully!\n\nFile saved as: \(backupURL.lastPathComponent)\nSize: \(firmwareData.count) bytes\nLocation: \(backupURL.deletingLastPathComponent().path)"
+            } else {
+                backupAlertMessage = "Failed to save firmware backup file. Please check permissions and try again."
+            }
+            showingBackupAlert = true
         }
     }
     
@@ -677,6 +680,37 @@ struct FirmwareUpdateView: View {
                 }
             }
         }
+    }
+    
+    /// Reads firmware data from EEPROM in chunks with progress updates
+    private func readFirmwareData(
+        startAddress: UInt16, 
+        totalSize: Int,
+        onProgress: @MainActor @escaping (String) -> Void = { _ in },
+        onError: @MainActor @escaping (String) -> Void = { _ in }
+    ) async -> Data? {
+        var allFirmwareData = Data()
+        var currentAddress = startAddress
+        var remainingBytes = totalSize
+        
+        while remainingBytes > 0 {
+            let chunkSize = min(255, remainingBytes) // Max UInt8 value
+            
+            guard let chunkData = HIDManager.shared.readEeprom(address: currentAddress, length: UInt8(chunkSize)) else {
+                await onError("Failed to read firmware from device at address 0x\(String(format: "%04X", currentAddress)). Please ensure the device is properly connected.")
+                return nil
+            }
+            
+            allFirmwareData.append(chunkData)
+            currentAddress += UInt16(chunkSize)
+            remainingBytes -= chunkSize
+            
+            // Update progress
+            let progress = Double(allFirmwareData.count) / Double(totalSize)
+            await onProgress("Reading firmware... \(Int(progress * 100))% (\(allFirmwareData.count)/\(totalSize) bytes)")
+        }
+        
+        return allFirmwareData
     }
     
 }

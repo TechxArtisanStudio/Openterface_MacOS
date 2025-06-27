@@ -493,8 +493,9 @@ class HIDManager {
     /// - Parameters:
     ///   - address: The starting address in EEPROM
     ///   - data: The data to write
+    ///   - progressCallback: Optional callback to report progress (0.0 to 1.0)
     /// - Returns: True if write was successful
-    func writeEeprom(address: UInt16, data: Data) -> Bool {
+    func writeEeprom(address: UInt16, data: Data, progressCallback: ((Double) -> Void)? = nil) -> Bool {
         Logger.shared.log(content: "Writing \(data.count) bytes to EEPROM at address 0x\(String(format: "%04X", address))")
         
         // Write in chunks (based on C++ implementation)
@@ -502,6 +503,10 @@ class HIDManager {
         var currentAddress = address
         var offset = 0
         var writtenSize = 0
+        let totalSize = data.count
+        
+        // Report initial progress
+        progressCallback?(0.0)
         
         while offset < data.count {
             let remainingBytes = data.count - offset
@@ -518,17 +523,32 @@ class HIDManager {
             currentAddress += UInt16(currentChunkSize)
             writtenSize += currentChunkSize
             
+            // Update progress
+            let progress = Double(writtenSize) / Double(totalSize)
+            progressCallback?(progress)
+            
             // Log progress periodically
             if writtenSize % 64 == 0 {
-                Logger.shared.log(content: "Written size: \(writtenSize)")
+                Logger.shared.log(content: "Written size: \(writtenSize)/\(totalSize) (\(Int(progress * 100))%)")
             }
             
             // Add delay between chunks (from C++ implementation)
             Thread.sleep(forTimeInterval: 0.1) // 100ms delay
         }
         
+        // Report completion
+        progressCallback?(1.0)
         Logger.shared.log(content: "EEPROM write completed successfully")
         return true
+    }
+    
+    /// Writes data to EEPROM using HID commands (backward compatibility method without progress)
+    /// - Parameters:
+    ///   - address: The starting address in EEPROM
+    ///   - data: The data to write
+    /// - Returns: True if write was successful
+    func writeEeprom(address: UInt16, data: Data) -> Bool {
+        return writeEeprom(address: address, data: data, progressCallback: nil)
     }
     
     /// Writes a single chunk to EEPROM using HID feature report
@@ -537,7 +557,7 @@ class HIDManager {
     ///   - data: The data chunk to write (2 bytes per command based on Python implementation)
     /// - Returns: True if successful
     private func writeChunk(address: UInt16, data: Data) -> Bool {
-        let chunkSize = 2 // Based on Python implementation - writes 2 bytes per command
+        let chunkSize = 1
         let reportSize = 9
         
         var currentAddress = address
@@ -572,9 +592,6 @@ class HIDManager {
             }
             
             currentAddress += UInt16(chunkBytes.count)
-            
-            // Add delay for EEPROM write to complete
-            Thread.sleep(forTimeInterval: 0.01) // 10ms delay
         }
         
         return true
