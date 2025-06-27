@@ -548,15 +548,15 @@ class HIDManager {
             // Create HID report for EEPROM write
             // Based on C++ code: CMD_EEPROM_WRITE = 0xB6
             var report = [UInt8](repeating: 0, count: reportSize)
-            report[1] = 0xB6 // CMD_EEPROM_WRITE
-            report[2] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
-            report[3] = UInt8(currentAddress & 0xFF)        // Address low byte
+            report[0] = 0xB6 // CMD_EEPROM_WRITE
+            report[1] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
+            report[2] = UInt8(currentAddress & 0xFF)        // Address low byte
             
-            // Copy chunk data to report (starting at index 4)
+            // Copy chunk data to report (starting at index 3)
             let chunkBytes = [UInt8](chunk)
             for (index, byte) in chunkBytes.enumerated() {
-                if index + 4 < reportSize {
-                    report[index + 4] = byte
+                if index + 3 < reportSize {
+                    report[index + 3] = byte
                 }
             }
             
