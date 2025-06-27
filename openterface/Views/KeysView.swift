@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 
-
 // Add a new parameter to CustomButtonStyle to allow programmatic pressed state
 struct CustomButtonStyle: ButtonStyle {
     var programmaticPressed: Bool = false
@@ -47,6 +46,7 @@ final class FloatingKeyboardManager {
     private var mainWindowObserver: NSObjectProtocol?
     private var focusLostObserver: NSObjectProtocol?
 
+
     init() {
         setupMainWindowObserver()
     }
@@ -65,7 +65,7 @@ final class FloatingKeyboardManager {
                 self?.closeFloatingKeysWindow()
             }
         }
-        
+ 
         // Observe main window focus loss notifications
         focusLostObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignMainNotification,
@@ -327,6 +327,7 @@ struct FloatingKeysWindow: View {
                             Text(keyboardManager.currentKeyboardLayout == .windows ? "Alt" : "Opt")
                         }
                         .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftAltHeld))
+
                         
                         Button(action: {
                             KeyboardManager.shared.sendSpecialKeyToKeyboard(code: .space)
@@ -379,6 +380,7 @@ struct FloatingKeysWindow: View {
             .padding(.bottom, 8)
             
             // Close button in top-left corner
+
             Button(action: {
                 FloatingKeyboardManager.shared.closeFloatingKeysWindow()
             }) {

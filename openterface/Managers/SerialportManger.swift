@@ -412,6 +412,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
+        Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate)")
         self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
 
         if self.serialPort != nil {
