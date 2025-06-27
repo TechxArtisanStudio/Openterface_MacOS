@@ -26,6 +26,7 @@ import Combine
 import IOKit
 import IOKit.hid
 import AVFoundation
+import UniformTypeIdentifiers
 
 // MARK: - Error Types
 enum FirmwareError: LocalizedError {
@@ -55,6 +56,11 @@ struct FirmwareUpdateView: View {
     @State private var updateProgress: Double = 0.0
     @State private var updateStatus: String = ""
     @State private var showingConfirmation: Bool = false
+    @State private var isBackupInProgress: Bool = false
+    @State private var backupStatus: String = ""
+    @State private var showingBackupAlert: Bool = false
+    @State private var backupAlertMessage: String = ""
+    @State private var selectedBackupURL: URL?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -137,6 +143,22 @@ struct FirmwareUpdateView: View {
                         }
                     }
                     
+                    // Show backup status if backup is in progress
+                    if isBackupInProgress {
+                        VStack(spacing: 8) {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text(backupStatus)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    
                     Spacer()
                     
                     // Action buttons
@@ -145,6 +167,20 @@ struct FirmwareUpdateView: View {
                             dismiss()
                         }
                         .keyboardShortcut(.escape)
+                        
+                        // Backup button (always available when not updating)
+                        Button("Backup Current Firmware") {
+                            backupCurrentFirmware()
+                        }
+                        .disabled(currentVersion == "Unknown" || isBackupInProgress)
+                        .overlay(
+                            // Show progress indicator when backup is in progress
+                            isBackupInProgress ? 
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            : nil
+                        )
                         
                         Spacer()
                         
@@ -219,6 +255,11 @@ struct FirmwareUpdateView: View {
             }
         } message: {
             Text("Are you sure you want to proceed with the firmware update? This process cannot be undone.")
+        }
+        .alert("Firmware Backup", isPresented: $showingBackupAlert) {
+            Button("OK") { }
+        } message: {
+            Text(backupAlertMessage)
         }
     }
     
@@ -461,6 +502,178 @@ struct FirmwareUpdateView: View {
                         object: nil,
                         userInfo: ["firmwareData": data, "continuation": continuation]
                     )
+                }
+            }
+        }
+    }
+    
+    // MARK: - Firmware Backup Functions
+    
+    private func backupCurrentFirmware() {
+        // Create filename with current date and version
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+        let timestamp = dateFormatter.string(from: Date())
+        let defaultFilename = "Openterface_Firmware_Backup_v\(currentVersion)_\(timestamp).bin"
+        
+        // Show save dialog to let user choose backup location
+        let savePanel = NSSavePanel()
+        savePanel.title = "Save Firmware Backup"
+        savePanel.message = "Choose location to save firmware backup"
+        savePanel.nameFieldStringValue = defaultFilename
+        savePanel.allowedContentTypes = [.data]
+        savePanel.canCreateDirectories = true
+        savePanel.isExtensionHidden = false
+        
+        // Set default directory to Desktop
+        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
+            savePanel.directoryURL = desktopURL
+        }
+        
+        savePanel.begin { response in
+            if response == .OK, let url = savePanel.url {
+                selectedBackupURL = url
+                isBackupInProgress = true
+                backupStatus = "Preparing to backup firmware..."
+                
+                Task {
+                    await performFirmwareBackup()
+                }
+            }
+        }
+    }
+    
+    private func performFirmwareBackup() async {
+        guard let backupURL = selectedBackupURL else {
+            await MainActor.run {
+                isBackupInProgress = false
+                backupAlertMessage = "No backup location selected."
+                showingBackupAlert = true
+            }
+            return
+        }
+        
+        do {
+            await MainActor.run {
+                backupStatus = "Determining firmware size..."
+            }
+            
+            // First, try to determine the actual firmware size
+            let firmwareSize = await determineFirmwareSize()
+            
+            await MainActor.run {
+                backupStatus = "Reading \(firmwareSize) bytes of firmware from device..."
+            }
+            
+            let firmwareStartAddress: UInt16 = 0x0000 // Start from beginning of EEPROM
+            
+            // Read firmware data from EEPROM using the HIDManager
+            // Need to split large reads into smaller chunks due to UInt8 length limitation
+            var allFirmwareData = Data()
+            var currentAddress = firmwareStartAddress
+            var remainingBytes = firmwareSize
+            
+            while remainingBytes > 0 {
+                let chunkSize = min(255, remainingBytes) // Max UInt8 value
+                
+                guard let chunkData = HIDManager.shared.readEeprom(address: currentAddress, length: UInt8(chunkSize)) else {
+                    await MainActor.run {
+                        isBackupInProgress = false
+                        backupAlertMessage = "Failed to read firmware from device at address 0x\(String(format: "%04X", currentAddress)). Please ensure the device is properly connected."
+                        showingBackupAlert = true
+                    }
+                    return
+                }
+                
+                allFirmwareData.append(chunkData)
+                currentAddress += UInt16(chunkSize)
+                remainingBytes -= chunkSize
+                
+                // Update progress
+                let progress = Double(allFirmwareData.count) / Double(firmwareSize)
+                await MainActor.run {
+                    backupStatus = "Reading firmware... \(Int(progress * 100))% (\(allFirmwareData.count)/\(firmwareSize) bytes)"
+                }
+            }
+            
+            await MainActor.run {
+                backupStatus = "Saving backup file..."
+            }
+            
+            // Save firmware data to the selected file location
+            let success = await saveFirmwareBackup(data: allFirmwareData, to: backupURL)
+            
+            await MainActor.run {
+                isBackupInProgress = false
+                if success {
+                    backupAlertMessage = "Firmware backup completed successfully!\n\nFile saved as: \(backupURL.lastPathComponent)\nSize: \(allFirmwareData.count) bytes\nLocation: \(backupURL.deletingLastPathComponent().path)"
+                } else {
+                    backupAlertMessage = "Failed to save firmware backup file. Please check permissions and try again."
+                }
+                showingBackupAlert = true
+            }
+            
+        } catch {
+            await MainActor.run {
+                isBackupInProgress = false
+                backupAlertMessage = "Firmware backup failed: \(error.localizedDescription)"
+                showingBackupAlert = true
+            }
+        }
+    }
+    
+    /// Determines the actual firmware size by reading the EEPROM
+    /// Based on the Python implementation which uses 0x05B0 (1456 bytes) as the full EEPROM size
+    private func determineFirmwareSize() async -> Int {
+        // The MS2109 EEPROM typically contains firmware up to address 0x05B0 (1456 bytes)
+        // This is based on the Python implementation and actual device specifications
+        let standardEepromSize = 0x05B0 // 1456 bytes
+        
+        // For now, we'll use the standard size. In the future, we could implement
+        // dynamic size detection by reading until we find empty regions (0xFF patterns)
+        // or by reading specific EEPROM headers that might contain size information
+        
+        Logger.shared.log(content: "Using standard MS2109 EEPROM size: \(standardEepromSize) bytes (0x\(String(format: "%04X", standardEepromSize)))")
+        
+        return standardEepromSize
+    }
+    
+    /// Alternative method to detect firmware end by scanning for empty regions
+    /// This could be used in the future for more accurate size detection
+    private func detectFirmwareEndAddress() async -> Int? {
+        // Start from a reasonable point and scan backwards for non-0xFF data
+        // This would be useful for firmware that doesn't fill the entire EEPROM
+        let maxScanAddress = 0x05B0
+        let scanChunkSize = 16
+        
+        // Scan from the end backwards to find the last non-empty region
+        for address in stride(from: maxScanAddress - scanChunkSize, through: 0, by: -scanChunkSize) {
+            if let data = HIDManager.shared.readEeprom(address: UInt16(address), length: UInt8(min(scanChunkSize, maxScanAddress - address))) {
+                // Check if this chunk contains non-0xFF data
+                if data.contains(where: { $0 != 0xFF }) {
+                    // Found non-empty data, the firmware likely extends to this point
+                    Logger.shared.log(content: "Detected firmware end near address: 0x\(String(format: "%04X", address + scanChunkSize))")
+                    return address + scanChunkSize
+                }
+            }
+        }
+        
+        // If we couldn't detect the end, return nil to use the standard size
+        return nil
+    }
+    
+    private func saveFirmwareBackup(data: Data, to url: URL) async -> Bool {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .background).async {
+                do {
+                    // Write firmware data to the selected file location
+                    try data.write(to: url)
+                    
+                    print("Firmware backup saved to: \(url.path)")
+                    continuation.resume(returning: true)
+                } catch {
+                    print("Failed to save firmware backup: \(error)")
+                    continuation.resume(returning: false)
                 }
             }
         }

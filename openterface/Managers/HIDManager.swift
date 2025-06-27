@@ -534,31 +534,33 @@ class HIDManager {
     /// Writes a single chunk to EEPROM using HID feature report
     /// - Parameters:
     ///   - address: The address to write to
-    ///   - data: The data chunk to write (max 1 byte per chunk based on C++ code)
+    ///   - data: The data chunk to write (2 bytes per command based on Python implementation)
     /// - Returns: True if successful
     private func writeChunk(address: UInt16, data: Data) -> Bool {
-        let chunkSize = 1 // Based on C++ implementation
+        let chunkSize = 2 // Based on Python implementation - writes 2 bytes per command
         let reportSize = 9
         
         var currentAddress = address
         
-        for i in 0..<data.count {
-            let chunk = data.subdata(in: i..<(i + chunkSize))
+        for i in stride(from: 0, to: data.count, by: chunkSize) {
+            let endIndex = min(i + chunkSize, data.count)
+            let chunk = data.subdata(in: i..<endIndex)
+            let chunkBytes = [UInt8](chunk)
             
-            // Create HID report for EEPROM write
-            // Based on C++ code: CMD_EEPROM_WRITE = 0xB6
+            // Create HID report for EEPROM write based on Python MS2109Device.py
+            // report = [0, CMD_WRITE, (_address >> 8) & 0xFF, _address & 0xFF] + chunk + [0] * (REPORT_SIZE - 4 - chunk_length)
             var report = [UInt8](repeating: 0, count: reportSize)
-            report[0] = 0xB6 // CMD_EEPROM_WRITE
+            report[0] = 0xE6 // CMD_WRITE (from Python implementation)
             report[1] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
             report[2] = UInt8(currentAddress & 0xFF)        // Address low byte
             
             // Copy chunk data to report (starting at index 3)
-            let chunkBytes = [UInt8](chunk)
             for (index, byte) in chunkBytes.enumerated() {
                 if index + 3 < reportSize {
                     report[index + 3] = byte
                 }
             }
+            // Remaining bytes are already 0 from initialization
             
             Logger.shared.log(content: "EEPROM Write Report: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
             
@@ -569,7 +571,10 @@ class HIDManager {
                 return false
             }
             
-            currentAddress += UInt16(chunkSize)
+            currentAddress += UInt16(chunkBytes.count)
+            
+            // Add delay for EEPROM write to complete
+            Thread.sleep(forTimeInterval: 0.01) // 10ms delay
         }
         
         return true
@@ -581,10 +586,108 @@ class HIDManager {
     ///   - length: Number of bytes to read
     /// - Returns: The read data, or nil if failed
     func readEeprom(address: UInt16, length: UInt8) -> Data? {
-        // This would be implemented similar to other HID read operations
-        // For now, we'll focus on the write functionality needed for firmware update
-        Logger.shared.log(content: "EEPROM read not yet implemented")
-        return nil
+        Logger.shared.log(content: "Reading \(length) bytes from EEPROM at address 0x\(String(format: "%04X", address))")
+        
+        guard length > 0 else {
+            Logger.shared.log(content: "Invalid read length: \(length)")
+            return nil
+        }
+        
+        var readData = Data()
+        var currentAddress = address
+        let maxChunkSize: UInt8 = 16 // Read up to 16 bytes at a time (8 commands * 2 bytes each)
+        var remainingBytes = length
+        
+        while remainingBytes > 0 {
+            let currentChunkSize = min(maxChunkSize, remainingBytes)
+            
+            if let chunk = readEepromChunk(address: currentAddress, length: currentChunkSize) {
+                readData.append(chunk)
+                currentAddress += UInt16(chunk.count)
+                remainingBytes -= UInt8(chunk.count)
+            } else {
+                Logger.shared.log(content: "Failed to read EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
+                return nil
+            }
+            
+            // Add small delay between chunk reads for stability
+            Thread.sleep(forTimeInterval: 0.005) // 5ms delay
+        }
+        
+        Logger.shared.log(content: "EEPROM read completed successfully, read \(readData.count) bytes")
+        return readData
+    }
+    
+    /// Reads a single chunk from EEPROM using HID feature report
+    /// - Parameters:
+    ///   - address: The address to read from
+    ///   - length: Number of bytes to read (must be even, reads 2 bytes per command)
+    /// - Returns: The read data chunk, or nil if failed
+    private func readEepromChunk(address: UInt16, length: UInt8) -> Data? {
+        let reportSize = 9
+        
+        // Based on Python MS2109Device.py implementation
+        // CMD_READ = 0xE5, and it reads 2 bytes per command from response indices 4 and 5
+        var result = Data()
+        var currentAddress = address
+        let bytesPerCommand = 2
+        
+        // Ensure we read in pairs of bytes as per the Python implementation
+        let numCommands = Int(length + 1) / bytesPerCommand // Round up division
+        
+        for _ in 0..<numCommands {
+            // Construct the read command: [report_id, cmd, addr_high, addr_low, length, padding]
+            var report = [UInt8](repeating: 0, count: reportSize)
+            report[0] = 0xE5 // CMD_READ (from Python implementation)
+            report[1] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
+            report[2] = UInt8(currentAddress & 0xFF)        // Address low byte
+            report[3] = length                               // Length parameter
+            // Remaining bytes are already 0 from initialization
+            
+            Logger.shared.log(content: "EEPROM Read Request: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            
+            // Send read command using feature report
+            if !sendHIDFeatureReport(report: report) {
+                Logger.shared.log(content: "Failed to send EEPROM read feature report")
+                return nil
+            }
+            
+            // Add delay for device processing
+            Thread.sleep(forTimeInterval: 0.01) // 10ms delay (less than before for efficiency)
+            
+            // Read response using feature report
+            guard let response = getHIDFeatureReport(bufferSize: reportSize) else {
+                Logger.shared.log(content: "Failed to get EEPROM read response")
+                return nil
+            }
+            
+            Logger.shared.log(content: "EEPROM Read Response: \(response.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            
+            // Extract data from response at indices 4 and 5 (as per Python implementation)
+            if response.count >= 6 {
+                result.append(response[4])
+                if result.count < length { // Only append second byte if we need it
+                    result.append(response[5])
+                }
+            } else {
+                Logger.shared.log(content: "Invalid EEPROM read response length")
+                return nil
+            }
+            
+            currentAddress += UInt16(bytesPerCommand)
+            
+            // Break if we've read enough bytes
+            if result.count >= length {
+                break
+            }
+        }
+        
+        // Trim to exact requested length
+        if result.count > length {
+            result = result.prefix(Int(length))
+        }
+        
+        return result
     }
     
     // MARK: - Feature Report Methods
