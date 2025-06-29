@@ -447,52 +447,14 @@ struct FirmwareUpdateView: View {
     /// Stops all operations before firmware update
     private func stopAllOperations() async {
         await MainActor.run {
-            firmwareManager.updateStatus = "Stopping video operations..."
+            firmwareManager.updateStatus = "Stopping all operations..."
         }
         
-        // Stop video operations directly and completely
-        await MainActor.run {
-            let videoManager = VideoManager.shared
-            
-            // Stop the video session
-            videoManager.stopVideoSession()
-            
-            // Remove all video inputs to ensure complete disconnection
-            videoManager.captureSession.beginConfiguration()
-            let videoInputs = videoManager.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
-            videoInputs.forEach { videoManager.captureSession.removeInput($0) }
-            videoManager.captureSession.commitConfiguration()
-            
-            firmwareManager.updateStatus = "Video completely stopped. Closing main windows..."
-        }
+        // Use the centralized stopAllOperations function from FirmwareManager
+        firmwareManager.stopAllOperations()
         
-        // Close main application windows (except firmware update window)
-        await MainActor.run {
-            let windows = NSApplication.shared.windows
-            for window in windows {
-                // Only close the main content window, not the firmware update window
-                if let identifier = window.identifier?.rawValue,
-                   identifier.contains("main_openterface") || window.title.contains("Openterface Mini-KVM") {
-                    window.orderOut(nil) // Hide the window instead of closing it completely
-                }
-            }
-            firmwareManager.updateStatus = "Main windows hidden. Stopping serial connections..."
-        }
-        
-        // Add a small delay to ensure video session is completely stopped
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Post notification to stop all other operations (serial, audio, HID)
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"),
-                object: nil
-            )
-            firmwareManager.updateStatus = "Stopping other operations..."
-        }
-        
-        // Additional delay to ensure all connections are properly closed
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds to ensure all operations stop
+        // Add a delay to ensure all operations have stopped
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         await MainActor.run {
             firmwareManager.updateStatus = "All operations stopped. Ready for firmware update..."

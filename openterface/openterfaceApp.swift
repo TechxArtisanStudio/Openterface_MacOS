@@ -420,6 +420,11 @@ struct openterfaceApp: App {
                 }) {
                     Text("Firmware Update Tool...")
                 }
+                Button(action: {
+                    showEdidNameWindow()
+                }) {
+                    Text("EDID Display Name Editor...")
+                }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
                 EmptyView()
@@ -709,5 +714,40 @@ func showFirmwareUpdateWindow() {
     window.isReleasedWhenClosed = false
     
     // Save window reference
+    NSApp.activate(ignoringOtherApps: true)
+}
+
+func showEdidNameWindow() {
+    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "edidNameWindow" }) {
+        // If window already exists, make it shake and bring to front
+        
+        // Use system-provided attention request (will make window or Dock icon bounce)
+        NSApp.requestUserAttention(.criticalRequest)
+        
+        // Bring window to front
+        existingWindow.makeKeyAndOrderFront(nil)
+        existingWindow.orderFrontRegardless()
+        return
+    }
+    
+    // If window doesn't exist, create a new one
+    let edidNameView = EdidNameView()
+    let controller = NSHostingController(rootView: edidNameView)
+    let window = NSWindow(contentViewController: controller)
+    window.title = "EDID Monitor Name Editor"
+    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "edidNameWindow")
+    window.setContentSize(NSSize(width: 450, height: 500))
+    window.styleMask = [.titled, .closable, .miniaturizable]
+    window.center()
+    
+    // Ensure window can accept key events and become first responder
+    window.acceptsMouseMovedEvents = true
+    
+    window.makeKeyAndOrderFront(nil)
+    
+    // Set callback when window closes to clear references
+    window.isReleasedWhenClosed = false
+    
+    // Save window reference and activate app
     NSApp.activate(ignoringOtherApps: true)
 }

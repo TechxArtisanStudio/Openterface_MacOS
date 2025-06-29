@@ -374,6 +374,14 @@ class KeyboardManager: ObservableObject {
         }
         
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            // Check if the current key window is an auxiliary window (like EDID editor)
+            // If so, let the event pass through to the window's text fields
+            if let keyWindow = NSApp.keyWindow,
+               let identifier = keyWindow.identifier?.rawValue,
+               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow")) {
+                return event // Let the event pass through to the window
+            }
+            
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             
@@ -426,6 +434,14 @@ class KeyboardManager: ObservableObject {
         }
 
         NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
+            // Check if the current key window is an auxiliary window (like EDID editor)
+            // If so, let the event pass through to the window's text fields
+            if let keyWindow = NSApp.keyWindow,
+               let identifier = keyWindow.identifier?.rawValue,
+               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow")) {
+                return event // Let the event pass through to the window
+            }
+            
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             
