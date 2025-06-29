@@ -628,7 +628,7 @@ class HIDManager {
             }
             
             // Add small delay between chunk reads for stability
-            Thread.sleep(forTimeInterval: 0.005) // 5ms delay
+            Thread.sleep(forTimeInterval: 0.05) // 50ms delay
         }
         
         Logger.shared.log(content: "EEPROM read completed successfully, read \(readData.count) bytes")
@@ -638,70 +638,54 @@ class HIDManager {
     /// Reads a single chunk from EEPROM using HID feature report
     /// - Parameters:
     ///   - address: The address to read from
-    ///   - length: Number of bytes to read (must be even, reads 2 bytes per command)
+    ///   - length: Number of bytes to read (reads 1 byte per command)
     /// - Returns: The read data chunk, or nil if failed
     private func readEepromChunk(address: UInt16, length: UInt8) -> Data? {
         let reportSize = 9
+        let cmdRead: UInt8 = 0xE5
         
-        // Based on Python MS2109Device.py implementation
-        // CMD_READ = 0xE5, and it reads 2 bytes per command from response indices 4 and 5
+        // Based on Python MS2109Device.py read_chunk() implementation
+        // Read one byte at a time since the device only supports single-byte reads
         var result = Data()
-        var currentAddress = address
-        let bytesPerCommand = 2
         
-        // Ensure we read in pairs of bytes as per the Python implementation
-        let numCommands = Int(length + 1) / bytesPerCommand // Round up division
-        
-        for _ in 0..<numCommands {
-            // Construct the read command: [report_id, cmd, addr_high, addr_low, length, padding]
+        for i in 0..<Int(length) {
+            let currentAddress = address + UInt16(i)
+            
+            // Construct the read command: [report_id=0, cmd, addr_high, addr_low, length=1, padding]
+            // Python format: [0, CMD_READ, addr_high, addr_low, length=1, padding]
             var report = [UInt8](repeating: 0, count: reportSize)
-            report[0] = 0xE5 // CMD_READ (from Python implementation)
+            report[0] = cmdRead                             // CMD_READ = 0xE5
             report[1] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
             report[2] = UInt8(currentAddress & 0xFF)        // Address low byte
-            report[3] = length                               // Length parameter
-            // Remaining bytes are already 0 from initialization
+            report[3] = 1                                   // Length = 1 (single byte read)
+            // Remaining bytes are already 0 from initialization (padding)
             
-            Logger.shared.log(content: "EEPROM Read Request: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            Logger.shared.log(content: "EEPROM Read Request [0x\(String(format: "%04X", currentAddress))]: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
             
             // Send read command using feature report
             if !sendHIDFeatureReport(report: report) {
-                Logger.shared.log(content: "Failed to send EEPROM read feature report")
+                Logger.shared.log(content: "Failed to send EEPROM read feature report at address 0x\(String(format: "%04X", currentAddress))")
                 return nil
             }
             
-            // Add delay for device processing
-            Thread.sleep(forTimeInterval: 0.01) // 10ms delay (less than before for efficiency)
+            // Add delay for device processing (similar to write operations)
+            Thread.sleep(forTimeInterval: 0.01) // 10ms delay
             
             // Read response using feature report
             guard let response = getHIDFeatureReport(bufferSize: reportSize) else {
-                Logger.shared.log(content: "Failed to get EEPROM read response")
+                Logger.shared.log(content: "Failed to get EEPROM read response at address 0x\(String(format: "%04X", currentAddress))")
                 return nil
             }
             
-            Logger.shared.log(content: "EEPROM Read Response: \(response.map { String(format: "%02X", $0) }.joined(separator: " "))")
-            
-            // Extract data from response at indices 4 and 5 (as per Python implementation)
-            if response.count >= 6 {
-                result.append(response[4])
-                if result.count < length { // Only append second byte if we need it
-                    result.append(response[5])
-                }
+            Logger.shared.log(content: "EEPROM Read Response [0x\(String(format: "%04X", currentAddress))]: \(response.map { String(format: "%02X", $0) }.joined(separator: " "))")
+
+            if response.count >= 4 {
+                // Fallback to index 3 if response is shorter
+                result.append(response[3])
             } else {
-                Logger.shared.log(content: "Invalid EEPROM read response length")
+                Logger.shared.log(content: "Invalid EEPROM read response length at address 0x\(String(format: "%04X", currentAddress)): expected >= 4, got \(response.count)")
                 return nil
             }
-            
-            currentAddress += UInt16(bytesPerCommand)
-            
-            // Break if we've read enough bytes
-            if result.count >= length {
-                break
-            }
-        }
-        
-        // Trim to exact requested length
-        if result.count > length {
-            result = result.prefix(Int(length))
         }
         
         return result
@@ -731,12 +715,6 @@ class HIDManager {
         
         let success = (result == kIOReturnSuccess)
         
-        if success {
-            print("Feature report sent successfully: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
-        } else {
-            print("Failed to send feature report: \(result), data: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
-        }
-        
         return success
     }
     
@@ -763,7 +741,6 @@ class HIDManager {
         
         if result == kIOReturnSuccess {
             let receivedData = Array(report[0..<reportLength])
-            print("Feature report received: \(receivedData.map { String(format: "%02X", $0) }.joined(separator: " "))")
             return receivedData
         } else {
             print("Failed to get feature report: \(result)")

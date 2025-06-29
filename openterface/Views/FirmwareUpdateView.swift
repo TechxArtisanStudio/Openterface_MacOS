@@ -51,23 +51,23 @@ enum FirmwareError: LocalizedError {
 }
 
 struct FirmwareUpdateView: View {
+    @StateObject private var firmwareManager = FirmwareManager.shared
     @State private var currentVersion: String = "Unknown"
     @State private var latestVersion: String = "Unknown"
-    @State private var isUpdateInProgress: Bool = false
-    @State private var updateProgress: Double = 0.0
-    @State private var updateStatus: String = ""
     @State private var showingConfirmation: Bool = false
-    @State private var isBackupInProgress: Bool = false
-    @State private var backupStatus: String = ""
     @State private var showingBackupAlert: Bool = false
     @State private var backupAlertMessage: String = ""
-    @State private var selectedBackupURL: URL?
+    @State private var showingUpdateCompletionAlert: Bool = false
+    @State private var updateSuccess: Bool = false
+    @State private var showingRestoreConfirmation: Bool = false
+    @State private var showingRestoreWarning: Bool = false
+    @State private var selectedRestoreFile: URL?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         VStack(spacing: 20) {
     
-            if !isUpdateInProgress {
+            if !firmwareManager.isUpdateInProgress {
                 // Firmware version information and confirmation dialog
                 VStack(alignment: .leading, spacing: 15) {
                     // Version information
@@ -78,6 +78,25 @@ struct FirmwareUpdateView: View {
                             Spacer()
                             Text(currentVersion)
                                 .foregroundColor(.secondary)
+                            
+                            // Backup button next to current version
+                            Button(action: {
+                                backupCurrentFirmware()
+                            }) {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 14))
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(currentVersion == "Unknown" || firmwareManager.isBackupInProgress)
+                            .help("Backup Current Firmware")
+                            .overlay(
+                                // Show progress indicator when backup is in progress
+                                firmwareManager.isBackupInProgress ? 
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                                : nil
+                            )
                         }
                         
                         HStack {
@@ -106,27 +125,12 @@ struct FirmwareUpdateView: View {
                                 .padding(.horizontal, 16)
                                 .background(Color.green.opacity(0.1))
                                 .cornerRadius(8)
-                            } else {
-                                // Update process information
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("The update process will:")
-                                        .fontWeight(.semibold)
-                                    
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text("1. Stop all video and USB operations")
-                                        Text("2. Install new firmware")
-                                        Text("3. Close the application automatically")
-                                    }
-                                    .padding(.leading, 10)
-                                }
                             }
                         }
                     }
                     
                     // Show important instructions only when update is available
-                    if currentVersion != latestVersion && currentVersion != "Unknown" && latestVersion != "Unknown" {
-                        Divider()
-                        
+                    if currentVersion != latestVersion && currentVersion != "Unknown" && latestVersion != "Checking..." {
                         // Important instructions
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Important:")
@@ -145,12 +149,12 @@ struct FirmwareUpdateView: View {
                     }
                     
                     // Show backup status if backup is in progress
-                    if isBackupInProgress {
+                    if firmwareManager.isBackupInProgress {
                         VStack(spacing: 8) {
                             HStack {
                                 ProgressView()
                                     .scaleEffect(0.8)
-                                Text(backupStatus)
+                                Text(firmwareManager.backupStatus)
                                     .foregroundColor(.blue)
                             }
                         }
@@ -158,6 +162,25 @@ struct FirmwareUpdateView: View {
                         .padding(.horizontal, 16)
                         .background(Color.blue.opacity(0.1))
                         .cornerRadius(8)
+                    }
+                    
+                    // Show update process information only when update is available and not in progress
+                    if !firmwareManager.isBackupInProgress && currentVersion != "Unknown" && currentVersion != latestVersion && latestVersion != "Unknown" && latestVersion != "Checking..." {
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Update process will:")
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("• Download the latest firmware from the official server")
+                                Text("• Install the new firmware to your device")
+                                Text("• Please disconnect and reconnect all cables after update")
+                            }
+                            .padding(.leading, 10)
+                            .foregroundColor(.secondary)
+                        }
                     }
                     
                     Spacer()
@@ -174,19 +197,12 @@ struct FirmwareUpdateView: View {
                         }
                         .keyboardShortcut(.escape)
                         
-                        // Backup button (always available when not updating)
-                        Button("Backup Current Firmware") {
-                            backupCurrentFirmware()
+                        Button("Restore Firmware...") {
+                            showingRestoreWarning = true
                         }
-                        .disabled(currentVersion == "Unknown" || isBackupInProgress)
-                        .overlay(
-                            // Show progress indicator when backup is in progress
-                            isBackupInProgress ? 
-                            ProgressView()
-                                .scaleEffect(0.6)
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            : nil
-                        )
+                        .buttonStyle(.bordered)
+                        .disabled(firmwareManager.isUpdateInProgress || firmwareManager.isBackupInProgress)
+                        .help("Restore firmware from a backup file")
                         
                         Spacer()
                         
@@ -205,7 +221,7 @@ struct FirmwareUpdateView: View {
                                 showingConfirmation = true
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(currentVersion == latestVersion || currentVersion == "Unknown" || latestVersion == "Unknown")
+                            .disabled(currentVersion == latestVersion || currentVersion == "Unknown" || latestVersion == "Unknown" || firmwareManager.isBackupInProgress)
                         }
                     }
                 }
@@ -217,15 +233,15 @@ struct FirmwareUpdateView: View {
                         .font(.title3)
                         .fontWeight(.semibold)
                     
-                    ProgressView(value: updateProgress)
+                    ProgressView(value: firmwareManager.updateProgress)
                         .progressViewStyle(LinearProgressViewStyle())
                         .frame(height: 8)
                     
-                    Text(updateStatus)
+                    Text(firmwareManager.updateStatus)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                     
-                    if updateProgress < 1.0 {
+                    if firmwareManager.updateProgress < 1.0 {
                         Text("Please do not disconnect or power off the device")
                             .font(.caption)
                             .foregroundColor(.orange)
@@ -233,7 +249,7 @@ struct FirmwareUpdateView: View {
                     }
                     
                     // Show close button when update is completed successfully
-                    if updateProgress >= 1.0 {
+                    if firmwareManager.updateProgress >= 1.0 {
                         VStack(spacing: 10) {
                             HStack {
                                
@@ -258,6 +274,7 @@ struct FirmwareUpdateView: View {
         .frame(width: 500, height: 400)
         .onAppear {
             loadFirmwareVersions()
+            setupFirmwareManagerObservers()
         }
         .alert("Confirm Firmware Update", isPresented: $showingConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -272,7 +289,57 @@ struct FirmwareUpdateView: View {
         } message: {
             Text(backupAlertMessage)
         }
+        .alert("Firmware Update Complete", isPresented: $showingUpdateCompletionAlert) {
+            Button("I Understand") {
+                // Exit the application
+                NSApplication.shared.terminate(nil)
+            }
+        } message: {
+            if updateSuccess {
+                Text("Firmware update completed successfully!\n\nTo ensure the new firmware takes effect, please:\n• Unplug all cables from the device\n• Wait 5 seconds\n• Reconnect all cables\n\nThe application will now close.")
+            } else {
+                Text("Firmware update failed. Please try again or contact support.")
+            }
+        }
+        .alert("⚠️ Firmware Restore Warning", isPresented: $showingRestoreWarning) {
+            Button("Cancel", role: .cancel) { }
+            Button("I Understand the Risks", role: .destructive) {
+                showRestoreFileSelector()
+            }
+        } message: {
+            Text("WARNING: Restoring firmware from a file is a potentially dangerous operation that could permanently damage your device.\n\n• Only use firmware files specifically designed for your device\n• Ensure the file is from a trusted source\n• Do not interrupt the process once started\n• The device may become unusable if incorrect firmware is installed\n\nProceed only if you understand these risks.")
+        }
+        .alert("Confirm Firmware Restore", isPresented: $showingRestoreConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Restore Now", role: .destructive) {
+                startFirmwareRestore()
+            }
+        } message: {
+            Text("Are you sure you want to restore firmware from the selected file? This process cannot be undone and may render your device unusable if the firmware is incompatible.")
+        }
     }
+    
+    private func setupFirmwareManagerObservers() {
+        // Observe backup completion
+        firmwareManager.firmwareBackupComplete
+            .receive(on: DispatchQueue.main)
+            .sink { (success, message) in
+                backupAlertMessage = message
+                showingBackupAlert = true
+            }
+            .store(in: &cancellables)
+        
+        // Observe firmware update completion
+        firmwareManager.firmwareWriteComplete
+            .receive(on: DispatchQueue.main)
+            .sink { success in
+                updateSuccess = success
+                showingUpdateCompletionAlert = true
+            }
+            .store(in: &cancellables)
+    }
+    
+    @State private var cancellables = Set<AnyCancellable>()
     
     private func loadFirmwareVersions() {
         // Load current firmware version from device
@@ -359,10 +426,6 @@ struct FirmwareUpdateView: View {
     }
     
     private func startFirmwareUpdate() {
-        isUpdateInProgress = true
-        updateProgress = 0.0
-        updateStatus = "Preparing for update..."
-        
         Task {
             await performFirmwareUpdate()
         }
@@ -370,44 +433,21 @@ struct FirmwareUpdateView: View {
     
     private func performFirmwareUpdate() async {
         // Step 1: Stop all operations before firmware update
-        updateStatus = "Stopping operations..."
-        updateProgress = 0.05
+        await MainActor.run {
+            firmwareManager.updateStatus = "Stopping operations..."
+            firmwareManager.updateProgress = 0.05
+        }
         
         await stopAllOperations()
         
-        // Step 2: Download and install firmware
-        do {
-            // Download firmware
-            updateStatus = "Downloading firmware..."
-            updateProgress = 0.2
-            let firmwareData = try await downloadLatestFirmware()
-            
-            // Install firmware
-            updateStatus = "Installing firmware to EEPROM..."
-            updateProgress = 0.4
-            let success = await writeFirmwareToEeprom(data: firmwareData)
-            
-            await MainActor.run {
-                if success {
-                    updateProgress = 1.0
-                    updateStatus = "Firmware update completed successfully!\n\nPlease:\n1. Restart the application\n2. Disconnect and reconnect all cables"
-                } else {
-                    updateStatus = "Firmware update failed. Please try again."
-                    isUpdateInProgress = false
-                }
-            }
-        } catch {
-            await MainActor.run {
-                updateStatus = "Firmware update failed: \(error.localizedDescription)"
-                isUpdateInProgress = false
-            }
-        }
+        // Step 2: Use FirmwareManager to handle the update
+        await firmwareManager.loadFirmwareToEeprom()
     }
     
     /// Stops all operations before firmware update
     private func stopAllOperations() async {
         await MainActor.run {
-            updateStatus = "Stopping video operations..."
+            firmwareManager.updateStatus = "Stopping video operations..."
         }
         
         // Stop video operations directly and completely
@@ -423,7 +463,7 @@ struct FirmwareUpdateView: View {
             videoInputs.forEach { videoManager.captureSession.removeInput($0) }
             videoManager.captureSession.commitConfiguration()
             
-            updateStatus = "Video completely stopped. Closing main windows..."
+            firmwareManager.updateStatus = "Video completely stopped. Closing main windows..."
         }
         
         // Close main application windows (except firmware update window)
@@ -436,7 +476,7 @@ struct FirmwareUpdateView: View {
                     window.orderOut(nil) // Hide the window instead of closing it completely
                 }
             }
-            updateStatus = "Main windows hidden. Stopping serial connections..."
+            firmwareManager.updateStatus = "Main windows hidden. Stopping serial connections..."
         }
         
         // Add a small delay to ensure video session is completely stopped
@@ -448,14 +488,14 @@ struct FirmwareUpdateView: View {
                 name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"),
                 object: nil
             )
-            updateStatus = "Stopping other operations..."
+            firmwareManager.updateStatus = "Stopping other operations..."
         }
         
         // Additional delay to ensure all connections are properly closed
         try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds to ensure all operations stop
         
         await MainActor.run {
-            updateStatus = "All operations stopped. Ready for firmware update..."
+            firmwareManager.updateStatus = "All operations stopped. Ready for firmware update..."
         }
     }
     
@@ -499,23 +539,24 @@ struct FirmwareUpdateView: View {
         
         // Update progress to show start of EEPROM write
         await MainActor.run {
-            updateProgress = 0.4
-            updateStatus = "Installing firmware to EEPROM..."
+            firmwareManager.updateProgress = 0.4
+            firmwareManager.updateStatus = "Installing firmware to EEPROM..."
         }
         
         // Use HID Manager directly with progress tracking
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .background).async {
                 let hidManager = HIDManager.shared
+                let firmwareManagerRef = self.firmwareManager
                 let success = hidManager.writeEeprom(address: 0x0000, data: data) { progress in
                     // Update progress on main thread
                     DispatchQueue.main.async {
                         // Map progress from 0.4 to 1.0 (40% to 100%)
                         let overallProgress = 0.4 + (progress * 0.6)
-                        self.updateProgress = overallProgress
+                        firmwareManagerRef.updateProgress = overallProgress
                         
                         let progressPercent = Int(overallProgress * 100)
-                        self.updateStatus = "Installing firmware to EEPROM... \(progressPercent)%"
+                        firmwareManagerRef.updateStatus = "Installing firmware to EEPROM... \(progressPercent)%"
                     }
                 }
                 
@@ -531,7 +572,8 @@ struct FirmwareUpdateView: View {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
         let timestamp = dateFormatter.string(from: Date())
-        let defaultFilename = "Openterface_Firmware_Backup_v\(currentVersion)_\(timestamp).bin"
+        let versionString = currentVersion != "Unknown" ? currentVersion : "Unknown"
+        let defaultFilename = "Openterface_Firmware_Backup_v\(versionString)_\(timestamp).bin"
         
         // Show save dialog to let user choose backup location
         let savePanel = NSSavePanel()
@@ -549,173 +591,71 @@ struct FirmwareUpdateView: View {
         
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
-                selectedBackupURL = url
-                isBackupInProgress = true
-                backupStatus = "Preparing to backup firmware..."
-                
                 Task {
-                    await performFirmwareBackup()
+                    await performFirmwareBackup(to: url)
                 }
             }
         }
     }
     
-    private func performFirmwareBackup() async {
-        guard let backupURL = selectedBackupURL else {
-            await MainActor.run {
-                isBackupInProgress = false
-                backupAlertMessage = "No backup location selected."
-                showingBackupAlert = true
-            }
-            return
-        }
-        
+    private func performFirmwareBackup(to backupURL: URL) async {
+        // Step 1: Stop all operations before firmware backup to avoid conflicts
         await MainActor.run {
-            backupStatus = "Determining firmware size..."
+            firmwareManager.backupStatus = "Stopping operations before backup..."
         }
         
-        // First, try to determine the actual firmware size
-        let firmwareSize = await determineFirmwareSize()
+        await stopAllOperations()
         
+        // Step 2: Use FirmwareManager to handle the backup process
+        await firmwareManager.backupFirmware(to: backupURL)
+    }
+    
+    // MARK: - Firmware Restore Functions
+    
+    private func showRestoreFileSelector() {
+        let openPanel = NSOpenPanel()
+        openPanel.title = "Select Firmware File to Restore"
+        openPanel.message = "Choose the firmware backup file (.bin) to restore"
+        openPanel.allowedContentTypes = [.data]
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+        
+        // Set default directory to Desktop
+        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
+            openPanel.directoryURL = desktopURL
+        }
+        
+        openPanel.begin { response in
+            if response == .OK, let url = openPanel.url {
+                selectedRestoreFile = url
+                showingRestoreConfirmation = true
+            }
+        }
+    }
+    
+    private func startFirmwareRestore() {
+        guard let restoreFile = selectedRestoreFile else { return }
+        
+        Task {
+            await performFirmwareRestore(from: restoreFile)
+        }
+    }
+    
+    private func performFirmwareRestore(from fileURL: URL) async {
+        // Step 1: Stop all operations before firmware restore
         await MainActor.run {
-            backupStatus = "Reading \(firmwareSize) bytes of firmware from device..."
+            firmwareManager.updateStatus = "Stopping operations..."
+            firmwareManager.updateProgress = 0.0
         }
         
-        let firmwareStartAddress: UInt16 = 0x0000 // Start from beginning of EEPROM
+        await stopAllOperations()
         
-        // Read firmware data from EEPROM using the HIDManager
-        // Need to split large reads into smaller chunks due to UInt8 length limitation
-        let allFirmwareData = await readFirmwareData(
-            startAddress: firmwareStartAddress,
-            totalSize: firmwareSize,
-            onProgress: { status in
-                backupStatus = status
-            },
-            onError: { errorMessage in
-                isBackupInProgress = false
-                backupAlertMessage = errorMessage
-                showingBackupAlert = true
-            }
-        )
-        
-        guard let firmwareData = allFirmwareData else {
-            await MainActor.run {
-                isBackupInProgress = false
-                backupAlertMessage = "Failed to read firmware from device. Please ensure the device is properly connected."
-                showingBackupAlert = true
-            }
-            return
-        }
-        
-        await MainActor.run {
-            backupStatus = "Saving backup file..."
-        }
-        
-        // Save firmware data to the selected file location
-        let success = await saveFirmwareBackup(data: firmwareData, to: backupURL)
-        
-        await MainActor.run {
-            isBackupInProgress = false
-            if success {
-                backupAlertMessage = "Firmware backup completed successfully!\n\nFile saved as: \(backupURL.lastPathComponent)\nSize: \(firmwareData.count) bytes\nLocation: \(backupURL.deletingLastPathComponent().path)"
-            } else {
-                backupAlertMessage = "Failed to save firmware backup file. Please check permissions and try again."
-            }
-            showingBackupAlert = true
-        }
+        // Step 2: Use FirmwareManager to handle the restore process
+        await firmwareManager.restoreFirmware(from: fileURL)
     }
-    
-    /// Determines the actual firmware size by reading the EEPROM
-    /// Based on the Python implementation which uses 0x05B0 (1456 bytes) as the full EEPROM size
-    private func determineFirmwareSize() async -> Int {
-        // The MS2109 EEPROM typically contains firmware up to address 0x05B0 (1456 bytes)
-        // This is based on the Python implementation and actual device specifications
-        let standardEepromSize = 0x05B0 // 1456 bytes
-        
-        // For now, we'll use the standard size. In the future, we could implement
-        // dynamic size detection by reading until we find empty regions (0xFF patterns)
-        // or by reading specific EEPROM headers that might contain size information
-        
-        Logger.shared.log(content: "Using standard MS2109 EEPROM size: \(standardEepromSize) bytes (0x\(String(format: "%04X", standardEepromSize)))")
-        
-        return standardEepromSize
-    }
-    
-    /// Alternative method to detect firmware end by scanning for empty regions
-    /// This could be used in the future for more accurate size detection
-    private func detectFirmwareEndAddress() async -> Int? {
-        // Start from a reasonable point and scan backwards for non-0xFF data
-        // This would be useful for firmware that doesn't fill the entire EEPROM
-        let maxScanAddress = 0x05B0
-        let scanChunkSize = 16
-        
-        // Scan from the end backwards to find the last non-empty region
-        for address in stride(from: maxScanAddress - scanChunkSize, through: 0, by: -scanChunkSize) {
-            if let data = HIDManager.shared.readEeprom(address: UInt16(address), length: UInt8(min(scanChunkSize, maxScanAddress - address))) {
-                // Check if this chunk contains non-0xFF data
-                if data.contains(where: { $0 != 0xFF }) {
-                    // Found non-empty data, the firmware likely extends to this point
-                    Logger.shared.log(content: "Detected firmware end near address: 0x\(String(format: "%04X", address + scanChunkSize))")
-                    return address + scanChunkSize
-                }
-            }
-        }
-        
-        // If we couldn't detect the end, return nil to use the standard size
-        return nil
-    }
-    
-    private func saveFirmwareBackup(data: Data, to url: URL) async -> Bool {
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .background).async {
-                do {
-                    // Write firmware data to the selected file location
-                    try data.write(to: url)
-                    
-                    print("Firmware backup saved to: \(url.path)")
-                    continuation.resume(returning: true)
-                } catch {
-                    print("Failed to save firmware backup: \(error)")
-                    continuation.resume(returning: false)
-                }
-            }
-        }
-    }
-    
-    /// Reads firmware data from EEPROM in chunks with progress updates
-    private func readFirmwareData(
-        startAddress: UInt16, 
-        totalSize: Int,
-        onProgress: @MainActor @escaping (String) -> Void = { _ in },
-        onError: @MainActor @escaping (String) -> Void = { _ in }
-    ) async -> Data? {
-        var allFirmwareData = Data()
-        var currentAddress = startAddress
-        var remainingBytes = totalSize
-        
-        while remainingBytes > 0 {
-            let chunkSize = min(255, remainingBytes) // Max UInt8 value
-            
-            guard let chunkData = HIDManager.shared.readEeprom(address: currentAddress, length: UInt8(chunkSize)) else {
-                await onError("Failed to read firmware from device at address 0x\(String(format: "%04X", currentAddress)). Please ensure the device is properly connected.")
-                return nil
-            }
-            
-            allFirmwareData.append(chunkData)
-            currentAddress += UInt16(chunkSize)
-            remainingBytes -= chunkSize
-            
-            // Update progress
-            let progress = Double(allFirmwareData.count) / Double(totalSize)
-            await onProgress("Reading firmware... \(Int(progress * 100))% (\(allFirmwareData.count)/\(totalSize) bytes)")
-        }
-        
-        return allFirmwareData
-    }
-    
 }
 
 #Preview {
     FirmwareUpdateView()
 }
-

@@ -46,6 +46,7 @@
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
+		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
 /* End PBXBuildFile section */
 
@@ -110,6 +111,7 @@
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
+		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -252,6 +254,7 @@
 				53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */,
 				53F7C7122B440C8E00ED872F /* SerialPortManger.swift */,
 				53CC66092B8EDB390081F927 /* LoggerManager.swift */,
+				BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */,
 				295DCFB52D76A8A20034BB1E /* AudioManger.swift */,
@@ -432,6 +435,7 @@
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				538462992BFF12D2002966FE /* SCContext.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
+				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,
 				6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */,
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
