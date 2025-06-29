@@ -37,6 +37,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     public static let CMD_GET_PARA_CFG: [UInt8] = [0x57, 0xAB, 0x00, 0x08, 0x00]
     public static let CMD_RESET: [UInt8] = [0x57, 0xAB, 0x00, 0x0F, 0x00]
     
+    // USB Configuration commands
+    public static let CMD_SET_PARA_CFG_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32]
+    public static let CMD_SET_USB_STRING_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x0A]
+    public static let RESERVED_2BYTES: [UInt8] = [0x80, 0x00]
+    public static let PACKAGE_INTERVAL: [UInt8] = [0x00, 0x01]
+    public static let KEYBOARD_UPLOAD_INTERVAL: [UInt8] = [0xC2, 0x00]
+    public static let KEYBOARD_RELEASE_TIMEOUT: [UInt8] = [0x00, 0x00]
+    public static let KEYBOARD_AUTO_ENTER: [UInt8] = [0x00, 0x00]
+    public static let KEYBOARD_ENTER: [UInt8] = [0x00, 0x00]
+    public static let FILTER: [UInt8] = [0x00, 0x00]
+    public static let SPEED_MODE: [UInt8] = [0x00, 0x00]
+    public static let RESERVED_4BYTES: [UInt8] = [0x00, 0x00, 0x00, 0x00]
+    
     public static let ORIGINAL_BAUDRATE:Int = 9600
     public static let DEFAULT_BAUDRATE:Int = 115200
     
@@ -309,14 +322,20 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 return intPointer[0].bigEndian
             }
             self.baudrate = Int(baudrateInt32)
-            Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
-            if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
+            
+            // Get the desired operating mode from UserDefaults, default to 0x82 if not defined
+            let userDefaults = UserDefaults.standard
+            let desiredMode = userDefaults.object(forKey: "hardware_operatingMode") as? Int ?? 0x82
+            
+            Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode)), Desired mode: \(String(format: "%02X", desiredMode))")
+            
+            if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == desiredMode {
                 self.isDeviceReady = true
                 self.getHidInfo()  
             }
             else {
-                Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")
-                var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
+                Logger.shared.log(content: "Reset to baudrate 115200 and mode \(String(format: "%02X", desiredMode))...")
+                var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, UInt8(desiredMode), 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
                 command.append(contentsOf: data[12...31])
                 for _ in 0...22 {
                     command.append(0x00)
@@ -578,5 +597,146 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func raiseRTS() {
         setRTS(true)
+    }
+    
+    // MARK: - USB Configuration Methods
+    
+    /// Set USB configuration with VID, PID and other parameters
+    func setUSBConfiguration() {
+        let userDefaults = UserDefaults.standard
+        
+        let vidString = userDefaults.string(forKey: "serial_vid") ?? "86 1A"
+        let pidString = userDefaults.string(forKey: "serial_pid") ?? "29 E1"
+        let enableString = userDefaults.string(forKey: "serial_enableflag") ?? "00"
+        
+        guard let vidBytes = convertStringToByteArray(vidString),
+              let pidBytes = convertStringToByteArray(pidString),
+              let enableBytes = convertStringToByteArray(enableString) else {
+            Logger.shared.log(content: "Failed to convert USB configuration strings to bytes")
+            return
+        }
+        
+        var command = SerialPortManager.CMD_SET_PARA_CFG_PREFIX
+        
+        // Get the operating mode from UserDefaults, default to 0x82 if not defined
+        let mode = userDefaults.object(forKey: "hardware_operatingMode") as? Int ?? 0x82
+        command.append(UInt8(mode))
+        
+        // Add configuration data
+        command.append(contentsOf: SerialPortManager.RESERVED_2BYTES)
+        command.append(contentsOf: SerialPortManager.PACKAGE_INTERVAL)
+        command.append(contentsOf: vidBytes)
+        command.append(contentsOf: pidBytes)
+        command.append(contentsOf: SerialPortManager.KEYBOARD_UPLOAD_INTERVAL)
+        command.append(contentsOf: SerialPortManager.KEYBOARD_RELEASE_TIMEOUT)
+        command.append(contentsOf: SerialPortManager.KEYBOARD_AUTO_ENTER)
+        command.append(contentsOf: SerialPortManager.KEYBOARD_ENTER)
+        command.append(contentsOf: SerialPortManager.FILTER)
+        command.append(contentsOf: enableBytes)
+        command.append(contentsOf: SerialPortManager.SPEED_MODE)
+        command.append(contentsOf: SerialPortManager.RESERVED_4BYTES)
+        command.append(contentsOf: SerialPortManager.RESERVED_4BYTES)
+        command.append(contentsOf: SerialPortManager.RESERVED_4BYTES)
+        
+        if Logger.shared.SerialDataPrint {
+            let commandString = command.map { String(format: "%02X", $0) }.joined(separator: " ")
+            Logger.shared.log(content: "USB configuration command (no checksum): \(commandString)")
+        }
+        
+        if serialPort != nil && serialPort!.isOpen {
+            sendCommand(command: command, force: true)
+            Logger.shared.log(content: "USB configuration command sent")
+        }
+    }
+    
+    /// Change USB descriptor strings (manufacturer, product, serial number)
+    func changeUSBDescriptor() {
+        let userDefaults = UserDefaults.standard
+        
+        let usbDescriptors = [
+            userDefaults.string(forKey: "serial_customVIDDescriptor") ?? "www.openterface.com", // Index 0
+            userDefaults.string(forKey: "serial_customPIDDescriptor") ?? "test",                // Index 1
+            userDefaults.string(forKey: "serial_serialnumber") ?? "1"                          // Index 2
+        ]
+        
+        let enableFlagString = userDefaults.string(forKey: "serial_enableflag") ?? "00"
+        
+        guard let enableFlag = UInt8(enableFlagString, radix: 16) else {
+            Logger.shared.log(content: "Failed to convert enable flag to hex")
+            return
+        }
+        
+        // Extract bits from enable flag
+        let bits = [
+            (enableFlag >> 0) & 1,  // Bit 0
+            (enableFlag >> 1) & 1,  // Bit 1
+            (enableFlag >> 2) & 1,  // Bit 2
+            (enableFlag >> 7) & 1   // Bit 7
+        ]
+        
+        if Logger.shared.SerialDataPrint {
+            Logger.shared.log(content: "Enable flag bits: \(bits)")
+        }
+        
+        // Check if bit 7 is set (descriptor update enabled)
+        if bits[3] == 1 {
+            for i in 0..<3 {
+                if bits[i] == 1 {
+                    var command = SerialPortManager.CMD_SET_USB_STRING_PREFIX
+                    
+                    let descriptorData = Data(usbDescriptors[i].utf8)
+                    let descriptorSize = descriptorData.count
+                    
+                    // Calculate lengths
+                    let totalLength = descriptorSize + 2
+                    let descriptorType = UInt8(i) // 0, 1, or 2 for the three descriptor types
+                    
+                    // Append data to command
+                    command.append(UInt8(totalLength))
+                    command.append(0x03) // String descriptor type
+                    command.append(descriptorType)
+                    command.append(UInt8(descriptorSize))
+                    command.append(contentsOf: descriptorData)
+                    
+                    if Logger.shared.SerialDataPrint {
+                        let commandString = command.map { String(format: "%02X", $0) }.joined(separator: " ")
+                        Logger.shared.log(content: "USB descriptor \(i) command: \(commandString)")
+                    }
+                    
+                    if serialPort != nil && serialPort!.isOpen {
+                        sendCommand(command: command, force: true)
+                        Logger.shared.log(content: "USB descriptor \(i) command sent")
+                    }
+                    
+                    // Add delay between commands
+                    Thread.sleep(forTimeInterval: 0.01) // 10ms delay
+                }
+            }
+        }
+    }
+    
+    /// Helper method to convert hex string to byte array (similar to GlobalSetting::convertStringToByteArray)
+    private func convertStringToByteArray(_ hexString: String) -> [UInt8]? {
+        let cleanString = hexString.replacingOccurrences(of: " ", with: "")
+        
+        guard cleanString.count % 2 == 0 else {
+            return nil
+        }
+        
+        var bytes: [UInt8] = []
+        
+        for i in stride(from: 0, to: cleanString.count, by: 2) {
+            let startIndex = cleanString.index(cleanString.startIndex, offsetBy: i)
+            let endIndex = cleanString.index(startIndex, offsetBy: 2)
+            let byteString = String(cleanString[startIndex..<endIndex])
+            
+            if let byte = UInt8(byteString, radix: 16) {
+                bytes.append(byte)
+            } else {
+                return nil
+            }
+        }
+        
+        return bytes
     }
 }

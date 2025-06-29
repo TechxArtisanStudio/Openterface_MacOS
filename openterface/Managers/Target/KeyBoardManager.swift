@@ -27,6 +27,14 @@ class KeyboardManager: ObservableObject {
     static let SHIFT_KEYS = ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+", "{", "}", "|", ":", "\"", "<", ">", "?"]
     static let shared = KeyboardManager()
 
+    // List of window identifier exceptions for passing key events to dialogs
+    private let eventWindowExceptions: [String] = [
+        "edidNameWindow",
+        "firmwareUpdateWindow",
+        "resetSerialToolWindow",
+        "targetUSBEditorWindow"
+    ]
+
     var escKeyDownCounts = 0
     var escKeyDownTimeStart = 0.0
     
@@ -374,11 +382,9 @@ class KeyboardManager: ObservableObject {
         }
         
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            // Check if the current key window is an auxiliary window (like EDID editor)
-            // If so, let the event pass through to the window's text fields
             if let keyWindow = NSApp.keyWindow,
                let identifier = keyWindow.identifier?.rawValue,
-               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow")) {
+               self.eventWindowExceptions.contains(where: { identifier.contains($0) }) {
                 return event // Let the event pass through to the window
             }
             
@@ -434,11 +440,9 @@ class KeyboardManager: ObservableObject {
         }
 
         NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
-            // Check if the current key window is an auxiliary window (like EDID editor)
-            // If so, let the event pass through to the window's text fields
             if let keyWindow = NSApp.keyWindow,
                let identifier = keyWindow.identifier?.rawValue,
-               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow")) {
+               self.eventWindowExceptions.contains(where: { identifier.contains($0) }) {
                 return event // Let the event pass through to the window
             }
             

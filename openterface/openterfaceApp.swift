@@ -423,7 +423,12 @@ struct openterfaceApp: App {
                 Button(action: {
                     showEdidNameWindow()
                 }) {
-                    Text("EDID Display Name Editor...")
+                    Text("Target EDID(Display Name) Editor...")
+                }
+                Button(action: {
+                    showTargetUSBEditorWindow()
+                }) {
+                    Text("Target USB Editor...")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -738,6 +743,41 @@ func showEdidNameWindow() {
     window.identifier = NSUserInterfaceItemIdentifier(rawValue: "edidNameWindow")
     window.setContentSize(NSSize(width: 450, height: 500))
     window.styleMask = [.titled, .closable, .miniaturizable]
+    window.center()
+    
+    // Ensure window can accept key events and become first responder
+    window.acceptsMouseMovedEvents = true
+    
+    window.makeKeyAndOrderFront(nil)
+    
+    // Set callback when window closes to clear references
+    window.isReleasedWhenClosed = false
+    
+    // Save window reference and activate app
+    NSApp.activate(ignoringOtherApps: true)
+}
+
+func showTargetUSBEditorWindow() {
+    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "targetUSBEditorWindow" }) {
+        // If window already exists, make it shake and bring to front
+        
+        // Use system-provided attention request (will make window or Dock icon bounce)
+        NSApp.requestUserAttention(.criticalRequest)
+        
+        // Bring window to front
+        existingWindow.makeKeyAndOrderFront(nil)
+        existingWindow.orderFrontRegardless()
+        return
+    }
+    
+    // If window doesn't exist, create a new one
+    let targetUSBEditorView = TargetUSBEditorView()
+    let controller = NSHostingController(rootView: targetUSBEditorView)
+    let window = NSWindow(contentViewController: controller)
+    window.title = "Target USB Editor"
+    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "targetUSBEditorWindow")
+    window.setContentSize(NSSize(width: 400, height: 600))
+    window.styleMask = [.titled, .closable]
     window.center()
     
     // Ensure window can accept key events and become first responder

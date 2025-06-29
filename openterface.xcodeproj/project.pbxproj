@@ -47,6 +47,7 @@
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
+		BFDE57D02E117B06000BB8BB /* TargetUSBEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CF2E117B06000BB8BB /* TargetUSBEditorView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
 /* End PBXBuildFile section */
 
@@ -111,6 +112,7 @@
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
+		BFDE57CF2E117B06000BB8BB /* TargetUSBEditorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetUSBEditorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -261,6 +263,7 @@
 				53955CBF2BF497D000FA4493 /* SettingsScreen.swift */,
 				538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */,
 				2950CB502CE33C8D00888267 /* USBDevicesView.swift */,
+				BFDE57CF2E117B06000BB8BB /* TargetUSBEditorView.swift */,
 				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
 				29267D562DACB7E2006D5107 /* WindowUtils.swift */,
 				6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */,
@@ -429,6 +432,7 @@
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
+				BFDE57D02E117B06000BB8BB /* TargetUSBEditorView.swift in Sources */,
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,
 				53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */,
