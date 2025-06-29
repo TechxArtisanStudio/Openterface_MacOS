@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		29267D572DACB7E3006D5107 /* WindowUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29267D562DACB7E2006D5107 /* WindowUtils.swift */; };
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
-		295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManger.swift */; };
+		295DCFB62D76A8A20034BB1E /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManager.swift */; };
 		296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */; };
 		29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */; };
 		5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5308F43B2B5A1A3800BADF35 /* UserSetting.swift */; };
@@ -35,7 +35,6 @@
 		53FBE7AE2B3D66D2007785B0 /* openterfaceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */; };
 		53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AF2B3D66D2007785B0 /* ContentView.swift */; };
 		53FBE7B22B3D66D6007785B0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 53FBE7B12B3D66D6007785B0 /* Assets.xcassets */; };
-		53FBE7B52B3D66D6007785B0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 53FBE7B42B3D66D6007785B0 /* Preview Assets.xcassets */; };
 		53FBE7C02B3D66D6007785B0 /* openterfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7BF2B3D66D6007785B0 /* openterfaceTests.swift */; };
 		53FBE7CA2B3D66D6007785B0 /* openterfaceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7C92B3D66D6007785B0 /* openterfaceUITests.swift */; };
 		53FBE7CC2B3D66D6007785B0 /* openterfaceUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7CB2B3D66D6007785B0 /* openterfaceUITestsLaunchTests.swift */; };
@@ -47,6 +46,7 @@
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
+		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
 /* End PBXBuildFile section */
 
@@ -70,7 +70,7 @@
 /* Begin PBXFileReference section */
 		29267D562DACB7E2006D5107 /* WindowUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowUtils.swift; sourceTree = "<group>"; };
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
-		295DCFB52D76A8A20034BB1E /* AudioManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManger.swift; sourceTree = "<group>"; };
+		295DCFB52D76A8A20034BB1E /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoManager.swift; sourceTree = "<group>"; };
 		29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetFactoryView.swift; sourceTree = "<group>"; };
 		5308F43B2B5A1A3800BADF35 /* UserSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSetting.swift; sourceTree = "<group>"; };
@@ -95,7 +95,6 @@
 		53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = openterfaceApp.swift; sourceTree = "<group>"; };
 		53FBE7AF2B3D66D2007785B0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		53FBE7B12B3D66D6007785B0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		53FBE7B42B3D66D6007785B0 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		53FBE7B62B3D66D6007785B0 /* openterface.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = openterface.entitlements; sourceTree = "<group>"; };
 		53FBE7BB2B3D66D6007785B0 /* openterfaceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = openterfaceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		53FBE7BF2B3D66D6007785B0 /* openterfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = openterfaceTests.swift; sourceTree = "<group>"; };
@@ -107,11 +106,11 @@
 		53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareUpdateView.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
-		6BAFEFD52E03D04F004331F6 /* WindowAccessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAccessor.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
+		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,7 +204,6 @@
 			isa = PBXGroup;
 			children = (
 				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
-				6BAFEFD52E03D04F004331F6 /* WindowAccessor.swift */,
 				53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */,
 				53FBE7AF2B3D66D2007785B0 /* ContentView.swift */,
 				53FBE7D82B3D676A007785B0 /* Managers */,
@@ -215,17 +213,8 @@
 				538462972BFF1271002966FE /* ShotOrc */,
 				53FBE7B12B3D66D6007785B0 /* Assets.xcassets */,
 				53FBE7B62B3D66D6007785B0 /* openterface.entitlements */,
-				53FBE7B32B3D66D6007785B0 /* Preview Content */,
 			);
 			path = openterface;
-			sourceTree = "<group>";
-		};
-		53FBE7B32B3D66D6007785B0 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				53FBE7B42B3D66D6007785B0 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
 			sourceTree = "<group>";
 		};
 		53FBE7BE2B3D66D6007785B0 /* openterfaceTests */ = {
@@ -257,7 +246,7 @@
 				BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */,
-				295DCFB52D76A8A20034BB1E /* AudioManger.swift */,
+				295DCFB52D76A8A20034BB1E /* AudioManager.swift */,
 				296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */,
 			);
 			path = Managers;
@@ -275,6 +264,7 @@
 				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
 				29267D562DACB7E2006D5107 /* WindowUtils.swift */,
 				6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */,
+				BFDE57CD2E116383000BB8BB /* EdidNameView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -401,7 +391,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				53FBE7B52B3D66D6007785B0 /* Preview Assets.xcassets in Resources */,
 				53FBE7B22B3D66D6007785B0 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -427,7 +416,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				295DCFB62D76A8A20034BB1E /* AudioManger.swift in Sources */,
+				295DCFB62D76A8A20034BB1E /* AudioManager.swift in Sources */,
 				296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */,
 				5384629B2BFF1778002966FE /* AreaSeletor.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
@@ -453,6 +442,7 @@
 				5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */,
 				53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */,
 				29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */,
+				BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */,
 				53A6E1BF2B3E943300B652A5 /* PlayerView.swift in Sources */,
 				6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */,
 				5351254D2B59177F0002A91E /* HostManager.swift in Sources */,

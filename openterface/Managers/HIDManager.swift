@@ -638,29 +638,30 @@ class HIDManager {
     /// Reads a single chunk from EEPROM using HID feature report
     /// - Parameters:
     ///   - address: The address to read from
-    ///   - length: Number of bytes to read (reads 1 byte per command)
+    ///   - length: Number of bytes to read (can read up to 5 bytes per command)
     /// - Returns: The read data chunk, or nil if failed
     private func readEepromChunk(address: UInt16, length: UInt8) -> Data? {
         let reportSize = 9
         let cmdRead: UInt8 = 0xE5
+        let maxBytesPerRead: UInt8 = 5 // Maximum bytes we can read in one command
         
-        // Based on Python MS2109Device.py read_chunk() implementation
-        // Read one byte at a time since the device only supports single-byte reads
         var result = Data()
+        var remainingLength = length
+        var currentAddress = address
         
-        for i in 0..<Int(length) {
-            let currentAddress = address + UInt16(i)
+        while remainingLength > 0 {
+            // Determine how many bytes to read in this iteration (up to 5)
+            let bytesToRead = min(remainingLength, maxBytesPerRead)
             
-            // Construct the read command: [report_id=0, cmd, addr_high, addr_low, length=1, padding]
-            // Python format: [0, CMD_READ, addr_high, addr_low, length=1, padding]
+            // Construct the read command: [report_id=0, cmd, addr_high, addr_low, length, padding]
             var report = [UInt8](repeating: 0, count: reportSize)
             report[0] = cmdRead                             // CMD_READ = 0xE5
             report[1] = UInt8((currentAddress >> 8) & 0xFF) // Address high byte
             report[2] = UInt8(currentAddress & 0xFF)        // Address low byte
-            report[3] = 1                                   // Length = 1 (single byte read)
+            report[3] = bytesToRead                         // Length (1-5 bytes)
             // Remaining bytes are already 0 from initialization (padding)
             
-            Logger.shared.log(content: "EEPROM Read Request [0x\(String(format: "%04X", currentAddress))]: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            Logger.shared.log(content: "EEPROM Read Request [0x\(String(format: "%04X", currentAddress)), \(bytesToRead) bytes]: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
             
             // Send read command using feature report
             if !sendHIDFeatureReport(report: report) {
@@ -669,7 +670,7 @@ class HIDManager {
             }
             
             // Add delay for device processing (similar to write operations)
-            Thread.sleep(forTimeInterval: 0.01) // 10ms delay
+            Thread.sleep(forTimeInterval: 0.005) // 5ms delay
             
             // Read response using feature report
             guard let response = getHIDFeatureReport(bufferSize: reportSize) else {
@@ -679,13 +680,21 @@ class HIDManager {
             
             Logger.shared.log(content: "EEPROM Read Response [0x\(String(format: "%04X", currentAddress))]: \(response.map { String(format: "%02X", $0) }.joined(separator: " "))")
 
-            if response.count >= 4 {
-                // Fallback to index 3 if response is shorter
-                result.append(response[3])
+            // Check if response has enough bytes (need at least 3 + bytesToRead)
+            let expectedMinLength = 3 + Int(bytesToRead)
+            if response.count >= expectedMinLength {
+                // Read data from response bytes 3 to (3 + bytesToRead - 1)
+                for i in 0..<Int(bytesToRead) {
+                    result.append(response[3 + i])
+                }
             } else {
-                Logger.shared.log(content: "Invalid EEPROM read response length at address 0x\(String(format: "%04X", currentAddress)): expected >= 4, got \(response.count)")
+                Logger.shared.log(content: "Invalid EEPROM read response length at address 0x\(String(format: "%04X", currentAddress)): expected >= \(expectedMinLength), got \(response.count)")
                 return nil
             }
+            
+            // Update for next iteration
+            currentAddress += UInt16(bytesToRead)
+            remainingLength -= bytesToRead
         }
         
         return result

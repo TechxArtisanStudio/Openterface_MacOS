@@ -22,6 +22,8 @@
 
 import Foundation
 import Combine
+import AVFoundation
+import AppKit
 
 class FirmwareManager: ObservableObject {
     static let shared = FirmwareManager()
@@ -51,11 +53,80 @@ class FirmwareManager: ObservableObject {
         firmwareBackupCompleteSubject.eraseToAnyPublisher()
     }
     
+    /// Published properties for EDID name operations
+    @Published var edidUpdateProgress: Double = 0.0
+    @Published var edidUpdateStatus: String = ""
+    @Published var isEdidUpdateInProgress: Bool = false
+    
+    /// Progress signals for EDID operations
+    private let edidUpdateCompleteSubject = PassthroughSubject<(Bool, String), Never>()
+    
+    var edidUpdateComplete: AnyPublisher<(Bool, String), Never> {
+        edidUpdateCompleteSubject.eraseToAnyPublisher()
+    }
+    
     private let chunkSize = 64 // EEPROM write chunk size
     private let eepromStartAddress: UInt16 = 0x0000 // Starting address for firmware
     private let defaultFirmwareSize = 1453 // Default MS2109 firmware size
     
     private init() {}
+    
+    // MARK: - Operation Management
+    
+    /// Stops all active operations and closes the main window
+    /// This should be called before EDID patching to ensure a clean state
+    func stopAllOperations() {
+        Logger.shared.log(content: "Stopping all operations before firmware/EDID operations...")
+        
+        // Stop video operations with complete session teardown
+        let videoManager = VideoManager.shared
+        videoManager.stopVideoSession()
+        
+        // Remove all video inputs to ensure complete disconnection
+        videoManager.captureSession.beginConfiguration()
+        let videoInputs = videoManager.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
+        videoInputs.forEach { videoManager.captureSession.removeInput($0) }
+        videoManager.captureSession.commitConfiguration()
+        Logger.shared.log(content: "✓ Video operations stopped and session cleared")
+        
+        // Stop audio operations
+        AudioManager.shared.stopAudioSession()
+        Logger.shared.log(content: "✓ Audio operations stopped")
+        
+        // Stop HID operations
+        HIDManager.shared.stopAllHIDOperations()
+        Logger.shared.log(content: "✓ HID operations stopped")
+        
+        // Post notification to stop any other operations
+        NotificationCenter.default.post(
+            name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"),
+            object: nil
+        )
+        
+        // Close main window
+        DispatchQueue.main.async {
+            let windows = NSApplication.shared.windows
+            for window in windows {
+                // Close/hide main content windows, but not auxiliary tool windows
+                if let identifier = window.identifier?.rawValue {
+                    if identifier.contains("main_openterface") || 
+                       (!identifier.contains("edidNameWindow") &&
+                        !identifier.contains("firmwareUpdateWindow") &&
+                        !identifier.contains("resetSerialToolWindow") &&
+                        window.contentViewController != nil &&
+                        window.isVisible) {
+                        Logger.shared.log(content: "✓ Closing/hiding main window: \(window.title)")
+                        window.orderOut(nil) // Hide the window
+                    }
+                } else if window.title.contains("Openterface Mini-KVM") {
+                    Logger.shared.log(content: "✓ Closing/hiding main window: \(window.title)")
+                    window.orderOut(nil) // Hide the window
+                }
+            }
+        }
+        
+        Logger.shared.log(content: "All operations stopped successfully")
+    }
     
     // MARK: - Firmware Download
     
@@ -135,8 +206,6 @@ class FirmwareManager: ObservableObject {
     
     private func writeEeprom(address: UInt16, data: Data) async -> Bool {
         Logger.shared.log(content: "Writing \(data.count) bytes to EEPROM starting at address 0x\(String(format: "%04X", address))")
-        
-        let totalSize = data.count
         
         // Use HID commands for EEPROM writing with progress tracking
         let hidManager = HIDManager.shared
@@ -517,6 +586,204 @@ class FirmwareManager: ObservableObject {
                 isUpdateInProgress = false
             }
             firmwareWriteCompleteSubject.send(false)
+        }
+    }
+    
+    // MARK: - EDID Name Management
+    
+    /// Read the current EDID monitor name from the device
+    /// Based on MS2109Device.py get_edid_name() method
+    /// - Returns: The current EDID name, or nil if failed to read
+    func getEdidName() async -> String? {
+        Logger.shared.log(content: "Reading EDID monitor name from device")
+        
+        let hidManager = HIDManager.shared
+        
+        // EDID name is at offset 0x0397 in the firmware (13 bytes)
+        let edidNameAddress: UInt16 = 0x0397
+        let nameLength: UInt8 = 13
+        
+        guard let nameData = hidManager.readEeprom(address: edidNameAddress, length: nameLength) else {
+            Logger.shared.log(content: "Failed to read EDID name from device")
+            return nil
+        }
+        
+        // Decode the name (stop at newline 0x0A)
+        var nameStr = ""
+        for byte in nameData {
+            if byte == 0x0A { // newline terminator
+                break
+            } else if byte >= 32 && byte <= 126 { // printable ASCII
+                nameStr += String(Character(UnicodeScalar(byte)))
+            } else {
+                break
+            }
+        }
+        
+        Logger.shared.log(content: "Current EDID name: '\(nameStr)'")
+        return nameStr.isEmpty ? nil : nameStr
+    }
+    
+    /// Set the EDID monitor name and update firmware checksums
+    /// Based on MS2109Device.py set_edid_name() method
+    /// - Parameter name: The new EDID monitor name (max 13 characters)
+    func setEdidName(_ name: String) async {
+        Logger.shared.log(content: "Starting EDID name update process")
+        
+        // First stop all operations and close main window for clean EDID patching
+        stopAllOperations()
+        
+        await MainActor.run {
+            isEdidUpdateInProgress = true
+            edidUpdateProgress = 0.0
+            edidUpdateStatus = "Validating EDID name..."
+        }
+        
+        // Validate name length
+        guard name.count <= 13 else {
+            await MainActor.run {
+                isEdidUpdateInProgress = false
+                let errorMessage = "EDID name must be 13 characters or less. Current length: \(name.count)"
+                edidUpdateCompleteSubject.send((false, errorMessage))
+            }
+            return
+        }
+        
+        // Validate ASCII characters
+        guard name.allSatisfy({ $0.isASCII && $0.asciiValue! >= 32 && $0.asciiValue! <= 126 }) else {
+            await MainActor.run {
+                isEdidUpdateInProgress = false
+                let errorMessage = "EDID name must contain only printable ASCII characters"
+                edidUpdateCompleteSubject.send((false, errorMessage))
+            }
+            return
+        }
+        
+        await MainActor.run {
+            edidUpdateProgress = 0.1
+            edidUpdateStatus = "Preparing EDID name data..."
+        }
+        
+        let edidNameAddress: UInt16 = 0x0397
+        let nameLength = 13
+        
+        // Create name data: pad name to 13 bytes with spaces, then add newline terminator
+        var nameData = Data()
+        let nameBytes = name.data(using: .ascii) ?? Data()
+        nameData.append(nameBytes)
+        
+        // Pad with spaces and ensure newline terminator
+        while nameData.count < nameLength - 1 {
+            nameData.append(0x20) // space character
+        }
+        nameData.append(0x0A) // newline terminator
+        
+        // Ensure exactly 13 bytes
+        if nameData.count > nameLength {
+            nameData = nameData.prefix(nameLength)
+        }
+        
+        await MainActor.run {
+            edidUpdateProgress = 0.3
+            edidUpdateStatus = "Writing EDID name to device..."
+        }
+        
+        // Write the name data to EEPROM
+        let writeSuccess = await writeEeprom(address: edidNameAddress, data: nameData)
+        
+        guard writeSuccess else {
+            await MainActor.run {
+                isEdidUpdateInProgress = false
+                let errorMessage = "Failed to write EDID name to device EEPROM"
+                edidUpdateCompleteSubject.send((false, errorMessage))
+            }
+            return
+        }
+        
+        await MainActor.run {
+            edidUpdateProgress = 0.7
+            edidUpdateStatus = "Updating firmware checksums..."
+        }
+        
+        // Update firmware checksums
+        let checksumSuccess = await updateFirmwareChecksums()
+        
+        await MainActor.run {
+            isEdidUpdateInProgress = false
+            if checksumSuccess {
+                edidUpdateProgress = 1.0
+                edidUpdateStatus = "EDID name updated successfully!"
+                let successMessage = """
+                EDID monitor name has been updated to '\(name)'.
+                
+                IMPORTANT: To apply the changes, please follow these steps:
+                1. Unplug ALL cables from the Openterface device
+                2. Wait a few seconds
+                3. Reconnect all cables to the device
+                4. Close this application completely
+                5. Restart the application
+                
+                The new monitor name will be visible after reconnection.
+                """
+                edidUpdateCompleteSubject.send((true, successMessage))
+                Logger.shared.log(content: "EDID name update completed successfully")
+            } else {
+                let errorMessage = "EDID name was written but firmware checksum update failed. The device may not function properly."
+                edidUpdateCompleteSubject.send((false, errorMessage))
+                Logger.shared.log(content: "EDID name update failed during checksum update")
+            }
+        }
+    }
+    
+    /// Update firmware header and code checksums after EDID modifications
+    /// Based on MS2109Device.py _update_firmware_checksums() method
+    /// - Returns: True if checksums were updated successfully, false otherwise
+    private func updateFirmwareChecksums() async -> Bool {
+        Logger.shared.log(content: "Updating firmware checksums after EDID modification")
+        
+        let hidManager = HIDManager.shared
+        let firmwareSize = defaultFirmwareSize // 1453 bytes
+        
+        // Read the entire firmware in chunks (max 255 bytes per read)
+        var completeFirmwareData = Data()
+        var currentAddress: UInt16 = 0x0000
+        let maxChunkSize: UInt8 = 255
+        var remainingBytes = firmwareSize
+        
+        while remainingBytes > 0 {
+            let chunkSize = UInt8(min(Int(maxChunkSize), remainingBytes))
+            
+            guard let chunk = hidManager.readEeprom(address: currentAddress, length: chunkSize) else {
+                Logger.shared.log(content: "Failed to read firmware chunk at address 0x\(String(format: "%04X", currentAddress))")
+                return false
+            }
+            
+            completeFirmwareData.append(chunk)
+            currentAddress += UInt16(chunk.count)
+            remainingBytes -= chunk.count
+        }
+        
+        Logger.shared.log(content: "Read \(completeFirmwareData.count) bytes of firmware for checksum calculation")
+        
+        // Calculate new checksums using the existing method
+        let (headerChecksum, codeChecksum) = calculateMS2109Checksums(firmwareData: completeFirmwareData)
+        
+        // Update checksums in the last 4 bytes (big-endian format)
+        let checksumAddress = UInt16(firmwareSize - 4)
+        let headerBytes = [UInt8((headerChecksum >> 8) & 0xFF), UInt8(headerChecksum & 0xFF)]
+        let codeBytes = [UInt8((codeChecksum >> 8) & 0xFF), UInt8(codeChecksum & 0xFF)]
+        
+        // Write the updated checksums
+        let headerSuccess = await writeEeprom(address: checksumAddress, data: Data(headerBytes))
+        let codeSuccess = await writeEeprom(address: checksumAddress + 2, data: Data(codeBytes))
+        
+        if headerSuccess && codeSuccess {
+            Logger.shared.log(content: "Firmware header checksum updated to: 0x\(String(format: "%04X", headerChecksum))")
+            Logger.shared.log(content: "Firmware code checksum updated to: 0x\(String(format: "%04X", codeChecksum))")
+            return true
+        } else {
+            Logger.shared.log(content: "Failed to write updated checksums to firmware")
+            return false
         }
     }
 
