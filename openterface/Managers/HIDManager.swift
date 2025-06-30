@@ -39,8 +39,6 @@ class HIDManager {
         
         startHID()
         startCommunication()
-        let spm = SerialPortManager.shared
-        spm.tryOpenSerialPort()
     }
     
     func startHID() {
