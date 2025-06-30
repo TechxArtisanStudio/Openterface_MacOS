@@ -36,7 +36,6 @@ class HIDManager {
     private let queue = DispatchQueue(label: "com.openterface.hidCommunicator", qos: .background)
     
     private init() {
-        
         startHID()
         startCommunication()
     }

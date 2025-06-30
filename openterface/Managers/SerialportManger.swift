@@ -130,6 +130,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func initializeSerialPort(){
+        // If the usb device is connected, try to open the serial port
+        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Initializing Serial Port") }
+
+        USBDeivcesManager.shared.update()
+        if USBDeivcesManager.shared.isOpenterfaceConnected(){
+            self.tryOpenSerialPort()
+        }
     }
     
     private func observerSerialPortNotifications() {
@@ -474,7 +481,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         AppStatus.isKeyboardConnected = false
         AppStatus.isMouseConnected = false
         
-        AppStatus.serialPortName = "N/A"
         AppStatus.serialPortBaudRate = AppStatus.serialPortBaudRate  == SerialPortManager.DEFAULT_BAUDRATE ? SerialPortManager.ORIGINAL_BAUDRATE : SerialPortManager.DEFAULT_BAUDRATE
     }
     

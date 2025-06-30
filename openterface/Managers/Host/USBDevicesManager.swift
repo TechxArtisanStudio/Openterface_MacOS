@@ -94,6 +94,30 @@ class USBDeivcesManager {
         return vendorId == MS2019_VID && productId == MS2019_PID
     }
     
+    /// Check if any Openterface devices are currently connected
+    /// - Returns: True if at least one Openterface device is connected, false otherwise
+    func isOpenterfaceConnected() -> Bool {
+        // Check if there are any grouped Openterface devices
+        if !AppStatus.groupOpenterfaceDevices.isEmpty {
+            return true
+        }
+        
+        // Alternative check: scan USB devices for Openterface chipsets
+        for device in AppStatus.USBDevices {
+            if isOpenterfaceChipset(vendorId: device.vendorID, productId: device.productID) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    /// Get the count of connected Openterface devices
+    /// - Returns: Number of Openterface device groups connected
+    func getOpenterfaceDeviceCount() -> Int {
+        return AppStatus.groupOpenterfaceDevices.count
+    }
+    
     func groundByOpenterface() {
         var groupedDevices: [[USBDeviceInfo]] = []
         var tempGroup: [USBDeviceInfo]?
