@@ -465,8 +465,8 @@ class FirmwareManager: ObservableObject {
         return (headerValid && codeValid, message)
     }
     
-    /// Calculates MS2109 firmware checksums based on the specification
-    /// MS2109 checksum format: Simple 16-bit sum of bytes (little-endian storage)
+    /// Calculates MS2109 firmware checksums based on the Python reference implementation
+    /// MS2109 checksum format: Simple 16-bit sum of bytes, header excludes signature bytes
     /// - Parameter firmwareData: The firmware data to calculate checksums for
     /// - Returns: Tuple of (headerChecksum, codeChecksum)
     private func calculateMS2109Checksums(firmwareData: Data) -> (headerChecksum: UInt16, codeChecksum: UInt16) {
@@ -479,32 +479,27 @@ class FirmwareManager: ObservableObject {
         let first16Bytes = firmwareData.prefix(16)
         Logger.shared.log(content: "🔍 First 16 bytes of firmware: \(first16Bytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
         
-        // Header checksum: Based on analysis, MS2109 uses range 0x00-0x2E (47 bytes)
-        // The difference between full 48 bytes (0x17FD) and expected (0x16FE) is 0xFF
-        // This confirms the last byte at 0x2F should be excluded
-        
+        // Header checksum: Based on Python implementation for MS2109
+        // Range: bytes 0x02-0x2F (from offset 2 to 47, total 46 bytes)
+        // Excludes the first 2 signature bytes (A5 5A)
         var headerSum: UInt32 = 0
-        let headerData = firmwareData.prefix(48)
         
-        // Sum bytes 0x00-0x2E (47 bytes) - exclude the last header byte at 0x2F
-        for i in 0..<47 {
-            headerSum += UInt32(headerData[i])
-            if i < 8 {
-                Logger.shared.log(content: "🔍 Header byte [0x\(String(format: "%02X", i))]: 0x\(String(format: "%02X", headerData[i])) (running sum: 0x\(String(format: "%08X", headerSum)))")
+        // Sum bytes from 0x02 to 0x2F (46 bytes) - exclude signature bytes at 0x00-0x01
+        for i in 2..<48 {
+            if i < firmwareData.count {
+                headerSum += UInt32(firmwareData[i])
+                if i < 10 {
+                    Logger.shared.log(content: "🔍 Header byte [0x\(String(format: "%02X", i))]: 0x\(String(format: "%02X", firmwareData[i])) (running sum: 0x\(String(format: "%08X", headerSum)))")
+                }
             }
         }
         
         let headerChecksum = UInt16(headerSum & 0xFFFF)
         
-        Logger.shared.log(content: "🔍 Header checksum calculation:")
-        Logger.shared.log(content: "   Range: 0x00-0x2E (47 bytes)")
-        Logger.shared.log(content: "   Excluded byte [0x2F]: 0x\(String(format: "%02X", headerData[47]))")
+        Logger.shared.log(content: "🔍 MS2109 Header checksum calculation:")
+        Logger.shared.log(content: "   Range: 0x02-0x2F (46 bytes, excluding signature)")
+        Logger.shared.log(content: "   Signature bytes [0x00-0x01]: 0x\(String(format: "%02X", firmwareData[0])) 0x\(String(format: "%02X", firmwareData[1])) (excluded)")
         Logger.shared.log(content: "   Sum: 0x\(String(format: "%08X", headerSum)) -> checksum: 0x\(String(format: "%04X", headerChecksum))")
-        
-        // Debug: Log header data in hex format for comparison
-        let headerHex = headerData.map { String(format: "%02X", $0) }.joined(separator: " ")
-        Logger.shared.log(content: "🔍 Header data (48 bytes): \(headerHex)")
-        Logger.shared.log(content: "🔍 Header sum calculation: sum=0x\(String(format: "%08X", headerSum)) -> checksum=0x\(String(format: "%04X", headerChecksum))")
         
         // Code checksum: Simple sum of code section (from byte 48 to end - 4 checksum bytes)
         var codeSum: UInt32 = 0
@@ -514,14 +509,16 @@ class FirmwareManager: ObservableObject {
         Logger.shared.log(content: "🔍 Code section range: 0x\(String(format: "%02X", codeStart)) to 0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
         
         for i in codeStart..<codeEnd {
-            codeSum += UInt32(firmwareData[i])
+            if i < firmwareData.count {
+                codeSum += UInt32(firmwareData[i])
+            }
         }
         // Take only the lower 16 bits as the checksum
         let codeChecksum = UInt16(codeSum & 0xFFFF)
         
         // Debug: Log code section info
         Logger.shared.log(content: "🔍 Code sum calculation: sum=0x\(String(format: "%08X", codeSum)) -> checksum=0x\(String(format: "%04X", codeChecksum))")
-        Logger.shared.log(content: "Checksum calculation - Header range: 0x00-0x2F (\(48) bytes), Code range: 0x\(String(format: "%02X", codeStart))-0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
+        Logger.shared.log(content: "Checksum calculation - Header range: 0x02-0x2F (\(46) bytes), Code range: 0x\(String(format: "%02X", codeStart))-0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
         
         return (headerChecksum, codeChecksum)
     }
