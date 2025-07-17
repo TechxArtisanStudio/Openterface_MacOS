@@ -135,7 +135,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
         USBDeivcesManager.shared.update()
         if USBDeivcesManager.shared.isOpenterfaceConnected(){
-            self.tryOpenSerialPort()
+            // Check if CH32V208 is connected - if so, use direct connection
+            if USBDeivcesManager.shared.isCH32V208Connected() {
+                Logger.shared.log(content: "CH32V208 detected - using direct serial port connection")
+                self.tryOpenSerialPortForCH32V208()
+            } else {
+                self.tryOpenSerialPort()
+            }
         }
     }
     
@@ -149,7 +155,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
     @objc func serialPortsWereConnected(_ notification: Notification) {
         if !self.isTrying{
-            self.tryOpenSerialPort()
+            // Check if CH32V208 is connected - if so, use direct connection
+            USBDeivcesManager.shared.update()
+            if USBDeivcesManager.shared.isCH32V208Connected() {
+                Logger.shared.log(content: "CH32V208 detected on port connection - using direct serial port connection")
+                self.tryOpenSerialPortForCH32V208()
+            } else {
+                self.tryOpenSerialPort()
+            }
         }
     }
     
@@ -159,6 +172,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     func checkCTS() {
+        // CTS monitoring only applies to CH9329 chipset
+        if !USBDeivcesManager.shared.isCH9329Connected() {
+            return
+        }
+        
         if let cts = self.serialPort?.cts {
             if lastCts == nil {
                 lastCts = cts
@@ -176,6 +194,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     func checkHIDEventTime() {
+        // HID event time checking only applies to CH9329 chipset
+        if !USBDeivcesManager.shared.isCH9329Connected() {
+            return
+        }
+        
         if let lastTime = lastHIDEventTime {
             if Date().timeIntervalSince(lastTime) > 5 {
 
@@ -193,6 +216,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
     func serialPortWasOpened(_ serialPort: ORSSerialPort) {
         if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial opened") }
+        
+        // Start CTS monitoring for HID event detection
+        self.startCTSMonitoring()
     }
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
@@ -420,7 +446,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
         Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate)")
-        self.serialPort = self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+        self.serialPort = getSerialPortPathFromUSBManager()
 
         if self.serialPort != nil {
             Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate), path: \(self.serialPort?.path ?? "Unknown")")
@@ -476,6 +502,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         self.isDeviceReady = false
         self.serialPort?.close()
         self.serialPort = nil
+
+        // Stop CTS monitoring timer
+        self.timer?.invalidate()
+        self.timer = nil
 
         AppStatus.isTargetConnected = false
         AppStatus.isKeyboardConnected = false
@@ -584,5 +614,152 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func raiseRTS() {
         setRTS(true)
+    }
+    
+    /// Directly opens serial port for CH32V208 without baudrate detection
+    /// CH32V208 doesn't require the command-response validation process
+    func tryOpenSerialPortForCH32V208() {
+        Logger.shared.log(content: "tryOpenSerialPortForCH32V208 - Direct connection mode")
+        
+        // Check if already trying to prevent race conditions
+        if self.isTrying {
+            Logger.shared.log(content: "Already trying to connect, returning early")
+            return
+        }
+        
+        self.isTrying = true
+        
+        // get all available serial ports
+        guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
+            Logger.shared.log(content: "No available serial ports found")
+            self.isTrying = false
+            return
+        }
+        self.serialPorts = availablePorts
+        
+        // Find the USB serial port using USB device manager
+        self.serialPort = getSerialPortPathFromUSBManager()
+        
+        if let serialPort = self.serialPort {
+            Logger.shared.log(content: "Opening CH32V208 serial port directly at default baudrate: \(SerialPortManager.DEFAULT_BAUDRATE), path: \(serialPort.path)")
+            
+            // Open the serial port with default baudrate
+            self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
+            
+            // For CH32V208, we don't need command validation - set device ready immediately
+            if serialPort.isOpen {
+                self.isDeviceReady = true
+                Logger.shared.log(content: "CH32V208 serial port opened successfully and device is ready")
+                
+                // Start the CTS monitoring timer for HID event detection
+                self.startCTSMonitoring()
+            } else {
+                Logger.shared.log(content: "Failed to open CH32V208 serial port")
+            }
+        } else {
+            Logger.shared.log(content: "No USB serial port found for CH32V208")
+        }
+        
+        self.isTrying = false
+    }
+    
+    /// Start CTS monitoring for HID event detection
+    /// CTS monitoring is only needed for CH9329 chipset
+    private func startCTSMonitoring() {
+        // Only start CTS monitoring for CH9329 chipset
+        if !USBDeivcesManager.shared.isCH9329Connected() {
+            Logger.shared.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
+            return
+        }
+        
+        // Start the timer for CTS checking if not already running
+        if self.timer == nil {
+            self.timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                self.checkCTS()
+            }
+            Logger.shared.log(content: "Started CTS monitoring for CH9329 HID event detection")
+        }
+    }
+    
+    /// Get the preferred serial port path from USB device manager
+    /// This method tries to find the serial port path based on the detected control chip device
+    /// or falls back to the default USB serial device identified during device grouping
+    private func getSerialPortPathFromUSBManager() -> ORSSerialPort? {
+        // Get the expected serial device path from USB device manager
+        if let expectedPath = USBDeivcesManager.shared.getExpectedSerialDevicePath() {
+            Logger.shared.log(content: "USB device manager provided expected serial device path hint: \(expectedPath)")
+        }
+        
+        // Log information about all device groups
+        let groupsInfo = USBDeivcesManager.shared.getDeviceGroupsInfo()
+        if !groupsInfo.isEmpty {
+            Logger.shared.log(content: "Found \(groupsInfo.count) device groups with total \(USBDeivcesManager.shared.getTotalDeviceCount()) devices")
+        }
+        
+        // First, try to find serial port based on control chip device location
+        if let controlDevice = USBDeivcesManager.shared.getControlChipDevice() {
+            Logger.shared.log(content: "Looking for serial port matching control chip device: \(controlDevice.productName) at \(controlDevice.locationID)")
+            
+            if let groupIndex = USBDeivcesManager.shared.findGroupContaining(device: controlDevice) {
+                Logger.shared.log(content: "Control chip device found in group \(groupIndex)")
+            }
+            
+            // Try to find a serial port that might be related to this USB device
+            // This is challenging because ORSSerial doesn't provide direct USB device correlation
+            // We'll use the existing filtering but prefer ports that might be related
+            return findBestMatchingSerialPort(for: controlDevice)
+        }
+        
+        // Fallback to default USB serial device if available
+        if let defaultSerial = AppStatus.DefaultUSBSerial {
+            Logger.shared.log(content: "Using default USB serial device: \(defaultSerial.productName) at \(defaultSerial.locationID)")
+            
+            if let groupIndex = USBDeivcesManager.shared.findGroupContaining(device: defaultSerial) {
+                Logger.shared.log(content: "Default serial device found in group \(groupIndex)")
+            }
+            
+            return findBestMatchingSerialPort(for: defaultSerial)
+        }
+        
+        // Final fallback to the old method
+        Logger.shared.log(content: "No USB device manager info available, falling back to name-based search")
+        return self.serialPorts.filter{ $0.path.contains("usbserial")}.first
+    }
+    
+    /// Find the best matching serial port for a given USB device
+    /// This method attempts to correlate USB device information with available serial ports
+    /// 
+    /// **Note:** The ORSSerial framework doesn't provide direct USB device correlation,
+    /// so this method uses heuristics to find the most likely serial port match.
+    /// The correlation is based on:
+    /// 1. Filtering for "usbserial" devices (USB-to-serial adapters)
+    /// 2. Preferring single matches when only one USB serial port is available
+    /// 3. Providing logging for debugging multiple port scenarios
+    /// 
+    /// **Future Enhancement:** Could be improved with IOKit registry correlation
+    /// to directly match USB device location IDs with serial port device paths.
+    private func findBestMatchingSerialPort(for usbDevice: USBDeviceInfo) -> ORSSerialPort? {
+        // Look for serial ports that contain "usbserial" (the typical pattern for USB serial devices)
+        let usbSerialPorts = self.serialPorts.filter{ $0.path.contains("usbserial") || $0.path.contains("usbmodem")}
+        
+        if usbSerialPorts.count == 1 {
+            // If there's only one USB serial port, it's likely the one we want
+            Logger.shared.log(content: "Found single USB serial port: \(usbSerialPorts[0].path)")
+            return usbSerialPorts.first
+        } else if usbSerialPorts.count > 1 {
+            // Multiple USB serial ports - try to find the best match
+            Logger.shared.log(content: "Found \(usbSerialPorts.count) USB serial ports, attempting to find best match")
+            
+            // For now, return the first one as we don't have enough correlation info
+            // This could be enhanced in the future with more sophisticated matching
+            if let firstPort = usbSerialPorts.first {
+                Logger.shared.log(content: "Selected first USB serial port: \(firstPort.path)")
+                return firstPort
+            }
+        }
+        
+        // If no usbserial ports found, log and return nil
+        Logger.shared.log(content: "No USB serial ports found for device: \(usbDevice.productName)")
+        return nil
     }
 }

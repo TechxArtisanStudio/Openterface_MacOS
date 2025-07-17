@@ -32,7 +32,7 @@ struct USBDevicesView: View {
             List(AppStatus.USBDevices, id: \.productName) { device in
                 VStack(alignment: .leading) {
                     Text("Product Name: \(device.productName)")
-                    Text("Vendor ID: \(device.vendorID)")
+                    Text("Vendor ID: \(hexString(from: Int(device.vendorID)))")
                     Text("Product ID: \(hexString(from: Int(device.productID)))")
                     Text("Location ID: \(device.locationID)")
                 }

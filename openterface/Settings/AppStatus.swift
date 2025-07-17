@@ -24,7 +24,25 @@
 import Foundation
 import AppKit
 
+// Enum to represent different video chipset types
+enum VideoChipsetType {
+    case ms2109    // MS2019 VID with MS2109 PID
+    case ms2130    // MS2130 VID with MS2130 PID
+    case unknown   // No video chipset detected or unknown type
+}
+
+// Enum to represent different control chipset types
+enum ControlChipsetType {
+    case ch9329    // WCH VID with CH9329 PID
+    case ch32v208  // WCH VID with CH32V208 PID
+    case unknown   // No control chipset detected or unknown type
+}
+
 struct AppStatus {
+    // Flags to track the currently connected chipset types
+    static var videoChipsetType: VideoChipsetType = .unknown
+    static var controlChipsetType: ControlChipsetType = .unknown
+    
     static var isFristRun: Bool = false
     
     static var isMouseInView: Bool = true
