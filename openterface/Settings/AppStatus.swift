@@ -47,7 +47,6 @@ struct AppStatus {
     
     static var isMouseInView: Bool = true
     static var isFouceWindow: Bool = true
-    static var isSerialPortConnected: Bool = true
     static var isHDMIConnected: Bool = false
     static var isMouseEdge: Bool = false
     static var isCursorHidden: Bool = false

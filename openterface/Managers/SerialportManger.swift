@@ -661,10 +661,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         }
         
         self.isTrying = false
+        AppStatus.isKeyboardConnected = true
+        AppStatus.isMouseConnected = true
     }
     
     /// Start CTS monitoring for HID event detection
     /// CTS monitoring is only needed for CH9329 chipset
+    /// For CH32V208, HID events are detected through direct serial communication
     private func startCTSMonitoring() {
         // Only start CTS monitoring for CH9329 chipset
         if !USBDeivcesManager.shared.isCH9329Connected() {

@@ -269,13 +269,20 @@ class HIDManager {
         // width
         let widthHigh = Int(widthHighResponse[3])
         let widthLow = Int(widthLowResponse[3])
-        let width = (widthHigh << 8) | widthLow
+        var width = (widthHigh << 8) | widthLow
         
         // height
         let heightHigh = Int(heightHighResponse[3])
         let heightLow = Int(heightLowResponse[3])
-        let height = (heightHigh << 8) | heightLow
+        var height = (heightHigh << 8) | heightLow
         
+        // Cap resolution at 4K, default to 1920x1080 if exceeded
+        if width > 4096 || height > 4096 {
+            Logger.shared.log(content: "Input resolution (\(width)x\(height)) exceeds 4K limit, defaulting to 1920x1080")
+            width = 1920
+            height = 1080
+        }
+
         // Check if a resolution change notification needs to be sent
         let newResolution = (width, height)
         let oldResolution = AppStatus.hidReadResolusion
