@@ -4,7 +4,18 @@
 *    This file is part of the Openterface Mini KVM                           *
 *                                                                            *
 *    Copyright (C) 2024   <info@openterface.com>                             *
-*                                                                            *
+*                                                                Button(action: {
+                    MouseManager.shared.forceStopAllMouseLoops()
+                }) {
+                    Text("Stop mouse loop")
+                }
+                .keyboardShortcut("t", modifiers: .command)
+                Button(action: {
+                    MouseManager.shared.testMouseMonitor()
+                }) {
+                    Text("Test mouse monitor")
+                }
+                .keyboardShortcut("m", modifiers: .command)                      *
 *    This program is free software: you can redistribute it and/or modify    *
 *    it under the terms of the GNU General Public License as published by    *
 *    the Free Software Foundation version 3.                                 *
@@ -440,20 +451,15 @@ struct openterfaceApp: App {
                 }
                 .keyboardShortcut("v", modifiers: .command)
                 Button(action: {
-                    // 使用MouseManager的共享实例
-                    MouseManager.shared.runMouseLoop()
+                    if _isMouseLoopRunning {
+                        MouseManager.shared.stopMouseLoop()
+                    } else {
+                        MouseManager.shared.runMouseLoop()
+                    }
                 }) {
-                    Text("Prevent screen saver")
+                    Text(_isMouseLoopRunning ? "Prevent screen saver ✓" : "Prevent screen saver")
                 }
                 .keyboardShortcut("s", modifiers: .command)
-                
-                Button(action: {
-                    // 使用MouseManager的共享实例
-                    MouseManager.shared.stopMouseLoop()
-                }) {
-                    Text("Stop mouse shake")
-                }
-                .keyboardShortcut("s", modifiers: [.command, .shift])
             }
         }
     }
