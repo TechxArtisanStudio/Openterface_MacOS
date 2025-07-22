@@ -384,6 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 AppStatus.currentWindow = window.frame
             }
         }
+        handleToolbarAutoHide()
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
@@ -443,7 +444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
-         
+        handleToolbarAutoHide()
     }
 
     // Handle window moving between screens
@@ -709,6 +710,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Since we kept the main window open, just log the completion
         // The main window should still be visible and functional
         Logger.shared.log(content: "Firmware update completed, operations restarted")
+    }
+    
+    // MARK: - Auto-hide Toolbar Logic
+    private var mouseMonitor: Any?
+    private var isToolbarHiddenForMaximize = false
+    private let toolbarRevealArea: CGFloat = 4 // px from top edge
+    private var toolbarAutoHideTimer: Timer?
+
+    private func handleToolbarAutoHide() {
+        guard let window = NSApplication.shared.mainWindow else { return }
+        let isZoomed = window.zoomedOrFullScreen
+        if isZoomed {
+            if !isToolbarHiddenForMaximize {
+                window.toolbar?.isVisible = false
+                isToolbarHiddenForMaximize = true
+                startMouseMonitor(for: window)
+            }
+        } else {
+            if isToolbarHiddenForMaximize {
+                window.toolbar?.isVisible = true
+                isToolbarHiddenForMaximize = false
+                stopMouseMonitor()
+            }
+        }
+    }
+
+    private func startMouseMonitor(for window: NSWindow) {
+        stopMouseMonitor()
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            guard let self = self else { return event }
+            let mouseLocation = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+            if mouseLocation.y >= window.frame.height - toolbarRevealArea {
+                window.toolbar?.isVisible = true
+                self.resetToolbarAutoHideTimer(for: window)
+            } else if isToolbarHiddenForMaximize {
+                // Only hide if timer is not running (i.e., not in the 10s grace period)
+                if self.toolbarAutoHideTimer == nil {
+                    window.toolbar?.isVisible = false
+                }
+            }
+            return event
+        }
+    }
+
+    private func resetToolbarAutoHideTimer(for window: NSWindow) {
+        toolbarAutoHideTimer?.invalidate()
+        toolbarAutoHideTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self, weak window] _ in
+            guard let self = self, let window = window else { return }
+            if self.isToolbarHiddenForMaximize {
+                window.toolbar?.isVisible = false
+            }
+            self.toolbarAutoHideTimer = nil
+        }
+    }
+
+    private func stopMouseMonitor() {
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMonitor = nil
+        }
+        toolbarAutoHideTimer?.invalidate()
+        toolbarAutoHideTimer = nil
+    }
+}
+
+private extension NSWindow {
+    var zoomedOrFullScreen: Bool {
+        return self.isZoomed || self.styleMask.contains(.fullScreen)
     }
 }
 
