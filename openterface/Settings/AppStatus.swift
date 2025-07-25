@@ -145,7 +145,9 @@ struct AppStatus {
 
 struct USBDeviceInfo {
     let productName: String
+    let manufacturer: String
     let vendorID: Int
     let productID: Int
     let locationID: String
+    let speed: String
 }
