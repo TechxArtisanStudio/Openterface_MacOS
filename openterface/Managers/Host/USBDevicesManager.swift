@@ -81,6 +81,9 @@ class USBDeivcesManager {
             // USB Product Name
             var productName = IORegistryEntryCreateCFProperty(usbDevice, "USB Product Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknow"
 
+            // USB Vendor Name (Manufacturer)
+            let manufacturer = IORegistryEntryCreateCFProperty(usbDevice, "USB Vendor Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknown"
+
             // VendorID
             let vendorID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBVendorID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int) ?? 0
 
@@ -94,13 +97,39 @@ class USBDeivcesManager {
             // LocationID
             let locationID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertyLocationID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.uint32Value ?? 0
             let locationIDString = String(format: "0x%08x", locationID)
+            
+            // USB Speed
+            let speedValue = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertySpeed as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.intValue ?? 0
+            let speedString = formatUSBSpeed(speedValue)
 
-            let deviceInfo = USBDeviceInfo(productName: productName, vendorID: vendorID, productID: productID, locationID: locationIDString)
+            let deviceInfo = USBDeviceInfo(productName: productName, manufacturer: manufacturer, vendorID: vendorID, productID: productID, locationID: locationIDString, speed: speedString)
             devices.append(deviceInfo)
         }
         
         IOObjectRelease(iterator)
         return devices
+    }
+    
+    /// Format USB speed value into human-readable string
+    /// - Parameter speed: The speed value from IORegistry
+    /// - Returns: Human-readable speed string
+    private func formatUSBSpeed(_ speed: Int) -> String {
+        switch speed {
+        case 0:
+            return "Low Speed (1.5 Mbps)"
+        case 1:
+            return "Full Speed (12 Mbps)"
+        case 2:
+            return "High Speed (480 Mbps)"
+        case 3:
+            return "Super Speed (5 Gbps)"
+        case 4:
+            return "Super Speed+ (10 Gbps)"
+        case 5:
+            return "Super Speed+ (20 Gbps)"
+        default:
+            return "Unknown (\(speed))"
+        }
     }
     
     func isOpenterfaceVideoChipset(vendorId:Int, productId:Int) -> Bool{

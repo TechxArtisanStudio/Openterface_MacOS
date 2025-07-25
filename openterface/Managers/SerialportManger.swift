@@ -207,7 +207,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                     Logger.shared.log(content: "No hid update more than 5 second, check the HID information")
                 }
                 // Rest the time, to avoide duplicated check
-                Logger.shared.log(content: "Has lastHIDEventTime")
                 lastHIDEventTime = Date()
                 getHidInfo()
             }
