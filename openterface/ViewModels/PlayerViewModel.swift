@@ -27,6 +27,7 @@ import CoreAudio
 
 /// ViewModel for handling UI-related functionality and coordinating with managers
 class PlayerViewModel: NSObject, ObservableObject {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     
     // MARK: - Published Properties
     
@@ -45,7 +46,7 @@ class PlayerViewModel: NSObject, ObservableObject {
     // MARK: - Properties
     
     /// Video manager for handling video capture
-    private let videoManager = VideoManager.shared
+    private let videoManager: any VideoManagerProtocol
     
     /// Set of cancellables for managing publishers
     private var cancellables = Set<AnyCancellable>()
@@ -55,7 +56,8 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     // MARK: - Initialization
     
-    override init() {
+    init(videoManager: any VideoManagerProtocol = DependencyContainer.shared.resolve(VideoManagerProtocol.self)) {
+        self.videoManager = videoManager
         super.init()
         
         self.setupBindings()
@@ -82,16 +84,22 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Configures data bindings between published properties and actions
     func setupBindings() {
+        // Cast to concrete type to access published properties
+        guard let concreteVideoManager = videoManager as? VideoManager else {
+            logger.log(content: "Warning: VideoManager is not the expected concrete type")
+            return
+        }
+        
         // Observe video manager's published properties
-        videoManager.$isVideoGranted
+        concreteVideoManager.$isVideoGranted
             .assign(to: \.isVideoGranted, on: self)
             .store(in: &cancellables)
         
-        videoManager.$dimensions
+        concreteVideoManager.$dimensions
             .assign(to: \.dimensions, on: self)
             .store(in: &cancellables)
         
-        videoManager.$isVideoConnected
+        concreteVideoManager.$isVideoConnected
             .assign(to: \.isVideoConnected, on: self)
             .store(in: &cancellables)
     }
@@ -186,7 +194,7 @@ class PlayerViewModel: NSObject, ObservableObject {
             let input = try AVCaptureDeviceInput(device: device)
             self.addInput(input)
         } catch {
-            Logger.shared.log(content: "Failed to set up audio capture: \(error.localizedDescription)")
+            logger.log(content: "Failed to set up audio capture: \(error.localizedDescription)")
         }
     }
     
@@ -202,7 +210,7 @@ class PlayerViewModel: NSObject, ObservableObject {
                 channels: inputFormat.channelCount,
                 interleaved: inputFormat.isInterleaved) ?? outputFormat
             
-            Logger.shared.log(content: "Adjusting sample rate from \(inputFormat.sampleRate) to \(outputFormat.sampleRate)")
+            logger.log(content: "Adjusting sample rate from \(inputFormat.sampleRate) to \(outputFormat.sampleRate)")
         }
         
         return format
@@ -224,7 +232,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         AppStatus.isFouceWindow = false
         AppStatus.isMouseInView = false
         if let handler = AppStatus.eventHandler {
-            Logger.shared.log(content: "Removing monitor handler")
+            logger.log(content: "Removing monitor handler")
             NSEvent.removeMonitor(handler)
             AppStatus.eventHandler = nil
         }
@@ -234,9 +242,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
             if window.styleMask.contains(.fullScreen) {
-                Logger.shared.log(content: "The window just entered full screen mode.")
+                logger.log(content: "The window just entered full screen mode.")
             } else {
-                Logger.shared.log(content: "The window just exited full screen mode.")
+                logger.log(content: "The window just exited full screen mode.")
             }
         }
     }

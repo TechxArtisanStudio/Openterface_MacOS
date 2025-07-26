@@ -24,6 +24,8 @@
 import Foundation
 import AppKit
 
+private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+
 // Enum to represent different video chipset types
 enum VideoChipsetType {
     case ms2109    // MS2019 VID with MS2109 PID
@@ -93,7 +95,7 @@ struct AppStatus {
     static var isMatchVideoDevice: Bool = false
     static var DefaultUSBSerial: USBDeviceInfo?
     static var isHIDOpen: Bool?
-    static let logFileName: String = "info.log"
+    static let logFileName: String = "openterface.log"
     
     static var serialPortName: String = "N/A"
     static var serialPortBaudRate: Int = 0
@@ -134,10 +136,10 @@ struct AppStatus {
     
     static func handleSoftwareSwitchChange() {
         if isSoftwareSwitchOn {
-            Logger.shared.log(content: "Software switch toggled: Switching to Target device mode")
+            logger.log(content: "Software switch toggled: Switching to Target device mode")
 
         } else {
-            Logger.shared.log(content: "Software switch toggled: Switching to Host device mode")
+            logger.log(content: "Software switch toggled: Switching to Host device mode")
         }
     }
 }

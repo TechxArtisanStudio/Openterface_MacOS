@@ -20,23 +20,80 @@
 * ========================================================================== *
 */
 
-
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
-    @ObservedObject private var audioManager = AudioManager()
     
-    var statusBarManager = StatusBarManager()
-    var hostmanager = HostManager()
-    var keyboardManager = KeyboardManager.shared
-
-    let spm = SerialPortManager.shared
-
-    // var observation: NSKeyValueObservation?
-    var log = Logger.shared
+    // MARK: - Protocol-based Dependencies
+    private var audioManager: any AudioManagerProtocol
+    private var statusBarManager: any StatusBarManagerProtocol
+    private var hostManager: any HostManagerProtocol
+    private var keyboardManager: any KeyboardManagerProtocol
+    private var serialPortManager: any SerialPortManagerProtocol
+    private var videoManager: any VideoManagerProtocol
+    private var hidManager: any HIDManagerProtocol
+    private var usbDevicesManager: (any USBDevicesManagerProtocol)?
+    private var logger: any LoggerProtocol
     
+    // MARK: - Legacy Properties (to be migrated)
     let aspectRatio = CGSize(width: 1080, height: 659)
+    private var isInitialLaunch = true
     
+    // MARK: - Initialization
+    override init() {
+        // Initialize dependencies through DI container
+        let container = DependencyContainer.shared
+        
+        // Setup dependencies first
+        Self.setupDependencies(container: container)
+        
+        // Resolve dependencies
+        self.audioManager = container.resolve(AudioManagerProtocol.self)
+        self.statusBarManager = container.resolve(StatusBarManagerProtocol.self)
+        self.hostManager = container.resolve(HostManagerProtocol.self)
+        self.keyboardManager = container.resolve(KeyboardManagerProtocol.self)
+        self.serialPortManager = container.resolve(SerialPortManagerProtocol.self)
+        self.videoManager = container.resolve(VideoManagerProtocol.self)
+        self.hidManager = container.resolve(HIDManagerProtocol.self)
+        self.logger = container.resolve(LoggerProtocol.self)
+        
+        // USB Devices Manager is only available on macOS 12.0+
+        if #available(macOS 12.0, *) {
+            self.usbDevicesManager = container.resolve(USBDevicesManagerProtocol.self)
+        }
+        
+        super.init()
+    }
+    
+    // MARK: - Dependency Setup
+    private static func setupDependencies(container: DependencyContainer) {
+        // Register concrete implementations with their protocols
+        container.register(LoggerProtocol.self, instance: Logger.shared as any LoggerProtocol)
+        container.register(USBDevicesManagerProtocol.self, instance: USBDevicesManager.shared as any USBDevicesManagerProtocol)
+        container.register(AudioManagerProtocol.self, instance: AudioManager.shared as any AudioManagerProtocol)
+        container.register(MouseManagerProtocol.self, instance: MouseManager.shared as any MouseManagerProtocol)
+        container.register(KeyboardManagerProtocol.self, instance: KeyboardManager.shared as any KeyboardManagerProtocol)
+        container.register(SerialPortManagerProtocol.self, instance: SerialPortManager.shared as any SerialPortManagerProtocol)
+        container.register(HostManagerProtocol.self, instance: HostManager.shared as any HostManagerProtocol)
+        container.register(StatusBarManagerProtocol.self, instance: StatusBarManager() as any StatusBarManagerProtocol)
+        container.register(TipLayerManagerProtocol.self, instance: TipLayerManager() as any TipLayerManagerProtocol)
+        container.register(HIDManagerProtocol.self, instance: HIDManager.shared as any HIDManagerProtocol)
+        
+        // OCR Manager (macOS 12.3+ only)
+        if #available(macOS 12.3, *) {
+            container.register(OCRManagerProtocol.self, instance: OCRManager.shared as any OCRManagerProtocol)
+        }
+        
+        // USB Devices Manager (macOS 12.0+ only) - Register before VideoManager since VideoManager depends on it
+        if #available(macOS 12.0, *) {
+            container.register(USBDevicesManagerProtocol.self, instance: USBDevicesManager.shared as any USBDevicesManagerProtocol)
+        }
+        
+        // Register VideoManager after USBDevicesManager to avoid dependency resolution issues
+        container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
+    }
+    
+    // MARK: - Computed Properties
     var isDarkMode: Bool {
         if #available(macOS 10.14, *) {
             if NSApp.effectiveAppearance.name == .darkAqua {
@@ -46,26 +103,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return false
     }
     
-    // Add a flag to track if the application has just launched
-    private var isInitialLaunch = true
-    
+    // MARK: - Application Lifecycle
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApp.mainMenu?.delegate = self
-        // spm.tryOpenSerialPort()
+        
+        // Initialize USB device management (macOS 12.0+ only)
         if #available(macOS 12.0, *) {
-            USBDeivcesManager.shared.update()
+            usbDevicesManager?.update()
         } else {
-            Logger.shared.log(content: "USB device management requires macOS 12.0 or later. Current functionality is limited.")
+            logger.log(content: "USB device management requires macOS 12.0 or later. Current functionality is limited.")
         }
 
-        // init HIDManager after USB device manager updated
-        _ = HIDManager.shared
+        // Initialize HID Manager after USB device manager is updated
+        _ = hidManager
         
+        // Initialize audio settings
+        logger.log(content: "App is initializing, audio is set to disabled")
+        audioManager.setAudioEnabled(false)
+        audioManager.initializeAudio()
+        
+        setupMainWindow()
+        setupNotificationObservers()
+        setupAspectRatioMenu()
+        
+        // Set a delay to mark initial launch as complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.isInitialLaunch = false
+        }
+    }
+    
+    // MARK: - Setup Methods
+    private func setupMainWindow() {
         NSApplication.shared.windows.forEach { window in
             if let windownName = window.identifier?.rawValue {
                 if windownName.contains(UserSettings.shared.mainWindownName) {
                     window.delegate = self
-                    window.backgroundColor = NSColor.fromHex("#000000")
+                    window.backgroundColor = NSColor.black
                     
                     // Allow window resizing but maintain aspect ratio
                     window.styleMask.insert(.resizable)
@@ -79,14 +152,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
                     window.center()
                 }
-                    
-                   
             }
         }
 
-        // Disable window tabbing feature, which makes the "Show Tab Bar" menu item unavailable
+        // Disable window tabbing feature
         NSWindow.allowsAutomaticWindowTabbing = false
-        
+    }
+    
+    private func setupNotificationObservers() {
         // Register for HID resolution change notifications
         NotificationCenter.default.addObserver(
             self,
@@ -99,7 +172,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleWindowSizeUpdateRequest(_:)),
-            // name: Notification.Name("UpdateWindowSizeNotification"),
             name: Notification.Name.updateWindowSize,
             object: nil
         )
@@ -126,19 +198,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"),
             object: nil
         )
-        
-        // Initialize window menu items
-        setupAspectRatioMenu()
-        
-        // start audio
-        // if audioManager.microphonePermissionGranted {
-        //     audioManager.prepareAudio()
-        // }
-        
-        // Set a delay to set the initial launch flag to false after the application has fully started
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isInitialLaunch = false
-        }
     }
     
     // Handle HID resolution change notifications
@@ -595,50 +654,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // MARK: - Debug Menu Actions
     #if DEBUG
     @objc func testVideoSessionControl(_ sender: NSMenuItem) {
-        Logger.shared.log(content: "Test Video Session Control menu item clicked")
+        logger.log(content: "Test Video Session Control menu item clicked")
         testFirmwareUpdateVideoSessionControl()
     }
     
     @objc func testDirectNotifications(_ sender: NSMenuItem) {
-        Logger.shared.log(content: "Test Direct Notifications menu item clicked")
+        logger.log(content: "Test Direct Notifications menu item clicked")
         testDirectVideoSessionNotifications()
     }
     
     /// Test the firmware update notification flow
     /// This simulates what happens during a real firmware update
     private func testFirmwareUpdateVideoSessionControl() {
-        Logger.shared.log(content: "=== Starting Firmware Update Video Session Test ===")
+        logger.log(content: "=== Starting Firmware Update Video Session Test ===")
         
         // Simulate firmware update start
-        Logger.shared.log(content: "Simulating firmware update start...")
+        logger.log(content: "Simulating firmware update start...")
         NotificationCenter.default.post(name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"), object: nil)
         
         // Wait a moment to allow the notification to be processed
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            Logger.shared.log(content: "Simulating firmware update completion...")
+            self.logger.log(content: "Simulating firmware update completion...")
             NotificationCenter.default.post(name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"), object: nil)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                Logger.shared.log(content: "=== Firmware Update Video Session Test Complete ===")
+                self.logger.log(content: "=== Firmware Update Video Session Test Complete ===")
             }
         }
     }
     
     /// Test just the video session stop/start notifications directly
     private func testDirectVideoSessionNotifications() {
-        Logger.shared.log(content: "=== Starting Direct Video Session Notification Test ===")
+        logger.log(content: "=== Starting Direct Video Session Notification Test ===")
         
         // Test stop notification
-        Logger.shared.log(content: "Sending StopVideoSession notification...")
+        logger.log(content: "Sending StopVideoSession notification...")
         NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
         
         // Wait and test start notification
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            Logger.shared.log(content: "Sending StartVideoSession notification...")
+            self.logger.log(content: "Sending StartVideoSession notification...")
             NotificationCenter.default.post(name: NSNotification.Name("StartVideoSession"), object: nil)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                Logger.shared.log(content: "=== Direct Video Session Notification Test Complete ===")
+                self.logger.log(content: "=== Direct Video Session Notification Test Complete ===")
             }
         }
     }
@@ -648,27 +707,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     /// Handles stopping all operations before firmware update
     @objc func handleStopAllOperationsBeforeFirmwareUpdate(_ notification: Notification) {
-        Logger.shared.log(content: "Stopping all operations for firmware update...")
+        logger.log(content: "Stopping all operations for firmware update...")
         
         // Stop serial port connections
-        spm.closeSerialPort()
+        serialPortManager.closeSerialPort()
         
         // Stop audio operations  
         audioManager.stopAudioSession()
 
         // Stop repeating HID operations but keep HID connection open for firmware update
-        HIDManager.shared.stopAllHIDOperations()
+        hidManager.stopAllHIDOperations()
 
         // Stop video session by posting notification for PlayerViewModel to handle
-        Logger.shared.log(content: "Posting StopVideoSession notification for firmware update")
+        logger.log(content: "Posting StopVideoSession notification for firmware update")
         NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
-        Logger.shared.log(content: "Video session stop requested for firmware update")
+        logger.log(content: "Video session stop requested for firmware update")
 
         // Note: Keep the main window open during firmware update
         // The firmware update dialog runs in its own separate window
-        Logger.shared.log(content: "Main window remains open during firmware update")
+        logger.log(content: "Main window remains open during firmware update")
 
-        Logger.shared.log(content: "All operations stopped for firmware update")
+        logger.log(content: "All operations stopped for firmware update")
     }
     
     /// Handles firmware write to EEPROM request
@@ -676,16 +735,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         guard let userInfo = notification.userInfo,
               let firmwareData = userInfo["firmwareData"] as? Data,
               let continuation = userInfo["continuation"] else {
-            Logger.shared.log(content: "Invalid firmware write request")
+            logger.log(content: "Invalid firmware write request")
             return
         }
         
-        Logger.shared.log(content: "Writing firmware to EEPROM...")
+        logger.log(content: "Writing firmware to EEPROM...")
         
         // Use HIDManager to write firmware
         DispatchQueue.global(qos: .userInitiated).async {
-            let hidManager = HIDManager.shared
-            let success = hidManager.writeEeprom(address: 0x0000, data: firmwareData)
+            let success = self.hidManager.writeEeprom(address: 0x0000, data: firmwareData)
             
             DispatchQueue.main.async {
                 if let cont = continuation as? CheckedContinuation<Bool, Never> {
@@ -697,19 +755,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     /// Handles reopening ContentView window after firmware update completion
     @objc func handleReopenContentViewAfterFirmwareUpdate(_ notification: Notification) {
-        Logger.shared.log(content: "Restarting operations after firmware update...")
+        logger.log(content: "Restarting operations after firmware update...")
         
         // Restart HID operations first
-        HIDManager.shared.restartHIDOperations()
+        hidManager.restartHIDOperations()
         
         // Restart video session by posting notification for PlayerViewModel to handle
-        Logger.shared.log(content: "Posting StartVideoSession notification after firmware update")
+        logger.log(content: "Posting StartVideoSession notification after firmware update")
         NotificationCenter.default.post(name: NSNotification.Name("StartVideoSession"), object: nil)
-        Logger.shared.log(content: "Video session restart requested after firmware update")
+        logger.log(content: "Video session restart requested after firmware update")
         
         // Since we kept the main window open, just log the completion
         // The main window should still be visible and functional
-        Logger.shared.log(content: "Firmware update completed, operations restarted")
+        logger.log(content: "Firmware update completed, operations restarted")
     }
     
     // MARK: - Auto-hide Toolbar Logic
@@ -775,7 +833,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 }
 
-private extension NSWindow {
+extension NSWindow {
     var zoomedOrFullScreen: Bool {
         return self.isZoomed || self.styleMask.contains(.fullScreen)
     }

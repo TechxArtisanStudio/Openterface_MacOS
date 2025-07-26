@@ -25,7 +25,8 @@ import IOKit
 import IOKit.usb
 import IOKit.hid
 
-class HIDManager {
+class HIDManager: ObservableObject, HIDManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     static let shared = HIDManager()
     
     var manager: IOHIDManager!
@@ -46,7 +47,7 @@ class HIDManager {
                 openHID(vid: _v, pid: _p, lid: _l)
             }
         }else{
-            Logger.shared.log(content: "No HID device detected when start HID Manager.")
+            logger.log(content: "No HID device detected when start HID Manager.")
         }
     }
     
@@ -57,9 +58,9 @@ class HIDManager {
         timer?.schedule(deadline: .now(), repeating: .seconds(1))
         timer?.setEventHandler { [weak self] in
             if AppStatus.isHIDOpen == nil {
-                Logger.shared.log(content: "No HID device detected during communication check")
+                self?.logger.log(content: "No HID device detected during communication check")
             } else if AppStatus.isHIDOpen == false {
-                Logger.shared.log(content: "HID device exists but failed to open - check device permissions and connectivity")
+                self?.logger.log(content: "HID device exists but failed to open - check device permissions and connectivity")
             } else {
                 // Get switch and HDMI status since HID device is now open and ready
                 //  HID has been opened!
@@ -101,7 +102,7 @@ class HIDManager {
             // Open HID Manager
             let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             if result != kIOReturnSuccess {
-                Logger.shared.log(content: "Failed to open HID Manager with error code: \(result). Please check device permissions and connectivity.")
+                logger.log(content: "Failed to open HID Manager with error code: \(result). Please check device permissions and connectivity.")
                 return
             }
             
@@ -134,40 +135,40 @@ class HIDManager {
             IOHIDManagerClose(self.manager, IOOptionBits(kIOHIDOptionsTypeNone))
             manager = nil
         }
-        Logger.shared.log(content: "HID Manager and device connections closed successfully")
+        logger.log(content: "HID Manager and device connections closed successfully")
     }
     
     /// Stops all repeating HID operations while keeping the HID connection open
     /// This is used during firmware updates to prevent interference with EEPROM operations
     func stopAllHIDOperations() {
-        Logger.shared.log(content: "Stopping all repeating HID operations for firmware update...")
+        logger.log(content: "Stopping all repeating HID operations for firmware update...")
         
         // Stop the timer that performs repeated HID operations
         timer?.cancel()
         timer = nil
         
-        Logger.shared.log(content: "All repeating HID operations stopped. HID connection remains open for firmware update.")
+        logger.log(content: "All repeating HID operations stopped. HID connection remains open for firmware update.")
     }
     
     /// Restarts repeating HID operations after firmware update is complete
     func restartHIDOperations() {
-        Logger.shared.log(content: "Restarting HID operations after firmware update...")
+        logger.log(content: "Restarting HID operations after firmware update...")
         
         // Only restart if we have a valid HID device connection
         guard device != nil, isOpen == true else {
-            Logger.shared.log(content: "Cannot restart HID operations - no valid HID device connection")
+            logger.log(content: "Cannot restart HID operations - no valid HID device connection")
             return
         }
         
         // Restart the communication timer
         startCommunication()
-        Logger.shared.log(content: "HID operations restarted successfully")
+        logger.log(content: "HID operations restarted successfully")
     }
     
     // read date from HID device
     func readHIDReport() -> [UInt8]? {
         guard let device = self.device else {
-            Logger.shared.log(content: "Cannot read HID report - no HID device is currently connected or available")
+            logger.log(content: "Cannot read HID report - no HID device is currently connected or available")
             return nil
         }
 
@@ -262,7 +263,7 @@ class HIDManager {
               let widthLowResponse = self.sendAndReadHIDReport(widthLowReport),
               let heightHighResponse = self.sendAndReadHIDReport(heightHighReport),
               let heightLowResponse = self.sendAndReadHIDReport(heightLowReport) else {
-            Logger.shared.log(content: "Failed to read resolution data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read resolution data from HID device. Check if device is properly connected.")
             return nil
         }
         
@@ -278,7 +279,7 @@ class HIDManager {
         
         // Cap resolution at 4K, default to 1920x1080 if exceeded
         if width > 4096 || height > 4096 {
-            Logger.shared.log(content: "Input resolution (\(width)x\(height)) exceeds 4K limit, defaulting to 1920x1080")
+            logger.log(content: "Input resolution (\(width)x\(height)) exceeds 4K limit, defaulting to 1920x1080")
             width = 1920
             height = 1080
         }
@@ -288,8 +289,8 @@ class HIDManager {
         let oldResolution = AppStatus.hidReadResolusion
         
         if (oldResolution.0 != 0 && oldResolution.1 != 0) && (newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1) {
-            Logger.shared.log(content: "HID input resolution changed: \(newResolution.0)x\(newResolution.1)")
-            Logger.shared.log(content: "Old input resolution: \(oldResolution.0)x\(oldResolution.1)")
+            logger.log(content: "HID input resolution changed: \(newResolution.0)x\(newResolution.1)")
+            logger.log(content: "Old input resolution: \(oldResolution.0)x\(oldResolution.1)")
             // When the resolution changes, send a notification
             if newResolution.0 > 0 && newResolution.1 > 0 {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
@@ -308,7 +309,7 @@ class HIDManager {
         
         guard let fpsHighResponse = self.sendAndReadHIDReport(fpsHighReport),
               let fpsLowResponse = self.sendAndReadHIDReport(fpsLowReport) else {
-            Logger.shared.log(content: "Failed to read FPS data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read FPS data from HID device. Check if device is properly connected.")
             return nil
         }
         
@@ -333,7 +334,7 @@ class HIDManager {
         
         guard let pixelClockHighResponse = self.sendAndReadHIDReport(pixelClockHighReport),
               let pixelClockLowResponse = self.sendAndReadHIDReport(pixelClockLowReport) else {
-            Logger.shared.log(content: "Failed to read pixel clock data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read pixel clock data from HID device. Check if device is properly connected.")
             return nil
         }
         
@@ -351,7 +352,7 @@ class HIDManager {
 
         guard let hTotalHighResponse = self.sendAndReadHIDReport(hTotalHighReport),
               let hTotalLowResponse = self.sendAndReadHIDReport(hTotalLowReport) else {
-            Logger.shared.log(content: "Failed to read HTotal data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read HTotal data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -367,7 +368,7 @@ class HIDManager {
 
         guard let vTotalHighResponse = self.sendAndReadHIDReport(vTotalHighReport),
               let vTotalLowResponse = self.sendAndReadHIDReport(vTotalLowReport) else {
-            Logger.shared.log(content: "Failed to read VTotal data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read VTotal data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -383,7 +384,7 @@ class HIDManager {
 
         guard let hstHighResponse = self.sendAndReadHIDReport(hstHighReport),
               let hstLowResponse = self.sendAndReadHIDReport(hstLowReport) else {
-            Logger.shared.log(content: "Failed to read HST data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read HST data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -399,7 +400,7 @@ class HIDManager {
 
         guard let vstHighResponse = self.sendAndReadHIDReport(vstHighReport),
               let vstLowResponse = self.sendAndReadHIDReport(vstLowReport) else {
-            Logger.shared.log(content: "Failed to read VST data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read VST data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -415,7 +416,7 @@ class HIDManager {
 
         guard let hwHighResponse = self.sendAndReadHIDReport(hwHighReport),
               let hwLowResponse = self.sendAndReadHIDReport(hwLowReport) else {
-            Logger.shared.log(content: "Failed to read HW data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read HW data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -431,7 +432,7 @@ class HIDManager {
 
         guard let vwHighResponse = self.sendAndReadHIDReport(vwHighReport),
               let vwLowResponse = self.sendAndReadHIDReport(vwLowReport) else {
-            Logger.shared.log(content: "Failed to read VW data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read VW data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -451,7 +452,7 @@ class HIDManager {
               let _v2 = self.sendAndReadHIDReport(v2),
               let _v3 = self.sendAndReadHIDReport(v3),
               let _v4 = self.sendAndReadHIDReport(v4) else {
-            Logger.shared.log(content: "Failed to read version data from HID device. Check if device is properly connected.")
+            logger.log(content: "Failed to read version data from HID device. Check if device is properly connected.")
             return nil
         }
 
@@ -500,7 +501,7 @@ class HIDManager {
     ///   - progressCallback: Optional callback to report progress (0.0 to 1.0)
     /// - Returns: True if write was successful
     func writeEeprom(address: UInt16, data: Data, progressCallback: ((Double) -> Void)? = nil) -> Bool {
-        Logger.shared.log(content: "Writing \(data.count) bytes to EEPROM at address 0x\(String(format: "%04X", address))")
+        logger.log(content: "Writing \(data.count) bytes to EEPROM at address 0x\(String(format: "%04X", address))")
         
         // Write in chunks (based on C++ implementation)
         let maxChunkSize = 16
@@ -519,7 +520,7 @@ class HIDManager {
             let chunk = data.subdata(in: offset..<(offset + currentChunkSize))
             
             if !writeChunk(address: currentAddress, data: chunk) {
-                Logger.shared.log(content: "Failed to write EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
+                logger.log(content: "Failed to write EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
                 return false
             }
             
@@ -533,7 +534,7 @@ class HIDManager {
             
             // Log progress periodically
             if writtenSize % 64 == 0 {
-                Logger.shared.log(content: "Written size: \(writtenSize)/\(totalSize) (\(Int(progress * 100))%)")
+                logger.log(content: "Written size: \(writtenSize)/\(totalSize) (\(Int(progress * 100))%)")
             }
             
             // Add delay between chunks (from C++ implementation)
@@ -542,7 +543,7 @@ class HIDManager {
         
         // Report completion
         progressCallback?(1.0)
-        Logger.shared.log(content: "EEPROM write completed successfully")
+        logger.log(content: "EEPROM write completed successfully")
         return true
     }
     
@@ -586,12 +587,12 @@ class HIDManager {
             }
             // Remaining bytes are already 0 from initialization
             
-            Logger.shared.log(content: "EEPROM Write Report: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            logger.log(content: "EEPROM Write Report: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
             
             // Send HID feature report (based on videohid.cpp implementation)
             // EEPROM operations use feature reports, not output reports
             if !sendHIDFeatureReport(report: report) {
-                Logger.shared.log(content: "Failed to send EEPROM write feature report")
+                logger.log(content: "Failed to send EEPROM write feature report")
                 return false
             }
             
@@ -607,10 +608,10 @@ class HIDManager {
     ///   - length: Number of bytes to read
     /// - Returns: The read data, or nil if failed
     func readEeprom(address: UInt16, length: UInt8) -> Data? {
-        Logger.shared.log(content: "Reading \(length) bytes from EEPROM at address 0x\(String(format: "%04X", address))")
+        logger.log(content: "Reading \(length) bytes from EEPROM at address 0x\(String(format: "%04X", address))")
         
         guard length > 0 else {
-            Logger.shared.log(content: "Invalid read length: \(length)")
+            logger.log(content: "Invalid read length: \(length)")
             return nil
         }
         
@@ -627,7 +628,7 @@ class HIDManager {
                 currentAddress += UInt16(chunk.count)
                 remainingBytes -= UInt8(chunk.count)
             } else {
-                Logger.shared.log(content: "Failed to read EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
+                logger.log(content: "Failed to read EEPROM chunk at address 0x\(String(format: "%04X", currentAddress))")
                 return nil
             }
             
@@ -635,7 +636,7 @@ class HIDManager {
             Thread.sleep(forTimeInterval: 0.05) // 50ms delay
         }
         
-        Logger.shared.log(content: "EEPROM read completed successfully, read \(readData.count) bytes")
+        logger.log(content: "EEPROM read completed successfully, read \(readData.count) bytes")
         return readData
     }
     
@@ -665,11 +666,11 @@ class HIDManager {
             report[3] = bytesToRead                         // Length (1-5 bytes)
             // Remaining bytes are already 0 from initialization (padding)
             
-            Logger.shared.log(content: "EEPROM Read Request [0x\(String(format: "%04X", currentAddress)), \(bytesToRead) bytes]: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            logger.log(content: "EEPROM Read Request [0x\(String(format: "%04X", currentAddress)), \(bytesToRead) bytes]: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
             
             // Send read command using feature report
             if !sendHIDFeatureReport(report: report) {
-                Logger.shared.log(content: "Failed to send EEPROM read feature report at address 0x\(String(format: "%04X", currentAddress))")
+                logger.log(content: "Failed to send EEPROM read feature report at address 0x\(String(format: "%04X", currentAddress))")
                 return nil
             }
             
@@ -678,11 +679,11 @@ class HIDManager {
             
             // Read response using feature report
             guard let response = getHIDFeatureReport(bufferSize: reportSize) else {
-                Logger.shared.log(content: "Failed to get EEPROM read response at address 0x\(String(format: "%04X", currentAddress))")
+                logger.log(content: "Failed to get EEPROM read response at address 0x\(String(format: "%04X", currentAddress))")
                 return nil
             }
             
-            Logger.shared.log(content: "EEPROM Read Response [0x\(String(format: "%04X", currentAddress))]: \(response.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            logger.log(content: "EEPROM Read Response [0x\(String(format: "%04X", currentAddress))]: \(response.map { String(format: "%02X", $0) }.joined(separator: " "))")
 
             // Check if response has enough bytes (need at least 3 + bytesToRead)
             let expectedMinLength = 3 + Int(bytesToRead)
@@ -692,7 +693,7 @@ class HIDManager {
                     result.append(response[3 + i])
                 }
             } else {
-                Logger.shared.log(content: "Invalid EEPROM read response length at address 0x\(String(format: "%04X", currentAddress)): expected >= \(expectedMinLength), got \(response.count)")
+                logger.log(content: "Invalid EEPROM read response length at address 0x\(String(format: "%04X", currentAddress)): expected >= \(expectedMinLength), got \(response.count)")
                 return nil
             }
             

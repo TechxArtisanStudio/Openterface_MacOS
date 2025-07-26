@@ -25,8 +25,8 @@ import Foundation
 import ORSSerial
 import os.log
 
-class SerialPortManager: NSObject, ORSSerialPortDelegate {
-    
+class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     static let shared = SerialPortManager()
     var tryOpenTimer: Timer?
     var receiveBuffer = Data()
@@ -131,13 +131,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func initializeSerialPort(){
         // If the usb device is connected, try to open the serial port
-        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Initializing Serial Port") }
+        if logger.SerialDataPrint { logger.log(content: "Initializing Serial Port") }
 
-        USBDeivcesManager.shared.update()
-        if USBDeivcesManager.shared.isOpenterfaceConnected(){
+        USBDevicesManager.shared.update()
+        if USBDevicesManager.shared.isOpenterfaceConnected(){
             // Check if CH32V208 is connected - if so, use direct connection
-            if USBDeivcesManager.shared.isCH32V208Connected() {
-                Logger.shared.log(content: "CH32V208 detected - using direct serial port connection")
+            if USBDevicesManager.shared.isCH32V208Connected() {
+                logger.log(content: "CH32V208 detected - using direct serial port connection")
                 self.tryOpenSerialPortForCH32V208()
             } else {
                 self.tryOpenSerialPort()
@@ -156,9 +156,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     @objc func serialPortsWereConnected(_ notification: Notification) {
         if !self.isTrying{
             // Check if CH32V208 is connected - if so, use direct connection
-            USBDeivcesManager.shared.update()
-            if USBDeivcesManager.shared.isCH32V208Connected() {
-                Logger.shared.log(content: "CH32V208 detected on port connection - using direct serial port connection")
+            USBDevicesManager.shared.update()
+            if USBDevicesManager.shared.isCH32V208Connected() {
+                logger.log(content: "CH32V208 detected on port connection - using direct serial port connection")
                 self.tryOpenSerialPortForCH32V208()
             } else {
                 self.tryOpenSerialPort()
@@ -167,13 +167,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
-        Logger.shared.log(content: "Serial port Disconnected")
+        logger.log(content: "Serial port Disconnected")
         self.closeSerialPort()
     }
 
     func checkCTS() {
         // CTS monitoring only applies to CH9329 chipset
-        if !USBDeivcesManager.shared.isCH9329Connected() {
+        if !USBDevicesManager.shared.isCH9329Connected() {
             return
         }
         
@@ -195,7 +195,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
 
     func checkHIDEventTime() {
         // HID event time checking only applies to CH9329 chipset
-        if !USBDeivcesManager.shared.isCH9329Connected() {
+        if !USBDevicesManager.shared.isCH9329Connected() {
             return
         }
         
@@ -203,8 +203,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             if Date().timeIntervalSince(lastTime) > 5 {
 
                 // 5 seconds pass since last HID event
-                if Logger.shared.SerialDataPrint {
-                    Logger.shared.log(content: "No hid update more than 5 second, check the HID information")
+                if logger.SerialDataPrint {
+                    logger.log(content: "No hid update more than 5 second, check the HID information")
                 }
                 // Rest the time, to avoide duplicated check
                 lastHIDEventTime = Date()
@@ -214,7 +214,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
 
     func serialPortWasOpened(_ serialPort: ORSSerialPort) {
-        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial opened") }
+        if logger.SerialDataPrint { logger.log(content: "Serial opened") }
         
         // Start CTS monitoring for HID event detection
         self.startCTSMonitoring()
@@ -222,16 +222,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
 
-        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "Serial port was closed") }
+        if logger.SerialDataPrint { logger.log(content: "Serial port was closed") }
     }
     
     /*
      * Receive data from serial
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
-        if Logger.shared.SerialDataPrint {
+        if logger.SerialDataPrint {
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-            Logger.shared.log(content: "Serial port receive data: \(dataString)")
+            logger.log(content: "Serial port receive data: \(dataString)")
         }
         // handle bytes data with prefix 57 AB 00
         let prefix: [UInt8] = [0x57, 0xAB, 0x00]
@@ -254,11 +254,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                     let errorDataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
                     let checksumHex = String(format: "%02X", checksum)
                     let chksumHex = String(format: "%02X", chksum)
-                    // Logger.shared.log(content: "Checksum error, discard the data: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
+                     logger.log(content: "Checksum error, discard the data: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
                 }
             }
         } else {
-            //Logger.shared.log(content: "Data does not start with the correct prefix")
+            //logger.log(content: "Data does not start with the correct prefix")
             // if the data does not start with the correct prefix and the buffer is empty, ignore it
             if receiveBuffer.isEmpty {
                 return
@@ -307,30 +307,30 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             let isScrollOn = (data[7] & 0x04) == 0x04
             AppStatus.isScrollOn = isScrollOn
             
-            // Logger.shared.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
+            // logger.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
             
         case 0x82:  //Keyboard hid execution status 0 - success
             let kbStatus = data[5]
-            if Logger.shared.SerialDataPrint  {
-                Logger.shared.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
+            if logger.SerialDataPrint  {
+                logger.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
             }
             
         case 0x83:  //multimedia data hid execution status 0 - success
-            if Logger.shared.SerialDataPrint  {
+            if logger.SerialDataPrint  {
                 let kbStatus = data[5]
-                Logger.shared.log(content: "Receive multi-meida status: \(String(format: "0x%02X", kbStatus))")
+                logger.log(content: "Receive multi-meida status: \(String(format: "0x%02X", kbStatus))")
             }
             
         case 0x84, 0x85:  //Mouse hid execution status 0 - success
             let kbStatus = data[5]
-            if Logger.shared.SerialDataPrint {
-                Logger.shared.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
+            if logger.SerialDataPrint {
+                logger.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
             }
             
         case 0x86, 0x87:  //custom hid execution status 0 - success
-            if Logger.shared.SerialDataPrint  {
+            if logger.SerialDataPrint  {
                 let kbStatus = data[5]
-                Logger.shared.log(content: "Receive \(cmd == 0x86 ? "SEND" : "READ") custom hid status: \(String(format: "0x%02X", kbStatus))")
+                logger.log(content: "Receive \(cmd == 0x86 ? "SEND" : "READ") custom hid status: \(String(format: "0x%02X", kbStatus))")
             }
             
         case 0x88:  // get para cfg
@@ -341,13 +341,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 return intPointer[0].bigEndian
             }
             self.baudrate = Int(baudrateInt32)
-            Logger.shared.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
+            logger.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
             if self.baudrate == SerialPortManager.DEFAULT_BAUDRATE && mode == 0x82 {
                 self.isDeviceReady = true
                 self.getHidInfo()  
             }
             else {
-                Logger.shared.log(content: "Reset to baudrate 115200 and mode 0x82...")
+                logger.log(content: "Reset to baudrate 115200 and mode 0x82...")
                 var command: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
                 command.append(contentsOf: data[12...31])
                 for _ in 0...22 {
@@ -357,14 +357,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             }
             
         case 0x89:  // set para cfg
-            if Logger.shared.SerialDataPrint {
+            if logger.SerialDataPrint {
                 let status = data[5]
-                Logger.shared.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
+                logger.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
             }
             
         default:
             let hexCmd = String(format: "%02hhX", cmd)
-            Logger.shared.log(content: "Unknown command: \(hexCmd)")
+            logger.log(content: "Unknown command: \(hexCmd)")
         }
     }
 
@@ -373,7 +373,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func serialPort(_ serialPort: ORSSerialPort, didEncounterError error: Error) {
-        if Logger.shared.SerialDataPrint { Logger.shared.log(content: "SerialPort \(serialPort) encountered an error: \(error)") }
+        if logger.SerialDataPrint { logger.log(content: "SerialPort \(serialPort) encountered an error: \(error)") }
         self.closeSerialPort()
         
     }
@@ -384,11 +384,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     }
     
     func tryOpenSerialPort( priorityBaudrate: Int =  SerialPortManager.DEFAULT_BAUDRATE) {
-        Logger.shared.log(content: "tryOpenSerialPort")
+        logger.log(content: "tryOpenSerialPort")
         
         // Check if already trying to prevent race conditions
         if self.isTrying {
-            Logger.shared.log(content: "Already trying to connect, returning early")
+            logger.log(content: "Already trying to connect, returning early")
             return
         }
         
@@ -396,7 +396,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         // get all available serial ports
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-            Logger.shared.log(content: "No available serial ports found")
+            logger.log(content: "No available serial ports found")
             self.isTrying = false
             return
         }
@@ -421,7 +421,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
                 
                 for baudrate in baudrates {
                     if self.tryConnectWithBaudrate(baudrate) {
-                        Logger.shared.log(content: "Connected successfully with baudrate: \(baudrate)")
+                        logger.log(content: "Connected successfully with baudrate: \(baudrate)")
                         self.isTrying = false
                         return // Connection successful, exit the loop
                     }
@@ -444,11 +444,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
-        Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate)")
+        logger.log(content: "Trying to connect with baudrate: \(baudrate)")
         self.serialPort = getSerialPortPathFromUSBManager()
 
         if self.serialPort != nil {
-            Logger.shared.log(content: "Trying to connect with baudrate: \(baudrate), path: \(self.serialPort?.path ?? "Unknown")")
+            logger.log(content: "Trying to connect with baudrate: \(baudrate), path: \(self.serialPort?.path ?? "Unknown")")
             self.openSerialPort(baudrate: baudrate)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.getChipParameterCfg()
@@ -515,8 +515,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     
     func sendCommand(command: [UInt8], force: Bool = false) {
         guard let serialPort = self.serialPort , serialPort.isOpen else {
-            if Logger.shared.SerialDataPrint {
-                Logger.shared.log(content: "Serial port is not open or not selected")
+            if logger.SerialDataPrint {
+                logger.log(content: "Serial port is not open or not selected")
             }
             return
         }
@@ -533,12 +533,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
 
         if self.isDeviceReady || force {
-            if Logger.shared.SerialDataPrint {
-                Logger.shared.log(content: "Sending command: \(dataString)")
+            if logger.SerialDataPrint {
+                logger.log(content: "Sending command: \(dataString)")
             }
             serialPort.send(data)
         } else {
-            Logger.shared.log(content: "Serial port is not ready")
+            logger.log(content: "Serial port is not ready")
         }
         
     }
@@ -584,9 +584,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     func setDTR(_ enabled: Bool) {
         if let port = self.serialPort {
             port.dtr = enabled
-            Logger.shared.log(content: "Set DTR to: \(enabled)")
+            logger.log(content: "Set DTR to: \(enabled)")
         } else {
-            Logger.shared.log(content: "Cannot set DTR: Serial port not available")
+            logger.log(content: "Cannot set DTR: Serial port not available")
         }
     }
     
@@ -601,9 +601,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     func setRTS(_ enabled: Bool) {
         if let port = self.serialPort {
             port.rts = enabled
-            Logger.shared.log(content: "Set RTS to: \(enabled)")
+            logger.log(content: "Set RTS to: \(enabled)")
         } else {
-            Logger.shared.log(content: "Cannot set RTS: Serial port not available")
+            logger.log(content: "Cannot set RTS: Serial port not available")
         }
     }
     
@@ -618,11 +618,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     /// Directly opens serial port for CH32V208 without baudrate detection
     /// CH32V208 doesn't require the command-response validation process
     func tryOpenSerialPortForCH32V208() {
-        Logger.shared.log(content: "tryOpenSerialPortForCH32V208 - Direct connection mode")
+        logger.log(content: "tryOpenSerialPortForCH32V208 - Direct connection mode")
         
         // Check if already trying to prevent race conditions
         if self.isTrying {
-            Logger.shared.log(content: "Already trying to connect, returning early")
+            logger.log(content: "Already trying to connect, returning early")
             return
         }
         
@@ -630,7 +630,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         // get all available serial ports
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-            Logger.shared.log(content: "No available serial ports found")
+            logger.log(content: "No available serial ports found")
             self.isTrying = false
             return
         }
@@ -640,7 +640,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         self.serialPort = getSerialPortPathFromUSBManager()
         
         if let serialPort = self.serialPort {
-            Logger.shared.log(content: "Opening CH32V208 serial port directly at default baudrate: \(SerialPortManager.DEFAULT_BAUDRATE), path: \(serialPort.path)")
+            logger.log(content: "Opening CH32V208 serial port directly at default baudrate: \(SerialPortManager.DEFAULT_BAUDRATE), path: \(serialPort.path)")
             
             // Open the serial port with default baudrate
             self.openSerialPort(baudrate: SerialPortManager.DEFAULT_BAUDRATE)
@@ -648,15 +648,15 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             // For CH32V208, we don't need command validation - set device ready immediately
             if serialPort.isOpen {
                 self.isDeviceReady = true
-                Logger.shared.log(content: "CH32V208 serial port opened successfully and device is ready")
+                logger.log(content: "CH32V208 serial port opened successfully and device is ready")
                 
                 // Start the CTS monitoring timer for HID event detection
                 self.startCTSMonitoring()
             } else {
-                Logger.shared.log(content: "Failed to open CH32V208 serial port")
+                logger.log(content: "Failed to open CH32V208 serial port")
             }
         } else {
-            Logger.shared.log(content: "No USB serial port found for CH32V208")
+            logger.log(content: "No USB serial port found for CH32V208")
         }
         
         self.isTrying = false
@@ -669,8 +669,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     /// For CH32V208, HID events are detected through direct serial communication
     private func startCTSMonitoring() {
         // Only start CTS monitoring for CH9329 chipset
-        if !USBDeivcesManager.shared.isCH9329Connected() {
-            Logger.shared.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
+        if !USBDevicesManager.shared.isCH9329Connected() {
+            logger.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
             return
         }
         
@@ -679,7 +679,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
             self.timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                 self.checkCTS()
             }
-            Logger.shared.log(content: "Started CTS monitoring for CH9329 HID event detection")
+            logger.log(content: "Started CTS monitoring for CH9329 HID event detection")
         }
     }
     
@@ -688,22 +688,22 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
     /// or falls back to the default USB serial device identified during device grouping
     private func getSerialPortPathFromUSBManager() -> ORSSerialPort? {
         // Get the expected serial device path from USB device manager
-        if let expectedPath = USBDeivcesManager.shared.getExpectedSerialDevicePath() {
-            Logger.shared.log(content: "USB device manager provided expected serial device path hint: \(expectedPath)")
+        if let expectedPath = USBDevicesManager.shared.getExpectedSerialDevicePath() {
+            logger.log(content: "USB device manager provided expected serial device path hint: \(expectedPath)")
         }
         
         // Log information about all device groups
-        let groupsInfo = USBDeivcesManager.shared.getDeviceGroupsInfo()
+        let groupsInfo = USBDevicesManager.shared.getDeviceGroupsInfo()
         if !groupsInfo.isEmpty {
-            Logger.shared.log(content: "Found \(groupsInfo.count) device groups with total \(USBDeivcesManager.shared.getTotalDeviceCount()) devices")
+            logger.log(content: "Found \(groupsInfo.count) device groups with total \(USBDevicesManager.shared.getTotalDeviceCount()) devices")
         }
         
         // First, try to find serial port based on control chip device location
-        if let controlDevice = USBDeivcesManager.shared.getControlChipDevice() {
-            Logger.shared.log(content: "Looking for serial port matching control chip device: \(controlDevice.productName) at \(controlDevice.locationID)")
+        if let controlDevice = USBDevicesManager.shared.getControlChipDevice() {
+            logger.log(content: "Looking for serial port matching control chip device: \(controlDevice.productName) at \(controlDevice.locationID)")
             
-            if let groupIndex = USBDeivcesManager.shared.findGroupContaining(device: controlDevice) {
-                Logger.shared.log(content: "Control chip device found in group \(groupIndex)")
+            if let groupIndex = USBDevicesManager.shared.findGroupContaining(device: controlDevice) {
+                logger.log(content: "Control chip device found in group \(groupIndex)")
             }
             
             // Try to find a serial port that might be related to this USB device
@@ -714,17 +714,17 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         // Fallback to default USB serial device if available
         if let defaultSerial = AppStatus.DefaultUSBSerial {
-            Logger.shared.log(content: "Using default USB serial device: \(defaultSerial.productName) at \(defaultSerial.locationID)")
+            logger.log(content: "Using default USB serial device: \(defaultSerial.productName) at \(defaultSerial.locationID)")
             
-            if let groupIndex = USBDeivcesManager.shared.findGroupContaining(device: defaultSerial) {
-                Logger.shared.log(content: "Default serial device found in group \(groupIndex)")
+            if let groupIndex = USBDevicesManager.shared.findGroupContaining(device: defaultSerial) {
+                logger.log(content: "Default serial device found in group \(groupIndex)")
             }
             
             return findBestMatchingSerialPort(for: defaultSerial)
         }
         
         // Final fallback to the old method
-        Logger.shared.log(content: "No USB device manager info available, falling back to name-based search")
+        logger.log(content: "No USB device manager info available, falling back to name-based search")
         return self.serialPorts.filter{ $0.path.contains("usbserial")}.first
     }
     
@@ -746,22 +746,22 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate {
         
         if usbSerialPorts.count == 1 {
             // If there's only one USB serial port, it's likely the one we want
-            Logger.shared.log(content: "Found single USB serial port: \(usbSerialPorts[0].path)")
+            logger.log(content: "Found single USB serial port: \(usbSerialPorts[0].path)")
             return usbSerialPorts.first
         } else if usbSerialPorts.count > 1 {
             // Multiple USB serial ports - try to find the best match
-            Logger.shared.log(content: "Found \(usbSerialPorts.count) USB serial ports, attempting to find best match")
+            logger.log(content: "Found \(usbSerialPorts.count) USB serial ports, attempting to find best match")
             
             // For now, return the first one as we don't have enough correlation info
             // This could be enhanced in the future with more sophisticated matching
             if let firstPort = usbSerialPorts.first {
-                Logger.shared.log(content: "Selected first USB serial port: \(firstPort.path)")
+                logger.log(content: "Selected first USB serial port: \(firstPort.path)")
                 return firstPort
             }
         }
         
         // If no usbserial ports found, log and return nil
-        Logger.shared.log(content: "No USB serial ports found for device: \(usbDevice.productName)")
+        logger.log(content: "No USB serial ports found for device: \(usbDevice.productName)")
         return nil
     }
 }

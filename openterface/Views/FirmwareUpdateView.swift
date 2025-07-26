@@ -51,7 +51,7 @@ enum FirmwareError: LocalizedError {
 }
 
 struct FirmwareUpdateView: View {
-    @StateObject private var firmwareManager = FirmwareManager.shared
+    @StateObject private var firmwareManager: FirmwareManager
     @State private var currentVersion: String = "Unknown"
     @State private var latestVersion: String = "Unknown"
     @State private var showingConfirmation: Bool = false
@@ -64,9 +64,16 @@ struct FirmwareUpdateView: View {
     @State private var selectedRestoreFile: URL?
     @Environment(\.dismiss) private var dismiss
     
+    // Protocol-based dependencies
+    private var  hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+    
+    init() {
+        self._firmwareManager = StateObject(wrappedValue: FirmwareManager.shared)
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
-    
+            
             if !firmwareManager.isUpdateInProgress {
                 // Firmware version information and confirmation dialog
                 VStack(alignment: .leading, spacing: 15) {
@@ -91,7 +98,7 @@ struct FirmwareUpdateView: View {
                             .help("Backup Current Firmware")
                             .overlay(
                                 // Show progress indicator when backup is in progress
-                                firmwareManager.isBackupInProgress ? 
+                                firmwareManager.isBackupInProgress ?
                                 ProgressView()
                                     .scaleEffect(0.5)
                                     .progressViewStyle(CircularProgressViewStyle(tint: .blue))
@@ -252,7 +259,7 @@ struct FirmwareUpdateView: View {
                     if firmwareManager.updateProgress >= 1.0 {
                         VStack(spacing: 10) {
                             HStack {
-                               
+                                
                                 Button("Close Application") {
                                     NSApplication.shared.terminate(nil)
                                 }
@@ -355,7 +362,7 @@ struct FirmwareUpdateView: View {
         // Read firmware version from device using HID commands
         // This would typically read from specific EEPROM addresses that contain version info
         print("Reading current firmware version from device...")
-        return HIDManager.shared.getVersion() ?? "Unknown"
+        return hidManager.getVersion() ?? "Unknown"
     }
     
     private func fetchLatestFirmwareVersion() async {
@@ -508,18 +515,14 @@ struct FirmwareUpdateView: View {
         // Use HID Manager directly with progress tracking
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .background).async {
-                let hidManager = HIDManager.shared
                 let firmwareManagerRef = self.firmwareManager
-                let success = hidManager.writeEeprom(address: 0x0000, data: data) { progress in
-                    // Update progress on main thread
-                    DispatchQueue.main.async {
-                        // Map progress from 0.4 to 1.0 (40% to 100%)
-                        let overallProgress = 0.4 + (progress * 0.6)
-                        firmwareManagerRef.updateProgress = overallProgress
-                        
-                        let progressPercent = Int(overallProgress * 100)
-                        firmwareManagerRef.updateStatus = "Installing firmware to EEPROM... \(progressPercent)%"
-                    }
+                let success = self.hidManager.writeEeprom(address: 0x0000, data: data)
+                
+                // Update progress on main thread
+                DispatchQueue.main.async {
+                    // Set completion progress
+                    firmwareManagerRef.updateProgress = 1.0
+                    firmwareManagerRef.updateStatus = "Firmware installation completed"
                 }
                 
                 continuation.resume(returning: success)

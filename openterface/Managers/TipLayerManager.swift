@@ -2,10 +2,9 @@ import SwiftUI
 import AVFoundation
 import AppKit
 
-public class TipLayerManager {
-    public static let shared = TipLayerManager()
+public class TipLayerManager: TipLayerManagerProtocol {
     
-    private init() {}
+    public init() {}
     
     // Single dictionary to track active windows and their timers
     private var activeWindows: [NSWindow: Timer] = [:]

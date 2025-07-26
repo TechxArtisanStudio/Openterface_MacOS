@@ -22,8 +22,9 @@
 
 import SwiftUI
 
-class StatusBarManager {
-    
+class StatusBarManager: StatusBarManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+
     var statusBarItem: NSStatusItem!
 
     init() {
@@ -35,7 +36,21 @@ class StatusBarManager {
         if let button = statusBarItem.button {
             button.image = NSImage(systemSymbolName: "gift.circle", accessibilityDescription: "Chart Line")
         } else {
-            Logger.shared.log(content: "Failed to load icon")
+            logger.log(content: "Failed to load icon")
         }
+    }
+    
+    // MARK: - StatusBarManagerProtocol Implementation
+    
+    func setupStatusBar() {
+        initBar()
+    }
+    
+    func updateStatusBar() {
+        // Implementation for updating status bar
+    }
+    
+    func removeStatusBar() {
+        NSStatusBar.system.removeStatusItem(statusBarItem)
     }
 }

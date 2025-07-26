@@ -25,10 +25,10 @@ import AppKit
 import Carbon.HIToolbox
 
 class KeyboardMapper {
-    let spm = SerialPortManager.shared
+    private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var serialPortManager: SerialPortManagerProtocol { DependencyContainer.shared.resolve(SerialPortManagerProtocol.self) }
     
     let keyCodeMapping: [UInt16: UInt8] = [
-        // 字母键
         UInt16(kVK_ANSI_A): 0x04, // a
         UInt16(kVK_ANSI_B): 0x05, // b
         UInt16(kVK_ANSI_C): 0x06, // c
@@ -284,7 +284,7 @@ class KeyboardMapper {
             if let mappedValue = keyCodeMapping[kc] {
                 keyDat[7 + index] = mappedValue
             } else {
-                Logger.shared.log(content: "Warning: \(kc) is not mapped.")
+                logger.log(content: "Warning: \(kc) is not mapped.")
             }
         }
 
@@ -297,9 +297,9 @@ class KeyboardMapper {
         
         keyDat[13] = calculateChecksum(data: keyDat)
         //
-        // let _ = self.spm.writeByte(data:keyDat)
+        // let _ = self.serialPortManager.writeByte(data:keyDat)
         //
-        let _ = spm.sendCommand(command: keyDat)
+        let _ = serialPortManager.sendCommand(command: keyDat)
     }
     
     private func processModifierFlags(_ modifiers: NSEvent.ModifierFlags) -> UInt8 {
@@ -431,7 +431,7 @@ class KeyboardMapper {
         } else if code == .esc {
             return 53
         }
-        Logger.shared.log(content: "Warning: \(code.rawValue) is not mapped to a key code.")
+        logger.log(content: "Warning: \(code.rawValue) is not mapped to a key code.")
         return nil
     }
 }

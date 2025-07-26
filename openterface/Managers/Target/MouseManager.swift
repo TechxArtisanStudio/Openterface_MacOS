@@ -21,11 +21,15 @@
 */
 
 import Foundation
+import AppKit
 
-class MouseManager {
+class MouseManager: MouseManagerProtocol {
 
     // 添加共享单例实例
     static let shared = MouseManager()
+    
+    // Protocol-based dependencies
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     
     let mouserMapper = MouseMapper()
     
@@ -39,7 +43,9 @@ class MouseManager {
     // 控制鼠标循环的变量
     private var isMouseLoopRunning = false
     
-    init() {
+    // Private initializer for dependency injection
+    private init() {
+        // Dependencies are now lazy and will be resolved when first accessed
     }
     
     // Add a public method to get the mouse loop status
@@ -55,7 +61,7 @@ class MouseManager {
         accumulatedDeltaX += dx
         accumulatedDeltaY += dy
         if self.skipMoveBack && recordCount > 0{
-            if Logger.shared.MouseEventPrint {  Logger.shared.log(content: "Mouse event Skipped...") }
+            if logger.MouseEventPrint {  logger.log(content: "Mouse event Skipped...") }
             accumulatedDeltaX = 0
             accumulatedDeltaY = 0
             skipMoveBack = false
@@ -66,12 +72,12 @@ class MouseManager {
         if self.dragging && !dragged {
             skipMoveBack = true
             recordCount = 0
-            if Logger.shared.MouseEventPrint {  Logger.shared.log(content: "Reset mouse move counter..") }
+            if logger.MouseEventPrint {  logger.log(content: "Reset mouse move counter..") }
             mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
         }
         self.dragging = dragged
 
-        if Logger.shared.MouseEventPrint {  Logger.shared.log(content: "Handled handleRelativeMouseAction, delta: (\(accumulatedDeltaX), \(accumulatedDeltaY)), accumulated records count: \(recordCount)") }
+        if logger.MouseEventPrint {  logger.log(content: "Handled handleRelativeMouseAction, delta: (\(accumulatedDeltaX), \(accumulatedDeltaY)), accumulated records count: \(recordCount)") }
         mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
 
         // Reset the accumulated delta and the record count
@@ -99,12 +105,11 @@ class MouseManager {
     func runMouseLoop() {
         // If already running, do not start again
         guard !isMouseLoopRunning else {
-            Logger.shared.log(content: "Mouse loop already running")
+            logger.log(content: "Mouse loop already running")
             return
         }
         
         isMouseLoopRunning = true
-        Logger.shared.log(content: "鼠标循环开始运行")
         
         DispatchQueue.global().async {
             
@@ -137,7 +142,7 @@ class MouseManager {
                         Thread.sleep(forTimeInterval: 1.0)
                     }
                     
-                    Logger.shared.log(content: "Mouse loop in relative mode stopped")
+                    self.logger.log(content: "Mouse loop in relative mode stopped")
                 }
             } else {
                 // Start the bouncing ball mouse loop in absolute mode
@@ -148,19 +153,19 @@ class MouseManager {
     
     func stopMouseLoop() {
         isMouseLoopRunning = false
-        Logger.shared.log(content: "Request to stop mouse loop")
+        logger.log(content: "Request to stop mouse loop")
     }
     
     // Run the bouncing ball mouse movement
     func runBouncingBallMouseLoop() {
         // If already running, do not start again
         guard !isMouseLoopRunning else {
-            Logger.shared.log(content: "Mouse loop already running")
+            logger.log(content: "Mouse loop already running")
             return
         }
         
         isMouseLoopRunning = true
-        Logger.shared.log(content: "Start the bouncing ball mouse loop")
+        logger.log(content: "Start the bouncing ball mouse loop")
         
         DispatchQueue.global().async {
             // The boundary of absolute mode
@@ -205,7 +210,6 @@ class MouseManager {
                     boostDirection = (velocityX > 0) ? -1 : 1
                     velocityX = boostDirection * horizontalBoost
                     lowEnergyCount = 0
-                    Logger.shared.log(content: "提供额外动力，垂直速度: \(velocityY), 水平速度: \(velocityX)")
                 }
                 
                 // Detect collision
@@ -229,7 +233,6 @@ class MouseManager {
                         velocityY = -boostVelocity
                         // Give a random horizontal push, making the movement more variable
                         velocityX += Int.random(in: -15...15)
-                        Logger.shared.log(content: "底部碰撞后提供额外动力，新垂直速度: \(velocityY)")
                     }
                 }
                 
@@ -243,7 +246,39 @@ class MouseManager {
                 if !self.isMouseLoopRunning { break }
             }
             
-            Logger.shared.log(content: "Bouncing ball mouse loop stopped")
+            self.logger.log(content: "Bouncing ball mouse loop stopped")
         }
+    }
+}
+
+// MARK: - MouseManagerProtocol Implementation
+
+extension MouseManager {
+    func sendMouseInput(_ input: MouseInput) {
+        // Implementation would depend on existing mouse input methods
+        // Convert protocol input to existing method calls
+    }
+    
+    func setMouseMode(_ mode: MouseMode) {
+        // Implementation for setting mouse mode (absolute/relative)
+        switch mode {
+        case .absolute:
+            // Set absolute mouse mode
+            break
+        case .relative:
+            // Set relative mouse mode
+            break
+        }
+    }
+    
+    func forceStopAllMouseLoops() {
+        // Stop all mouse loops forcefully
+        stopMouseLoop()
+        isMouseLoopRunning = false
+    }
+    
+    func testMouseMonitor() {
+        // Test mouse monitor functionality
+        logger.log(content: "Testing mouse monitor functionality")
     }
 }
