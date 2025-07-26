@@ -24,42 +24,43 @@ import Foundation
 
 /// Test helper for verifying firmware update video session control
 class FirmwareUpdateTest {
-    
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+
     /// Test the firmware update notification flow
     /// This simulates what happens during a real firmware update
     static func testVideoSessionControl() {
-        Logger.shared.log(content: "=== Starting Firmware Update Video Session Test ===")
+        logger.log(content: "=== Starting Firmware Update Video Session Test ===")
         
         // Simulate firmware update start
-        Logger.shared.log(content: "Simulating firmware update start...")
+        logger.log(content: "Simulating firmware update start...")
         NotificationCenter.default.post(name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"), object: nil)
         
         // Wait a moment to allow the notification to be processed
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            Logger.shared.log(content: "Simulating firmware update completion...")
+            logger.log(content: "Simulating firmware update completion...")
             NotificationCenter.default.post(name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"), object: nil)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                Logger.shared.log(content: "=== Firmware Update Video Session Test Complete ===")
+                logger.log(content: "=== Firmware Update Video Session Test Complete ===")
             }
         }
     }
     
     /// Test just the video session stop/start notifications directly
     static func testDirectVideoSessionNotifications() {
-        Logger.shared.log(content: "=== Starting Direct Video Session Notification Test ===")
+        logger.log(content: "=== Starting Direct Video Session Notification Test ===")
         
         // Test stop notification
-        Logger.shared.log(content: "Sending StopVideoSession notification...")
+        logger.log(content: "Sending StopVideoSession notification...")
         NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
         
         // Wait and test start notification
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            Logger.shared.log(content: "Sending StartVideoSession notification...")
+            logger.log(content: "Sending StartVideoSession notification...")
             NotificationCenter.default.post(name: NSNotification.Name("StartVideoSession"), object: nil)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                Logger.shared.log(content: "=== Direct Video Session Notification Test Complete ===")
+                logger.log(content: "=== Direct Video Session Notification Test Complete ===")
             }
         }
     }

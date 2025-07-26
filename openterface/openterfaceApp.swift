@@ -4,18 +4,7 @@
 *    This file is part of the Openterface Mini KVM                           *
 *                                                                            *
 *    Copyright (C) 2024   <info@openterface.com>                             *
-*                                                                Button(action: {
-                    MouseManager.shared.forceStopAllMouseLoops()
-                }) {
-                    Text("Stop mouse loop")
-                }
-                .keyboardShortcut("t", modifiers: .command)
-                Button(action: {
-                    MouseManager.shared.testMouseMonitor()
-                }) {
-                    Text("Test mouse monitor")
-                }
-                .keyboardShortcut("m", modifiers: .command)                      *
+*                                                                            *
 *    This program is free software: you can redistribute it and/or modify    *
 *    it under the terms of the GNU General Public License as published by    *
 *    the Free Software Foundation version 3.                                 *
@@ -48,16 +37,19 @@ struct openterfaceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
     
+    // Protocol-based dependencies - using computed properties since App structs are immutable
+    private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
+    private var audioManager: AudioManagerProtocol { DependencyContainer.shared.resolve(AudioManagerProtocol.self) }
+    private var mouseManager: MouseManagerProtocol { DependencyContainer.shared.resolve(MouseManagerProtocol.self) }
+    private var keyboardManager: KeyboardManagerProtocol { DependencyContainer.shared.resolve(KeyboardManagerProtocol.self) }
+    private var hidManager: HIDManagerProtocol { DependencyContainer.shared.resolve(HIDManagerProtocol.self) }
+    private var serialPortManager: SerialPortManagerProtocol { DependencyContainer.shared.resolve(SerialPortManagerProtocol.self) }
+    private var floatingKeyboardManager: FloatingKeyboardManagerProtocol { DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self) }
+    private var tipLayerManager: TipLayerManagerProtocol { DependencyContainer.shared.resolve(TipLayerManagerProtocol.self) }
+    
     init() {
-        // Setup logging
-        Logger.shared.log(content: "App is initializing, audio is set to disabled")
-        
-        // Set audio status when initializing, default is disabled
-        // First set the enabled state of the audio manager, then initialize
-        AudioManager.shared.setAudioEnabled(false)
-        
-        // Explicitly call audio initialization (but will not automatically start playback, because autoStartEnabled is set to false)
-        AudioManager.shared.initializeAudio()
+        // Dependencies will be initialized when needed
+        // Cannot access lazy dependencies here due to initialization order
     }
     
     @State private var relativeTitle = "Relative"
@@ -90,7 +82,7 @@ struct openterfaceApp: App {
     @State private var _serialPortName: String = "N/A"
     @State private var _serialPortBaudRate: Int = 0
 
-    var log = Logger.shared
+    var log: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     
@@ -113,7 +105,7 @@ struct openterfaceApp: App {
                         }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
-                                FloatingKeyboardManager.shared.showFloatingKeysWindow()
+                                floatingKeyboardManager.showFloatingKeysWindow()
                             }) {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
                             }
@@ -270,7 +262,7 @@ struct openterfaceApp: App {
                         }
                         
                         // Check mouse loop status
-                        let isMouseRunning = MouseManager.shared.getMouseLoopRunning()
+                        let isMouseRunning = mouseManager.getMouseLoopRunning()
                         if _isMouseLoopRunning != isMouseRunning {
                             _isMouseLoopRunning = isMouseRunning
                             stateChanged = true
@@ -403,7 +395,16 @@ struct openterfaceApp: App {
                     Text("Shortcut Keys")
                 }
                 Button(action: {
-                    takeAreaOCRing()
+                    if #available(macOS 12.3, *) {
+                        let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
+                        ocrManager.startAreaSelection()
+                    } else {
+                        let alert = NSAlert()
+                        alert.messageText = "Feature Unavailable"
+                        alert.informativeText = "OCR functionality requires macOS 12.3 or later."
+                        alert.addButton(withTitle: "OK")
+                        alert.runModal()
+                    }
                 }) {
                     Text("Target Screen OCR")
                 }
@@ -444,7 +445,7 @@ struct openterfaceApp: App {
                 Button(action: {
                     let pasteboard = NSPasteboard.general
                     if let string = pasteboard.string(forType: .string) {
-                        KeyboardManager.shared.sendTextToKeyboard(text: string)
+                        keyboardManager.sendTextToKeyboard(text: string)
                     }
                 }) {
                     Text("Paste")
@@ -452,9 +453,9 @@ struct openterfaceApp: App {
                 .keyboardShortcut("v", modifiers: .command)
                 Button(action: {
                     if _isMouseLoopRunning {
-                        MouseManager.shared.stopMouseLoop()
+                        mouseManager.stopMouseLoop()
                     } else {
-                        MouseManager.shared.runMouseLoop()
+                        mouseManager.runMouseLoop()
                     }
                 }) {
                     Text(_isMouseLoopRunning ? "Prevent screen saver ✓" : "Prevent screen saver")
@@ -486,17 +487,15 @@ struct openterfaceApp: App {
     
     private func handleSwitchToggle(isOn: Bool) {
         if isOn {
-            let hid = HIDManager.shared
-            hid.setUSBtoTrager()
+            hidManager.setUSBtoTrager()
         } else {
-            let hid = HIDManager.shared
-            hid.setUSBtoHost()
+            hidManager.setUSBtoHost()
         }
         
         // update AppStatus
         AppStatus.isSwitchToggleOn = isOn
         
-        let ser = SerialPortManager.shared
+        let ser = serialPortManager
         ser.raiseDTR()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -508,7 +507,7 @@ struct openterfaceApp: App {
         // Update audio status
         _isAudioEnabled = isEnabled
         AppStatus.isAudioEnabled = isEnabled
-        AudioManager.shared.setAudioEnabled(isEnabled)
+        audioManager.setAudioEnabled(isEnabled)
     }
     
     func showAspectRatioSelectionWindow() {
@@ -524,15 +523,17 @@ struct openterfaceApp: App {
 
 @MainActor
 final class AppState: ObservableObject {
+    private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    
     init() {
         KeyboardShortcuts.onKeyUp(for: .exitRelativeMode) {
             // TODO: exitRelativeMode
-            Logger.shared.log(content: "Exit Relative Mode...")
+            self.logger.log(content: "Exit Relative Mode...")
         }
         
         KeyboardShortcuts.onKeyUp(for: .exitFullScreenMode) {
             // TODO: exitFullScreenMode
-            Logger.shared.log(content: "Exit FullScreen Mode...")
+            self.logger.log(content: "Exit FullScreen Mode...")
             // Exit full screen
             if let window = NSApp.windows.first {
                 let isFullScreen = window.styleMask.contains(.fullScreen)
@@ -543,7 +544,10 @@ final class AppState: ObservableObject {
         }
         
         KeyboardShortcuts.onKeyUp(for: .triggerAreaOCR) {
-            takeAreaOCRing()
+            if #available(macOS 12.3, *) {
+                let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
+                ocrManager.startAreaSelection()
+            }
         }
     }
 }
@@ -559,39 +563,6 @@ func hexStringToDecimalInt(hexString: String) -> Int? {
     }
     
     return Int(hexValue)
-}
-
-func takeAreaOCRing() {
-    if AppStatus.isAreaOCRing == false {
-        // Show tip before starting OCR
-        DispatchQueue.main.async {
-            if let window = NSApplication.shared.mainWindow {
-                TipLayerManager.shared.showTip(
-                    text: "Double Click to copy text from target",
-                    window: window
-                )
-            }
-        }
-        
-        // Wait a moment to let user read the tip, then start OCR
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            AppStatus.isAreaOCRing = true
-            if #available(macOS 12.3, *) {
-                guard let screen = SCContext.getScreenWithMouse() else { return }
-                let screenshotWindow = ScreenshotWindow(contentRect: screen.frame, styleMask: [], backing: .buffered, defer: false)
-                screenshotWindow.title = "Area Selector".local
-                screenshotWindow.makeKeyAndOrderFront(nil)
-                screenshotWindow.orderFrontRegardless()
-            } else {
-                let alert = NSAlert()
-                alert.messageText = "OCR feature not available"
-                alert.informativeText = "OCR function is not available on this version of macOS. Please upgrade to macOS 12.3 or later."
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "Ok")
-                alert.runModal()
-            }
-        }
-    }
 }
 
 

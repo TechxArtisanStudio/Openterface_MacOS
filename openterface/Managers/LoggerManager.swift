@@ -22,7 +22,7 @@
 
 import Foundation
 
-class Logger {
+class Logger: LoggerProtocol {
     static let shared = Logger()
     
     var isPrintEnabled = false

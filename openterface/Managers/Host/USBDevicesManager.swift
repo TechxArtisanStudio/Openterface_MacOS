@@ -26,9 +26,11 @@ import IOKit.usb
 import IOKit.hid
 
 @available(macOS 12.0, *)
-class USBDeivcesManager {
+class USBDevicesManager: USBDevicesManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+
     // Singleton instance
-    static let shared = USBDeivcesManager()
+    static let shared = USBDevicesManager()
     let MS2019_VID = 0x534D
     let MS2019_PID = 0x2109
 
@@ -51,8 +53,8 @@ class USBDeivcesManager {
         if !_d.isEmpty {
             AppStatus.USBDevices = _d
         } else {
-            Logger.shared.log(content: "USB device scan completed: No USB devices detected on the system")
-            Logger.shared.log(content: "No USB devices found")
+            logger.log(content: "USB device scan completed: No USB devices detected on the system")
+            logger.log(content: "No USB devices found")
         }
         groundByOpenterface()
         
@@ -69,7 +71,7 @@ class USBDeivcesManager {
         var iterator: io_iterator_t = 0
         let kr = IOServiceGetMatchingServices(masterPort, matchingDict, &iterator)
         if kr != KERN_SUCCESS {
-            Logger.shared.log(content: "Failed to get matching USB services. This may indicate issues with USB device enumeration or system permissions.")
+            logger.log(content: "Failed to get matching USB services. This may indicate issues with USB device enumeration or system permissions.")
             return devices
         }
 
@@ -207,13 +209,13 @@ class USBDeivcesManager {
                 if videoType != .unknown && videoChipDevice == nil {
                     AppStatus.videoChipsetType = videoType
                     videoChipDevice = device
-                    Logger.shared.log(content: "Detected video chipset type: \(videoType)")
+                    logger.log(content: "Detected video chipset type: \(videoType)")
                 }
                 
                 if controlType != .unknown && controlChipDevice == nil {
                     AppStatus.controlChipsetType = controlType
                     controlChipDevice = device
-                    Logger.shared.log(content: "Detected control chipset type: \(controlType)")
+                    logger.log(content: "Detected control chipset type: \(controlType)")
                 }
             }
         }
@@ -226,18 +228,18 @@ class USBDeivcesManager {
             if videoType != .unknown && videoChipDevice == nil {
                 AppStatus.videoChipsetType = videoType
                 videoChipDevice = device
-                Logger.shared.log(content: "Detected video chipset type: \(videoType)")
+                logger.log(content: "Detected video chipset type: \(videoType)")
             }
             
             if controlType != .unknown && controlChipDevice == nil {
                 AppStatus.controlChipsetType = controlType
                 controlChipDevice = device
-                Logger.shared.log(content: "Detected control chipset type: \(controlType)")
+                logger.log(content: "Detected control chipset type: \(controlType)")
             }
         }
         
         if AppStatus.videoChipsetType == .unknown && AppStatus.controlChipsetType == .unknown {
-            Logger.shared.log(content: "No supported chipsets detected")
+            logger.log(content: "No supported chipsets detected")
         }
     }
     
@@ -382,13 +384,13 @@ class USBDeivcesManager {
     func getExpectedSerialDevicePath() -> String? {
         // For control chips, try to get the associated serial device
         if let controlDevice = controlChipDevice {
-            Logger.shared.log(content: "Control chip device detected: \(controlDevice.productName) at \(controlDevice.locationID)")
+            logger.log(content: "Control chip device detected: \(controlDevice.productName) at \(controlDevice.locationID)")
             
             // Look for devices in the same group that contain "Serial" in the name
             for deviceGroup in AppStatus.groupOpenterfaceDevices {
                 if deviceGroup.contains(where: { $0.locationID == controlDevice.locationID }) {
                     if let serialDevice = deviceGroup.first(where: { $0.productName.contains("Serial") }) {
-                        Logger.shared.log(content: "Found associated serial device: \(serialDevice.productName)")
+                        logger.log(content: "Found associated serial device: \(serialDevice.productName)")
                         return serialDevice.locationID // Return as hint, actual correlation is handled in SerialPortManager
                     }
                 }
@@ -398,14 +400,14 @@ class USBDeivcesManager {
         // If no control chip specific serial device found, search all groups for any serial device
         for deviceGroup in AppStatus.groupOpenterfaceDevices {
             if let serialDevice = deviceGroup.first(where: { $0.productName.contains("Serial") }) {
-                Logger.shared.log(content: "Found serial device in group: \(serialDevice.productName)")
+                logger.log(content: "Found serial device in group: \(serialDevice.productName)")
                 return serialDevice.locationID
             }
         }
         
         // Fallback to default USB serial device
         if let defaultSerial = AppStatus.DefaultUSBSerial {
-            Logger.shared.log(content: "Using default USB serial device: \(defaultSerial.productName)")
+            logger.log(content: "Using default USB serial device: \(defaultSerial.productName)")
             return defaultSerial.locationID
         }
         
@@ -447,9 +449,9 @@ class USBDeivcesManager {
             }
             if !groupedDevices.isEmpty {
                 AppStatus.groupOpenterfaceDevices = groupedDevices
-                Logger.shared.log(content: "Created \(groupedDevices.count) device groups:")
+                logger.log(content: "Created \(groupedDevices.count) device groups:")
                 for (index, group) in groupedDevices.enumerated() {
-                    Logger.shared.log(content: "Group \(index + 1): \(group.map { $0.productName }.joined(separator: ", "))")
+                    logger.log(content: "Group \(index + 1): \(group.map { $0.productName }.joined(separator: ", "))")
                 }
             }
             
@@ -479,10 +481,10 @@ class USBDeivcesManager {
                 AppStatus.DefaultVideoDevice = defaultVideoDevice
                 AppStatus.DefaultUSBSerial = defaultSerialDevice
                 
-                Logger.shared.log(content: "Found \(groupedDevices.count) device groups, default video: \(defaultVideoDevice?.productName ?? "none"), default serial: \(defaultSerialDevice?.productName ?? "none")")
+                logger.log(content: "Found \(groupedDevices.count) device groups, default video: \(defaultVideoDevice?.productName ?? "none"), default serial: \(defaultSerialDevice?.productName ?? "none")")
             }
         } else {
-            Logger.shared.log(content: "No supported devices found in USB device list")
+            logger.log(content: "No supported devices found in USB device list")
         }
     }
     

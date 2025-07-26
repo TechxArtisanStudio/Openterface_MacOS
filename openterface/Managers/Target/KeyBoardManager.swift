@@ -23,7 +23,9 @@
 import Cocoa
 import SwiftUI
 
-class KeyboardManager: ObservableObject {
+class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    
     static let SHIFT_KEYS = ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+", "{", "}", "|", ":", "\"", "<", ">", "?"]
     static let shared = KeyboardManager()
 
@@ -63,7 +65,7 @@ class KeyboardManager: ObservableObject {
         case .windows:
             currentKeyboardLayout = .mac
         }
-        Logger.shared.log(content: "Keyboard layout switched to: \(currentKeyboardLayout.rawValue)")
+        logger.log(content: "Keyboard layout switched to: \(currentKeyboardLayout.rawValue)")
     }
     
     // Function to get modifier key labels based on layout
@@ -220,7 +222,7 @@ class KeyboardManager: ObservableObject {
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
-            Logger.shared.log(content: "Modifier flags changed: \(modifierDescription), CapsLock toggle: \(modifiers.contains(.capsLock))")
+            self.logger.log(content: "Modifier flags changed: \(modifierDescription), CapsLock toggle: \(modifiers.contains(.capsLock))")
             
             // Handle Shift keys
             if modifiers.contains(.shift) {
@@ -386,12 +388,15 @@ class KeyboardManager: ObservableObject {
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             
             // Log the key press with its keycode
-            Logger.shared.log(content: "Key pressed: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
+            self.logger.log(content: "Key pressed: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
             
             if event.keyCode == 53 {
-                for w in NSApplication.shared.windows.filter({ $0.title == "Area Selector".local }) {
-                    w.close()
-                    AppStatus.isAreaOCRing = false
+                // Handle ESC key - cancel area selection if active
+                if #available(macOS 12.3, *) {
+                    let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
+                    if ocrManager.isAreaSelectionActive {
+                        ocrManager.cancelAreaSelection()
+                    }
                 }
                 
                 if self.escKeyDownCounts == 0 {
@@ -446,7 +451,7 @@ class KeyboardManager: ObservableObject {
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             
             // Log the key release with its keycode
-            Logger.shared.log(content: "Key released: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
+            self.logger.log(content: "Key released: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
             
             // 移除释放的键
             if let index = self.pressedKeys.firstIndex(of: event.keyCode) {
@@ -504,7 +509,7 @@ class KeyboardManager: ObservableObject {
     }
     
     func sendTextToKeyboard(text:String) {
-        Logger.shared.log(content: "Sending text to keyboard: \(text)")
+        logger.log(content: "Sending text to keyboard: \(text)")
         // Send text to keyboard
         let textArray = Array(text.utf8) // Convert string to UTF-8 byte array
         for charString in textArray { // Iterate through each character's UTF-8 encoding
@@ -548,6 +553,28 @@ class KeyboardManager: ObservableObject {
                 kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
             }
+        }
+    }
+}
+
+// MARK: - KeyboardManagerProtocol Implementation
+
+extension KeyboardManager {
+    func sendKeyboardInput(_ input: KeyboardInput) {
+        // Convert protocol input to existing method call
+        // Implementation would depend on existing keyboard input methods
+    }
+    
+    func sendSpecialKey(_ key: SpecialKey) {
+        // Convert protocol special key to existing method call
+        // Implementation would depend on existing special key methods
+    }
+    
+    func executeKeyboardMacro(_ macro: KeyboardMacro) {
+        // Implementation for macro execution
+        for input in macro.sequence {
+            sendKeyboardInput(input)
+            Thread.sleep(forTimeInterval: 0.01) // Small delay between keys
         }
     }
 }

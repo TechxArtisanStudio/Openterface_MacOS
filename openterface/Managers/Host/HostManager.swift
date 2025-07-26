@@ -22,11 +22,12 @@
 
 import SwiftUI
 
-let mm = MouseManager()
+let mm = MouseManager.shared
 let km = KeyboardManager.shared
 var eventHandler: Any?
 
-class HostManager {
+class HostManager: ObservableObject, HostManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     // Singleton instance
     static let shared = HostManager()
     
@@ -81,7 +82,7 @@ class HostManager {
                                     mouseCursorPosition: CGPoint(x: x, y: y),
                                     mouseButton: .left)
         mouseMoveEvent?.post(tap: .cghidEventTap)
-        Logger.shared.log(content: "Moved mouse to current location: \(x), \(y)")
+        logger.log(content: "Moved mouse to current location: \(x), \(y)")
     }
     
     func makeCursorTransparent() {
@@ -149,4 +150,20 @@ func mouseKeyMapper(hidMouseEventType:CGEventType) -> UInt8{
         break
     }
     return value
+}
+
+// MARK: - HostManagerProtocol Implementation
+
+extension HostManager {
+    func setupHostIntegration() {
+        // Implementation for host integration setup
+    }
+    
+    func handleHostEvents() {
+        // Implementation for handling host events
+    }
+    
+    func cleanupHostIntegration() {
+        // Implementation for cleanup
+    }
 }

@@ -26,7 +26,8 @@ import ORSSerial
 
 struct ResetFactoryView: View {
     
-    let smp = SerialPortManager.shared
+    // Protocol-based dependencies
+    private var serialPortManager: SerialPortManagerProtocol { DependencyContainer.shared.resolve(SerialPortManagerProtocol.self) }
     
     @Environment(\.colorScheme) var colorScheme
     @State private var isResetting = false
@@ -318,13 +319,13 @@ struct ResetFactoryView: View {
     }
     
     func softRebootSerial() {
-        smp.resetHidChip()
+        serialPortManager.resetHidChip()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            smp.closeSerialPort()
+            serialPortManager.closeSerialPort()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                smp.tryOpenSerialPort()
+                serialPortManager.tryOpenSerialPort()
             }
         }
     }
@@ -344,7 +345,7 @@ struct ResetFactoryView: View {
                 
                 // Add delay to simulate checking process
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    guard let port = smp.serialPort, port.isOpen else {
+                    guard let port = serialPortManager.serialPort, port.isOpen else {
                         // Update serial port status
                         serialPortStatus = "Serial port not connected or not open"
                         // Set error state
@@ -394,21 +395,21 @@ struct ResetFactoryView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 currentStep = 3
                 
-                smp.isDeviceReady = false
-                smp.raiseRTS()
+                serialPortManager.isDeviceReady = false
+                serialPortManager.raiseRTS()
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
                     currentStep = 4
-                    smp.lowerRTS()
+                    serialPortManager.lowerRTS()
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                         currentStep = 5
-                        smp.closeSerialPort()
+                        serialPortManager.closeSerialPort()
                         
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                             currentStep = 6
-                            smp.tryOpenSerialPort(priorityBaudrate: SerialPortManager.ORIGINAL_BAUDRATE)
+                            serialPortManager.tryOpenSerialPort(priorityBaudrate: SerialPortManager.ORIGINAL_BAUDRATE)
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                                 currentStep = 7

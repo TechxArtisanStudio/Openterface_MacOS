@@ -27,7 +27,9 @@ import AppKit
 
 class FirmwareManager: ObservableObject {
     static let shared = FirmwareManager()
-    
+    private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var  hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+
     // Published properties for progress tracking
     @Published var updateProgress: Double = 0.0
     @Published var updateStatus: String = ""
@@ -76,10 +78,11 @@ class FirmwareManager: ObservableObject {
     /// Stops all active operations and closes the main window
     /// This should be called before EDID patching to ensure a clean state
     func stopAllOperations() {
-        Logger.shared.log(content: "Stopping all operations before firmware/EDID operations...")
+        let logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+        logger.log(content: "Stopping all operations before firmware/EDID operations...")
         
         // Stop video operations with complete session teardown
-        let videoManager = VideoManager.shared
+        let videoManager = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
         videoManager.stopVideoSession()
         
         // Remove all video inputs to ensure complete disconnection
@@ -87,15 +90,16 @@ class FirmwareManager: ObservableObject {
         let videoInputs = videoManager.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
         videoInputs.forEach { videoManager.captureSession.removeInput($0) }
         videoManager.captureSession.commitConfiguration()
-        Logger.shared.log(content: "✓ Video operations stopped and session cleared")
+        logger.log(content: "✓ Video operations stopped and session cleared")
         
         // Stop audio operations
-        AudioManager.shared.stopAudioSession()
-        Logger.shared.log(content: "✓ Audio operations stopped")
+        let audioManager = DependencyContainer.shared.resolve(AudioManagerProtocol.self)
+        audioManager.stopAudioSession()
+        logger.log(content: "✓ Audio operations stopped")
         
         // Stop HID operations
-        HIDManager.shared.stopAllHIDOperations()
-        Logger.shared.log(content: "✓ HID operations stopped")
+        self.hidManager.stopAllHIDOperations()
+        logger.log(content: "✓ HID operations stopped")
         
         // Post notification to stop any other operations
         NotificationCenter.default.post(
@@ -115,17 +119,17 @@ class FirmwareManager: ObservableObject {
                         !identifier.contains("resetSerialToolWindow") &&
                         window.contentViewController != nil &&
                         window.isVisible) {
-                        Logger.shared.log(content: "✓ Closing/hiding main window: \(window.title)")
+                        logger.log(content: "✓ Closing/hiding main window: \(window.title)")
                         window.orderOut(nil) // Hide the window
                     }
                 } else if window.title.contains("Openterface Mini-KVM") {
-                    Logger.shared.log(content: "✓ Closing/hiding main window: \(window.title)")
+                    logger.log(content: "✓ Closing/hiding main window: \(window.title)")
                     window.orderOut(nil) // Hide the window
                 }
             }
         }
         
-        Logger.shared.log(content: "All operations stopped successfully")
+        logger.log(content: "All operations stopped successfully")
     }
     
     // MARK: - Firmware Download
@@ -154,21 +158,21 @@ class FirmwareManager: ObservableObject {
             throw FirmwareError.invalidURL
         }
         
-        Logger.shared.log(content: "Downloading firmware from: \(firmwareUrlString)")
+        logger.log(content: "Downloading firmware from: \(firmwareUrlString)")
         let (firmwareData, response) = try await URLSession.shared.data(from: firmwareUrl)
         
         if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
             throw FirmwareError.downloadFailed(httpResponse.statusCode)
         }
         
-        Logger.shared.log(content: "Firmware downloaded successfully, size: \(firmwareData.count) bytes")
+        logger.log(content: "Firmware downloaded successfully, size: \(firmwareData.count) bytes")
         return firmwareData
     }
     
     // MARK: - EEPROM Writing
     
     func loadFirmwareToEeprom() async {
-        Logger.shared.log(content: "Starting firmware update process")
+        logger.log(content: "Starting firmware update process")
         
         DispatchQueue.main.async {
             self.isUpdateInProgress = true
@@ -195,7 +199,7 @@ class FirmwareManager: ObservableObject {
             }
             
         } catch {
-            Logger.shared.log(content: "Firmware update failed: \(error.localizedDescription)")
+            logger.log(content: "Firmware update failed: \(error.localizedDescription)")
             DispatchQueue.main.async {
                 self.isUpdateInProgress = false
                 self.updateStatus = "Firmware update failed: \(error.localizedDescription)"
@@ -205,11 +209,10 @@ class FirmwareManager: ObservableObject {
     }
     
     private func writeEeprom(address: UInt16, data: Data) async -> Bool {
-        Logger.shared.log(content: "Writing \(data.count) bytes to EEPROM starting at address 0x\(String(format: "%04X", address))")
+        logger.log(content: "Writing \(data.count) bytes to EEPROM starting at address 0x\(String(format: "%04X", address))")
         
         // Use HID commands for EEPROM writing with progress tracking
-        let hidManager = HIDManager.shared
-        let success = hidManager.writeEeprom(address: address, data: data) { progress in
+        let success = hidManager.writeEeprom(address: address, data: data, progressCallback: { progress in
             // Update the progress on main thread
             DispatchQueue.main.async {
                 // Map the EEPROM write progress (0.1 to 1.0 of overall progress)
@@ -221,12 +224,12 @@ class FirmwareManager: ObservableObject {
                 self.updateStatus = "Writing firmware to EEPROM... \(progressPercent)%"
                 self.firmwareWriteProgressSubject.send(progressPercent)
             }
-        }
+        })
         
         if success {
-            Logger.shared.log(content: "EEPROM write completed successfully")
+            logger.log(content: "EEPROM write completed successfully")
         } else {
-            Logger.shared.log(content: "EEPROM write failed")
+            logger.log(content: "EEPROM write failed")
         }
         
         return success
@@ -237,7 +240,7 @@ class FirmwareManager: ObservableObject {
     /// Backup firmware from device to file
     /// - Parameter backupURL: The URL where to save the backup
     func backupFirmware(to backupURL: URL) async {
-        Logger.shared.log(content: "Starting firmware backup process")
+        logger.log(content: "Starting firmware backup process")
         
         await MainActor.run {
             isBackupInProgress = true
@@ -300,15 +303,15 @@ class FirmwareManager: ObservableObject {
     /// Based on the MS2109 firmware structure documented in the README
     private func determineFirmwareSize() async -> Int {
         // Read the firmware header (first 16 bytes) to check signature and get code size
-        guard let headerData = HIDManager.shared.readEeprom(address: 0x0000, length: 16) else {
-            Logger.shared.log(content: "⚠ Failed to read firmware header, using default size: \(defaultFirmwareSize) bytes")
+        guard let headerData = hidManager.readEeprom(address: 0x0000, length: 16) else {
+            logger.log(content: "⚠ Failed to read firmware header, using default size: \(defaultFirmwareSize) bytes")
             return defaultFirmwareSize
         }
         
         // Check for valid MS2109 firmware signature (bytes 0x00-0x01 should be A5 5A)
         guard headerData.count >= 4 && headerData[0] == 0xA5 && headerData[1] == 0x5A else {
-            Logger.shared.log(content: "⚠ Invalid firmware signature: \(String(format: "%02X %02X", headerData[0], headerData[1])) (expected: A5 5A)")
-            Logger.shared.log(content: "Using default firmware size: \(defaultFirmwareSize) bytes")
+            logger.log(content: "⚠ Invalid firmware signature: \(String(format: "%02X %02X", headerData[0], headerData[1])) (expected: A5 5A)")
+            logger.log(content: "Using default firmware size: \(defaultFirmwareSize) bytes")
             return defaultFirmwareSize
         }
         
@@ -321,13 +324,13 @@ class FirmwareManager: ObservableObject {
         
         // Sanity check: firmware should be reasonable size (between 1000 and 2048 bytes)
         if totalFirmwareSize < 1000 || totalFirmwareSize > 2048 {
-            Logger.shared.log(content: "⚠ Detected firmware size \(totalFirmwareSize) seems unreasonable, using default")
+            logger.log(content: "⚠ Detected firmware size \(totalFirmwareSize) seems unreasonable, using default")
             return defaultFirmwareSize
         }
         
-        Logger.shared.log(content: "✓ Valid MS2109 firmware signature detected")
-        Logger.shared.log(content: "Code size: \(codeSize) bytes (0x\(String(format: "%04X", codeSize)))")
-        Logger.shared.log(content: "Total firmware size: \(totalFirmwareSize) bytes (0x\(String(format: "%04X", totalFirmwareSize)))")
+        logger.log(content: "✓ Valid MS2109 firmware signature detected")
+        logger.log(content: "Code size: \(codeSize) bytes (0x\(String(format: "%04X", codeSize)))")
+        logger.log(content: "Total firmware size: \(totalFirmwareSize) bytes (0x\(String(format: "%04X", totalFirmwareSize)))")
         
         return totalFirmwareSize
     }
@@ -339,7 +342,7 @@ class FirmwareManager: ObservableObject {
         var remainingBytes = totalSize
         let maxRetries = 3
         
-        Logger.shared.log(content: "Starting firmware read: \(totalSize) bytes from address 0x\(String(format: "%04X", startAddress))")
+        logger.log(content: "Starting firmware read: \(totalSize) bytes from address 0x\(String(format: "%04X", startAddress))")
         
         while remainingBytes > 0 {
             let chunkSize = min(16, remainingBytes) // Max UInt8 value
@@ -349,21 +352,21 @@ class FirmwareManager: ObservableObject {
             // Retry logic for each chunk
             while retryCount < maxRetries && chunkData == nil {
                 if retryCount > 0 {
-                    Logger.shared.log(content: "Retrying read at address 0x\(String(format: "%04X", currentAddress)), attempt \(retryCount + 1)/\(maxRetries)")
+                    logger.log(content: "Retrying read at address 0x\(String(format: "%04X", currentAddress)), attempt \(retryCount + 1)/\(maxRetries)")
                     // Add longer delay before retry
                     try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
                 }
                 
-                chunkData = HIDManager.shared.readEeprom(address: currentAddress, length: UInt8(chunkSize))
+                chunkData = hidManager.readEeprom(address: currentAddress, length: UInt8(chunkSize))
                 
                 if chunkData == nil {
                     retryCount += 1
-                    Logger.shared.log(content: "Failed to read chunk at address 0x\(String(format: "%04X", currentAddress)), retry \(retryCount)/\(maxRetries)")
+                    logger.log(content: "Failed to read chunk at address 0x\(String(format: "%04X", currentAddress)), retry \(retryCount)/\(maxRetries)")
                 }
             }
             
             guard let validChunkData = chunkData else {
-                Logger.shared.log(content: "Failed to read firmware from device at address 0x\(String(format: "%04X", currentAddress)) after \(maxRetries) retries")
+                logger.log(content: "Failed to read firmware from device at address 0x\(String(format: "%04X", currentAddress)) after \(maxRetries) retries")
                 return nil
             }
             
@@ -383,7 +386,7 @@ class FirmwareManager: ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
         }
         
-        Logger.shared.log(content: "Firmware read completed successfully: \(allFirmwareData.count) bytes")
+        logger.log(content: "Firmware read completed successfully: \(allFirmwareData.count) bytes")
         return allFirmwareData
     }
     
@@ -393,10 +396,10 @@ class FirmwareManager: ObservableObject {
             DispatchQueue.global(qos: .background).async {
                 do {
                     try data.write(to: url)
-                    Logger.shared.log(content: "Firmware backup saved to: \(url.path)")
+                    self.logger.log(content: "Firmware backup saved to: \(url.path)")
                     continuation.resume(returning: true)
                 } catch {
-                    Logger.shared.log(content: "Failed to save firmware backup: \(error)")
+                    self.logger.log(content: "Failed to save firmware backup: \(error)")
                     continuation.resume(returning: false)
                 }
             }
@@ -409,7 +412,7 @@ class FirmwareManager: ObservableObject {
     private func verifyFirmwareChecksums(firmwareData: Data) async -> (isValid: Bool, message: String) {
         guard firmwareData.count >= 4 else {
             let message = "⚠ Firmware too small for checksum verification (\(firmwareData.count) bytes)"
-            Logger.shared.log(content: message)
+            logger.log(content: message)
             return (false, message)
         }
         
@@ -427,17 +430,17 @@ class FirmwareManager: ObservableObject {
         
         // Debug: Log the raw checksum bytes
         let checksumBytes = firmwareData.suffix(4)
-        Logger.shared.log(content: "🔍 Last 4 checksum bytes: \(checksumBytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
-        Logger.shared.log(content: "🔍 Checksum parsing (big-endian):")
-        Logger.shared.log(content: "   Header MSB[0]: 0x\(String(format: "%02X", firmwareData[checksumOffset])), LSB[1]: 0x\(String(format: "%02X", firmwareData[checksumOffset+1]))")
-        Logger.shared.log(content: "   Code MSB[2]: 0x\(String(format: "%02X", firmwareData[checksumOffset+2])), LSB[3]: 0x\(String(format: "%02X", firmwareData[checksumOffset+3]))")
+        logger.log(content: "🔍 Last 4 checksum bytes: \(checksumBytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        logger.log(content: "🔍 Checksum parsing (big-endian):")
+        logger.log(content: "   Header MSB[0]: 0x\(String(format: "%02X", firmwareData[checksumOffset])), LSB[1]: 0x\(String(format: "%02X", firmwareData[checksumOffset+1]))")
+        logger.log(content: "   Code MSB[2]: 0x\(String(format: "%02X", firmwareData[checksumOffset+2])), LSB[3]: 0x\(String(format: "%02X", firmwareData[checksumOffset+3]))")
         
-        Logger.shared.log(content: "Stored checksums - Header: 0x\(String(format: "%04X", storedHeaderChecksum)), Code: 0x\(String(format: "%04X", storedCodeChecksum))")
+        logger.log(content: "Stored checksums - Header: 0x\(String(format: "%04X", storedHeaderChecksum)), Code: 0x\(String(format: "%04X", storedCodeChecksum))")
         
         // Calculate expected checksums
         let (calculatedHeaderChecksum, calculatedCodeChecksum) = calculateMS2109Checksums(firmwareData: firmwareData)
         
-        Logger.shared.log(content: "Calculated checksums - Header: 0x\(String(format: "%04X", calculatedHeaderChecksum)), Code: 0x\(String(format: "%04X", calculatedCodeChecksum))")
+        logger.log(content: "Calculated checksums - Header: 0x\(String(format: "%04X", calculatedHeaderChecksum)), Code: 0x\(String(format: "%04X", calculatedCodeChecksum))")
         
         let headerValid = storedHeaderChecksum == calculatedHeaderChecksum
         let codeValid = storedCodeChecksum == calculatedCodeChecksum
@@ -445,7 +448,7 @@ class FirmwareManager: ObservableObject {
         var message: String
         if headerValid && codeValid {
             message = "✅ Firmware checksums are valid\nHeader: 0x\(String(format: "%04X", storedHeaderChecksum)) ✓\nCode: 0x\(String(format: "%04X", storedCodeChecksum)) ✓"
-            Logger.shared.log(content: "✅ All firmware checksums verified successfully")
+            logger.log(content: "✅ All firmware checksums verified successfully")
         } else {
             var details: [String] = []
             if !headerValid {
@@ -459,7 +462,7 @@ class FirmwareManager: ObservableObject {
                 details.append("Code: 0x\(String(format: "%04X", storedCodeChecksum)) ✓")
             }
             message = "❌ Firmware checksum mismatch detected\n\(details.joined(separator: "\n"))"
-            Logger.shared.log(content: "❌ Firmware checksum verification failed")
+            logger.log(content: "❌ Firmware checksum verification failed")
         }
         
         return (headerValid && codeValid, message)
@@ -471,13 +474,13 @@ class FirmwareManager: ObservableObject {
     /// - Returns: Tuple of (headerChecksum, codeChecksum)
     private func calculateMS2109Checksums(firmwareData: Data) -> (headerChecksum: UInt16, codeChecksum: UInt16) {
         guard firmwareData.count >= 52 else {
-            Logger.shared.log(content: "⚠ Firmware too small for checksum calculation")
+            logger.log(content: "⚠ Firmware too small for checksum calculation")
             return (0, 0)
         }
         
         // Debug: Log first 16 bytes to verify data integrity
         let first16Bytes = firmwareData.prefix(16)
-        Logger.shared.log(content: "🔍 First 16 bytes of firmware: \(first16Bytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        logger.log(content: "🔍 First 16 bytes of firmware: \(first16Bytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
         
         // Header checksum: Based on Python implementation for MS2109
         // Range: bytes 0x02-0x2F (from offset 2 to 47, total 46 bytes)
@@ -489,24 +492,24 @@ class FirmwareManager: ObservableObject {
             if i < firmwareData.count {
                 headerSum += UInt32(firmwareData[i])
                 if i < 10 {
-                    Logger.shared.log(content: "🔍 Header byte [0x\(String(format: "%02X", i))]: 0x\(String(format: "%02X", firmwareData[i])) (running sum: 0x\(String(format: "%08X", headerSum)))")
+                    logger.log(content: "🔍 Header byte [0x\(String(format: "%02X", i))]: 0x\(String(format: "%02X", firmwareData[i])) (running sum: 0x\(String(format: "%08X", headerSum)))")
                 }
             }
         }
         
         let headerChecksum = UInt16(headerSum & 0xFFFF)
         
-        Logger.shared.log(content: "🔍 MS2109 Header checksum calculation:")
-        Logger.shared.log(content: "   Range: 0x02-0x2F (46 bytes, excluding signature)")
-        Logger.shared.log(content: "   Signature bytes [0x00-0x01]: 0x\(String(format: "%02X", firmwareData[0])) 0x\(String(format: "%02X", firmwareData[1])) (excluded)")
-        Logger.shared.log(content: "   Sum: 0x\(String(format: "%08X", headerSum)) -> checksum: 0x\(String(format: "%04X", headerChecksum))")
+        logger.log(content: "🔍 MS2109 Header checksum calculation:")
+        logger.log(content: "   Range: 0x02-0x2F (46 bytes, excluding signature)")
+        logger.log(content: "   Signature bytes [0x00-0x01]: 0x\(String(format: "%02X", firmwareData[0])) 0x\(String(format: "%02X", firmwareData[1])) (excluded)")
+        logger.log(content: "   Sum: 0x\(String(format: "%08X", headerSum)) -> checksum: 0x\(String(format: "%04X", headerChecksum))")
         
         // Code checksum: Simple sum of code section (from byte 48 to end - 4 checksum bytes)
         var codeSum: UInt32 = 0
         let codeStart = 48
         let codeEnd = firmwareData.count - 4  // Exclude last 4 checksum bytes
         
-        Logger.shared.log(content: "🔍 Code section range: 0x\(String(format: "%02X", codeStart)) to 0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
+        logger.log(content: "🔍 Code section range: 0x\(String(format: "%02X", codeStart)) to 0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
         
         for i in codeStart..<codeEnd {
             if i < firmwareData.count {
@@ -517,8 +520,8 @@ class FirmwareManager: ObservableObject {
         let codeChecksum = UInt16(codeSum & 0xFFFF)
         
         // Debug: Log code section info
-        Logger.shared.log(content: "🔍 Code sum calculation: sum=0x\(String(format: "%08X", codeSum)) -> checksum=0x\(String(format: "%04X", codeChecksum))")
-        Logger.shared.log(content: "Checksum calculation - Header range: 0x02-0x2F (\(46) bytes), Code range: 0x\(String(format: "%02X", codeStart))-0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
+        logger.log(content: "🔍 Code sum calculation: sum=0x\(String(format: "%08X", codeSum)) -> checksum=0x\(String(format: "%04X", codeChecksum))")
+        logger.log(content: "Checksum calculation - Header range: 0x02-0x2F (\(46) bytes), Code range: 0x\(String(format: "%02X", codeStart))-0x\(String(format: "%02X", codeEnd-1)) (\(codeEnd - codeStart) bytes)")
         
         return (headerChecksum, codeChecksum)
     }
@@ -526,7 +529,7 @@ class FirmwareManager: ObservableObject {
     // MARK: - Firmware Restore
     
     func restoreFirmware(from fileURL: URL) async {
-        Logger.shared.log(content: "Starting firmware restore process from file: \(fileURL.path)")
+        logger.log(content: "Starting firmware restore process from file: \(fileURL.path)")
         
         await MainActor.run {
             isUpdateInProgress = true
@@ -537,7 +540,7 @@ class FirmwareManager: ObservableObject {
         do {
             // Read firmware data from file
             let firmwareData = try Data(contentsOf: fileURL)
-            Logger.shared.log(content: "Loaded firmware file, size: \(firmwareData.count) bytes")
+            logger.log(content: "Loaded firmware file, size: \(firmwareData.count) bytes")
             
             await MainActor.run {
                 updateProgress = 0.1
@@ -567,17 +570,17 @@ class FirmwareManager: ObservableObject {
                 if success {
                     updateProgress = 1.0
                     updateStatus = "Firmware restore completed successfully!"
-                    Logger.shared.log(content: "Firmware restore completed successfully")
+                    logger.log(content: "Firmware restore completed successfully")
                 } else {
                     updateStatus = "Firmware restore failed!"
-                    Logger.shared.log(content: "Firmware restore failed")
+                    logger.log(content: "Firmware restore failed")
                 }
             }
             
             firmwareWriteCompleteSubject.send(success)
             
         } catch {
-            Logger.shared.log(content: "Error loading firmware file: \(error.localizedDescription)")
+            logger.log(content: "Error loading firmware file: \(error.localizedDescription)")
             await MainActor.run {
                 updateStatus = "Failed to load firmware file: \(error.localizedDescription)"
                 isUpdateInProgress = false
@@ -592,16 +595,14 @@ class FirmwareManager: ObservableObject {
     /// Based on MS2109Device.py get_edid_name() method
     /// - Returns: The current EDID name, or nil if failed to read
     func getEdidName() async -> String? {
-        Logger.shared.log(content: "Reading EDID monitor name from device")
-        
-        let hidManager = HIDManager.shared
+        logger.log(content: "Reading EDID monitor name from device")
         
         // EDID name is at offset 0x0397 in the firmware (13 bytes)
         let edidNameAddress: UInt16 = 0x0397
         let nameLength: UInt8 = 13
         
         guard let nameData = hidManager.readEeprom(address: edidNameAddress, length: nameLength) else {
-            Logger.shared.log(content: "Failed to read EDID name from device")
+            logger.log(content: "Failed to read EDID name from device")
             return nil
         }
         
@@ -617,7 +618,7 @@ class FirmwareManager: ObservableObject {
             }
         }
         
-        Logger.shared.log(content: "Current EDID name: '\(nameStr)'")
+        logger.log(content: "Current EDID name: '\(nameStr)'")
         return nameStr.isEmpty ? nil : nameStr
     }
     
@@ -625,7 +626,7 @@ class FirmwareManager: ObservableObject {
     /// Based on MS2109Device.py set_edid_name() method
     /// - Parameter name: The new EDID monitor name (max 13 characters)
     func setEdidName(_ name: String) async {
-        Logger.shared.log(content: "Starting EDID name update process")
+        logger.log(content: "Starting EDID name update process")
         
         // First stop all operations and close main window for clean EDID patching
         stopAllOperations()
@@ -723,11 +724,11 @@ class FirmwareManager: ObservableObject {
                 The new monitor name will be visible after reconnection.
                 """
                 edidUpdateCompleteSubject.send((true, successMessage))
-                Logger.shared.log(content: "EDID name update completed successfully")
+                logger.log(content: "EDID name update completed successfully")
             } else {
                 let errorMessage = "EDID name was written but firmware checksum update failed. The device may not function properly."
                 edidUpdateCompleteSubject.send((false, errorMessage))
-                Logger.shared.log(content: "EDID name update failed during checksum update")
+                logger.log(content: "EDID name update failed during checksum update")
             }
         }
     }
@@ -736,9 +737,8 @@ class FirmwareManager: ObservableObject {
     /// Based on MS2109Device.py _update_firmware_checksums() method
     /// - Returns: True if checksums were updated successfully, false otherwise
     private func updateFirmwareChecksums() async -> Bool {
-        Logger.shared.log(content: "Updating firmware checksums after EDID modification")
+        logger.log(content: "Updating firmware checksums after EDID modification")
         
-        let hidManager = HIDManager.shared
         let firmwareSize = defaultFirmwareSize // 1453 bytes
         
         // Read the entire firmware in chunks (max 255 bytes per read)
@@ -751,7 +751,7 @@ class FirmwareManager: ObservableObject {
             let chunkSize = UInt8(min(Int(maxChunkSize), remainingBytes))
             
             guard let chunk = hidManager.readEeprom(address: currentAddress, length: chunkSize) else {
-                Logger.shared.log(content: "Failed to read firmware chunk at address 0x\(String(format: "%04X", currentAddress))")
+                logger.log(content: "Failed to read firmware chunk at address 0x\(String(format: "%04X", currentAddress))")
                 return false
             }
             
@@ -760,7 +760,7 @@ class FirmwareManager: ObservableObject {
             remainingBytes -= chunk.count
         }
         
-        Logger.shared.log(content: "Read \(completeFirmwareData.count) bytes of firmware for checksum calculation")
+        logger.log(content: "Read \(completeFirmwareData.count) bytes of firmware for checksum calculation")
         
         // Calculate new checksums using the existing method
         let (headerChecksum, codeChecksum) = calculateMS2109Checksums(firmwareData: completeFirmwareData)
@@ -775,11 +775,11 @@ class FirmwareManager: ObservableObject {
         let codeSuccess = await writeEeprom(address: checksumAddress + 2, data: Data(codeBytes))
         
         if headerSuccess && codeSuccess {
-            Logger.shared.log(content: "Firmware header checksum updated to: 0x\(String(format: "%04X", headerChecksum))")
-            Logger.shared.log(content: "Firmware code checksum updated to: 0x\(String(format: "%04X", codeChecksum))")
+            logger.log(content: "Firmware header checksum updated to: 0x\(String(format: "%04X", headerChecksum))")
+            logger.log(content: "Firmware code checksum updated to: 0x\(String(format: "%04X", codeChecksum))")
             return true
         } else {
-            Logger.shared.log(content: "Failed to write updated checksums to firmware")
+            logger.log(content: "Failed to write updated checksums to firmware")
             return false
         }
     }

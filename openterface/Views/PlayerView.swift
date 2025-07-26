@@ -25,7 +25,9 @@ import AVFoundation
 import KeyboardShortcuts
 
 class PlayerView: NSView, NSWindowDelegate {
-    private let tipLayer = TipLayerManager.shared
+    private let tipLayerManager = DependencyContainer.shared.resolve(TipLayerManagerProtocol.self)
+    private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var  hostManager = DependencyContainer.shared.resolve(HostManagerProtocol.self)
     var previewLayer: AVCaptureVideoPreviewLayer?
     let playerBackgorundWarringLayer = CATextLayer()
     let playerBackgroundImage = CALayer()
@@ -58,7 +60,7 @@ class PlayerView: NSView, NSWindowDelegate {
     }
 
     func setupLayer() {
-        Logger.shared.log(content: "Setup layer start")
+        logger.log(content: "Setup layer start")
     
         self.previewLayer?.frame = self.frame
         self.previewLayer?.contentsGravity = .resizeAspectFill
@@ -74,7 +76,7 @@ class PlayerView: NSView, NSWindowDelegate {
 
         layer = self.previewLayer
 
-        Logger.shared.log(content: "Setup layer completed")
+        logger.log(content: "Setup layer completed")
         
     }
     
@@ -89,8 +91,9 @@ class PlayerView: NSView, NSWindowDelegate {
     @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
         let tips = "Press click「ESC」 multiple times to exit relative mode"
         if let window = self.window {
-            tipLayer.showTip(
+            tipLayerManager.showTip(
                 text: tips,
+                yOffset: 1.5,
                 window: window
             )
         }
@@ -104,7 +107,7 @@ class PlayerView: NSView, NSWindowDelegate {
                     description = "\(shortcut)"
                 }
                 let tips = "「\(description)」exit to full screen"
-                tipLayer.showTip(
+                tipLayerManager.showTip(
                     text: tips,
                     yOffset: 6.0,
                     window: window
@@ -123,7 +126,7 @@ class PlayerView: NSView, NSWindowDelegate {
     
     // When the capture session starts running, call this method
     @objc func captureSessionDidStartRunning(_ notification: Notification) {
-        Logger.shared.log(content: "Capture session started running, updating view")
+        logger.log(content: "Capture session started running, updating view")
         DispatchQueue.main.async {
             self.needsLayout = true
             self.needsDisplay = true
@@ -132,7 +135,7 @@ class PlayerView: NSView, NSWindowDelegate {
     
     // When the capture session stops running, call this method
     @objc func captureSessionDidStopRunning(_ notification: Notification) {
-        Logger.shared.log(content: "Capture session stopped running, updating view")
+        logger.log(content: "Capture session stopped running, updating view")
         DispatchQueue.main.async {
             self.needsLayout = true
             self.needsDisplay = true
@@ -255,7 +258,7 @@ class PlayerView: NSView, NSWindowDelegate {
         let keyCode = event.keyCode
         let modifierFlags = event.modifierFlags
 
-        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifierFlags, isKeyDown: isKeyDown)
+        hostManager.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifierFlags, isKeyDown: isKeyDown)
     }
 
     private func handleMouseMovement(with event: NSEvent, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
@@ -277,7 +280,7 @@ class PlayerView: NSView, NSWindowDelegate {
                             event.type == .rightMouseDragged || 
                             event.type == .otherMouseDragged
             
-            HostManager.shared.handleRelativeMouseAction(dx: deltaX, dy: deltaY, 
+            hostManager.handleRelativeMouseAction(dx: deltaX, dy: deltaY, 
                                                        mouseEvent: mouseEvent, 
                                                        wheelMovement: wheelMovement, 
                                                        dragged: isDragging)
@@ -286,7 +289,7 @@ class PlayerView: NSView, NSWindowDelegate {
                 let mouseLocation = convert(event.locationInWindow, from: nil)
                 let mouseX = Float(mouseLocation.x) / Float(self.frame.width) * 4096.0
                 let mouseY = 4096.0 - Float(mouseLocation.y) / Float(self.frame.height) * 4096.0
-                HostManager.shared.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), 
+                hostManager.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), 
                                                            mouseEvent: mouseEvent, 
                                                            wheelMovement: wheelMovement)
             }
@@ -328,7 +331,7 @@ class PlayerView: NSView, NSWindowDelegate {
         }
 
         if UserSettings.shared.MouseControl == .relative && AppStatus.isFouceWindow {
-            HostManager.shared.moveToAppCenter()
+            hostManager.moveToAppCenter()
         }
     }
 
@@ -346,7 +349,7 @@ class PlayerView: NSView, NSWindowDelegate {
             // Update the frame of playerBackgroundImage
             playerBackgroundImage.frame = self.bounds
         } else {
-            Logger.shared.log(content: "The view is not in a window yet.")
+            logger.log(content: "The view is not in a window yet.")
         }
     }
     

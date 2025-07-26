@@ -28,7 +28,9 @@ import CoreAudio
 import Combine
 
 // Audio management class
-class AudioManager: ObservableObject {
+class AudioManager: ObservableObject, AudioManagerProtocol {
+    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    
     // Published properties for UI status display
     @Published var isAudioDeviceConnected: Bool = false
     @Published var isAudioPlaying: Bool = false
@@ -206,7 +208,7 @@ class AudioManager: ObservableObject {
                 self.setDefaultAudioInputDevice()
                 
                 // Connect nodes using compatible format
-                try self.engine.connect(inputNode, to: outputNode, format: format)
+                self.engine.connect(inputNode, to: outputNode, format: format)
                 
                 try self.engine.start()
                 DispatchQueue.main.async {
@@ -229,7 +231,7 @@ class AudioManager: ObservableObject {
         // Check if engine is running
         if engine.isRunning {
             // Log the operation
-            Logger.shared.log(content: "Engine is running, stopping...")
+            logger.log(content: "Engine is running, stopping...")
             
             // Stop engine first to avoid errors when disconnecting
             engine.stop()
@@ -241,9 +243,9 @@ class AudioManager: ObservableObject {
             // Reset engine
             engine.reset()
             
-            Logger.shared.log(content: "Audio engine stopped and reset")
+            logger.log(content: "Audio engine stopped and reset")
         } else {
-            Logger.shared.log(content: "Audio engine not running, no need to stop")
+            logger.log(content: "Audio engine not running, no need to stop")
         }
         
         // Reset audio device ID
@@ -449,11 +451,11 @@ class AudioManager: ObservableObject {
     func setAudioEnabled(_ enabled: Bool) {
         // Update auto-start flag
         self.autoStartEnabled = enabled
-        Logger.shared.log(content: "Audio auto-start set to: \(enabled)")
+        logger.log(content: "Audio auto-start set to: \(enabled)")
         
         if enabled {
             // If we're enabling audio, start it
-            Logger.shared.log(content: "Starting audio session explicitly")
+            logger.log(content: "Starting audio session explicitly")
             // First ensure the device is discovered
             let deviceID = getAudioDeviceByName(name: "OpenterfaceA")
             if deviceID != nil {
@@ -462,12 +464,12 @@ class AudioManager: ObservableObject {
                 startAudioSession()
             } else {
                 // If the device does not exist, attempt to initialize the audio process
-                Logger.shared.log(content: "Audio device not found, attempting to initialize")
+                logger.log(content: "Audio device not found, attempting to initialize")
                 prepareAudio()
             }
         } else {
             // If we're disabling audio, stop it
-            Logger.shared.log(content: "Stopping audio session explicitly")
+            logger.log(content: "Stopping audio session explicitly")
             stopAudioSession()
         }
     }
