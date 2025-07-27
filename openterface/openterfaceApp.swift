@@ -67,7 +67,6 @@ struct openterfaceApp: App {
     
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
-    @State private var _isAudioEnabled = false
     @State private var _isRecording = false
     @State private var _canTakePicture = false
     @State private var _isAudioEnabled = UserSettings.shared.isAudioEnabled  // Initialize with saved preference
@@ -125,13 +124,6 @@ struct openterfaceApp: App {
                             .disabled(true)
                             .buttonStyle(PlainButtonStyle())
                             
-                            Button {
-                                toggleAudio(isEnabled: !_isAudioEnabled)
-                        }
-                        ToolbarItem(placement: .automatic) {
-                            Image(systemName: "poweron") // spacer
-                        }
-                        ToolbarItem(placement: .automatic) {
                             Menu {
                                 Button(action: {
                                     toggleAudio(isEnabled: !_isAudioEnabled)
@@ -152,7 +144,13 @@ struct openterfaceApp: App {
                                     .frame(width: 16, height: 16)
                                     .foregroundColor(_isAudioEnabled ? .green : .red)
                             }
-                            .help(_isAudioEnabled ? "Close audio" : "Open audio")
+                            .help("""
+                                Audio controls - Click to toggle audio or change settings
+                                
+                                Status: \(_isAudioEnabled ? "Enabled" : "Disabled")
+                                Input: \((audioManager as! AudioManager).selectedInputDevice?.name ?? "None")
+                                Output: \((audioManager as! AudioManager).selectedOutputDevice?.name ?? "None")
+                                """)
                             
                             Button {
                                 cameraManager.takePicture()
@@ -183,18 +181,21 @@ struct openterfaceApp: App {
                             .disabled(!_canTakePicture)
                             
                             Button {
-                            .help("""
-                                Audio controls - Click to toggle audio or change settings
-                                
-                                Status: \(_isAudioEnabled ? "Enabled" : "Disabled")
-                                Input: \((audioManager as! AudioManager).selectedInputDevice?.name ?? "None")
-                                Output: \((audioManager as! AudioManager).selectedOutputDevice?.name ?? "None")
-                                """)
-                        }
-                        ToolbarItem(placement: .automatic) {
+                                if let capturesURL = cameraManager.getSavedFilesDirectory() {
+                                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: capturesURL.path)
+                                }
+                            } label: {
+                                Image(systemName: "folder.fill")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 16, height: 16)
+                                    .foregroundColor(.blue)
+                            }
+                            .help("Show Captures Folder")
+                            
                             Button(action: {
                                 showAspectRatioSelectionWindow()
-                            } label: {
+                            }) {
                                 Image(systemName: "display")
                                     .resizable()
                                     .frame(width: 14, height: 14)
@@ -687,7 +688,7 @@ struct openterfaceApp: App {
         NSApp.activate(ignoringOtherApps: false)
     }
     
-    private func colorForConnectionStatus(_ isConnected: Bool?) -> Color {
+   func colorForConnectionStatus(_ isConnected: Bool?) -> Color {
         switch isConnected {
         case .some(true):
             return Color(red: 124 / 255.0, green: 205 / 255.0, blue: 124 / 255.0)
@@ -698,7 +699,7 @@ struct openterfaceApp: App {
         }
     }
     
-    private func handleSwitchToggle(isOn: Bool) {
+    func handleSwitchToggle(isOn: Bool) {
         if isOn {
             hidManager.setUSBtoTarget()
         } else {
