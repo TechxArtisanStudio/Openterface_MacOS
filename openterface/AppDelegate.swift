@@ -42,11 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // MARK: - Initialization
     override init() {
-        // Initialize dependencies through DI container
+        // Get dependencies from DI container (they should already be setup)
         let container = DependencyContainer.shared
-        
-        // Setup dependencies first
-        Self.setupDependencies(container: container)
         
         // Resolve dependencies
         self.audioManager = container.resolve(AudioManagerProtocol.self)
@@ -68,10 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     // MARK: - Dependency Setup
-    private static func setupDependencies(container: DependencyContainer) {
+    static func setupDependencies(container: DependencyContainer) {
         // Register concrete implementations with their protocols
         container.register(LoggerProtocol.self, instance: Logger.shared as any LoggerProtocol)
         container.register(AudioManagerProtocol.self, instance: AudioManager.shared as any AudioManagerProtocol)
+        container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
         container.register(MouseManagerProtocol.self, instance: MouseManager.shared as any MouseManagerProtocol)
         container.register(KeyboardManagerProtocol.self, instance: KeyboardManager.shared as any KeyboardManagerProtocol)
         container.register(SerialPortManagerProtocol.self, instance: SerialPortManager.shared as any SerialPortManagerProtocol)
@@ -124,8 +122,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         _ = hidManager
         
         // Initialize audio settings
-        logger.log(content: "App is initializing, audio is set to disabled")
-        audioManager.setAudioEnabled(false)
         audioManager.initializeAudio()
         
         setupMainWindow()

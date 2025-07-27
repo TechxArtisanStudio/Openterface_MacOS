@@ -34,6 +34,9 @@ final class UserSettings: ObservableObject {
         let savedPasteBehavior = UserDefaults.standard.string(forKey: "pasteBehavior")
         self.pasteBehavior = PasteBehavior(rawValue: savedPasteBehavior ?? "") ?? .askEveryTime
         
+        // Load audio enabled preference from UserDefaults
+        self.isAudioEnabled = UserDefaults.standard.object(forKey: "isAudioEnabled") as? Bool ?? false
+        
         // Legacy settings for backward compatibility
         self.pasteConfirmationEnabled = UserDefaults.standard.object(forKey: "pasteConfirmationEnabled") as? Bool ?? true
         self.automaticPasteToTarget = UserDefaults.standard.object(forKey: "automaticPasteToTarget") as? Bool ?? false
@@ -53,6 +56,13 @@ final class UserSettings: ObservableObject {
     
     // Whether to show HID resolution change alert
     @Published var doNotShowHidResolutionAlert: Bool = false
+    
+    // Audio enabled state persistence
+    @Published var isAudioEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isAudioEnabled, forKey: "isAudioEnabled")
+        }
+    }
     
     // Paste behavior settings
     @Published var pasteBehavior: PasteBehavior {
