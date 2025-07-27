@@ -180,19 +180,6 @@ struct openterfaceApp: App {
                             .help(_isRecording ? "Stop Recording" : "Start Video Recording")
                             .disabled(!_canTakePicture)
                             
-                            Button {
-                                if let capturesURL = cameraManager.getSavedFilesDirectory() {
-                                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: capturesURL.path)
-                                }
-                            } label: {
-                                Image(systemName: "folder.fill")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 16, height: 16)
-                                    .foregroundColor(.blue)
-                            }
-                            .help("Show Captures Folder")
-                            
                             Button(action: {
                                 showAspectRatioSelectionWindow()
                             }) {
