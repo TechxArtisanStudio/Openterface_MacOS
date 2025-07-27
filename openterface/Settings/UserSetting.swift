@@ -30,7 +30,13 @@ final class UserSettings: ObservableObject {
         self.viewHeight = 0.0
         self.isSerialOutput = false
         self.isFullScreen = false
+        // Load paste preferences from UserDefaults
+        let savedPasteBehavior = UserDefaults.standard.string(forKey: "pasteBehavior")
+        self.pasteBehavior = PasteBehavior(rawValue: savedPasteBehavior ?? "") ?? .askEveryTime
         
+        // Legacy settings for backward compatibility
+        self.pasteConfirmationEnabled = UserDefaults.standard.object(forKey: "pasteConfirmationEnabled") as? Bool ?? true
+        self.automaticPasteToTarget = UserDefaults.standard.object(forKey: "automaticPasteToTarget") as? Bool ?? false
     }
     @Published var isSerialOutput: Bool
     @Published var MouseControl:MouseControlMode
@@ -47,11 +53,60 @@ final class UserSettings: ObservableObject {
     
     // Whether to show HID resolution change alert
     @Published var doNotShowHidResolutionAlert: Bool = false
+    
+    // Paste behavior settings
+    @Published var pasteBehavior: PasteBehavior {
+        didSet {
+            UserDefaults.standard.set(pasteBehavior.rawValue, forKey: "pasteBehavior")
+        }
+    }
+    
+    // Legacy properties for backward compatibility
+    @Published var pasteConfirmationEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(pasteConfirmationEnabled, forKey: "pasteConfirmationEnabled")
+        }
+    }
+    
+    @Published var automaticPasteToTarget: Bool {
+        didSet {
+            UserDefaults.standard.set(automaticPasteToTarget, forKey: "automaticPasteToTarget")
+        }
+    }
 }
 
 enum MouseControlMode: Int {
     case relative = 0
     case absolute = 1
+}
+
+// Paste behavior options
+enum PasteBehavior: String, CaseIterable {
+    case askEveryTime = "askEveryTime"
+    case alwaysPasteToTarget = "alwaysPasteToTarget" 
+    case alwaysPassToTarget = "alwaysPassToTarget"
+    
+    var displayName: String {
+        switch self {
+        case .askEveryTime:
+            return "Ask Every Time"
+        case .alwaysPasteToTarget:
+            return "Always Paste text to Target"
+        case .alwaysPassToTarget:
+            return "Always Pass events to Target"
+        }
+    }
+    
+    var menuDisplayName: String {
+        switch self {
+        case .askEveryTime:
+            return "Ask Every Time"
+        case .alwaysPasteToTarget:
+            return "Paste text to Target"
+        case .alwaysPassToTarget:
+            return "Pass events to Target"
+        }
+    }
 }
 
 // Screen ratio option enumeration

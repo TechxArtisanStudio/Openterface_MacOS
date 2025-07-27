@@ -286,13 +286,11 @@ class HALIntegrationManager {
                     configureHIDForCH9329(hidManager, controlChipset)
                 case .ch32v208:
                     configureHIDForCH32V208(hidManager, controlChipset)
-                @unknown default:
+                case .unknown:
                     logger.log(content: "⚠️ Unknown control chipset type, using generic configuration")
                 }
             case .video:
                 logger.log(content: "⚠️ Video chipset info found in control chipset context")
-            @unknown default:
-                logger.log(content: "⚠️ Unknown chipset type")
             }
         }
         

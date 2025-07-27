@@ -24,6 +24,8 @@ import SwiftUI
 import KeyboardShortcuts
 
 struct SettingsScreen: View {
+    @ObservedObject private var userSettings = UserSettings.shared
+    
     var body: some View {
         VStack {
             Form {
@@ -37,6 +39,44 @@ struct SettingsScreen: View {
             }
             .padding(.horizontal, 50)
             .padding(.vertical, 10)
+            
+            // Paste Settings Section
+            Form {
+                Section(header: Text("Paste Settings").font(.headline)) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("When Cmd+V is pressed:")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Picker("Paste Behavior", selection: $userSettings.pasteBehavior) {
+                            ForEach(PasteBehavior.allCases, id: \.self) { behavior in
+                                VStack(alignment: .leading) {
+                                    Text(behavior.displayName)
+                                    Text(behaviorDescription(for: behavior))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .tag(behavior)
+                            }
+                        }
+                        .pickerStyle(RadioGroupPickerStyle())
+                        .help("Choose how clipboard paste operations should be handled")
+                    }
+                }
+            }
+            .padding(.horizontal, 50)
+            .padding(.vertical, 10)
+        }
+    }
+    
+    private func behaviorDescription(for behavior: PasteBehavior) -> String {
+        switch behavior {
+        case .askEveryTime:
+            return "Show confirmation dialog with options to paste text to target or pass events to target"
+        case .alwaysPasteToTarget:
+            return "Automatically send clipboard content to the connected device"
+        case .alwaysPassToTarget:
+            return "Handle paste normally on this Mac (no action to target device)"
         }
     }
 }
