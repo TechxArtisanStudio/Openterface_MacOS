@@ -413,12 +413,12 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             isVideoSessionStarting = false
         }
         
-        print("Supported pixel format--------")
-        for format in device.formats {
-            let description = format.formatDescription
-            let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
-            print("Supported pixel format: \(pixelFormat)")
-        }
+        // print("Supported pixel format--------")
+        // for format in device.formats {
+        //     let description = format.formatDescription
+        //     let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
+        //     print("Supported pixel format: \(pixelFormat)")
+        // }
     }
     
     /// Starts video capture session

@@ -25,6 +25,20 @@ import AVFoundation
 import SwiftUI
 import ORSSerial
 
+// MARK: - Audio Device Structure
+
+/// Audio device structure for dropdown selection
+struct AudioDevice: Identifiable, Equatable {
+    var id: AudioDeviceID { deviceID } // Use deviceID as the id for consistency
+    let deviceID: AudioDeviceID
+    let name: String
+    let isInput: Bool
+    
+    static func == (lhs: AudioDevice, rhs: AudioDevice) -> Bool {
+        return lhs.deviceID == rhs.deviceID
+    }
+}
+
 // MARK: - Core Manager Protocols
 
 /// Protocol for video capture and management functionality
@@ -109,6 +123,14 @@ protocol AudioManagerProtocol: AnyObject {
     var microphonePermissionGranted: Bool { get }
     var showingPermissionAlert: Bool { get }
     
+    // Separate input and output device management
+    var availableInputDevices: [AudioDevice] { get }
+    var availableOutputDevices: [AudioDevice] { get }
+    var selectedInputDevice: AudioDevice? { get }
+    var selectedOutputDevice: AudioDevice? { get }
+    var isAudioEnabled: Bool { get }
+    
+    
     func initializeAudio()
     func checkMicrophonePermission()
     func prepareAudio()
@@ -116,6 +138,11 @@ protocol AudioManagerProtocol: AnyObject {
     func stopAudioSession()
     func setAudioEnabled(_ enabled: Bool)
     func openSystemPreferences()
+    func updateAvailableAudioDevices()
+    
+    // New device selection methods
+    func selectInputDevice(_ device: AudioDevice)
+    func selectOutputDevice(_ device: AudioDevice)
 }
 
 /// Protocol for USB device enumeration and management
