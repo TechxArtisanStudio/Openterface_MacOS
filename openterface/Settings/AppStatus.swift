@@ -73,6 +73,7 @@ struct AppStatus {
 
     static var chipVersion: Int8 = 0
     static var isTargetConnected: Bool = false
+    static var isControlChipsetReady: Bool = false
     static var isNumLockOn: Bool = false
     static var isCapLockOn: Bool = false
     static var isScrollOn: Bool = false

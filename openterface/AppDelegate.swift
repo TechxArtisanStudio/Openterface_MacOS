@@ -114,6 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             logger.log(content: "USB device management requires macOS 12.0 or later. Current functionality is limited.")
         }
 
+        // Initialize Hardware Abstraction Layer
+        initializeHAL()
+
         // Initialize HID Manager after USB device manager is updated
         _ = hidManager
         
@@ -130,6 +133,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.isInitialLaunch = false
         }
+    }
+    
+    // MARK: - Hardware Abstraction Layer
+    private func initializeHAL() {
+        logger.log(content: "🚀 Initializing Hardware Abstraction Layer...")
+        
+        let halIntegration = HALIntegrationManager.shared
+        
+        if halIntegration.initializeHALIntegration() {
+            // Integrate HAL with existing managers
+            halIntegration.integrateWithVideoManager()
+            halIntegration.integrateWithHIDManager()
+            halIntegration.integrateWithSerialPortManager()
+            
+            // Log HAL status
+            let halStatus = halIntegration.getHALStatus()
+            logger.log(content: "📊 HAL Status: \(halStatus.description)")
+            
+            logger.log(content: "✅ Hardware Abstraction Layer initialized successfully")
+        } else {
+            logger.log(content: "⚠️ Hardware Abstraction Layer initialization failed - falling back to legacy mode")
+        }
+    }
+    
+    private func deinitializeHAL() {
+        logger.log(content: "🔄 Deinitializing Hardware Abstraction Layer...")
+        
+        let halIntegration = HALIntegrationManager.shared
+        halIntegration.deinitializeHALIntegration()
+        
+        logger.log(content: "✅ Hardware Abstraction Layer deinitialized successfully")
     }
     
     // MARK: - Setup Methods
@@ -556,6 +590,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Deinitialize Hardware Abstraction Layer
+        deinitializeHAL()
         return .terminateNow
     }
     

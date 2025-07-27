@@ -23,6 +23,29 @@
 import Foundation
 import AVFoundation
 
+// MARK: - HAL Data Structure Forward Declarations
+
+/// Forward declarations for HAL data structures to avoid circular dependencies
+/// The actual definitions are in HardwareAbstractionLayer.swift
+
+struct VideoSignalStatus {
+    let hasSignal: Bool
+    let signalStrength: Float
+    let isStable: Bool
+    let errorRate: Float
+    let lastUpdate: Date
+}
+
+struct VideoTimingInfo {
+    let horizontalTotal: UInt32
+    let verticalTotal: UInt32
+    let horizontalSyncStart: UInt32
+    let verticalSyncStart: UInt32
+    let horizontalSyncWidth: UInt32
+    let verticalSyncWidth: UInt32
+    let pixelClock: UInt32
+}
+
 // MARK: - Protocol Extensions with Default Implementations
 
 extension VideoManagerProtocol {
@@ -46,9 +69,43 @@ extension HIDManagerProtocol {
         logger.log(content: "Switching USB to host")
     }
     
-    func setUSBtoTrager() {
+    func setUSBtoTarget() {
         let logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
         logger.log(content: "Switching USB to target")
+    }
+    
+    // MARK: - HAL Integration Default Implementations
+    
+    /// Default implementation returns nil - only concrete implementations with HAL support provide this
+    func getHALVideoSignalStatus() -> VideoSignalStatus? {
+        return nil
+    }
+    
+    /// Default implementation returns nil - only concrete implementations with HAL support provide this
+    func getHALVideoTimingInfo() -> VideoTimingInfo? {
+        return nil
+    }
+    
+    /// Default implementation returns false - no HAL features available by default
+    func halSupportsHIDFeature(_ feature: String) -> Bool {
+        return false
+    }
+    
+    /// Default implementation returns empty array - no HAL capabilities by default
+    func getHALHIDCapabilities() -> [String] {
+        return []
+    }
+    
+    /// Default implementation returns false - no HAL initialization by default
+    func initializeHALAwareHID() -> Bool {
+        let logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+        logger.log(content: "HAL-aware HID not supported in this implementation")
+        return false
+    }
+    
+    /// Default implementation returns basic information
+    func getHALSystemInfo() -> String {
+        return "HAL information not available in this implementation"
     }
 }
 

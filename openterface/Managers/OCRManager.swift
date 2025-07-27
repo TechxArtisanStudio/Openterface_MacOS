@@ -275,7 +275,11 @@ class OCRManager: OCRManagerProtocol {
     
     func cancelAreaSelection() {
         DispatchQueue.main.async { [weak self] in
-            self?.textSelectionOverlay?.removeFromSuperview()
+            // Clean up overlay and its key monitor
+            if let overlay = self?.textSelectionOverlay {
+                // The deinit will clean up the key monitor automatically
+                overlay.removeFromSuperview()
+            }
             self?.textSelectionOverlay = nil
             self?.selectedArea = nil
             AppStatus.isAreaOCRing = false
@@ -785,7 +789,7 @@ class OCRManager: OCRManagerProtocol {
             contentView = window.contentView
         }
         
-        guard let window = mainWindow, let view = contentView else {
+        guard let _ = mainWindow, let view = contentView else {
             logger.log(content: "Could not get application window for text selection")
             showTipMessage("Cannot access main window for text selection")
             return
@@ -871,7 +875,19 @@ class OCRManager: OCRManagerProtocol {
         
         // Force the overlay to become first responder and trigger immediate draw
         DispatchQueue.main.async { [weak self] in
-            overlayView.window?.makeFirstResponder(overlayView)
+            // Ensure the overlay can become first responder
+            if overlayView.acceptsFirstResponder {
+                let success = overlayView.window?.makeFirstResponder(overlayView) ?? false
+                logger.log(content: "First responder status: \(success)")
+                
+                // If making first responder failed, try again after a short delay
+                if !success {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        let retrySuccess = overlayView.window?.makeFirstResponder(overlayView) ?? false
+                        logger.log(content: "Retry first responder status: \(retrySuccess)")
+                    }
+                }
+            }
             
             // Disable layer backing to ensure draw() method is called
             if overlayView.wantsLayer {
@@ -989,6 +1005,9 @@ class TextSelectionOverlayView: NSView {
     private var videoDisplayRect: NSRect = .zero
     private var videoScale: CGFloat = 1.0
     
+    // Key monitoring for ESC key as backup
+    private var keyMonitor: Any?
+    
     init(videoImage: NSImage, onTextSelected: @escaping (NSRect) -> Void, onCancel: @escaping () -> Void) {
         self.videoImage = videoImage
         self.onTextSelected = onTextSelected
@@ -997,6 +1016,21 @@ class TextSelectionOverlayView: NSView {
         
         // Set up proper mouse tracking and drawing
         self.wantsLayer = false
+        
+        // Set up a local key monitor as backup for ESC key
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { // Escape key
+                logger.log(content: "ESC key detected in local monitor - cancelling selection")
+                DispatchQueue.main.async {
+                    self?.temporarySelectionRect = nil
+                    self?.selectionRect = nil
+                    self?.needsDisplay = true
+                    self?.onCancel()
+                }
+                return nil // Consume the event
+            }
+            return event
+        }
         
         // Force immediate display after init
         self.needsDisplay = true
@@ -1029,11 +1063,28 @@ class TextSelectionOverlayView: NSView {
             self.needsLayout = true
             self.layout()
             self.updateTrackingAreas()
+            
+            // Ensure we become first responder for key events
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if self.acceptsFirstResponder {
+                    let success = self.window?.makeFirstResponder(self) ?? false
+                    logger.log(content: "TextSelectionOverlayView first responder in viewDidMoveToSuperview: \(success)")
+                }
+            }
         }
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        // Clean up the key monitor
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
     }
     
     override func updateTrackingAreas() {
@@ -1057,7 +1108,10 @@ class TextSelectionOverlayView: NSView {
     }
     
     override func keyDown(with event: NSEvent) {
+        logger.log(content: "TextSelectionOverlayView keyDown event: keyCode=\(event.keyCode), characters=\(event.characters ?? "nil")")
+        
         if event.keyCode == 53 { // Escape key
+            logger.log(content: "ESC key pressed in TextSelectionOverlayView - cancelling selection")
             // Clear any temporary or finalized selection
             temporarySelectionRect = nil
             selectionRect = nil
@@ -1068,11 +1122,28 @@ class TextSelectionOverlayView: NSView {
         }
     }
     
+    override func flagsChanged(with event: NSEvent) {
+        // Handle modifier keys if needed
+        super.flagsChanged(with: event)
+    }
+    
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Handle ESC as a key equivalent as well
+        if event.keyCode == 53 {
+            logger.log(content: "ESC key equivalent in TextSelectionOverlayView - cancelling selection")
+            temporarySelectionRect = nil
+            selectionRect = nil
+            needsDisplay = true
+            onCancel()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+    
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         
-        // Make this view the first responder to receive key events
-        window?.makeFirstResponder(self)
+        guard window != nil else { return }
         
         // Set up mouse tracking
         updateTrackingAreas()
@@ -1084,6 +1155,25 @@ class TextSelectionOverlayView: NSView {
         
         // Force a redraw to ensure everything is displayed
         needsDisplay = true
+        
+        // Make this view the first responder to receive key events
+        // Do this multiple times with delays to ensure it works
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if self.acceptsFirstResponder {
+                let success = self.window?.makeFirstResponder(self) ?? false
+                logger.log(content: "TextSelectionOverlayView first responder in viewDidMoveToWindow: \(success)")
+                
+                // If first attempt failed, try again
+                if !success {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                        guard let self = self else { return }
+                        let retrySuccess = self.window?.makeFirstResponder(self) ?? false
+                        logger.log(content: "TextSelectionOverlayView retry first responder: \(retrySuccess)")
+                    }
+                }
+            }
+        }
     }
     
     override func layout() {
@@ -1098,11 +1188,35 @@ class TextSelectionOverlayView: NSView {
         let viewBounds = bounds
         let imageSize = videoImage.size
         
-        // If the overlay is positioned directly over the PlayerView, 
-        // the video should fill the entire overlay bounds (aspect fill behavior)
-        // This matches how PlayerView displays the video
-        videoDisplayRect = viewBounds
-        videoScale = viewBounds.width / imageSize.width
+        // Calculate aspect ratios to determine video scaling method (aspect fit)
+        let videoAspectRatio = imageSize.width / imageSize.height
+        let viewAspectRatio = viewBounds.width / viewBounds.height
+        
+        if abs(videoAspectRatio - viewAspectRatio) < 0.01 {
+            // Aspect ratios match - video fills view exactly
+            videoDisplayRect = viewBounds
+            videoScale = viewBounds.width / imageSize.width
+        } else if videoAspectRatio > viewAspectRatio {
+            // Video is wider - aspect fit with letterboxing top/bottom
+            let scaledHeight = viewBounds.width / videoAspectRatio
+            videoDisplayRect = NSRect(
+                x: 0,
+                y: (viewBounds.height - scaledHeight) / 2,
+                width: viewBounds.width,
+                height: scaledHeight
+            )
+            videoScale = viewBounds.width / imageSize.width
+        } else {
+            // Video is taller - aspect fit with letterboxing left/right
+            let scaledWidth = viewBounds.height * videoAspectRatio
+            videoDisplayRect = NSRect(
+                x: (viewBounds.width - scaledWidth) / 2,
+                y: 0,
+                width: scaledWidth,
+                height: viewBounds.height
+            )
+            videoScale = viewBounds.height / imageSize.height
+        }
     }
     
     override func draw(_ dirtyRect: NSRect) {
@@ -1117,10 +1231,9 @@ class TextSelectionOverlayView: NSView {
         NSColor.black.withAlphaComponent(0.3).setFill()
         bounds.fill()
         
-        // Draw the video image - since overlay is positioned over PlayerView, 
-        // draw video filling the entire overlay bounds
+        // Draw the video image with proper aspect ratio and letterboxing/pillarboxing
         if videoImage.size.width > 0 && videoImage.size.height > 0 {
-            videoImage.draw(in: bounds)
+            videoImage.draw(in: videoDisplayRect)
         }
         
         // Always draw instructions at the top
@@ -1270,55 +1383,21 @@ class TextSelectionOverlayView: NSView {
     
     private func convertFromDisplayCoordinates(_ displayRect: NSRect) -> NSRect {
         // Convert from PlayerView coordinates back to video coordinates
-        // This needs to match the logic in convertAreaSelectionToVideoCoordinates
+        // Use the calculated videoDisplayRect for accurate conversion
         
         let imageSize = videoImage.size
-        let viewBounds = bounds
         
-        // Calculate aspect ratios to determine how video is displayed
-        let videoAspectRatio = imageSize.width / imageSize.height
-        let viewAspectRatio = viewBounds.width / viewBounds.height
-        
-        var actualVideoDisplaySize: CGSize
-        var videoOffsetInView: CGPoint
-        
-        if abs(videoAspectRatio - viewAspectRatio) < 0.01 {
-            // Aspect ratios match - video fills view exactly
-            actualVideoDisplaySize = viewBounds.size
-            videoOffsetInView = CGPoint(x: 0, y: 0)
-        } else if videoAspectRatio > viewAspectRatio {
-            // Video is wider - using aspect fit (letterboxing top/bottom)
-            actualVideoDisplaySize = CGSize(
-                width: viewBounds.width,
-                height: viewBounds.width / videoAspectRatio
-            )
-            videoOffsetInView = CGPoint(
-                x: 0,
-                y: (viewBounds.height - actualVideoDisplaySize.height) / 2
-            )
-        } else {
-            // Video is taller - using aspect fit (letterboxing left/right)
-            actualVideoDisplaySize = CGSize(
-                width: viewBounds.height * videoAspectRatio,
-                height: viewBounds.height
-            )
-            videoOffsetInView = CGPoint(
-                x: (viewBounds.width - actualVideoDisplaySize.width) / 2,
-                y: 0
-            )
-        }
-        
-        // Remove video offset to get relative coordinates
+        // Remove video offset to get relative coordinates within the video display area
         let relativeRect = NSRect(
-            x: displayRect.minX - videoOffsetInView.x,
-            y: displayRect.minY - videoOffsetInView.y,
+            x: displayRect.minX - videoDisplayRect.minX,
+            y: displayRect.minY - videoDisplayRect.minY,
             width: displayRect.width,
             height: displayRect.height
         )
         
         // Scale from displayed size to video coordinates
-        let scaleX = imageSize.width / actualVideoDisplaySize.width
-        let scaleY = imageSize.height / actualVideoDisplaySize.height
+        let scaleX = imageSize.width / videoDisplayRect.width
+        let scaleY = imageSize.height / videoDisplayRect.height
         
         // No Y-flip needed since both PlayerView and video use top-left origin
         return NSRect(
@@ -1349,8 +1428,10 @@ class TextSelectionOverlayView: NSView {
             self.alphaValue = originalAlpha
         }
         
-        // Since overlay is positioned over PlayerView, all clicks within bounds are valid
-        // No need to check videoDisplayRect containment
+        // Only allow interactions within the actual video display area
+        guard videoDisplayRect.contains(location) else {
+            return
+        }
         
         initialLocation = location
         lastMouseLocation = location
@@ -1382,10 +1463,10 @@ class TextSelectionOverlayView: NSView {
             self.alphaValue = originalAlpha
         }
         
-        // Since overlay covers the entire PlayerView, clamp to overlay bounds
+        // Clamp to video display area instead of full overlay bounds
         let clampedLocation = NSPoint(
-            x: max(bounds.minX, min(bounds.maxX, currentLocation.x)),
-            y: max(bounds.minY, min(bounds.maxY, currentLocation.y))
+            x: max(videoDisplayRect.minX, min(videoDisplayRect.maxX, currentLocation.x)),
+            y: max(videoDisplayRect.minY, min(videoDisplayRect.maxY, currentLocation.y))
         )
         
         if activeHandle != .none {
@@ -1516,8 +1597,8 @@ class TextSelectionOverlayView: NSView {
         let deltaY = currentLocation.y - initialLocation.y
         
         let newPlayerViewRect = NSRect(
-            x: max(bounds.minX, min(bounds.maxX - rect.width, rect.minX + deltaX)),
-            y: max(bounds.minY, min(bounds.maxY - rect.height, rect.minY + deltaY)),
+            x: max(videoDisplayRect.minX, min(videoDisplayRect.maxX - rect.width, rect.minX + deltaX)),
+            y: max(videoDisplayRect.minY, min(videoDisplayRect.maxY - rect.height, rect.minY + deltaY)),
             width: rect.width,
             height: rect.height
         )
@@ -1569,8 +1650,8 @@ class TextSelectionOverlayView: NSView {
             break
         }
         
-        // Clamp to bounds
-        newPlayerViewRect = newPlayerViewRect.intersection(bounds)
+        // Clamp to video display area
+        newPlayerViewRect = newPlayerViewRect.intersection(videoDisplayRect)
         
         // Store directly in PlayerView coordinates
         selectionRect = newPlayerViewRect
@@ -1632,6 +1713,16 @@ class TextSelectionOverlayView: NSView {
         )
         
         buttonText.draw(in: textRect, withAttributes: textAttributes)
+    }
+    
+    override func removeFromSuperview() {
+        // Clean up key monitor before removing from superview
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+            logger.log(content: "Key monitor removed from TextSelectionOverlayView")
+        }
+        super.removeFromSuperview()
     }
 }
 

@@ -24,9 +24,15 @@ import SwiftUI
 import IOKit
 import IOKit.usb
 import IOKit.hid
+import Foundation
+
+// MARK: - HAL Integration
+
+/// HIDManager now integrates with the Hardware Abstraction Layer
+/// This provides chipset-aware HID operations and better hardware abstraction
 
 class HIDManager: ObservableObject, HIDManagerProtocol {
-    private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     static let shared = HIDManager()
     
     var manager: IOHIDManager!
@@ -201,7 +207,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         self.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
     }
     
-    func setUSBtoTrager() {
+    func setUSBtoTarget() {
         self.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
     }
     
@@ -832,4 +838,62 @@ extension String {
 // Add notification name extension
 extension Notification.Name {
     static let hidResolutionChanged = Notification.Name("hidResolutionChanged")
+}
+
+// MARK: - HAL Integration Methods
+
+extension HIDManager {
+    /// Get HAL-aware chipset information
+    func getHALChipsetInfo() -> ChipsetInfo? {
+        // Try to get chipset info from the HAL
+        let hal = HardwareAbstractionLayer.shared
+        if let videoChipset = hal.getCurrentVideoChipset() {
+            return videoChipset.chipsetInfo
+        }
+        
+        // Fallback: create chipset info based on connected USB device
+        if let device = AppStatus.DefaultVideoDevice {
+            return ChipsetInfo(
+                name: "MS2109", // Default assumption
+                vendorID: device.vendorID,
+                productID: device.productID,
+                firmwareVersion: getVersion(),
+                manufacturer: "MacroSilicon",
+                chipsetType: .video(.ms2109)
+            )
+        }
+        
+        return nil
+    }
+    
+    /// Get HAL-aware signal status
+    func getHALSignalStatus() -> VideoSignalStatus {
+        let hasSignal = getHDMIStatus()
+        
+        return VideoSignalStatus(
+            hasSignal: hasSignal,
+            signalStrength: hasSignal ? 1.0 : 0.0,
+            isStable: hasSignal,
+            errorRate: 0.0,
+            lastUpdate: Date()
+        )
+    }
+    
+    /// Get HAL-aware timing info
+    func getHALTimingInfo() -> VideoTimingInfo? {
+        // Check if we have timing information available
+        guard AppStatus.hidInputHTotal > 0 && AppStatus.hidInputVTotal > 0 else {
+            return nil
+        }
+        
+        return VideoTimingInfo(
+            horizontalTotal: AppStatus.hidInputHTotal,
+            verticalTotal: AppStatus.hidInputVTotal,
+            horizontalSyncStart: AppStatus.hidInputHst,
+            verticalSyncStart: AppStatus.hidInputVst,
+            horizontalSyncWidth: AppStatus.hidInputHsyncWidth,
+            verticalSyncWidth: AppStatus.hidInputVsyncWidth,
+            pixelClock: AppStatus.hidReadPixelClock
+        )
+    }
 }

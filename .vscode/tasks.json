@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Openterface with HAL",
+			"type": "shell",
+			"command": "cd /opt/source/Openterface/Openterface_MacOS && xcodebuild -project openterface.xcodeproj -scheme openterface -configuration Debug build",
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			]
+		}
+	]
+}
