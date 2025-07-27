@@ -395,20 +395,6 @@ struct openterfaceApp: App {
                     Text("Shortcut Keys")
                 }
                 Button(action: {
-                    if #available(macOS 12.3, *) {
-                        let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
-                        ocrManager.startAreaSelection()
-                    } else {
-                        let alert = NSAlert()
-                        alert.messageText = "Feature Unavailable"
-                        alert.informativeText = "OCR functionality requires macOS 12.3 or later."
-                        alert.addButton(withTitle: "OK")
-                        alert.runModal()
-                    }
-                }) {
-                    Text("Target Screen OCR")
-                }
-                Button(action: {
                     showUSBDevicesWindow()
                 }) {
                     Text("USB Info")
@@ -451,6 +437,22 @@ struct openterfaceApp: App {
                     Text("Paste")
                 }
                 .keyboardShortcut("v", modifiers: .command)
+                
+                Button(action: {
+                    if #available(macOS 12.3, *) {
+                        let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
+                        ocrManager.startAreaSelection()
+                    } else {
+                        let alert = NSAlert()
+                        alert.messageText = "Feature Unavailable"
+                        alert.informativeText = "OCR functionality requires macOS 12.3 or later."
+                        alert.addButton(withTitle: "OK")
+                        alert.runModal()
+                    }
+                }) {
+                    Text("OCR Text")
+                }
+                
                 Button(action: {
                     if _isMouseLoopRunning {
                         mouseManager.stopMouseLoop()
@@ -487,7 +489,7 @@ struct openterfaceApp: App {
     
     private func handleSwitchToggle(isOn: Bool) {
         if isOn {
-            hidManager.setUSBtoTrager()
+            hidManager.setUSBtoTarget()
         } else {
             hidManager.setUSBtoHost()
         }

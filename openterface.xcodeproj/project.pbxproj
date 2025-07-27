@@ -48,6 +48,12 @@
 		BF98F71D2E34C805002EACD7 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F71C2E34C805002EACD7 /* DependencyContainer.swift */; };
 		BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */; };
 		BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7222E34FC8D002EACD7 /* OCRManager.swift */; };
+		BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */; };
+		BF98F7362E35A1BD002EACD7 /* ControlChipsetHAL.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7302E35A1BC002EACD7 /* ControlChipsetHAL.swift */; };
+		BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */; };
+		BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */; };
+		BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */; };
+		BF98F73A2E35A1BD002EACD7 /* HALExamples.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7342E35A1BC002EACD7 /* HALExamples.swift */; };
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
@@ -115,6 +121,12 @@
 		BF98F71C2E34C805002EACD7 /* DependencyContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DependencyContainer.swift; path = openterface/Core/DependencyContainer.swift; sourceTree = SOURCE_ROOT; };
 		BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FloatingKeyboardManager.swift; sourceTree = "<group>"; };
 		BF98F7222E34FC8D002EACD7 /* OCRManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OCRManager.swift; sourceTree = "<group>"; };
+		BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DependencyContainer.swift; path = openterface/Core/DependencyContainer.swift; sourceTree = SOURCE_ROOT; };
+		BF98F7302E35A1BC002EACD7 /* ControlChipsetHAL.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ControlChipsetHAL.swift; path = openterface/Core/ControlChipsetHAL.swift; sourceTree = SOURCE_ROOT; };
+		BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HardwareAbstractionLayer.swift; path = openterface/Core/HardwareAbstractionLayer.swift; sourceTree = SOURCE_ROOT; };
+		BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = VideoChipsetHAL.swift; path = openterface/Core/VideoChipsetHAL.swift; sourceTree = SOURCE_ROOT; };
+		BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HALIntegration.swift; path = openterface/Core/HALIntegration.swift; sourceTree = SOURCE_ROOT; };
+		BF98F7342E35A1BC002EACD7 /* HALExamples.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HALExamples.swift; path = openterface/Core/HALExamples.swift; sourceTree = SOURCE_ROOT; };
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -200,6 +212,7 @@
 		53FBE7AC2B3D66D2007785B0 /* openterface */ = {
 			isa = PBXGroup;
 			children = (
+				BF98F73B2E35A1EA002EACD7 /* Core */,
 				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
 				53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */,
 				53FBE7AF2B3D66D2007785B0 /* ContentView.swift */,
@@ -277,6 +290,19 @@
 				53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */,
 			);
 			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		BF98F73B2E35A1EA002EACD7 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				BF98F7302E35A1BC002EACD7 /* ControlChipsetHAL.swift */,
+				BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */,
+				BF98F7342E35A1BC002EACD7 /* HALExamples.swift */,
+				BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */,
+				BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */,
+				BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */,
+			);
+			path = Core;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -421,20 +447,26 @@
 				296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */,
+				BF98F73A2E35A1BD002EACD7 /* HALExamples.swift in Sources */,
+				BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
 				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,
 				6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */,
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
+				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
+				BF98F7362E35A1BD002EACD7 /* ControlChipsetHAL.swift in Sources */,
 				BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */,
+				BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */,
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,
 				53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */,
 				29267D572DACB7E3006D5107 /* WindowUtils.swift in Sources */,
 				BF98F71A2E34C29E002EACD7 /* ProtocolExtensions.swift in Sources */,
 				53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */,
+				BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */,
 				53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */,
 				53955CC02BF497D000FA4493 /* SettingsScreen.swift in Sources */,
 				6B60EB7F2E0E7C39006874D3 /* FirmwareUpdateView.swift in Sources */,

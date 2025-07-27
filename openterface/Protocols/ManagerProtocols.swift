@@ -62,11 +62,19 @@ protocol HIDManagerProtocol: AnyObject {
     func getVersion() -> String?
     
     func setUSBtoHost()
-    func setUSBtoTrager()
+    func setUSBtoTarget()
     
     func writeEeprom(address: UInt16, data: Data) -> Bool
     func writeEeprom(address: UInt16, data: Data, progressCallback: ((Double) -> Void)?) -> Bool
     func readEeprom(address: UInt16, length: UInt8) -> Data?
+    
+    // MARK: - HAL Integration Methods (Optional - with default implementations)
+    func getHALVideoSignalStatus() -> VideoSignalStatus?
+    func getHALVideoTimingInfo() -> VideoTimingInfo?
+    func halSupportsHIDFeature(_ feature: String) -> Bool
+    func getHALHIDCapabilities() -> [String]
+    func initializeHALAwareHID() -> Bool
+    func getHALSystemInfo() -> String
 }
 
 /// Protocol for serial port communication

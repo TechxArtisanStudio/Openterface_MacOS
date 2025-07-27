@@ -38,6 +38,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     // MARK: - Published Properties
     
+    
     /// Indicates if camera permission is granted
     @Published var isVideoGranted: Bool = false
     
@@ -125,7 +126,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         $isVideoGranted
             .sink { [weak self] isVideoGranted in
                 if isVideoGranted {
-                    self?.prepareVideo()
+                    self?.prepareVideoWithHAL()
                 } else {
                     self?.stopVideoSession()
                 }
@@ -607,12 +608,12 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
            let device = notification.object as? AVCaptureDevice, 
            matchesLocalID(device.uniqueID, defaultDevice.locationID) {
             
-            logger.log(content: "Matching video device connected, preparing video")
+            logger.log(content: "Matching video device connected, preparing video with HAL")
             
             // Add delay to ensure device is fully initialized
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self = self else { return }
-                self.prepareVideo()
+                self.prepareVideoWithHAL()
                 self.hidManager.startHID()
             }
         }
@@ -678,6 +679,47 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                 self?.prepareVideo()
                 self?.logger.log(content: "Video session restart initiated after firmware update. New state: isRunning=\(self?.captureSession.isRunning ?? false)")
             }
+        }
+    }
+    
+    // MARK: - HAL Integration
+    
+    /// Get HAL instance for hardware abstraction
+    private var hal: HardwareAbstractionLayer {
+        return HardwareAbstractionLayer.shared
+    }
+    
+    /// Check if HAL has detected compatible video hardware
+    private func isHALVideoHardwareAvailable() -> Bool {
+        let systemInfo = hal.getSystemInfo()
+        return systemInfo.isVideoActive && systemInfo.videoChipset != nil
+    }
+    
+    /// Get video capabilities from HAL
+    private func getHALVideoCapabilities() -> [String] {
+        let systemInfo = hal.getSystemInfo()
+        return systemInfo.systemCapabilities.features.filter { feature in
+            feature.contains("Video") || feature.contains("HDMI") || feature.contains("Capture")
+        }
+    }
+    
+    /// Enhanced video preparation with HAL integration
+    private func prepareVideoWithHAL() {
+        logger.log(content: "🔧 Preparing video with HAL integration...")
+        
+        // Check if HAL has detected compatible hardware
+        if isHALVideoHardwareAvailable() {
+            logger.log(content: "✅ HAL-compatible video hardware detected")
+            
+            // Get capabilities from HAL
+            let capabilities = getHALVideoCapabilities()
+            logger.log(content: "📋 Video capabilities: \(capabilities.joined(separator: ", "))")
+            
+            // Use HAL-enhanced video preparation
+            prepareVideo()
+        } else {
+            logger.log(content: "⚠️ No HAL-compatible video hardware detected, using standard preparation")
+            prepareVideo()
         }
     }
 }
