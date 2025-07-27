@@ -390,6 +390,14 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             // Log the key press with its keycode
             self.logger.log(content: "Key pressed: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
             
+            // Detect Cmd+V (paste) combination
+            if event.keyCode == 9 && modifiers.contains(.command) { // 'v' key with Command
+                self.logger.log(content: "📋 Paste key combination detected (Cmd+V)")
+                let clipboardManager = DependencyContainer.shared.resolve(ClipboardManagerProtocol.self)
+                clipboardManager.handlePasteRequest()
+                return nil // Consume the event to prevent default paste behavior
+            }
+            
             if event.keyCode == 53 {
                 // Handle ESC key - cancel area selection if active
                 if #available(macOS 12.3, *) {

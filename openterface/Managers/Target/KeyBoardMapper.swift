@@ -283,7 +283,7 @@ class KeyboardMapper {
         for (index, kc) in keyCode.prefix(6).enumerated() {
             if let mappedValue = keyCodeMapping[kc] {
                 keyDat[7 + index] = mappedValue
-            } else {
+            } else if (kc != 255) {
                 logger.log(content: "Warning: \(kc) is not mapped.")
             }
         }

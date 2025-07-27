@@ -56,6 +56,7 @@ struct openterfaceApp: App {
     @State private var absoluteTitle = "Absolute ✓"
     @State private var logModeTitle = "No logging ✓"
     @State private var mouseHideTitle = "Auto-hide in Control Mode"
+    @State private var pasteBehaviorTitle = "Ask Every Time"
     
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
@@ -98,17 +99,25 @@ struct openterfaceApp: App {
                 .animation(.easeInOut(duration: 0.5), value: showButtons)
                 .zIndex(100)
                 ContentView()
-                    .navigationTitle("")
+                    .navigationTitle("Openterface Mini-KVM")
                     .toolbar {
-                        ToolbarItemGroup(placement: .navigation) {
-                            Text("Openterface Mini-KVM")
-                        }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {
                                 floatingKeyboardManager.showFloatingKeysWindow()
                             }) {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
                             }
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Button(action: {
+                                ClipboardWindowController.shared.toggle()
+                            }) {
+                                Image(systemName: "doc.on.clipboard")
+                                    .resizable()
+                                    .frame(width: 14, height: 16)
+                                    .foregroundColor(.gray)
+                            }
+                            .help("Open Clipboard Manager")
                         }
                         ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
@@ -185,6 +194,7 @@ struct openterfaceApp: App {
                                 """
                             )
                         }
+                    
                         
                         // Add serial port information display
                         ToolbarItem(placement: .automatic) {
@@ -208,6 +218,11 @@ struct openterfaceApp: App {
                         }
                     }
                     .onReceive(timer) { _ in
+                        // Initialize paste behavior title on first run
+                        if pasteBehaviorTitle == "Ask Every Time" {
+                            pasteBehaviorTitle = UserSettings.shared.pasteBehavior.menuDisplayName
+                        }
+                        
                         // Add debounce mechanism to avoid frequent status updates
                         let now = Date()
                         guard now.timeIntervalSince(lastUpdateTime) >= updateDebounceInterval else {
@@ -429,10 +444,8 @@ struct openterfaceApp: App {
             }
             CommandGroup(replacing: CommandGroupPlacement.pasteboard){
                 Button(action: {
-                    let pasteboard = NSPasteboard.general
-                    if let string = pasteboard.string(forType: .string) {
-                        keyboardManager.sendTextToKeyboard(text: string)
-                    }
+                    let clipboardManager = DependencyContainer.shared.resolve(ClipboardManagerProtocol.self)
+                    clipboardManager.handlePasteRequest()
                 }) {
                     Text("Paste")
                 }
@@ -450,7 +463,29 @@ struct openterfaceApp: App {
                         alert.runModal()
                     }
                 }) {
-                    Text("OCR Text")
+                    Text("OCR Copy")
+                }
+                
+                Divider()
+                
+                Menu("Paste Behavior: \(pasteBehaviorTitle)") {
+                    Button("Ask Every Time\(UserSettings.shared.pasteBehavior == .askEveryTime ? " ✓" : "")") {
+                        UserSettings.shared.pasteBehavior = .askEveryTime
+                        pasteBehaviorTitle = "Ask Every Time"
+                        log.log(content: "Paste behavior set to: Ask Every Time")
+                    }
+                    
+                    Button("Paste text to Target\(UserSettings.shared.pasteBehavior == .alwaysPasteToTarget ? " ✓" : "")") {
+                        UserSettings.shared.pasteBehavior = .alwaysPasteToTarget
+                        pasteBehaviorTitle = "Paste text to Target"
+                        log.log(content: "Paste behavior set to: Auto Paste text to Target")
+                    }
+                    
+                    Button("Pass events to Target\(UserSettings.shared.pasteBehavior == .alwaysPassToTarget ? " ✓" : "")") {
+                        UserSettings.shared.pasteBehavior = .alwaysPassToTarget
+                        pasteBehaviorTitle = "Pass events to Target"
+                        log.log(content: "Paste behavior set to: Pass events to Target")
+                    }
                 }
                 
                 Button(action: {

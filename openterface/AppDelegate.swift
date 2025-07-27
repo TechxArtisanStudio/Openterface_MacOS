@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var serialPortManager: any SerialPortManagerProtocol
     private var videoManager: any VideoManagerProtocol
     private var hidManager: any HIDManagerProtocol
+    private var clipboardManager: any ClipboardManagerProtocol
     private var usbDevicesManager: (any USBDevicesManagerProtocol)?
     private var logger: any LoggerProtocol
     
@@ -55,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         self.serialPortManager = container.resolve(SerialPortManagerProtocol.self)
         self.videoManager = container.resolve(VideoManagerProtocol.self)
         self.hidManager = container.resolve(HIDManagerProtocol.self)
+        self.clipboardManager = container.resolve(ClipboardManagerProtocol.self)
         self.logger = container.resolve(LoggerProtocol.self)
         
         // USB Devices Manager is only available on macOS 12.0+
@@ -78,6 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(StatusBarManagerProtocol.self, instance: StatusBarManager() as any StatusBarManagerProtocol)
         container.register(TipLayerManagerProtocol.self, instance: TipLayerManager() as any TipLayerManagerProtocol)
         container.register(HIDManagerProtocol.self, instance: HIDManager.shared as any HIDManagerProtocol)
+        container.register(ClipboardManagerProtocol.self, instance: ClipboardManager.shared as any ClipboardManagerProtocol)
+        container.register(FloatingKeyboardManagerProtocol.self, instance: FloatingKeyboardManager() as any FloatingKeyboardManagerProtocol)
         
         // OCR Manager (macOS 12.3+ only)
         if #available(macOS 12.3, *) {

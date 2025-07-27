@@ -219,6 +219,20 @@ protocol OCRManagerProtocol: AnyObject {
     var isAreaSelectionActive: Bool { get }
 }
 
+/// Protocol for clipboard content management and history tracking
+protocol ClipboardManagerProtocol: AnyObject {
+    var currentClipboardContent: String? { get }
+    var clipboardHistory: [ClipboardItem] { get }
+    
+    func startMonitoring()
+    func stopMonitoring()
+    func addToHistory(_ content: String)
+    func clearHistory()
+    func copyToClipboard(_ content: String)
+    func handlePasteRequest()
+    func handlePasteRequest(with content: String)
+}
+
 // MARK: - Supporting Types
 
 enum LogLevel {

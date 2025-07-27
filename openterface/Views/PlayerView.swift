@@ -246,21 +246,6 @@ class PlayerView: NSView, NSWindowDelegate {
         self.window?.makeFirstResponder(self)
     }
 
-    override func keyDown(with event: NSEvent) {
-        handleKeyboardEvent(with: event, isKeyDown: true)
-    }
-
-    override func keyUp(with event: NSEvent) {
-        handleKeyboardEvent(with: event, isKeyDown: false)
-    }
-
-    private func handleKeyboardEvent(with event: NSEvent, isKeyDown: Bool) {
-        let keyCode = event.keyCode
-        let modifierFlags = event.modifierFlags
-
-        hostManager.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifierFlags, isKeyDown: isKeyDown)
-    }
-
     private func handleMouseMovement(with event: NSEvent, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
         if UserSettings.shared.MouseControl == .relative {
             let deltaX = Int(event.deltaX)

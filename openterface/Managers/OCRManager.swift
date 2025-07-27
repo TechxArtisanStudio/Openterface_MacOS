@@ -36,6 +36,7 @@ class OCRManager: OCRManagerProtocol {
     // MARK: - Protocol-based Dependencies (Lazy to avoid circular dependency)
     private lazy var tipLayerManager: TipLayerManagerProtocol = DependencyContainer.shared.resolve(TipLayerManagerProtocol.self)
     private lazy var videoManager: VideoManagerProtocol = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
+    private lazy var clipboardManager: ClipboardManagerProtocol = ClipboardManager.shared
     
     // MARK: - Text Selection Properties
     private var textSelectionOverlay: TextSelectionOverlayView?
@@ -180,6 +181,10 @@ class OCRManager: OCRManagerProtocol {
     func performOCROnSelectedArea(completion: @escaping (OCRResult) -> Void) {
         guard let selectedArea = self.selectedArea else {
             logger.log(content: "❌ No area selected for OCR")
+            // Restore cursor to normal state if no area selected
+            DispatchQueue.main.async {
+                NSCursor.arrow.set()
+            }
             completion(.failed(OCRError.screenCaptureFailure))
             return
         }
@@ -199,6 +204,10 @@ class OCRManager: OCRManagerProtocol {
         if let videoImage = captureFromVideoFeed(selectedArea) {
             guard let cgImage = videoImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
                 logger.log(content: "Failed to convert captured video image to CGImage for OCR")
+                // Restore cursor to normal state if conversion fails
+                DispatchQueue.main.async {
+                    NSCursor.arrow.set()
+                }
                 completion(.failed(OCRError.imageConversionFailure))
                 return
             }
@@ -206,6 +215,9 @@ class OCRManager: OCRManagerProtocol {
             logger.log(content: "🔍 Starting multiline OCR on captured area with dimensions: \(cgImage.width)x\(cgImage.height)")
             performOCR(on: cgImage) { [weak self] result in
                 DispatchQueue.main.async {
+                    // Restore cursor to normal state after OCR completes
+                    NSCursor.arrow.set()
+                    
                     switch result {
                     case .success(let text):
                         self?.copyTextToClipboard(text: text)
@@ -225,6 +237,10 @@ class OCRManager: OCRManagerProtocol {
             }
         } else {
             logger.log(content: "❌ Failed to capture video area for OCR")
+            // Restore cursor to normal state if capture fails
+            DispatchQueue.main.async {
+                NSCursor.arrow.set()
+            }
             completion(.failed(OCRError.screenCaptureFailure))
         }
     }
@@ -746,10 +762,9 @@ class OCRManager: OCRManagerProtocol {
     }
     
     private func copyTextToClipboard(text: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        logger.log(content: "Copied text to clipboard: \(text)")
+        // Use the ClipboardManager instead of direct pasteboard access
+        clipboardManager.copyToClipboard(text)
+        logger.log(content: "Copied text to clipboard via ClipboardManager: \(text)")
     }
     
     private func showTipMessage(_ message: String) {
@@ -874,7 +889,7 @@ class OCRManager: OCRManagerProtocol {
         self.textSelectionOverlay = overlayView
         
         // Force the overlay to become first responder and trigger immediate draw
-        DispatchQueue.main.async { [weak self] in
+        DispatchQueue.main.async {
             // Ensure the overlay can become first responder
             if overlayView.acceptsFirstResponder {
                 let success = overlayView.window?.makeFirstResponder(overlayView) ?? false
@@ -1022,6 +1037,8 @@ class TextSelectionOverlayView: NSView {
             if event.keyCode == 53 { // Escape key
                 logger.log(content: "ESC key detected in local monitor - cancelling selection")
                 DispatchQueue.main.async {
+                    // Restore cursor in case OCR was in progress
+                    NSCursor.arrow.set()
                     self?.temporarySelectionRect = nil
                     self?.selectionRect = nil
                     self?.needsDisplay = true
@@ -1112,6 +1129,8 @@ class TextSelectionOverlayView: NSView {
         
         if event.keyCode == 53 { // Escape key
             logger.log(content: "ESC key pressed in TextSelectionOverlayView - cancelling selection")
+            // Restore cursor in case OCR was in progress
+            NSCursor.arrow.set()
             // Clear any temporary or finalized selection
             temporarySelectionRect = nil
             selectionRect = nil
@@ -1131,6 +1150,8 @@ class TextSelectionOverlayView: NSView {
         // Handle ESC as a key equivalent as well
         if event.keyCode == 53 {
             logger.log(content: "ESC key equivalent in TextSelectionOverlayView - cancelling selection")
+            // Restore cursor in case OCR was in progress
+            NSCursor.arrow.set()
             temporarySelectionRect = nil
             selectionRect = nil
             needsDisplay = true
@@ -1222,8 +1243,8 @@ class TextSelectionOverlayView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
-        // Get the current graphics context
-        guard let context = NSGraphicsContext.current?.cgContext else {
+        // Ensure we have a graphics context
+        guard NSGraphicsContext.current != nil else {
             return
         }
         
@@ -1413,6 +1434,9 @@ class TextSelectionOverlayView: NSView {
         
         // Check if user clicked the copy button
         if selectionRect != nil && copyButtonRect.contains(location) {
+            // Change cursor to indicate processing
+            NSCursor.crosshair.set()
+            
             // Add visual feedback
             NSSound.beep()
             if let rect = selectionRect {
