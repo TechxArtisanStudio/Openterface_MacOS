@@ -109,17 +109,6 @@ struct openterfaceApp: App {
                             }
                         }
                         ToolbarItem(placement: .automatic) {
-                            Button(action: {
-                                ClipboardWindowController.shared.toggle()
-                            }) {
-                                Image(systemName: "doc.on.clipboard")
-                                    .resizable()
-                                    .frame(width: 14, height: 16)
-                                    .foregroundColor(.gray)
-                            }
-                            .help("Open Clipboard Manager")
-                        }
-                        ToolbarItem(placement: .automatic) {
                             Image(systemName: "poweron") // spacer
                         }
                         ToolbarItem(placement: .automatic) {
@@ -416,18 +405,10 @@ struct openterfaceApp: App {
                 }
                 Divider()
                 Button(action: {
-                    print("App Delegate Type: \(type(of: NSApp.delegate))")
-                    print("Can cast to AppDelegate: \(NSApp.delegate is AppDelegate)")
-                    showAspectRatioSelectionWindow()
-                }) {
-                    Text("Target Aspect Ratio...")
-                }
-                Button(action: {
                     showResetFactoryWindow()
                 }) {
                     Text("Serial Reset Tool...")
                 }
-                Divider()
                 Button(action: {
                     showFirmwareUpdateWindow()
                 }) {
@@ -468,6 +449,14 @@ struct openterfaceApp: App {
                 
                 Divider()
                 
+                Button(action: {
+                    ClipboardWindowController.shared.toggle()
+                }) {
+                    Text("Open Clipboard Manager")
+                }
+                
+                Divider()
+                
                 Menu("Paste Behavior: \(pasteBehaviorTitle)") {
                     Button("Ask Every Time\(UserSettings.shared.pasteBehavior == .askEveryTime ? " ✓" : "")") {
                         UserSettings.shared.pasteBehavior = .askEveryTime
@@ -498,6 +487,13 @@ struct openterfaceApp: App {
                     Text(_isMouseLoopRunning ? "Prevent screen saver ✓" : "Prevent screen saver")
                 }
                 .keyboardShortcut("s", modifiers: .command)
+            }
+            CommandGroup(after: CommandGroupPlacement.sidebar) {
+                Button(action: {
+                    showAspectRatioSelectionWindow()
+                }) {
+                    Text("Target Aspect Ratio...")
+                }
             }
         }
     }
