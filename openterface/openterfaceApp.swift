@@ -46,6 +46,7 @@ struct openterfaceApp: App {
     private var serialPortManager: SerialPortManagerProtocol { DependencyContainer.shared.resolve(SerialPortManagerProtocol.self) }
     private var floatingKeyboardManager: FloatingKeyboardManagerProtocol { DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self) }
     private var tipLayerManager: TipLayerManagerProtocol { DependencyContainer.shared.resolve(TipLayerManagerProtocol.self) }
+    private var cameraManager: CameraManagerProtocol { DependencyContainer.shared.resolve(CameraManagerProtocol.self) }
     
     init() {
         // Dependencies will be initialized when needed
@@ -61,6 +62,8 @@ struct openterfaceApp: App {
     @State private var _isSwitchToggleOn = false
     @State private var _isLockSwitch = true
     @State private var _isAudioEnabled = false
+    @State private var _isRecording = false
+    @State private var _canTakePicture = false
     
     @State private var  _hasHdmiSignal: Bool?
     @State private var  _isKeyboardConnected: Bool?
@@ -101,20 +104,22 @@ struct openterfaceApp: App {
                 ContentView()
                     .navigationTitle("Openterface Mini-KVM")
                     .toolbar {
-                        ToolbarItem(placement: .automatic) {
-                            Button(action: {
+                        ToolbarItemGroup(placement: .automatic) {
+                            Button {
                                 floatingKeyboardManager.showFloatingKeysWindow()
-                            }) {
+                            } label: {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
                             }
-                        }
-                        ToolbarItem(placement: .automatic) {
-                            Image(systemName: "poweron") // spacer
-                        }
-                        ToolbarItem(placement: .automatic) {
-                            Button(action: {
+                            
+                            Button(action: {}) {
+                                Image(systemName: "poweron") // spacer
+                            }
+                            .disabled(true)
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button {
                                 toggleAudio(isEnabled: !_isAudioEnabled)
-                            }) {
+                            } label: {
                                 Image(systemName: _isAudioEnabled ? "speaker.wave.3.fill" : "speaker.slash.fill")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
@@ -122,11 +127,38 @@ struct openterfaceApp: App {
                                     .foregroundColor(_isAudioEnabled ? .green : .red)
                             }
                             .help(_isAudioEnabled ? "Close audio" : "Open audio")
-                        }
-                        ToolbarItem(placement: .automatic) {
-                            Button(action: {
+                            
+                            Button {
+                                cameraManager.takePicture()
+                            } label: {
+                                Image(systemName: "camera.fill")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 16, height: 16)
+                                    .foregroundColor(_canTakePicture ? .blue : .gray)
+                            }
+                            .help("Take Picture")
+                            .disabled(!_canTakePicture)
+                            
+                            Button {
+                                if _isRecording {
+                                    cameraManager.stopVideoRecording()
+                                } else {
+                                    cameraManager.startVideoRecording()
+                                }
+                            } label: {
+                                Image(systemName: _isRecording ? "record.circle.fill" : "record.circle")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 16, height: 16)
+                                    .foregroundColor(_isRecording ? .red : (_canTakePicture ? .blue : .gray))
+                            }
+                            .help(_isRecording ? "Stop Recording" : "Start Video Recording")
+                            .disabled(!_canTakePicture)
+                            
+                            Button {
                                 showAspectRatioSelectionWindow()
-                            }) {
+                            } label: {
                                 Image(systemName: "display")
                                     .resizable()
                                     .frame(width: 14, height: 14)
@@ -134,6 +166,7 @@ struct openterfaceApp: App {
                             }
                             .help("Click to view Target Aspect Ratio...")
                         }
+                        
                         ToolbarItem(placement: .primaryAction) {
                             ResolutionView(
                                 width: _resolution.width, 
@@ -190,7 +223,11 @@ struct openterfaceApp: App {
                             SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate)
                         }
                         ToolbarItem(placement: .automatic) {
-                            Image(systemName: "poweron") // spacer
+                            Button(action: {}) {
+                                Image(systemName: "poweron") // spacer
+                            }
+                            .disabled(true)
+                            .buttonStyle(PlainButtonStyle())
                         }
                         ToolbarItemGroup(placement: .automatic) {
                             Toggle(isOn: $_isSwitchToggleOn) {
@@ -226,6 +263,11 @@ struct openterfaceApp: App {
                         let newSerialPortName = AppStatus.serialPortName
                         let newSerialPortBaudRate = AppStatus.serialPortBaudRate
                         let newAudioEnabled = AppStatus.isAudioEnabled
+                        
+                        // Update camera status
+                        cameraManager.updateStatus()
+                        let newIsRecording = cameraManager.isRecording
+                        let newCanTakePicture = cameraManager.canTakePicture
 
                         
                         var stateChanged = false
@@ -262,6 +304,16 @@ struct openterfaceApp: App {
                         
                         if _isAudioEnabled != newAudioEnabled {
                             _isAudioEnabled = newAudioEnabled
+                            stateChanged = true
+                        }
+                        
+                        if _isRecording != newIsRecording {
+                            _isRecording = newIsRecording
+                            stateChanged = true
+                        }
+                        
+                        if _canTakePicture != newCanTakePicture {
+                            _canTakePicture = newCanTakePicture
                             stateChanged = true
                         }
                         
@@ -352,6 +404,35 @@ struct openterfaceApp: App {
                         Text("Disable Audio")
                     }
                     .disabled(!_isAudioEnabled)
+                }
+                Menu("Camera Control") {
+                    Button(action: {
+                        cameraManager.takePicture()
+                    }) {
+                        Text("Take Picture")
+                    }
+                    .disabled(!_canTakePicture)
+                    
+                    Button(action: {
+                        if _isRecording {
+                            cameraManager.stopVideoRecording()
+                        } else {
+                            cameraManager.startVideoRecording()
+                        }
+                    }) {
+                        Text(_isRecording ? "Stop Recording" : "Start Recording")
+                    }
+                    .disabled(!_canTakePicture)
+                    
+                    Divider()
+                    
+                    Button(action: {
+                        if let capturesURL = cameraManager.getSavedFilesDirectory() {
+                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: capturesURL.path)
+                        }
+                    }) {
+                        Text("Show Captures Folder")
+                    }
                 }
                 Menu("Logging Setting"){
                     Button(action: {
@@ -453,6 +534,14 @@ struct openterfaceApp: App {
                     ClipboardWindowController.shared.toggle()
                 }) {
                     Text("Open Clipboard Manager")
+                }
+                
+                Button(action: {
+                    if let capturesURL = cameraManager.getSavedFilesDirectory() {
+                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: capturesURL.path)
+                    }
+                }) {
+                    Text("Show Capture Folder")
                 }
                 
                 Divider()

@@ -56,6 +56,7 @@
 		BFD4EA932E35EE970029BFC2 /* ManagerProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD4EA912E35EE970029BFC2 /* ManagerProtocols.swift */; };
 		BFD4EA942E35EE970029BFC2 /* ProtocolExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD4EA922E35EE970029BFC2 /* ProtocolExtensions.swift */; };
 		BFD4EA962E3643CA0029BFC2 /* PasteConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD4EA952E3643CA0029BFC2 /* PasteConfirmationView.swift */; };
+		BFD4EA982E369C870029BFC2 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD4EA972E369C870029BFC2 /* CameraManager.swift */; };
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
@@ -134,6 +135,7 @@
 		BFD4EA912E35EE970029BFC2 /* ManagerProtocols.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ManagerProtocols.swift; sourceTree = "<group>"; };
 		BFD4EA922E35EE970029BFC2 /* ProtocolExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProtocolExtensions.swift; sourceTree = "<group>"; };
 		BFD4EA952E3643CA0029BFC2 /* PasteConfirmationView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PasteConfirmationView.swift; sourceTree = "<group>"; };
+		BFD4EA972E369C870029BFC2 /* CameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -263,6 +265,7 @@
 				53F7C7122B440C8E00ED872F /* SerialPortManger.swift */,
 				53CC66092B8EDB390081F927 /* LoggerManager.swift */,
 				BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */,
+				BFD4EA972E369C870029BFC2 /* CameraManager.swift */,
 				BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				BF98F7222E34FC8D002EACD7 /* OCRManager.swift */,
@@ -497,6 +500,7 @@
 				531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */,
 				BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */,
 				5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */,
+				BFD4EA982E369C870029BFC2 /* CameraManager.swift in Sources */,
 				53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */,
 				29E5E0E02D6D5FBD00E1849A /* ResetFactoryView.swift in Sources */,
 				BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */,

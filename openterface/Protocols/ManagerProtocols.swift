@@ -33,6 +33,7 @@ protocol VideoManagerProtocol: AnyObject {
     var captureSession: AVCaptureSession! { get }
     var dimensions: CMVideoDimensions { get }
     var isVideoConnected: Bool { get }
+    var outputDelegate: VideoOutputDelegate? { get }
     
     func checkAuthorization()
     func prepareVideo()
@@ -231,6 +232,20 @@ protocol ClipboardManagerProtocol: AnyObject {
     func copyToClipboard(_ content: String)
     func handlePasteRequest()
     func handlePasteRequest(with content: String)
+}
+
+/// Protocol for camera and video recording functionality
+protocol CameraManagerProtocol: AnyObject {
+    var isRecording: Bool { get }
+    var canTakePicture: Bool { get }
+    var statusMessage: String { get }
+    
+    func takePicture()
+    func startVideoRecording()
+    func stopVideoRecording()
+    func getRecordingDuration() -> TimeInterval
+    func getSavedFilesDirectory() -> URL?
+    func updateStatus()
 }
 
 // MARK: - Supporting Types

@@ -81,6 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(HIDManagerProtocol.self, instance: HIDManager.shared as any HIDManagerProtocol)
         container.register(ClipboardManagerProtocol.self, instance: ClipboardManager.shared as any ClipboardManagerProtocol)
         container.register(FloatingKeyboardManagerProtocol.self, instance: FloatingKeyboardManager() as any FloatingKeyboardManagerProtocol)
+        container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
+        container.register(CameraManagerProtocol.self, instance: CameraManager.shared as any CameraManagerProtocol)
         
         // OCR Manager (macOS 12.3+ only)
         if #available(macOS 12.3, *) {
