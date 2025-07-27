@@ -27,16 +27,16 @@ import ScreenCaptureKit
 import CoreGraphics
 import Vision
 
-private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+
 
 @available(macOS 12.3, *)
 class OCRManager: OCRManagerProtocol {
     static let shared = OCRManager()
     
-    // MARK: - Protocol-based Dependencies (Lazy to avoid circular dependency)
-    private lazy var tipLayerManager: TipLayerManagerProtocol = DependencyContainer.shared.resolve(TipLayerManagerProtocol.self)
-    private lazy var videoManager: VideoManagerProtocol = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
-    private lazy var clipboardManager: ClipboardManagerProtocol = ClipboardManager.shared
+    private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var tipLayerManager: TipLayerManagerProtocol = DependencyContainer.shared.resolve(TipLayerManagerProtocol.self)
+    private var videoManager: VideoManagerProtocol = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
+    private var clipboardManager: ClipboardManagerProtocol = ClipboardManager.shared
     
     // MARK: - Text Selection Properties
     private var textSelectionOverlay: TextSelectionOverlayView?
@@ -84,7 +84,7 @@ class OCRManager: OCRManagerProtocol {
             do {
                 try imageRequestHandler.perform(requests)
             } catch let error {
-                logger.log(content: "Failed to perform text detection on image: \(error.localizedDescription)")
+                self.logger.log(content: "Failed to perform text detection on image: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     completion(.failed(error))
                 }
@@ -224,13 +224,13 @@ class OCRManager: OCRManagerProtocol {
                         let lineCount = text.components(separatedBy: .newlines).count
                         let displayText = lineCount > 1 ? "\(lineCount) lines copied" : text
                         self?.showTipMessage("✅ Text Copied: \(displayText)")
-                        logger.log(content: "✅ Multiline OCR successful (\(lineCount) lines): \(text)")
+                        self?.logger.log(content: "✅ Multiline OCR successful (\(lineCount) lines): \(text)")
                     case .noTextFound:
                         self?.showTipMessage("⚠️ No Text Found - try selecting a larger area or area with clearer text")
-                        logger.log(content: "⚠️ OCR completed but no text found")
+                        self?.logger.log(content: "⚠️ OCR completed but no text found")
                     case .failed(let error):
                         self?.showTipMessage("❌ OCR Failed")
-                        logger.log(content: "❌ OCR failed: \(error.localizedDescription)")
+                        self?.logger.log(content: "❌ OCR failed: \(error.localizedDescription)")
                     }
                     completion(result)
                 }
@@ -299,7 +299,7 @@ class OCRManager: OCRManagerProtocol {
             self?.textSelectionOverlay = nil
             self?.selectedArea = nil
             AppStatus.isAreaOCRing = false
-            logger.log(content: "Text selection cancelled and OCR state reset")
+            self?.logger.log(content: "Text selection cancelled and OCR state reset")
         }
     }
     
@@ -307,7 +307,7 @@ class OCRManager: OCRManagerProtocol {
     
     /// Capture image content from the video feed within the given rect
     private func captureFromVideoFeed(_ rect: NSRect) -> NSImage? {
-        logger.log(content: "📹 captureFromVideoFeed called with rect: \(rect)")
+        self.logger.log(content: "📹 captureFromVideoFeed called with rect: \(rect)")
         
         // Get the video manager as concrete type to access outputDelegate
         guard let concreteVideoManager = videoManager as? VideoManager,
@@ -893,13 +893,13 @@ class OCRManager: OCRManagerProtocol {
             // Ensure the overlay can become first responder
             if overlayView.acceptsFirstResponder {
                 let success = overlayView.window?.makeFirstResponder(overlayView) ?? false
-                logger.log(content: "First responder status: \(success)")
+                self.logger.log(content: "First responder status: \(success)")
                 
                 // If making first responder failed, try again after a short delay
                 if !success {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         let retrySuccess = overlayView.window?.makeFirstResponder(overlayView) ?? false
-                        logger.log(content: "Retry first responder status: \(retrySuccess)")
+                        self.logger.log(content: "Retry first responder status: \(retrySuccess)")
                     }
                 }
             }
@@ -999,6 +999,7 @@ enum OCRError: Error, LocalizedError {
 
 @available(macOS 12.3, *)
 class TextSelectionOverlayView: NSView {
+    private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private let videoImage: NSImage
     private var selectionRect: NSRect?
     private var temporarySelectionRect: NSRect? // For live preview during dragging
@@ -1035,7 +1036,7 @@ class TextSelectionOverlayView: NSView {
         // Set up a local key monitor as backup for ESC key
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { // Escape key
-                logger.log(content: "ESC key detected in local monitor - cancelling selection")
+                self?.logger.log(content: "ESC key detected in local monitor - cancelling selection")
                 DispatchQueue.main.async {
                     // Restore cursor in case OCR was in progress
                     NSCursor.arrow.set()
@@ -1086,7 +1087,7 @@ class TextSelectionOverlayView: NSView {
                 guard let self = self else { return }
                 if self.acceptsFirstResponder {
                     let success = self.window?.makeFirstResponder(self) ?? false
-                    logger.log(content: "TextSelectionOverlayView first responder in viewDidMoveToSuperview: \(success)")
+                    self.logger.log(content: "TextSelectionOverlayView first responder in viewDidMoveToSuperview: \(success)")
                 }
             }
         }
@@ -1125,7 +1126,7 @@ class TextSelectionOverlayView: NSView {
     }
     
     override func keyDown(with event: NSEvent) {
-        logger.log(content: "TextSelectionOverlayView keyDown event: keyCode=\(event.keyCode), characters=\(event.characters ?? "nil")")
+        self.logger.log(content: "TextSelectionOverlayView keyDown event: keyCode=\(event.keyCode), characters=\(event.characters ?? "nil")")
         
         if event.keyCode == 53 { // Escape key
             logger.log(content: "ESC key pressed in TextSelectionOverlayView - cancelling selection")

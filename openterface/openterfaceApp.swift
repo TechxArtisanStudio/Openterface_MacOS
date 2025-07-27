@@ -49,8 +49,14 @@ struct openterfaceApp: App {
     private var cameraManager: CameraManagerProtocol { DependencyContainer.shared.resolve(CameraManagerProtocol.self) }
     
     init() {
-        // Dependencies will be initialized when needed
-        // Cannot access lazy dependencies here due to initialization order
+        // Setup dependencies before UI construction to ensure they're available
+        AppDelegate.setupDependencies(container: DependencyContainer.shared)
+        
+        // Initialize audio after dependencies are set up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            let audioMgr = DependencyContainer.shared.resolve(AudioManagerProtocol.self)
+            audioMgr.initializeAudio()
+        }
     }
     
     @State private var relativeTitle = "Relative"
@@ -64,6 +70,8 @@ struct openterfaceApp: App {
     @State private var _isAudioEnabled = false
     @State private var _isRecording = false
     @State private var _canTakePicture = false
+    @State private var _isAudioEnabled = UserSettings.shared.isAudioEnabled  // Initialize with saved preference
+    @State private var _isShowingAudioSourceDropdown = false
     
     @State private var  _hasHdmiSignal: Bool?
     @State private var  _isKeyboardConnected: Bool?
@@ -119,6 +127,24 @@ struct openterfaceApp: App {
                             
                             Button {
                                 toggleAudio(isEnabled: !_isAudioEnabled)
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Image(systemName: "poweron") // spacer
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Menu {
+                                Button(action: {
+                                    toggleAudio(isEnabled: !_isAudioEnabled)
+                                }) {
+                                    Label(_isAudioEnabled ? "Mute Audio" : "Unmute Audio", 
+                                          systemImage: _isAudioEnabled ? "speaker.slash" : "speaker.wave.3")
+                                }
+                                
+                                Divider()
+
+                                Menu("Audio Settings") {
+                                    AudioSourceMenuContent(audioManager: audioManager as! AudioManager)
+                                }
                             } label: {
                                 Image(systemName: _isAudioEnabled ? "speaker.wave.3.fill" : "speaker.slash.fill")
                                     .resizable()
@@ -157,6 +183,16 @@ struct openterfaceApp: App {
                             .disabled(!_canTakePicture)
                             
                             Button {
+                            .help("""
+                                Audio controls - Click to toggle audio or change settings
+                                
+                                Status: \(_isAudioEnabled ? "Enabled" : "Disabled")
+                                Input: \((audioManager as! AudioManager).selectedInputDevice?.name ?? "None")
+                                Output: \((audioManager as! AudioManager).selectedOutputDevice?.name ?? "None")
+                                """)
+                        }
+                        ToolbarItem(placement: .automatic) {
+                            Button(action: {
                                 showAspectRatioSelectionWindow()
                             } label: {
                                 Image(systemName: "display")
@@ -404,6 +440,58 @@ struct openterfaceApp: App {
                         Text("Disable Audio")
                     }
                     .disabled(!_isAudioEnabled)
+                    
+                    Divider()
+                    
+                    Menu("Audio Input Devices") {
+                        if (audioManager as! AudioManager).availableInputDevices.isEmpty {
+                            Text("No input devices available")
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach((audioManager as! AudioManager).availableInputDevices) { device in
+                                Button(action: {
+                                    (audioManager as! AudioManager).selectInputDevice(device)
+                                }) {
+                                    HStack {
+                                        Text(device.name)
+                                        if (audioManager as! AudioManager).selectedInputDevice?.deviceID == device.deviceID {
+                                            Text("✓")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        Button("Refresh Input Devices") {
+                            (audioManager as! AudioManager).updateAvailableAudioDevices()
+                        }
+                    }
+                    
+                    Menu("Audio Output Devices") {
+                        Text("Output devices: \((audioManager as! AudioManager).availableOutputDevices.count)")
+                            .foregroundColor(.blue)
+                        
+                        if (audioManager as! AudioManager).availableOutputDevices.isEmpty {
+                            Text("No output devices available")
+                                .foregroundColor(.secondary)
+                        } else {
+                            Button("List Output Devices") {
+                                print("Settings: Output devices available:")
+                                for device in (audioManager as! AudioManager).availableOutputDevices {
+                                    print("Settings: - \(device.name)")
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        Button("Refresh Output Devices") {
+                            print("Settings: Refreshing output devices")
+                            (audioManager as! AudioManager).updateAvailableAudioDevices()
+                        }
+                    }
                 }
                 Menu("Camera Control") {
                     Button(action: {
@@ -576,6 +664,9 @@ struct openterfaceApp: App {
                     Text(_isMouseLoopRunning ? "Prevent screen saver ✓" : "Prevent screen saver")
                 }
                 .keyboardShortcut("s", modifiers: .command)
+                
+                Divider()
+
             }
             CommandGroup(after: CommandGroupPlacement.sidebar) {
                 Button(action: {
@@ -849,4 +940,78 @@ func showEdidNameWindow() {
     
     // Save window reference and activate app
     NSApp.activate(ignoringOtherApps: true)
+}
+
+// MARK: - Audio Source Menu Component
+struct AudioSourceMenuContent: View {
+    @ObservedObject var audioManager: AudioManager
+    
+    var body: some View {
+        Group {
+            // Input devices section
+            Text("Microphone (Input)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            if audioManager.availableInputDevices.isEmpty {
+                Text("No input devices available")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            } else {
+                ForEach(audioManager.availableInputDevices) { device in
+                    Button(action: {
+                        audioManager.selectInputDevice(device)
+                    }) {
+                        HStack {
+                            if audioManager.selectedInputDevice?.deviceID == device.deviceID {
+                                Image(systemName: "mic")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 16)
+                            }
+                            Text(device.name)
+                                .truncationMode(.tail)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Output devices section
+            Text("Speakers (Output)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            if audioManager.availableOutputDevices.isEmpty {
+                Text("No output devices available")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            } else {
+                ForEach(audioManager.availableOutputDevices) { device in
+                    Button(action: {
+                        audioManager.selectOutputDevice(device)
+                    }) {
+                        HStack {
+                            if audioManager.selectedOutputDevice?.deviceID == device.deviceID {
+                                Image(systemName: "speaker.wave.2")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 16)
+                            }
+                            Text(device.name)
+                                .truncationMode(.tail)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            Button("Refresh Audio Devices") {
+                audioManager.updateAvailableAudioDevices()
+            }
+        }
+        .onAppear {
+            audioManager.updateAvailableAudioDevices()
+        }
+    }
 }
