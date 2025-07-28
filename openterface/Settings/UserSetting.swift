@@ -36,10 +36,6 @@ final class UserSettings: ObservableObject {
         
         // Load audio enabled preference from UserDefaults
         self.isAudioEnabled = UserDefaults.standard.object(forKey: "isAudioEnabled") as? Bool ?? false
-        
-        // Legacy settings for backward compatibility
-        self.pasteConfirmationEnabled = UserDefaults.standard.object(forKey: "pasteConfirmationEnabled") as? Bool ?? true
-        self.automaticPasteToTarget = UserDefaults.standard.object(forKey: "automaticPasteToTarget") as? Bool ?? false
     }
     @Published var isSerialOutput: Bool
     @Published var MouseControl:MouseControlMode
@@ -68,19 +64,6 @@ final class UserSettings: ObservableObject {
     @Published var pasteBehavior: PasteBehavior {
         didSet {
             UserDefaults.standard.set(pasteBehavior.rawValue, forKey: "pasteBehavior")
-        }
-    }
-    
-    // Legacy properties for backward compatibility
-    @Published var pasteConfirmationEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(pasteConfirmationEnabled, forKey: "pasteConfirmationEnabled")
-        }
-    }
-    
-    @Published var automaticPasteToTarget: Bool {
-        didSet {
-            UserDefaults.standard.set(automaticPasteToTarget, forKey: "automaticPasteToTarget")
         }
     }
 }
