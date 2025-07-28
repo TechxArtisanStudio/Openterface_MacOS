@@ -551,11 +551,6 @@ struct openterfaceApp: App {
                     }
                 }
                 Button(action: {
-                    showSetKeyWindow()
-                }) {
-                    Text("Shortcut Keys")
-                }
-                Button(action: {
                     showUSBDevicesWindow()
                 }) {
                     Text("USB Info")
@@ -575,6 +570,12 @@ struct openterfaceApp: App {
                     showEdidNameWindow()
                 }) {
                     Text("EDID Display Name Editor...")
+                }
+                Divider()
+                Button(action: {
+                    showSetKeyWindow()
+                }) {
+                    Text("Settings...")
                 }
             }
             CommandGroup(replacing: CommandGroupPlacement.undoRedo) {
@@ -670,7 +671,7 @@ struct openterfaceApp: App {
         NSApp.activate(ignoringOtherApps: true)
         let detailView = SettingsScreen()
         let controller = SettingsScreenWC(rootView: detailView)
-        controller.window?.title = "Shortcut Keys Setting"
+        controller.window?.title = "Settings"
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: false)
     }

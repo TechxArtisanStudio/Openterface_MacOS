@@ -220,6 +220,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
 
     func monitorKeyboardEvents() {
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
+            // Check if settings window is active and let keyboard shortcuts recorder capture events
+            if let keyWindow = NSApp.keyWindow,
+               let identifier = keyWindow.identifier?.rawValue,
+               identifier.contains("settingsWindow") {
+                return event // Let the event pass through to settings window for keyboard shortcuts recording
+            }
+            
             let modifiers = event.modifierFlags
             let modifierDescription = self.modifierFlagsDescription(modifiers)
             self.logger.log(content: "Modifier flags changed: \(modifierDescription), CapsLock toggle: \(modifiers.contains(.capsLock))")
@@ -380,7 +387,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             // If so, let the event pass through to the window's text fields
             if let keyWindow = NSApp.keyWindow,
                let identifier = keyWindow.identifier?.rawValue,
-               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow")) {
+               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow")) {
                 return event // Let the event pass through to the window
             }
             
@@ -451,7 +458,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             // If so, let the event pass through to the window's text fields
             if let keyWindow = NSApp.keyWindow,
                let identifier = keyWindow.identifier?.rawValue,
-               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow")) {
+               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow")) {
                 return event // Let the event pass through to the window
             }
             
