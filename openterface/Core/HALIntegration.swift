@@ -572,9 +572,6 @@ class HALIntegrationManager {
             // Update control chipset specific status
             updateControlChipsetStatus(controlChipset)
         }
-        
-        // Update HAL system information periodically
-        updateHALFromHIDManager()
     }
     
     /// Update control chipset specific status information
@@ -610,27 +607,6 @@ class HALIntegrationManager {
         logger.log(content: systemInfo.description)
     }
     
-    /// Update HAL with current HID device information
-    func updateHALFromHIDManager() {
-        let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-        
-        // Check if HID manager has HAL integration methods (duck typing approach)
-        if let halAwareHIDManager = hidManager as? HIDManager {
-            // Update video chipset info if available
-            if let chipsetInfo = halAwareHIDManager.getHALChipsetInfo() {
-                logger.log(content: "🔄 Updating HAL with HID chipset info: \(chipsetInfo.name)")
-            }
-            
-            // Update signal status
-            let signalStatus = halAwareHIDManager.getHALSignalStatus()
-            logger.log(content: "📡 HAL Signal Status: \(signalStatus.hasSignal ? "Connected" : "Disconnected")")
-            
-            // Update timing info if available
-            if let timingInfo = halAwareHIDManager.getHALTimingInfo() {
-                logger.log(content: "⏱️ HAL Timing: \(timingInfo.horizontalTotal)x\(timingInfo.verticalTotal)")
-            }
-        }
-    }
 }
 
 // MARK: - HAL Status Structure
