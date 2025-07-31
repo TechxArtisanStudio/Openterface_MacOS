@@ -59,8 +59,6 @@ struct openterfaceApp: App {
         }
     }
     
-    @State private var relativeTitle = "Relative"
-    @State private var absoluteTitle = "Absolute ✓"
     @State private var logModeTitle = "No logging ✓"
     @State private var mouseHideTitle = "Auto-hide in Control Mode"
     @State private var pasteBehaviorTitle = "Ask Every Time"
@@ -113,6 +111,8 @@ struct openterfaceApp: App {
                     .toolbar {
                         ToolbarItemGroup(placement: .automatic) {
                             Button {
+                                logger.log(content: "🎹 Floating keyboard button pressed")
+                                print("🎹 DEBUG: Floating keyboard button pressed") // Additional debug
                                 floatingKeyboardManager.showFloatingKeysWindow()
                             } label: {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
@@ -397,21 +397,21 @@ struct openterfaceApp: App {
                 }
                 Menu("Mouse Mode"){
                     Button(action: {
-                        relativeTitle = "Relative ✓"
-                        absoluteTitle = "Absolute"
+                        appState.relativeTitle = "Relative ✓"
+                        appState.absoluteTitle = "Absolute"
                         UserSettings.shared.MouseControl = .relative
                         NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
                         NSCursor.hide()
                     }) {
-                        Text(relativeTitle)
+                        Text(appState.relativeTitle)
                     }
                     Button(action: {
-                        relativeTitle = "Relative"
-                        absoluteTitle = "Absolute ✓"
+                        appState.relativeTitle = "Relative"
+                        appState.absoluteTitle = "Absolute ✓"
                         UserSettings.shared.MouseControl = .absolute
                         NSCursor.unhide()
                     }) {
-                        Text(absoluteTitle)
+                        Text(appState.absoluteTitle)
                     }
                 }                         
                 Menu("Audio Control") {
@@ -688,19 +688,27 @@ struct openterfaceApp: App {
     }
     
     func handleSwitchToggle(isOn: Bool) {
+        logger.log(content: "🔄 USB switch toggle called: \(isOn ? "Target" : "Host")")
+        print("🔄 DEBUG: USB switch toggle called: \(isOn ? "Target" : "Host")") // Additional debug
+        
         if isOn {
+            logger.log(content: "Setting USB to Target")
             hidManager.setUSBtoTarget()
         } else {
+            logger.log(content: "Setting USB to Host")
             hidManager.setUSBtoHost()
         }
         
         // update AppStatus
         AppStatus.isSwitchToggleOn = isOn
+        logger.log(content: "Updated AppStatus.isSwitchToggleOn to: \(isOn)")
         
         let ser = serialPortManager
+        logger.log(content: "Raising DTR signal")
         ser.raiseDTR()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            self.logger.log(content: "Lowering DTR signal")
             ser.lowerDTR()
         }
     }
@@ -727,21 +735,66 @@ struct openterfaceApp: App {
 final class AppState: ObservableObject {
     private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
     
+    // Published properties for menu titles
+    @Published var relativeTitle = "Relative"
+    @Published var absoluteTitle = "Absolute ✓"
+    
     init() {
         KeyboardShortcuts.onKeyUp(for: .exitRelativeMode) {
-            // TODO: exitRelativeMode
             self.logger.log(content: "Exit Relative Mode...")
+            // Only exit if currently in relative mode
+            if UserSettings.shared.MouseControl == .relative {
+                UserSettings.shared.MouseControl = .absolute
+                NSCursor.unhide()
+                // Update menu titles to reflect the change
+                self.relativeTitle = "Relative"
+                self.absoluteTitle = "Absolute ✓"
+                self.logger.log(content: "Switched from relative to absolute mouse mode")
+            }
         }
         
         KeyboardShortcuts.onKeyUp(for: .exitFullScreenMode) {
-            // TODO: exitFullScreenMode
             self.logger.log(content: "Exit FullScreen Mode...")
-            // Exit full screen
-            if let window = NSApp.windows.first {
+            
+            // Try to find the main window first
+            var targetWindow: NSWindow?
+            
+            // Option 1: Use NSApplication.shared.mainWindow
+            if let mainWindow = NSApplication.shared.mainWindow {
+                targetWindow = mainWindow
+                self.logger.log(content: "Found main window for full screen exit")
+            }
+            // Option 2: Look for window with main window identifier
+            else if let mainWindow = NSApp.windows.first(where: { 
+                $0.identifier?.rawValue.contains(UserSettings.shared.mainWindownName) == true 
+            }) {
+                targetWindow = mainWindow
+                self.logger.log(content: "Found main window by identifier for full screen exit")
+            }
+            // Option 3: Use key window
+            else if let keyWindow = NSApp.keyWindow {
+                targetWindow = keyWindow
+                self.logger.log(content: "Using key window for full screen exit")
+            }
+            // Option 4: Use first window
+            else if let firstWindow = NSApp.windows.first {
+                targetWindow = firstWindow
+                self.logger.log(content: "Using first available window for full screen exit")
+            }
+            
+            // Exit full screen if we found a window and it's in full screen mode
+            if let window = targetWindow {
                 let isFullScreen = window.styleMask.contains(.fullScreen)
+                self.logger.log(content: "Window full screen status: \(isFullScreen)")
+                
                 if isFullScreen {
                     window.toggleFullScreen(nil)
+                    self.logger.log(content: "Successfully triggered full screen exit")
+                } else {
+                    self.logger.log(content: "Window is not in full screen mode")
                 }
+            } else {
+                self.logger.log(content: "No suitable window found for full screen exit")
             }
         }
         
@@ -750,6 +803,44 @@ final class AppState: ObservableObject {
                 let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
                 ocrManager.startAreaSelection()
             }
+        }
+        
+        KeyboardShortcuts.onKeyUp(for: .toggleUSBSwitch) {
+            self.logger.log(content: "USB Switch Toggle shortcut triggered")
+            
+            // Get current toggle state and flip it
+            let currentState = AppStatus.isSwitchToggleOn
+            let newState = !currentState
+            
+            // Update the global app state 
+            AppStatus.isSwitchToggleOn = newState
+            
+            // Trigger the same logic as the UI toggle
+            let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+            let serialPortManager = DependencyContainer.shared.resolve(SerialPortManagerProtocol.self)
+            
+            if newState {
+                self.logger.log(content: "Shortcut: Setting USB to Target")
+                hidManager.setUSBtoTarget()
+            } else {
+                self.logger.log(content: "Shortcut: Setting USB to Host")
+                hidManager.setUSBtoHost()
+            }
+            
+            // Raise and lower DTR signal
+            self.logger.log(content: "Shortcut: Raising DTR signal")
+            serialPortManager.raiseDTR()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                self.logger.log(content: "Shortcut: Lowering DTR signal")
+                serialPortManager.lowerDTR()
+            }
+        }
+        
+        KeyboardShortcuts.onKeyUp(for: .toggleFloatingKeyboard) {
+            self.logger.log(content: "Show Floating Keyboard shortcut triggered")
+            let floatingKeyboardManager = DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self)
+            floatingKeyboardManager.showFloatingKeysWindow()
         }
     }
 }

@@ -204,10 +204,12 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func setUSBtoHost() {
+        logger.log(content: "🔄 HIDManager.setUSBtoHost() called - sending host report")
         self.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
     }
     
     func setUSBtoTarget() {
+        logger.log(content: "🔄 HIDManager.setUSBtoTarget() called - sending target report")
         self.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
     }
     

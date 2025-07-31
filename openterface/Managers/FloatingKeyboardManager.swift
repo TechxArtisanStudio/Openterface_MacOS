@@ -27,6 +27,7 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
     private var floatingKeyboardWindow: NSWindow?
     private var mainWindowObserver: NSObjectProtocol?
     private var focusLostObserver: NSObjectProtocol?
+    private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
 
     public init() {
         setupMainWindowObserver()
@@ -72,12 +73,17 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
     }
 
     public func showFloatingKeysWindow() {
+        logger.log(content: "🎹 FloatingKeyboardManager.showFloatingKeysWindow() called")
+        
         if let existingWindow = floatingKeyboardWindow {
+            logger.log(content: "Existing floating keyboard window found, bringing to front")
             existingWindow.makeKeyAndOrderFront(nil)
             return
         }
 
+        logger.log(content: "Creating new floating keyboard window")
         let floatingKeysView = FloatingKeysWindow(onClose: { [weak self] in
+            self?.logger.log(content: "Floating keyboard window close callback triggered")
             self?.closeFloatingKeysWindow()
         })
         let controller = NSHostingController(rootView: floatingKeysView)
@@ -91,12 +97,16 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
         window.isOpaque = false
         window.hasShadow = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        
+        logger.log(content: "Making floating keyboard window key and ordering front")
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
         floatingKeyboardWindow = window
+        logger.log(content: "Floating keyboard window created and stored")
 
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { [weak self] _ in
+            self?.logger.log(content: "Floating keyboard window will close notification received")
             self?.floatingKeyboardWindow = nil
         }
     }
