@@ -36,6 +36,10 @@ final class UserSettings: ObservableObject {
         
         // Load audio enabled preference from UserDefaults
         self.isAudioEnabled = UserDefaults.standard.object(forKey: "isAudioEnabled") as? Bool ?? false
+        
+        // Load keyboard layout preference from UserDefaults
+        let savedKeyboardLayout = UserDefaults.standard.string(forKey: "keyboardLayout")
+        self.keyboardLayout = KeyboardLayout(rawValue: savedKeyboardLayout ?? "") ?? .mac
     }
     @Published var isSerialOutput: Bool
     @Published var MouseControl:MouseControlMode
@@ -57,6 +61,13 @@ final class UserSettings: ObservableObject {
     @Published var isAudioEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isAudioEnabled, forKey: "isAudioEnabled")
+        }
+    }
+    
+    // Keyboard layout preference persistence
+    @Published var keyboardLayout: KeyboardLayout {
+        didSet {
+            UserDefaults.standard.set(keyboardLayout.rawValue, forKey: "keyboardLayout")
         }
     }
     
@@ -98,6 +109,30 @@ enum PasteBehavior: String, CaseIterable {
             return "Paste text to Target"
         case .alwaysPassToTarget:
             return "Pass events to Target"
+        }
+    }
+}
+
+// Keyboard layout enumeration
+enum KeyboardLayout: String, CaseIterable {
+    case windows = "windows"
+    case mac = "mac"
+    
+    var displayName: String {
+        switch self {
+        case .windows:
+            return "Windows Mode"
+        case .mac:
+            return "Mac Mode"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .windows:
+            return "Optimized for Windows targets"
+        case .mac:
+            return "Optimized for Mac targets"
         }
     }
 }
