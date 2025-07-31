@@ -129,6 +129,7 @@ struct SettingsScreen: View {
 // MARK: - Enhanced Key Mapping Settings
 struct KeyMappingSettingsView: View {
     @ObservedObject private var keyboardManager = KeyboardManager.shared
+    @ObservedObject private var userSettings = UserSettings.shared
     @State private var selectedSpecialKey: KeyboardMapper.SpecialKey?
     @State private var showingKeyTestDialog = false
     
@@ -150,7 +151,6 @@ struct KeyMappingSettingsView: View {
                         KeyboardShortcuts.Recorder("Exit relative mouse mode", name: .exitRelativeMode)
                         KeyboardShortcuts.Recorder("Trigger OCR text selection", name: .triggerAreaOCR)
                         KeyboardShortcuts.Recorder("Toggle USB switching", name: .toggleUSBSwitch)
-                        KeyboardShortcuts.Recorder("Quick firmware update", name: .openFirmwareUpdate)
                         KeyboardShortcuts.Recorder("Show floating keyboard", name: .toggleFloatingKeyboard)
                     }
                 }
@@ -162,9 +162,9 @@ struct KeyMappingSettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Layout mode:")
-                        Picker("", selection: $keyboardManager.currentKeyboardLayout) {
-                            ForEach(KeyboardManager.KeyboardLayout.allCases, id: \.self) { layout in
-                                Text(layout.rawValue.capitalized).tag(layout)
+                        Picker("", selection: $userSettings.keyboardLayout) {
+                            ForEach(KeyboardLayout.allCases, id: \.self) { layout in
+                                Text(layout.displayName).tag(layout)
                             }
                         }
                         .pickerStyle(SegmentedPickerStyle())
@@ -181,9 +181,37 @@ struct KeyMappingSettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Text("Windows mode maps Cmd → Ctrl, Mac mode preserves key meanings")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Replace this section with more detailed mapping information
+                    VStack(alignment: .leading, spacing: 4) {
+                        if userSettings.keyboardLayout == .windows {
+                            Text("Windows Mode Key Mapping:")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("• Cmd (⌘) → Ctrl")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("• Option (⌥) → Alt")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("• Control (⌃) → Win Key")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("Mac Mode Key Mapping:")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("• Cmd (⌘) → Cmd (⌘)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("• Option (⌥) → Option (⌥)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("• Control (⌃) → Control (⌃)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
                 .padding(.vertical, 8)
             }
@@ -206,38 +234,6 @@ struct KeyMappingSettingsView: View {
                         SpecialKeyButton(key: .F12, label: "F12")
                         SpecialKeyButton(key: .windowsWin, label: "Win Key")
                     }
-                }
-                .padding(.vertical, 8)
-            }
-            
-            // Real-time Modifier Key Status
-            GroupBox("Live Modifier Key Status") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Real-time status of modifier keys being tracked")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {
-                        ModifierKeyStatus(name: "L-Shift", isActive: keyboardManager.isLeftShiftHeld)
-                        ModifierKeyStatus(name: "R-Shift", isActive: keyboardManager.isRightShiftHeld)
-                        ModifierKeyStatus(name: "L-Ctrl", isActive: keyboardManager.isLeftCtrlHeld)
-                        ModifierKeyStatus(name: "R-Ctrl", isActive: keyboardManager.isRightCtrlHeld)
-                        ModifierKeyStatus(name: "L-Alt", isActive: keyboardManager.isLeftAltHeld)
-                        ModifierKeyStatus(name: "R-Alt", isActive: keyboardManager.isRightAltHeld)
-                        ModifierKeyStatus(name: "Caps Lock", isActive: keyboardManager.isCapsLockOn)
-                        ModifierKeyStatus(name: "Uppercase", isActive: keyboardManager.shouldShowUppercase)
-                    }
-                    
-                    HStack {
-                        Text("Case behavior:")
-                        Text(keyboardManager.shouldShowUppercase ? "UPPERCASE" : "lowercase")
-                            .font(.system(.caption, design: .monospaced))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(keyboardManager.shouldShowUppercase ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
-                            .cornerRadius(4)
-                    }
-                    .font(.caption)
                 }
                 .padding(.vertical, 8)
             }
@@ -435,6 +431,14 @@ struct KeyMacrosSettingsView: View {
             EnhancedMacroCreatorDialog { macro in
                 savedMacros.append(macro)
             }
+            .onAppear {
+                // Set window identifier for keyboard manager to recognize this dialog
+                DispatchQueue.main.async {
+                    if let window = NSApp.keyWindow {
+                        window.identifier = NSUserInterfaceItemIdentifier("macroCreatorDialog")
+                    }
+                }
+            }
         }
     }
     
@@ -442,14 +446,107 @@ struct KeyMacrosSettingsView: View {
         for input in macro.sequence {
             switch input.key {
             case .keyboardMapperSpecialKey(let specialKey):
-                KeyboardManager.shared.sendSpecialKeyToKeyboard(code: specialKey)
+                // Handle standalone modifier keys specially for macro execution
+                if isModifierKey(specialKey) && input.modifiers.isEmpty {
+                    executeStandaloneModifierKey(specialKey)
+                } else {
+                    KeyboardManager.shared.sendSpecialKeyToKeyboard(code: specialKey)
+                }
             case .character(let char):
-                KeyboardManager.shared.sendTextToKeyboard(text: String(char))
-            case .specialKey(_):
-                // Handle enhanced special keys if needed
-                break
+                // For character inputs with modifiers, we need to handle them properly
+                if !input.modifiers.isEmpty {
+                    executeCharacterWithModifiers(char, modifiers: input.modifiers)
+                } else {
+                    KeyboardManager.shared.sendTextToKeyboard(text: String(char))
+                }
+            case .specialKey(let specialKey):
+                // Handle enhanced special keys with their modifiers
+                executeSpecialKeyWithModifiers(specialKey, modifiers: input.modifiers)
             }
             Thread.sleep(forTimeInterval: 0.05) // Small delay between keys
+        }
+    }
+    
+    private func executeCharacterWithModifiers(_ char: Character, modifiers: NSEvent.ModifierFlags) {
+        let keyboardManager = KeyboardManager.shared
+        let kbm = keyboardManager.kbm
+        
+        // Convert character to key code
+        let charCode = String(char).utf16.first ?? 0
+        let keyCode = kbm.fromCharToKeyCode(char: charCode)
+        
+        // Press the key with modifiers
+        kbm.pressKey(keys: [UInt16(keyCode)], modifiers: modifiers)
+        Thread.sleep(forTimeInterval: 0.01) // Short press duration
+        
+        // Release the key
+        kbm.releaseKey(keys: [UInt16(keyCode)])
+        Thread.sleep(forTimeInterval: 0.01) // Brief pause after release
+    }
+    
+    private func executeSpecialKeyWithModifiers(_ specialKey: EnhancedSpecialKey, modifiers: NSEvent.ModifierFlags) {
+        let keyboardManager = KeyboardManager.shared
+        let kbm = keyboardManager.kbm
+        
+        // Map Enhanced special keys to key codes
+        var keyCode: UInt16?
+        switch specialKey {
+        case .enter: keyCode = 36
+        case .tab: keyCode = 48
+        case .escape: keyCode = 53
+        case .space: keyCode = 49
+        case .backspace: keyCode = 51
+        case .delete: keyCode = 117
+        case .arrowUp: keyCode = 126
+        case .arrowDown: keyCode = 125
+        case .arrowLeft: keyCode = 123
+        case .arrowRight: keyCode = 124
+        case .f1: keyCode = 122
+        case .f2: keyCode = 120
+        case .f3: keyCode = 99
+        case .f4: keyCode = 118
+        case .f5: keyCode = 96
+        case .f6: keyCode = 97
+        case .f7: keyCode = 98
+        case .f8: keyCode = 100
+        case .f9: keyCode = 101
+        case .f10: keyCode = 109
+        case .f11: keyCode = 103
+        case .f12: keyCode = 111
+        case .ctrlAltDel: keyCode = nil // Special combination, handle separately
+        case .c: keyCode = 8 // 'c' key
+        case .v: keyCode = 9 // 'v' key  
+        case .s: keyCode = 1 // 's' key
+        }
+        
+        if let code = keyCode {
+            // Press the key with modifiers
+            kbm.pressKey(keys: [code], modifiers: modifiers)
+            Thread.sleep(forTimeInterval: 0.01) // Short press duration
+            
+            // Release the key
+            kbm.releaseKey(keys: [code])
+            Thread.sleep(forTimeInterval: 0.01) // Brief pause after release
+        }
+    }
+    
+    private func isModifierKey(_ key: KeyboardMapper.SpecialKey) -> Bool {
+        return [.leftShift, .rightShift, .leftCtrl, .rightCtrl, .leftAlt, .rightAlt, .win].contains(key)
+    }
+    
+    private func executeStandaloneModifierKey(_ key: KeyboardMapper.SpecialKey) {
+        // For standalone modifier keys in macros, we want to press and immediately release
+        let keyboardManager = KeyboardManager.shared
+        
+        // Get the key code for the modifier
+        if let keyCode = keyboardManager.kbm.fromSpecialKeyToKeyCode(code: key) {
+            // Press the modifier key
+            keyboardManager.kbm.pressKey(keys: [keyCode], modifiers: [])
+            Thread.sleep(forTimeInterval: 0.01) // Short press duration
+            
+            // Release the modifier key specifically
+            keyboardManager.kbm.releaseKey(keys: [keyCode])
+            Thread.sleep(forTimeInterval: 0.01) // Brief pause after release
         }
     }
 }
@@ -516,6 +613,10 @@ struct EnhancedMacroCreatorDialog: View {
     @State private var macroName = ""
     @State private var recordedKeys: [EnhancedKeyboardInput] = []
     @State private var isRecording = false
+    @State private var keyEventMonitor: Any?
+    @State private var currentRecordingText = "Press keys to record..."
+    @State private var lastModifierFlags: NSEvent.ModifierFlags = []
+    @State private var modifierKeyPressed = false // Track if any regular key was pressed with modifiers
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -523,17 +624,51 @@ struct EnhancedMacroCreatorDialog: View {
             Text("Create Keyboard Macro")
                 .font(.headline)
             
+            Text("Create custom key sequences for repeated tasks. Click 'Start Recording', then press the keys you want to include in your macro.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
             TextField("Macro name", text: $macroName)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
+                .disabled(isRecording)
             
-            VStack {
+            VStack(spacing: 8) {
                 Text("Recorded sequence: \(recordedKeys.count) keys")
                     .font(.caption)
                 
+                if isRecording {
+                    Text(currentRecordingText)
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .italic()
+                }
+                
+                // Display recorded keys preview
+                if !recordedKeys.isEmpty {
+                    ScrollView {
+                        Text(getRecordedKeysPreview())
+                            .font(.system(.caption, design: .monospaced))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(4)
+                    }
+                    .frame(maxHeight: 60)
+                }
+                
                 Button(isRecording ? "Stop Recording" : "Start Recording") {
-                    isRecording.toggle()
+                    toggleRecording()
                 }
                 .foregroundColor(isRecording ? .red : .blue)
+                
+                if !recordedKeys.isEmpty && !isRecording {
+                    Button("Clear Recording") {
+                        recordedKeys.removeAll()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                }
             }
             
             HStack {
@@ -544,15 +679,249 @@ struct EnhancedMacroCreatorDialog: View {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
-                .disabled(macroName.isEmpty || recordedKeys.isEmpty)
+                .disabled(macroName.isEmpty || recordedKeys.isEmpty || isRecording)
                 
                 Button("Cancel") {
+                    stopRecording()
                     presentationMode.wrappedValue.dismiss()
                 }
             }
         }
         .padding()
-        .frame(width: 400, height: 250)
+        .frame(width: 450, height: 350)
+        .onDisappear {
+            stopRecording()
+        }
+    }
+    
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+    
+    private func startRecording() {
+        isRecording = true
+        currentRecordingText = "Recording... Press ESC to stop"
+        lastModifierFlags = [] // Initialize modifier state
+        modifierKeyPressed = false // Reset the flag
+        
+        // Start monitoring keyboard events for both key presses and modifier changes
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+            if event.type == .keyDown {
+                self.handleKeyEvent(event)
+            } else if event.type == .flagsChanged {
+                self.handleModifierEvent(event)
+            }
+            return nil // Consume the event to prevent it from being processed elsewhere
+        }
+    }
+    
+    private func stopRecording() {
+        if let monitor = keyEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyEventMonitor = nil
+        }
+        isRecording = false
+        currentRecordingText = "Press keys to record..."
+        lastModifierFlags = [] // Reset modifier state
+        modifierKeyPressed = false // Reset the flag
+    }
+    
+    private func handleKeyEvent(_ event: NSEvent) {
+        // Stop recording if ESC is pressed
+        if event.keyCode == 53 { // ESC key
+            stopRecording()
+            return
+        }
+        
+        let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        
+        // Mark that a regular key was pressed (not just modifiers)
+        modifierKeyPressed = true
+        
+        // Convert the key event to our EnhancedKeyboardInput format
+        if let characters = event.characters, !characters.isEmpty {
+            let char = characters.first!
+            
+            // Check if this is a special key that should be recorded as such
+            if let specialKey = keyCodeToSpecialKey(event.keyCode) {
+                let input = EnhancedKeyboardInput(
+                    key: .specialKey(specialKey),
+                    modifiers: modifiers
+                )
+                recordedKeys.append(input)
+                currentRecordingText = "Recorded: \(getKeyDescription(input))"
+            } else if char.isPrintable || char == " " || char == "\t" || char == "\n" {
+                // Record as character input
+                let input = EnhancedKeyboardInput(
+                    key: .character(char),
+                    modifiers: modifiers
+                )
+                recordedKeys.append(input)
+                currentRecordingText = "Recorded: \(getKeyDescription(input))"
+            } else {
+                // Try to map to KeyboardMapper.SpecialKey
+                if let kbSpecialKey = keyCodeToKeyboardMapperSpecialKey(event.keyCode) {
+                    let input = EnhancedKeyboardInput(
+                        key: .keyboardMapperSpecialKey(kbSpecialKey),
+                        modifiers: modifiers
+                    )
+                    recordedKeys.append(input)
+                    currentRecordingText = "Recorded: \(getKeyDescription(input))"
+                }
+            }
+        }
+    }
+    
+    private func keyCodeToSpecialKey(_ keyCode: UInt16) -> EnhancedSpecialKey? {
+        switch keyCode {
+        case 36: return .enter
+        case 48: return .tab
+        case 53: return .escape
+        case 49: return .space
+        case 51: return .backspace
+        case 117: return .delete
+        case 126: return .arrowUp
+        case 125: return .arrowDown
+        case 123: return .arrowLeft
+        case 124: return .arrowRight
+        case 122: return .f1
+        case 120: return .f2
+        case 99: return .f3
+        case 118: return .f4
+        case 96: return .f5
+        case 97: return .f6
+        case 98: return .f7
+        case 100: return .f8
+        case 101: return .f9
+        case 109: return .f10
+        case 103: return .f11
+        case 111: return .f12
+        default: return nil
+        }
+    }
+    
+    private func keyCodeToKeyboardMapperSpecialKey(_ keyCode: UInt16) -> KeyboardMapper.SpecialKey? {
+        switch keyCode {
+        case 122: return .F1
+        case 120: return .F2
+        case 99: return .F3
+        case 118: return .F4
+        case 96: return .F5
+        case 97: return .F6
+        case 98: return .F7
+        case 100: return .F8
+        case 101: return .F9
+        case 109: return .F10
+        case 103: return .F11
+        case 111: return .F12
+        case 53: return .esc
+        case 49: return .space
+        case 36: return .enter
+        case 48: return .tab
+        case 51: return .backspace
+        case 117: return .delete
+        case 126: return .arrowUp
+        case 125: return .arrowDown
+        case 123: return .arrowLeft
+        case 124: return .arrowRight
+        default: return nil
+        }
+    }
+    
+    private func handleModifierEvent(_ event: NSEvent) {
+        let currentModifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        let previousModifiers = lastModifierFlags.intersection([.shift, .control, .option, .command])
+        
+        // Check which modifiers were released (removed)
+        let releasedModifiers = previousModifiers.subtracting(currentModifiers)
+        
+        // Count how many modifiers were released by checking each flag
+        let releasedCount = [releasedModifiers.contains(.shift), 
+                           releasedModifiers.contains(.control),
+                           releasedModifiers.contains(.option), 
+                           releasedModifiers.contains(.command)].filter { $0 }.count
+        
+        // Only record standalone modifier keys when:
+        // 1. All modifiers are released (currentModifiers.isEmpty)
+        // 2. No regular key was pressed while modifiers were held (!modifierKeyPressed)
+        // 3. Only one modifier was being held (releasedCount == 1)
+        if !releasedModifiers.isEmpty && currentModifiers.isEmpty && !modifierKeyPressed && releasedCount == 1 {
+            if releasedModifiers.contains(.shift) {
+                let input = EnhancedKeyboardInput(
+                    key: .keyboardMapperSpecialKey(.leftShift),
+                    modifiers: []
+                )
+                recordedKeys.append(input)
+                currentRecordingText = "Recorded: Shift (standalone)"
+            } else if releasedModifiers.contains(.control) {
+                let input = EnhancedKeyboardInput(
+                    key: .keyboardMapperSpecialKey(.leftCtrl),
+                    modifiers: []
+                )
+                recordedKeys.append(input)
+                currentRecordingText = "Recorded: Ctrl (standalone)"
+            } else if releasedModifiers.contains(.option) {
+                let input = EnhancedKeyboardInput(
+                    key: .keyboardMapperSpecialKey(.leftAlt),
+                    modifiers: []
+                )
+                recordedKeys.append(input)
+                currentRecordingText = "Recorded: Alt (standalone)"
+            } else if releasedModifiers.contains(.command) {
+                let input = EnhancedKeyboardInput(
+                    key: .keyboardMapperSpecialKey(.win),
+                    modifiers: []
+                )
+                recordedKeys.append(input)
+                currentRecordingText = "Recorded: Cmd (standalone)"
+            }
+        }
+        
+        // Reset the flag when all modifiers are released
+        if currentModifiers.isEmpty {
+            modifierKeyPressed = false
+        }
+        
+        // Update the last modifier state
+        lastModifierFlags = event.modifierFlags
+    }
+    
+    private func getKeyDescription(_ input: EnhancedKeyboardInput) -> String {
+        var description = ""
+        
+        // Add modifiers
+        if input.modifiers.contains(.control) { description += "Ctrl+" }
+        if input.modifiers.contains(.option) { description += "Alt+" }
+        if input.modifiers.contains(.command) { description += "Cmd+" }
+        if input.modifiers.contains(.shift) { description += "Shift+" }
+        
+        // Add key
+        switch input.key {
+        case .character(let char):
+            if char == " " {
+                description += "Space"
+            } else if char == "\t" {
+                description += "Tab"
+            } else if char == "\n" {
+                description += "Enter"
+            } else {
+                description += String(char).uppercased()
+            }
+        case .specialKey(let special):
+            description += special.rawValue.capitalized
+        case .keyboardMapperSpecialKey(let kbSpecial):
+            description += kbSpecial.rawValue.uppercased()
+        }
+        
+        return description
+    }
+    
+    private func getRecordedKeysPreview() -> String {
+        return recordedKeys.map { getKeyDescription($0) }.joined(separator: " → ")
     }
 }
 
@@ -1285,20 +1654,21 @@ extension KeyboardShortcuts.Name {
 }
 
 // MARK: - Additional Protocol Definitions for Enhanced Key Mapping
-enum EnhancedSpecialKey {
-    case enter
-    case tab
-    case escape
-    case space
-    case delete
-    case backspace
-    case arrowUp
-    case arrowDown
-    case arrowLeft
-    case arrowRight
-    case f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12
-    case ctrlAltDel
-    case c, v, s
+enum EnhancedSpecialKey: String {
+    case enter = "enter"
+    case tab = "tab"
+    case escape = "escape"
+    case space = "space"
+    case delete = "delete"
+    case backspace = "backspace"
+    case arrowUp = "arrowUp"
+    case arrowDown = "arrowDown"
+    case arrowLeft = "arrowLeft"
+    case arrowRight = "arrowRight"
+    case f1 = "f1", f2 = "f2", f3 = "f3", f4 = "f4", f5 = "f5", f6 = "f6"
+    case f7 = "f7", f8 = "f8", f9 = "f9", f10 = "f10", f11 = "f11", f12 = "f12"
+    case ctrlAltDel = "ctrlAltDel"
+    case c = "c", v = "v", s = "s"
 }
 
 struct EnhancedKeyboardInput {
@@ -1320,4 +1690,16 @@ struct EnhancedKeyboardMacro {
 // MARK: - Notification Extensions
 extension Notification.Name {
     static let ocrComplete = Notification.Name("ocrComplete")
+}
+
+// MARK: - Character Extensions
+extension Character {
+    var isPrintable: Bool {
+        return unicodeScalars.allSatisfy { scalar in
+            CharacterSet.alphanumerics.contains(scalar) ||
+            CharacterSet.punctuationCharacters.contains(scalar) ||
+            CharacterSet.symbols.contains(scalar) ||
+            scalar == UnicodeScalar(" ")
+        }
+    }
 }

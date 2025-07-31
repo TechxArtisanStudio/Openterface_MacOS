@@ -62,7 +62,6 @@ final class WindowUtils {
         
         // Special case for 4096x2160 resolution
         if currentResolution == 4096.0 / 2160.0 {
-            logger.log(content: "Detected special resolution 4096x2160, setting aspect ratio to 9:5")
             currentResolution = 1.8 // Set to 9:5 aspect ratio
         }
 
@@ -70,8 +69,6 @@ final class WindowUtils {
         // Add all preset ratio options
         for option in AspectRatioOption.allCases {
             var title = option.rawValue
-            logger.log(content: "Adding aspect ratio option: \(title) with ratio \(option.widthToHeightRatio)")
-            logger.log(content: "Current resolution ratio: \(currentResolution)")
             if Float(CGFloat(option.widthToHeightRatio)) == Float(currentResolution) {
                 title += " (Input Resolution)"
             }
@@ -107,10 +104,6 @@ final class WindowUtils {
                 
                 // Save user's choice for HID resolution change alerts
                 UserSettings.shared.doNotShowHidResolutionAlert = (showHidAlertCheckbox.state == .off)
-                
-                // Log settings changes
-                logger.log(content: "User selected aspect ratio: \(UserSettings.shared.customAspectRatio.rawValue)")
-                logger.log(content: "User \(UserSettings.shared.doNotShowHidResolutionAlert ? "disabled" : "enabled") HID resolution change alerts")
                 
                 // Notify caller to update window size
                 completion(true)
