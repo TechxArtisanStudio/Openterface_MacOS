@@ -246,6 +246,11 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     
     private func passThroughToHost() {
         logger.log(content: "📋 Passing paste event to host system")
+        
+        // Release any held modifier keys before passing through to ensure clean operation
+        let keyboardManager = DependencyContainer.shared.resolve(KeyboardManagerProtocol.self)
+        keyboardManager.releaseAllModifierKeysForPaste()
+        
         // Let the system handle the paste normally
         // This essentially does nothing, allowing the natural paste to occur
         DispatchQueue.main.async {
@@ -255,7 +260,7 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     }
     
     private func performPaste(content: String) {
-        logger.log(content: "📋 Performing paste text to target: \(content.prefix(50))...")
+        logger.log(content: "📋 Performing Host Paste: \(content.prefix(50))...")
         let keyboardManager = DependencyContainer.shared.resolve(KeyboardManagerProtocol.self)
         keyboardManager.sendTextToKeyboard(text: content)
         

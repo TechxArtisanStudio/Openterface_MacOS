@@ -757,8 +757,62 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         return modifiers
     }
     
+    // MARK: - Modifier Key Release for Paste Operations
+    
+    /// Releases all currently held modifier keys to ensure clean paste operations
+    private func releaseAllModifierKeys() {
+        logger.log(content: "🔓 Releasing all modifier keys before paste operation")
+        
+        // Release all currently held modifier keys
+        if isLeftShiftHeld {
+            releaseAndUpdateModifierKey(keyCode: 56, isHeld: &isLeftShiftHeld, logMessage: "Released left shift for paste")
+        }
+        if isRightShiftHeld {
+            releaseAndUpdateModifierKey(keyCode: 60, isHeld: &isRightShiftHeld, logMessage: "Released right shift for paste")
+        }
+        if isLeftCtrlHeld {
+            let leftCtrlRemapped = getRemappedKeyCode(sourceKey: 59, sourceModifier: .control, isLeft: true)
+            releaseAndUpdateModifierKey(keyCode: leftCtrlRemapped, isHeld: &isLeftCtrlHeld, logMessage: "Released left ctrl for paste")
+        }
+        if isRightCtrlHeld {
+            let rightCtrlRemapped = getRemappedKeyCode(sourceKey: 62, sourceModifier: .control, isLeft: false)
+            releaseAndUpdateModifierKey(keyCode: rightCtrlRemapped, isHeld: &isRightCtrlHeld, logMessage: "Released right ctrl for paste")
+        }
+        if isLeftAltHeld {
+            let leftAltRemapped = getRemappedKeyCode(sourceKey: 58, sourceModifier: .option, isLeft: true)
+            releaseAndUpdateModifierKey(keyCode: leftAltRemapped, isHeld: &isLeftAltHeld, logMessage: "Released left alt for paste")
+        }
+        if isRightAltHeld {
+            let rightAltRemapped = getRemappedKeyCode(sourceKey: 61, sourceModifier: .option, isLeft: false)
+            releaseAndUpdateModifierKey(keyCode: rightAltRemapped, isHeld: &isRightAltHeld, logMessage: "Released right alt for paste")
+        }
+        
+        // Release command keys if they're being held (they don't have state variables but might be in pressedKeys)
+        let leftCmdRemapped = getRemappedKeyCode(sourceKey: 55, sourceModifier: .command, isLeft: true)
+        let rightCmdRemapped = getRemappedKeyCode(sourceKey: 54, sourceModifier: .command, isLeft: false)
+        
+        if pressedKeys.contains(leftCmdRemapped) {
+            releaseAndUpdateModifierKeyWithoutState(keyCode: leftCmdRemapped, logMessage: "Released left command for paste")
+        }
+        if pressedKeys.contains(rightCmdRemapped) {
+            releaseAndUpdateModifierKeyWithoutState(keyCode: rightCmdRemapped, logMessage: "Released right command for paste")
+        }
+        
+        // Send a general key release to ensure all modifiers are cleared on the target
+        kbm.releaseKey(keys: pressedKeys)
+        
+        // Small delay to ensure the release events are processed
+        Thread.sleep(forTimeInterval: 0.01)
+        
+        logger.log(content: "✅ All modifier keys released, ready for paste operation")
+    }
+
     func sendTextToKeyboard(text:String) {
         logger.log(content: "Sending text to keyboard: \(text)")
+        
+        // Release all modifier keys before starting paste operation
+        releaseAllModifierKeys()
+        
         // Send text to keyboard
         let textArray = Array(text.utf8) // Convert string to UTF-8 byte array
         for charString in textArray { // Iterate through each character's UTF-8 encoding
@@ -835,5 +889,10 @@ extension KeyboardManager {
             sendKeyboardInput(input)
             Thread.sleep(forTimeInterval: 0.01) // Small delay between keys
         }
+    }
+    
+    func releaseAllModifierKeysForPaste() {
+        // Call the private implementation method
+        releaseAllModifierKeys()
     }
 }

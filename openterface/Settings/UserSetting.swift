@@ -95,9 +95,9 @@ enum PasteBehavior: String, CaseIterable {
         case .askEveryTime:
             return "Ask Every Time"
         case .alwaysPasteToTarget:
-            return "Always Paste text to Target"
+            return "Always Host Paste"
         case .alwaysPassToTarget:
-            return "Always Pass events to Target"
+            return "Always Local Paste"
         }
     }
     
@@ -106,9 +106,9 @@ enum PasteBehavior: String, CaseIterable {
         case .askEveryTime:
             return "Ask Every Time"
         case .alwaysPasteToTarget:
-            return "Paste text to Target"
+            return "Host Paste"
         case .alwaysPassToTarget:
-            return "Pass events to Target"
+            return "Local Paste"
         }
     }
 }
