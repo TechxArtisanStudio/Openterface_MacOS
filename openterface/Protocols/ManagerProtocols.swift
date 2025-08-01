@@ -276,6 +276,13 @@ protocol CameraManagerProtocol: AnyObject {
     func updateStatus()
 }
 
+/// Protocol for permission management
+protocol PermissionManagerProtocol: AnyObject {
+    func isAccessibilityPermissionGranted() -> Bool
+    func requestAccessibilityPermission()
+    func showPermissionStatus()
+}
+
 // MARK: - Supporting Types
 
 enum LogLevel {

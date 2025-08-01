@@ -170,7 +170,7 @@ class PlayerView: NSView, NSWindowDelegate {
     
     override func mouseDown(with event: NSEvent) {
         handleMouseMovement(with: event, mouseEvent: 0x01)
-        if UserSettings.shared.MouseControl == .relative {
+        if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
             AppStatus.isFouceWindow = true
             NSCursor.hide()
         }
@@ -247,7 +247,7 @@ class PlayerView: NSView, NSWindowDelegate {
     }
 
     private func handleMouseMovement(with event: NSEvent, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
-        if UserSettings.shared.MouseControl == .relative {
+        if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
             let deltaX = Int(event.deltaX)
             let deltaY = Int(event.deltaY)
             let mouseLocation = convert(event.locationInWindow, from: nil)
@@ -315,7 +315,7 @@ class PlayerView: NSView, NSWindowDelegate {
             NSCursor.unhide()
         }
 
-        if UserSettings.shared.MouseControl == .relative && AppStatus.isFouceWindow {
+        if (UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents) && AppStatus.isFouceWindow {
             hostManager.moveToAppCenter()
         }
     }

@@ -25,7 +25,20 @@ final class UserSettings: ObservableObject {
     static let shared = UserSettings()
     
     private init() {
-        self.MouseControl = .absolute
+        // Migrate old mouse control setting if needed
+        let savedMouseMode = UserDefaults.standard.object(forKey: "MouseControl") as? Int
+        if let mode = savedMouseMode {
+            // Migrate old "relative" (0) to "relativeEvents" (1) for better compatibility
+            if mode == 0 {
+                self.MouseControl = .relativeEvents
+                UserDefaults.standard.set(MouseControlMode.relativeEvents.rawValue, forKey: "MouseControl")
+            } else {
+                self.MouseControl = MouseControlMode(rawValue: mode) ?? .absolute
+            }
+        } else {
+            self.MouseControl = .absolute
+        }
+        
         self.viewWidth = 0.0
         self.viewHeight = 0.0
         self.isSerialOutput = false
@@ -42,7 +55,11 @@ final class UserSettings: ObservableObject {
         self.keyboardLayout = KeyboardLayout(rawValue: savedKeyboardLayout ?? "") ?? .mac
     }
     @Published var isSerialOutput: Bool
-    @Published var MouseControl:MouseControlMode
+    @Published var MouseControl:MouseControlMode {
+        didSet {
+            UserDefaults.standard.set(MouseControl.rawValue, forKey: "MouseControl")
+        }
+    }
     @Published var viewWidth: Float
     @Published var viewHeight: Float
     @Published var edgeThreshold: CGFloat = 5
@@ -80,8 +97,31 @@ final class UserSettings: ObservableObject {
 }
 
 enum MouseControlMode: Int {
-    case relative = 0
-    case absolute = 1
+    case relativeHID = 0
+    case relativeEvents = 1
+    case absolute = 2
+    
+    var displayName: String {
+        switch self {
+        case .relativeHID:
+            return "Relative (HID)"
+        case .relativeEvents:
+            return "Relative (Events)"
+        case .absolute:
+            return "Absolute"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .relativeHID:
+            return "Relative mouse control via HID (requires accessibility permissions)"
+        case .relativeEvents:
+            return "Relative mouse control via window events (no extra permissions)"
+        case .absolute:
+            return "Absolute mouse positioning"
+        }
+    }
 }
 
 // Paste behavior options

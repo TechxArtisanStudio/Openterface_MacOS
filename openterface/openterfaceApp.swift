@@ -47,6 +47,7 @@ struct openterfaceApp: App {
     private var floatingKeyboardManager: FloatingKeyboardManagerProtocol { DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self) }
     private var tipLayerManager: TipLayerManagerProtocol { DependencyContainer.shared.resolve(TipLayerManagerProtocol.self) }
     private var cameraManager: CameraManagerProtocol { DependencyContainer.shared.resolve(CameraManagerProtocol.self) }
+    private var permissionManager: PermissionManagerProtocol { DependencyContainer.shared.resolve(PermissionManagerProtocol.self) }
     
     init() {
         // Setup dependencies before UI construction to ensure they're available
@@ -397,21 +398,43 @@ struct openterfaceApp: App {
                 }
                 Menu("Mouse Mode"){
                     Button(action: {
-                        appState.relativeTitle = "Relative ✓"
-                        appState.absoluteTitle = "Absolute"
-                        UserSettings.shared.MouseControl = .relative
+                        // Check permissions for HID mode
+                        if !permissionManager.isAccessibilityPermissionGranted() {
+                            permissionManager.requestAccessibilityPermission()
+                            return
+                        }
+                        
+                        UserSettings.shared.MouseControl = .relativeHID
+                        appState.updateMenuTitles(for: .relativeHID)
                         NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
                         NSCursor.hide()
                     }) {
-                        Text(appState.relativeTitle)
+                        Text(appState.relativeHIDTitle)
                     }
+                    
                     Button(action: {
-                        appState.relativeTitle = "Relative"
-                        appState.absoluteTitle = "Absolute ✓"
+                        UserSettings.shared.MouseControl = .relativeEvents
+                        appState.updateMenuTitles(for: .relativeEvents)
+                        NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
+                        NSCursor.hide()
+                    }) {
+                        Text(appState.relativeEventsTitle)
+                    }
+                    
+                    Button(action: {
                         UserSettings.shared.MouseControl = .absolute
+                        appState.updateMenuTitles(for: .absolute)
                         NSCursor.unhide()
                     }) {
                         Text(appState.absoluteTitle)
+                    }
+                    
+                    Divider()
+                    
+                    Button(action: {
+                        permissionManager.showPermissionStatus()
+                    }) {
+                        Text("Check HID Permissions...")
                     }
                 }                         
                 Menu("Audio Control") {
@@ -615,7 +638,7 @@ struct openterfaceApp: App {
                 
                 Button(action: {
                     if let capturesURL = cameraManager.getSavedFilesDirectory() {
-                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: capturesURL.path)
+                                                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: capturesURL.path)
                     }
                 }) {
                     Text("Show Capture Folder")
@@ -736,19 +759,22 @@ final class AppState: ObservableObject {
     private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
     
     // Published properties for menu titles
-    @Published var relativeTitle = "Relative"
+    @Published var relativeHIDTitle = "Relative (HID)"
+    @Published var relativeEventsTitle = "Relative (Events)"
     @Published var absoluteTitle = "Absolute ✓"
     
     init() {
+        // Set initial menu titles based on current setting
+        updateMenuTitles(for: UserSettings.shared.MouseControl)
+        
         KeyboardShortcuts.onKeyUp(for: .exitRelativeMode) {
             self.logger.log(content: "Exit Relative Mode...")
             // Only exit if currently in relative mode
-            if UserSettings.shared.MouseControl == .relative {
+            if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
                 UserSettings.shared.MouseControl = .absolute
                 NSCursor.unhide()
                 // Update menu titles to reflect the change
-                self.relativeTitle = "Relative"
-                self.absoluteTitle = "Absolute ✓"
+                self.updateMenuTitles(for: .absolute)
                 self.logger.log(content: "Switched from relative to absolute mouse mode")
             }
         }
@@ -841,6 +867,23 @@ final class AppState: ObservableObject {
             self.logger.log(content: "Show Floating Keyboard shortcut triggered")
             let floatingKeyboardManager = DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self)
             floatingKeyboardManager.showFloatingKeysWindow()
+        }
+    }
+    
+    func updateMenuTitles(for mode: MouseControlMode) {
+        switch mode {
+        case .relativeHID:
+            relativeHIDTitle = "Relative (HID) ✓"
+            relativeEventsTitle = "Relative (Events)"
+            absoluteTitle = "Absolute"
+        case .relativeEvents:
+            relativeHIDTitle = "Relative (HID)"
+            relativeEventsTitle = "Relative (Events) ✓"
+            absoluteTitle = "Absolute"
+        case .absolute:
+            relativeHIDTitle = "Relative (HID)"
+            relativeEventsTitle = "Relative (Events)"
+            absoluteTitle = "Absolute ✓"
         }
     }
 }

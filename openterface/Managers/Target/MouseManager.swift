@@ -117,7 +117,7 @@ class MouseManager: MouseManagerProtocol {
             self.isMouseLoopRunning = false
             
             // Call appropriate loop function
-            if UserSettings.shared.MouseControl == .relative {
+            if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
                 self.isMouseLoopRunning = true
                 DispatchQueue.global().async {
                     while self.isMouseLoopRunning {
