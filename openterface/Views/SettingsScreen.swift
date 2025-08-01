@@ -1135,9 +1135,9 @@ struct ClipboardOCRSettingsView: View {
                         
                         Text("• Ask Every Time: Shows a dialog to choose the action")
                             .font(.caption)
-                        Text("• Always Paste text to Target: Automatically sends clipboard text as keystrokes")
+                        Text("• Always Host Paste: Automatically sends clipboard text as keystrokes")
                             .font(.caption)
-                        Text("• Always Pass events to Target: Forwards the Cmd+V combination directly")
+                        Text("• Always Local Paste: Forwards the Cmd+V combination directly")
                             .font(.caption)
                     }
                     .foregroundColor(.secondary)

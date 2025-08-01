@@ -93,7 +93,7 @@ struct ClipboardView: View {
                             .foregroundColor(.orange)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help("paste text to target")
+                    .help("Host Paste")
                 }
             }
             
@@ -204,7 +204,7 @@ struct ClipboardHistoryRow: View {
             Spacer()
             
             HStack(spacing: 4) {
-                // paste text to target button
+                // Host Paste button
                 Button(action: {
                     keyboardManager.sendTextToKeyboard(text: item.content)
                     showPasteConfirmationFeedback()
@@ -213,7 +213,7 @@ struct ClipboardHistoryRow: View {
                         .foregroundColor(.orange)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("paste text to target")
+                .help("Host Paste")
                 
                 // Copy to clipboard button
                 Button(action: onCopy) {

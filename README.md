@@ -22,8 +22,8 @@ Our Openterface Mini-KVM crowdfunding was successed and now already for pre-orde
  - [x] Mouse control absolute mode
  - [x] Mouse control relative mode
  - [x] Audio playing from target
- - [x] Paste text to Target device
- - [x] OCR text from Target device
+ - [x] Paste text to Target device (Host Paste)
+ - [x] OCR text from Target device (Local Paste)
  - [x] HDMI, K/M connnection indicators [Required Hardward 1.9] 
  - [x] Special keys support (F1 - F12, Del, Ctrl+Alt+Del)
  - [X] Keystrokes marco support

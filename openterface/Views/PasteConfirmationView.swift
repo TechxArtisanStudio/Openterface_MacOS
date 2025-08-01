@@ -69,11 +69,11 @@ struct PasteConfirmationView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text("• Paste text to Target: Send text to the connected device")
+                Text("• Host Paste: When you want to paste text from your computer’s clipboard into the target.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
-                Text("• Pass events to Target: Send key events to the connected device ")
+                Text("• Local Paste: When you want to paste text already copied inside the target.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -104,7 +104,7 @@ struct PasteConfirmationView: View {
                 
                 Spacer()
                 
-                Button("Pass events to Target") {
+                Button("Local Paste") {
                     if rememberChoice {
                         userSettings.pasteBehavior = selectedBehavior == .askEveryTime ? .alwaysPassToTarget : selectedBehavior
                     }
@@ -112,7 +112,7 @@ struct PasteConfirmationView: View {
                 }
                 .keyboardShortcut("h", modifiers: .command)
                 
-                Button("Paste text to Target") {
+                Button("Host Paste") {
                     if rememberChoice {
                         userSettings.pasteBehavior = selectedBehavior == .askEveryTime ? .alwaysPasteToTarget : selectedBehavior
                     }
@@ -197,8 +197,8 @@ enum PasteAction {
 #Preview {
     PasteConfirmationView(
         clipboardContent: "Sample clipboard content\nwith multiple lines\nto demonstrate the paste confirmation dialog",
-        onPasteToTarget: { print("Paste text to target confirmed") },
-        onPassToHost: { print("Pass events to target confirmed") },
+        onPasteToTarget: { print("Host Paste confirmed") },
+        onPassToHost: { print("Local Paste confirmed") },
         onCancel: { print("Paste cancelled") }
     )
 }
