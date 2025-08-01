@@ -220,7 +220,7 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Handles when window becomes main
     @objc func windowDidBecomeMain(_ notification: Notification) {
-        if UserSettings.shared.MouseControl == MouseControlMode.relative && AppStatus.isExit == false {
+        if (UserSettings.shared.MouseControl == MouseControlMode.relativeHID || UserSettings.shared.MouseControl == MouseControlMode.relativeEvents) && AppStatus.isExit == false {
             NSCursor.hide()
             AppStatus.isCursorHidden = true
         }

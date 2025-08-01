@@ -921,7 +921,7 @@ struct EnhancedMacroCreatorDialog: View {
     }
     
     private func getRecordedKeysPreview() -> String {
-        return recordedKeys.map { getKeyDescription($0) }.joined(separator: " → ")
+        recordedKeys.map { getKeyDescription($0) }.joined(separator: " → ")
     }
 }
 
@@ -935,25 +935,51 @@ struct MouseHIDSettingsView: View {
     @State private var resolution = "Unknown"
     @State private var frameRate = "Unknown"
     
+    private var mouseControlDescription: String {
+        switch userSettings.MouseControl {
+        case .absolute:
+            return "Absolute mode: Mouse cursor position directly matches target screen position"
+        case .relativeHID:
+            return "Relative (HID) mode: Precise mouse control via HID interface - requires accessibility permissions"
+        case .relativeEvents:
+            return "Relative (Events) mode: Mouse control via window events - no extra permissions required"
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Mouse & HID Control")
                 .font(.title2)
-                .bold()
+                .fontWeight(.bold)
             
             GroupBox("Mouse Control Mode") {
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("Mouse mode", selection: $userSettings.MouseControl) {
                         Text("Absolute").tag(MouseControlMode.absolute)
-                        Text("Relative").tag(MouseControlMode.relative)
+                        Text("Relative (HID)").tag(MouseControlMode.relativeHID)
+                        Text("Relative (Events)").tag(MouseControlMode.relativeEvents)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     
-                    Text(userSettings.MouseControl == .absolute ? 
-                         "Absolute mode: Mouse cursor position directly matches target screen position" :
-                         "Relative mode: Mouse movements are relative, allows for precise control")
+                    Text(mouseControlDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    
+                    if userSettings.MouseControl == .relativeHID {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("Requires accessibility permissions")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                            
+                            Button("Check Permissions") {
+                                let permissionManager = DependencyContainer.shared.resolve(PermissionManagerProtocol.self)
+                                permissionManager.showPermissionStatus()
+                            }
+                            .font(.caption)
+                        }
+                    }
                     
                     Toggle("Auto-hide host cursor in absolute mode", isOn: $userSettings.isAbsoluteModeMouseHide)
                 }
@@ -1492,6 +1518,12 @@ struct AdvancedDebugSettingsView: View {
         }
     }
     
+    private func getCurrentDateString() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return formatter.string(from: Date())
+    }
+    
     private func createSettingsExportData() -> [String: Any] {
         return [
             "version": "1.0",
@@ -1590,12 +1622,6 @@ struct AdvancedDebugSettingsView: View {
         if let isFullScreen = settings["isFullScreen"] as? Bool {
             userSettings.isFullScreen = isFullScreen
         }
-    }
-    
-    private func getCurrentDateString() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        return formatter.string(from: Date())
     }
 }
 

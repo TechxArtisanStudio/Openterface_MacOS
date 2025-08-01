@@ -43,6 +43,7 @@
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
+		BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */; };
 		BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */; };
 		BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7222E34FC8D002EACD7 /* OCRManager.swift */; };
 		BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */; };
@@ -118,6 +119,7 @@
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
+		BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
 		BF98F7182E34C29E002EACD7 /* ProtocolExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ProtocolExtensions.swift; path = openterface/Protocols/ProtocolExtensions.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7192E34C29E002EACD7 /* ManagerProtocols.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ManagerProtocols.swift; path = openterface/Protocols/ManagerProtocols.swift; sourceTree = SOURCE_ROOT; };
@@ -266,6 +268,7 @@
 				53CC66092B8EDB390081F927 /* LoggerManager.swift */,
 				BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */,
 				BFD4EA972E369C870029BFC2 /* CameraManager.swift */,
+				BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */,
 				BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				BF98F7222E34FC8D002EACD7 /* OCRManager.swift */,
@@ -474,6 +477,7 @@
 				BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
+				BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */,
 				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,
 				BFD4EA942E35EE970029BFC2 /* ProtocolExtensions.swift in Sources */,
 				6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */,
