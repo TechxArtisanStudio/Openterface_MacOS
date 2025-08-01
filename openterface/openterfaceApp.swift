@@ -653,16 +653,16 @@ struct openterfaceApp: App {
                         log.log(content: "Paste behavior set to: Ask Every Time")
                     }
                     
-                    Button("Paste text to Target\(UserSettings.shared.pasteBehavior == .alwaysPasteToTarget ? " ✓" : "")") {
+                    Button("Host Paste\(UserSettings.shared.pasteBehavior == .alwaysPasteToTarget ? " ✓" : "")") {
                         UserSettings.shared.pasteBehavior = .alwaysPasteToTarget
-                        pasteBehaviorTitle = "Paste text to Target"
-                        log.log(content: "Paste behavior set to: Auto Paste text to Target")
+                        pasteBehaviorTitle = "Host Paste"
+                        log.log(content: "Paste behavior set to: Auto Host Paste")
                     }
                     
-                    Button("Pass events to Target\(UserSettings.shared.pasteBehavior == .alwaysPassToTarget ? " ✓" : "")") {
+                    Button("Local Paste\(UserSettings.shared.pasteBehavior == .alwaysPassToTarget ? " ✓" : "")") {
                         UserSettings.shared.pasteBehavior = .alwaysPassToTarget
-                        pasteBehaviorTitle = "Pass events to Target"
-                        log.log(content: "Paste behavior set to: Pass events to Target")
+                        pasteBehaviorTitle = "Local Paste"
+                        log.log(content: "Paste behavior set to: Local Paste")
                     }
                 }
                 

@@ -200,6 +200,7 @@ protocol KeyboardManagerProtocol: AnyObject {
     func sendSpecialKey(_ key: SpecialKey)
     func executeKeyboardMacro(_ macro: KeyboardMacro)
     func sendTextToKeyboard(text: String)
+    func releaseAllModifierKeysForPaste()
 }
 
 /// Protocol for mouse management
