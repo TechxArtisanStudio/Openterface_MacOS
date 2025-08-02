@@ -212,6 +212,11 @@ protocol MouseManagerProtocol: AnyObject {
     func getMouseLoopRunning() -> Bool
     func stopMouseLoop()
     func runMouseLoop()
+    
+    // HID-specific mouse control methods
+    func enableHIDMouseMode()
+    func disableHIDMouseMode()
+    func isHIDMouseModeActive() -> Bool
 }
 
 /// Protocol for host system integration

@@ -170,10 +170,11 @@ class PlayerView: NSView, NSWindowDelegate {
     
     override func mouseDown(with event: NSEvent) {
         handleMouseMovement(with: event, mouseEvent: 0x01)
-        if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
+        if UserSettings.shared.MouseControl == .relativeEvents {
             AppStatus.isFouceWindow = true
             NSCursor.hide()
         }
+        // For HID mode, cursor hiding is handled in handleMouseMovement
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -247,7 +248,17 @@ class PlayerView: NSView, NSWindowDelegate {
     }
 
     private func handleMouseMovement(with event: NSEvent, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
-        if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
+        if UserSettings.shared.MouseControl == .relativeHID {
+            // In HID mode, events are handled by the HID monitor in MouseManager
+            // Only handle cursor hiding/showing for clicks, but not the movement itself
+            if mouseEvent != 0x00 { // Only handle button press/release events
+                if mouseEvent == 0x01 || mouseEvent == 0x02 || mouseEvent == 0x04 {
+                    AppStatus.isFouceWindow = true
+                    NSCursor.hide()
+                }
+            }
+            return
+        } else if UserSettings.shared.MouseControl == .relativeEvents {
             let deltaX = Int(event.deltaX)
             let deltaY = Int(event.deltaY)
             let mouseLocation = convert(event.locationInWindow, from: nil)
@@ -315,9 +326,10 @@ class PlayerView: NSView, NSWindowDelegate {
             NSCursor.unhide()
         }
 
-        if (UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents) && AppStatus.isFouceWindow {
+        if UserSettings.shared.MouseControl == .relativeEvents && AppStatus.isFouceWindow {
             hostManager.moveToAppCenter()
         }
+        // For HID mode, mouse positioning is handled by the HID monitor
     }
 
     // Get window dimensions

@@ -407,6 +407,9 @@ struct openterfaceApp: App {
                         UserSettings.shared.MouseControl = .relativeHID
                         appState.updateMenuTitles(for: .relativeHID)
                         NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
+                        
+                        // Enable HID mouse monitoring
+                        mouseManager.enableHIDMouseMode()
                         NSCursor.hide()
                     }) {
                         Text(appState.relativeHIDTitle)
@@ -416,6 +419,9 @@ struct openterfaceApp: App {
                         UserSettings.shared.MouseControl = .relativeEvents
                         appState.updateMenuTitles(for: .relativeEvents)
                         NotificationCenter.default.post(name: .enableRelativeModeNotification, object: nil)
+                        
+                        // Disable HID mouse monitoring for Events mode
+                        mouseManager.disableHIDMouseMode()
                         NSCursor.hide()
                     }) {
                         Text(appState.relativeEventsTitle)
@@ -424,6 +430,9 @@ struct openterfaceApp: App {
                     Button(action: {
                         UserSettings.shared.MouseControl = .absolute
                         appState.updateMenuTitles(for: .absolute)
+                        
+                        // Disable HID mouse monitoring for Absolute mode
+                        mouseManager.disableHIDMouseMode()
                         NSCursor.unhide()
                     }) {
                         Text(appState.absoluteTitle)
@@ -772,6 +781,11 @@ final class AppState: ObservableObject {
             // Only exit if currently in relative mode
             if UserSettings.shared.MouseControl == .relativeHID || UserSettings.shared.MouseControl == .relativeEvents {
                 UserSettings.shared.MouseControl = .absolute
+                
+                // Disable HID mouse monitoring when exiting relative mode
+                let mouseManager = DependencyContainer.shared.resolve(MouseManagerProtocol.self)
+                mouseManager.disableHIDMouseMode()
+                
                 NSCursor.unhide()
                 // Update menu titles to reflect the change
                 self.updateMenuTitles(for: .absolute)
