@@ -233,53 +233,89 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             logger.log(content: "Serial port receive data: \(dataString)")
         }
-        // handle bytes data with prefix 57 AB 00
+        
+        // Append new data to buffer
+        receiveBuffer.append(data)
+        
+        // Process all complete messages in the buffer
+        processBufferedMessages()
+    }
+    
+    private func processBufferedMessages() {
         let prefix: [UInt8] = [0x57, 0xAB, 0x00]
-        let dataBytes = [UInt8](data)
-        if dataBytes.starts(with: prefix) {
-            self.isDeviceReady = true
-            // get check the following bytes
-            let len = dataBytes[4]
-
-            if dataBytes.count < Int(len) + 5 {
-                // if the data length is not complete, put it into the buffer
-                receiveBuffer.append(data)
-                return
-            }else{
-                let chksum = dataBytes[data.count - 1]
-                let checksum = self.calculateChecksum(data: Array(dataBytes[0...data.count - 2]))
-                if chksum == checksum {
-                    handleSerialData(data: data)
-                } else {
-                    let errorDataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-                    let checksumHex = String(format: "%02X", checksum)
-                    let chksumHex = String(format: "%02X", chksum)
-                     logger.log(content: "Checksum error, discard the data: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
+        var bufferBytes = [UInt8](receiveBuffer)
+        var processedBytes = 0
+        
+        while bufferBytes.count >= 6 { // Minimum message size: 5 bytes header + 1 byte checksum
+            // Look for the next valid message start
+            guard let prefixIndex = findNextMessageStart(in: bufferBytes, from: processedBytes) else {
+                // No valid message start found, keep remaining data in buffer
+                if processedBytes > 0 {
+                    receiveBuffer = Data(bufferBytes[processedBytes...])
                 }
+                return
             }
-        } else {
-            //logger.log(content: "Data does not start with the correct prefix")
-            // if the data does not start with the correct prefix and the buffer is empty, ignore it
-            if receiveBuffer.isEmpty {
-                return
-            }else{
-                // if the data does not start with the correct prefix and the buffer is not empty, append the data to the buffer
-                receiveBuffer.append(data)
-                let dataBytes = [UInt8](receiveBuffer)
-                if dataBytes.starts(with: prefix) {
-                    // get check the following bytes
-                    let cmd = dataBytes[3]
-                    let len = dataBytes[4]
-                    if dataBytes.count < Int(len) + 5 {
-                        // if the data length is not complete, put it into the buffer
-                        return
-                    }else{
-                        handleSerialData(data: receiveBuffer)
-                        receiveBuffer.removeAll()
-                    }
+            
+            // Adjust buffer if we skipped invalid data
+            if prefixIndex > processedBytes {
+                if logger.SerialDataPrint {
+                    let skippedData = bufferBytes[processedBytes..<prefixIndex]
+                    let skippedString = skippedData.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    logger.log(content: "Skipping invalid data: \(skippedString)")
                 }
+                bufferBytes = Array(bufferBytes[prefixIndex...])
+                processedBytes = 0
+            }
+            
+            // Check if we have enough bytes for a complete message
+            if bufferBytes.count < 6 {
+                break
+            }
+            
+            let len = bufferBytes[4]
+            let expectedMessageLength = Int(len) + 6 // 5 bytes header + length + 1 byte checksum
+            
+            if bufferBytes.count < expectedMessageLength {
+                // Incomplete message, wait for more data
+                break
+            }
+            
+            // Extract the complete message
+            let messageBytes = Array(bufferBytes[0..<expectedMessageLength])
+            let messageData = Data(messageBytes)
+            
+            // Verify checksum
+            let chksum = messageBytes[messageBytes.count - 1]
+            let checksum = self.calculateChecksum(data: Array(messageBytes[0..<messageBytes.count - 1]))
+            
+            if chksum == checksum {
+                self.isDeviceReady = true
+                handleSerialData(data: messageData)
+            } else {
+                let errorDataString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+                let checksumHex = String(format: "%02X", checksum)
+                let chksumHex = String(format: "%02X", chksum)
+                logger.log(content: "Checksum error, discard the message: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
+            }
+            
+            // Move to the next message
+            bufferBytes = Array(bufferBytes[expectedMessageLength...])
+            processedBytes = 0
+        }
+        
+        // Update the buffer with remaining data
+        receiveBuffer = Data(bufferBytes)
+    }
+    
+    private func findNextMessageStart(in bytes: [UInt8], from startIndex: Int) -> Int? {
+        let prefix: [UInt8] = [0x57, 0xAB, 0x00]
+        
+        for i in startIndex..<(bytes.count - 2) {
+            if bytes[i] == prefix[0] && bytes[i + 1] == prefix[1] && bytes[i + 2] == prefix[2] {
+                return i
             }
         }
+        return nil
     }
 
     func handleSerialData(data: Data) {
