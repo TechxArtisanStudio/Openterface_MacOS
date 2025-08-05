@@ -45,11 +45,19 @@ class MouseManager: MouseManagerProtocol {
     
     // HID event monitoring variables
     private var hidEventMonitor: Any?
+    private var hidLocalMonitor: Any?
     private var isHIDMonitoringActive = false
     private var lastHIDPosition = CGPoint.zero
     private var isHIDMouseCaptured = false
     private var lastCenterTime: TimeInterval = 0
     private var centeringCooldown: TimeInterval = 0.1 // Minimum time between centering operations
+    
+    // ESC key escape mechanism for HID mode
+    private var escapeKeyPressCount = 0
+    private var lastEscapeKeyTime: TimeInterval = 0
+    private var longPressTimer: Timer?
+    private let escapeKeyTimeout: TimeInterval = 2.0 // Reset count after 2 seconds
+    private let longPressThreshold: TimeInterval = 1.0 // Long press threshold in seconds
     
     // Private initializer for dependency injection
     private init() {
@@ -72,45 +80,65 @@ class MouseManager: MouseManagerProtocol {
         
         let eventMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
         
-        hidEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
-            self?.handleHIDMouseEvent(event)
-        })
-        
-        // Also monitor local events within the app
-        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
+        // Start with only local monitor (for app window detection)
+        hidLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
             self?.handleHIDMouseEvent(event)
             return event
         })
         
-        if let localMonitor = localMonitor {
-            // Store both monitors - we'll need to remove both later
-            if hidEventMonitor == nil {
-                hidEventMonitor = [localMonitor]
-            } else if var monitors = hidEventMonitor as? [Any] {
-                monitors.append(localMonitor)
-                hidEventMonitor = monitors
-            } else {
-                hidEventMonitor = [hidEventMonitor!, localMonitor]
-            }
-        }
-        
         isHIDMonitoringActive = true
         isHIDMouseCaptured = false
         
-        logger.log(content: "HID monitoring setup complete, waiting for first mouse interaction")
-        
-        // Hide cursor in HID mode
-        NSCursor.hide()
+        logger.log(content: "HID monitoring setup complete with local monitor only")
         
         // Force capture after a short delay to ensure we get mouse events
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             if !self.isHIDMouseCaptured && UserSettings.shared.MouseControl == .relativeHID {
                 self.logger.log(content: "Force capturing mouse for HID mode")
-                self.isHIDMouseCaptured = true
-                self.centerMouseCursor()
+                self.captureMouseForHID()
             }
         }
+    }
+    
+    private func captureMouseForHID() {
+        guard !isHIDMouseCaptured else { return }
+        
+        logger.log(content: "Capturing mouse for HID mode")
+        
+        // Now add global monitor for capturing all mouse events
+        let eventMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
+        
+        hidEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
+            self?.handleHIDMouseEvent(event)
+        })
+        
+        isHIDMouseCaptured = true
+        NSCursor.hide()
+        AppStatus.isFouceWindow = true
+        AppStatus.isCursorHidden = true
+        
+        centerMouseCursor()
+        logger.log(content: "HID mouse captured with global monitor")
+    }
+    
+    private func releaseMouseFromHID() {
+        guard isHIDMouseCaptured else { return }
+        
+        logger.log(content: "Releasing mouse from HID capture")
+        
+        // Remove global monitor to allow normal mouse movement
+        if let monitor = hidEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            hidEventMonitor = nil
+        }
+        
+        isHIDMouseCaptured = false
+        NSCursor.unhide()
+        AppStatus.isFouceWindow = false
+        AppStatus.isCursorHidden = false
+        
+        logger.log(content: "HID mouse released - global monitor removed")
     }
     
     func stopHIDMouseMonitoring() {
@@ -118,23 +146,118 @@ class MouseManager: MouseManagerProtocol {
         
         logger.log(content: "Stopping HID mouse monitoring")
         
+        // Remove global monitor if active
         if let monitor = hidEventMonitor {
-            if let monitors = monitor as? [Any] {
-                // Remove all monitors
-                for mon in monitors {
-                    NSEvent.removeMonitor(mon)
-                }
-            } else {
-                NSEvent.removeMonitor(monitor)
-            }
+            NSEvent.removeMonitor(monitor)
+            hidEventMonitor = nil
         }
         
-        hidEventMonitor = nil
+        // Remove local monitor
+        if let localMonitor = hidLocalMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            hidLocalMonitor = nil
+        }
+        
         isHIDMonitoringActive = false
         isHIDMouseCaptured = false
         
+        // Clean up escape mechanism
+        longPressTimer?.invalidate()
+        longPressTimer = nil
+        escapeKeyPressCount = 0
+        
         // Show cursor when stopping HID monitoring
         NSCursor.unhide()
+        AppStatus.isFouceWindow = false
+        AppStatus.isCursorHidden = false
+    }
+    
+    // MARK: - ESC Key Escape Mechanism for HID Mode
+    
+    func handleEscapeKeyForHIDMode(isKeyDown: Bool) {
+        guard UserSettings.shared.MouseControl == .relativeHID else { return }
+        guard isHIDMonitoringActive else { return }
+        
+        let currentTime = CACurrentMediaTime()
+        
+        if isKeyDown {
+            // Handle ESC key down
+            if escapeKeyPressCount == 0 {
+                // First ESC press - start timer for long press detection
+                lastEscapeKeyTime = currentTime
+                escapeKeyPressCount = 1
+                
+                logger.log(content: "ESC key pressed - starting long press timer")
+                
+                // Start long press timer
+                longPressTimer = Timer.scheduledTimer(withTimeInterval: longPressThreshold, repeats: false) { [weak self] _ in
+                    self?.triggerHIDEscape(reason: "Long press ESC detected")
+                }
+            } else {
+                // Subsequent ESC presses - check if within timeout
+                if currentTime - lastEscapeKeyTime < escapeKeyTimeout {
+                    escapeKeyPressCount += 1
+                    logger.log(content: "ESC key pressed \(escapeKeyPressCount) times")
+                    
+                    if escapeKeyPressCount >= 2 {
+                        // Multiple ESC presses detected
+                        triggerHIDEscape(reason: "Multiple ESC presses detected")
+                        return
+                    }
+                } else {
+                    // Timeout exceeded - reset counter
+                    escapeKeyPressCount = 1
+                    lastEscapeKeyTime = currentTime
+                }
+            }
+        } else {
+            // Handle ESC key up - cancel long press timer if still running
+            longPressTimer?.invalidate()
+            longPressTimer = nil
+            
+            // Reset counter after timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + escapeKeyTimeout) { [weak self] in
+                guard let self = self else { return }
+                if CACurrentMediaTime() - self.lastEscapeKeyTime >= self.escapeKeyTimeout {
+                    self.escapeKeyPressCount = 0
+                    self.logger.log(content: "ESC key press counter reset due to timeout")
+                }
+            }
+        }
+    }
+    
+    private func triggerHIDEscape(reason: String) {
+        logger.log(content: "Triggering HID escape: \(reason)")
+        
+        // Clean up escape state
+        longPressTimer?.invalidate()
+        longPressTimer = nil
+        escapeKeyPressCount = 0
+        
+        // Release mouse capture using the new method
+        releaseMouseFromHID()
+        
+        // Stop centering the cursor so it can move freely
+        lastCenterTime = 0
+        
+        logger.log(content: "HID mouse capture released - user can now use host mouse normally")
+        
+        NSCursor.unhide()
+
+        // Post notification to inform UI about mouse escape
+        NotificationCenter.default.post(name: .hidMouseEscapedNotification, object: nil)
+    }
+    
+    func recaptureHIDMouse() {
+        guard UserSettings.shared.MouseControl == .relativeHID else { return }
+        guard isHIDMonitoringActive else { return }
+        guard !isHIDMouseCaptured else { return }
+        
+        logger.log(content: "Re-capturing HID mouse")
+        
+        captureMouseForHID()
+        
+        logger.log(content: "HID mouse re-captured successfully")
     }
     
     private func handleHIDMouseEvent(_ event: NSEvent) {
@@ -143,31 +266,25 @@ class MouseManager: MouseManagerProtocol {
             logger.log(content: "HID Event ignored - not in relativeHID mode, current mode: \(UserSettings.shared.MouseControl)")
             return 
         }
-        
-        logger.log(content: "HID Event received: type=\(event.type.rawValue), location=\(event.locationInWindow)")
-        
-        // Check if the event is from our application window
-        let isFromOurApp = isEventFromOurApplication(event)
-        logger.log(content: "Event from our app: \(isFromOurApp)")
-        
-        if !isHIDMouseCaptured && isFromOurApp {
-            // First mouse interaction with our app - start capturing
-            isHIDMouseCaptured = true
-            logger.log(content: "HID mouse capture started")
+               
+        if !isHIDMouseCaptured {
+            // Mouse is not captured - only check for app window clicks to re-capture
+            let isFromOurApp = isEventFromOurApplication(event)
             
-            // Center the mouse cursor
-            centerMouseCursor()
+            if isFromOurApp && (event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown) {
+                logger.log(content: "Click detected in app window - capturing mouse")
+                captureMouseForHID()
+                return
+            }
+            
+            // For all other events when not captured, do nothing (allow normal mouse behavior)
             return
         }
         
-        // Only process events when mouse is captured
-        guard isHIDMouseCaptured else { 
-            logger.log(content: "HID Event ignored - mouse not captured yet")
-            return 
-        }
+        // Mouse is captured - process events for KVM
+        logger.log(content: "Processing captured HID event")
         
-        // For movement events, use the event's deltaX and deltaY instead of position calculations
-        // This is more accurate for HID events
+        // For movement events, use the event's deltaX and deltaY
         if event.type == .mouseMoved || event.type == .leftMouseDragged || event.type == .rightMouseDragged || event.type == .otherMouseDragged {
             let deltaX = event.deltaX
             let deltaY = event.deltaY
@@ -212,13 +329,55 @@ class MouseManager: MouseManagerProtocol {
     }
     
     private func isEventFromOurApplication(_ event: NSEvent) -> Bool {
-        // For HID mode, we want to capture ALL mouse events once monitoring starts
-        // Check if we're in our main window area
+        // When mouse is not captured, be more strict about what constitutes an "app event"
+        if !isHIDMouseCaptured {
+            // Only consider clicks within the main window's content area (excluding title bar and chrome)
+            if let mainWindow = NSApplication.shared.mainWindow {
+                let mouseLocation = NSEvent.mouseLocation
+                let windowFrame = mainWindow.frame
+                
+                // Get the actual content area frame in screen coordinates
+                // Use contentLayoutRect which gives us the actual content area excluding title bar
+                let contentLayoutRect = mainWindow.contentLayoutRect
+                let titleBarHeight = windowFrame.height - contentLayoutRect.height
+                
+                // Content rect is the window frame minus the title bar height
+                let contentRect = NSRect(
+                    x: windowFrame.minX,
+                    y: windowFrame.minY,
+                    width: windowFrame.width,
+                    height: contentLayoutRect.height
+                )
+                
+                logger.log(content: "Window frame: \(windowFrame), Content layout rect: \(contentLayoutRect), Title bar height: \(titleBarHeight), Content rect calculated: \(contentRect)")
+                
+                // In macOS coordinate system (origin at bottom-left):
+                // - windowFrame.maxY is the top of the window (including title bar)
+                // - contentRect.maxY is the top of the content area (bottom of title bar)
+                // - Title bar is between contentRect.maxY and windowFrame.maxY
+                let isInContentArea = contentRect.contains(mouseLocation)
+                let isInTitleBar = mouseLocation.y > contentRect.maxY && 
+                                  mouseLocation.y <= windowFrame.maxY && 
+                                  mouseLocation.x >= windowFrame.minX && 
+                                  mouseLocation.x <= windowFrame.maxX
+                
+                logger.log(content: "Mouse not captured - Mouse location: \(mouseLocation), Window frame: \(windowFrame), Content rect: \(contentRect), In content area: \(isInContentArea), In title bar: \(isInTitleBar)")
+                
+                // For non-captured state, only return true for actual clicks within the content area
+                // AND explicitly NOT in the title bar area - this prevents title bar clicks from triggering re-capture
+                let shouldCapture = isInContentArea && !isInTitleBar && (event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown)
+
+                return shouldCapture
+            }
+            return false
+        }
+        
+        // When mouse is captured, use the original logic
         if let mainWindow = NSApplication.shared.mainWindow {
             let mouseLocation = NSEvent.mouseLocation
             let windowFrame = mainWindow.frame
             let isInWindow = windowFrame.contains(mouseLocation)
-            logger.log(content: "Mouse location: \(mouseLocation), Window frame: \(windowFrame), In window: \(isInWindow)")
+            logger.log(content: "Mouse captured - Mouse location: \(mouseLocation), Window frame: \(windowFrame), In window: \(isInWindow)")
             return isInWindow
         }
         
@@ -229,9 +388,8 @@ class MouseManager: MouseManagerProtocol {
             return belongsToApp
         }
         
-        // Fallback: if we're in HID mode and monitoring is active, assume it's from our app
-        // This is more aggressive but necessary for HID mode
-        logger.log(content: "No window info, assuming event is from our app for HID mode")
+        // Only when captured and no other info available, assume it's from our app
+        logger.log(content: "Mouse captured, no window info - assuming event is from our app for HID mode")
         return true
     }
     
@@ -567,5 +725,9 @@ extension MouseManager {
     
     func isHIDMouseModeActive() -> Bool {
         return isHIDMonitoringActive
+    }
+    
+    var isMouseCaptured: Bool {
+        return isHIDMouseCaptured
     }
 }

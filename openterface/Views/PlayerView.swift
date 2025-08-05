@@ -83,19 +83,23 @@ class PlayerView: NSView, NSWindowDelegate {
     func observe() {
         let playViewNtf = NotificationCenter.default
         
-        // observer full Screen Nootification
+        // Setup notification observers
         playViewNtf.addObserver(self, selector: #selector(handleDidEnterFullScreenNotification(_:)), name: NSWindow.didEnterFullScreenNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(promptUserHowToExitRelativeMode(_:)), name: .enableRelativeModeNotification, object: nil)
+        playViewNtf.addObserver(self, selector: #selector(handleHIDMouseEscaped(_:)), name: .hidMouseEscapedNotification, object: nil)
     }
     
-    @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
-        let tips = "Press click「ESC」 multiple times to exit relative mode"
-        if let window = self.window {
-            tipLayerManager.showTip(
-                text: tips,
-                yOffset: 1.5,
-                window: window
-            )
+        @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
+        let tips = "Long press or multiple clikc「ESC」to exit relative mode"
+        DispatchQueue.main.async {
+            self.tipLayerManager.showTip(text: tips, yOffset: 1.5, window: NSApp.mainWindow)
+        }
+    }
+    
+    @objc func handleHIDMouseEscaped(_ notification: Notification) {
+        let tips = "Mouse capture released. Click on the video to re-capture."
+        DispatchQueue.main.async {
+            self.tipLayerManager.showTip(text: tips, yOffset: 1.5, window: NSApp.mainWindow)
         }
     }
     
@@ -169,6 +173,28 @@ class PlayerView: NSView, NSWindowDelegate {
     }
     
     override func mouseDown(with event: NSEvent) {
+        // Check if we need to re-capture HID mouse
+        if UserSettings.shared.MouseControl == .relativeHID {
+            let mouseManager = MouseManager.shared
+            if !mouseManager.isMouseCaptured {
+                // Verify the click is actually within this PlayerView
+                let locationInView = self.convert(event.locationInWindow, from: nil)
+                let isWithinView = self.bounds.contains(locationInView)
+                
+                logger.log(content: "MouseDown in PlayerView: location=\(locationInView), bounds=\(self.bounds), withinView=\(isWithinView)")
+                
+                if isWithinView {
+                    // Re-capture the mouse when clicking on the player view
+                    logger.log(content: "Click within PlayerView bounds - re-capturing mouse")
+                    mouseManager.recaptureHIDMouse()
+                    return // Don't send the click event when re-capturing
+                } else {
+                    logger.log(content: "Click outside PlayerView bounds - not re-capturing")
+                    return // Don't process clicks outside the view
+                }
+            }
+        }
+        
         handleMouseMovement(with: event, mouseEvent: 0x01)
         if UserSettings.shared.MouseControl == .relativeEvents {
             AppStatus.isFouceWindow = true
@@ -372,6 +398,7 @@ class PlayerView: NSView, NSWindowDelegate {
 
 extension Notification.Name {
     static let enableRelativeModeNotification = Notification.Name("enableRelativeModeNotification")
+    static let hidMouseEscapedNotification = Notification.Name("hidMouseEscapedNotification")
 }
 
 

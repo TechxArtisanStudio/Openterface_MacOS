@@ -662,10 +662,20 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 let ocrManager = DependencyContainer.shared.resolve(OCRManagerProtocol.self)
                 if ocrManager.isAreaSelectionActive {
                     ocrManager.cancelAreaSelection()
+                    return true
                 }
             }
             
-            // Handle exit functionality
+            // Check if we're in HID mouse mode and delegate to MouseManager
+            if UserSettings.shared.MouseControl == .relativeHID {
+                let mouseManager = MouseManager.shared
+                mouseManager.handleEscapeKeyForHIDMode(isKeyDown: event.type == .keyDown)
+                
+                // Still send the ESC key to the target as well
+                return false // Don't consume the event so it can be processed normally
+            }
+            
+            // Handle exit functionality for non-HID modes
             if escKeyDownCounts == 0 {
                 escKeyDownTimeStart = event.timestamp
                 escKeyDownCounts = escKeyDownCounts + 1
