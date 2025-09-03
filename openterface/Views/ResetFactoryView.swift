@@ -40,8 +40,8 @@ struct ResetFactoryView: View {
         "Preparing to reset serial to factory settings...",
         "1. Checking serial port connection",
         "2. Starting serial to factory reset",
-        "3. Pull down Factory Reset signal (RTS) and waiting for 3 seconds",
-        "4. Pulling up Factory Reset signal (RTS)",
+        "3. Performing factory reset with RTS control (3.5 seconds)",
+        "4. Factory reset signal completed",
         "5. Closing serial port",
         "6. Reopening serial port",
         "7. Restart the serial port",
@@ -99,24 +99,31 @@ struct ResetFactoryView: View {
                             HStack {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.red)
-                                Text("Connection Error")
+                                Text("Factory Reset Error")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.red)
                             }
                             
-                            Text("Cannot connect to device serial port. Please check:")
-                                .font(.system(size: 14))
-                            
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("• Device is properly connected")
-                                Text("• USB cable is working")
-                                Text("• Device is powered on")
-                                Text("• Drivers are installed")
+                            // Show specific error message from serialPortStatus if available
+                            if !serialPortStatus.isEmpty {
+                                Text(serialPortStatus)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.primary)
+                            } else {
+                                Text("Cannot connect to device serial port. Please check:")
+                                    .font(.system(size: 14))
+                                
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("• Device is properly connected")
+                                    Text("• USB cable is working")
+                                    Text("• Device is powered on")
+                                    Text("• Drivers are installed")
+                                }
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
                             }
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
                             
-                            Text("Click Retry to attempt connection again")
+                            Text("Click Retry to attempt factory reset again")
                                 .font(.system(size: 13, weight: .medium))
                                 .padding(.top, 5)
                         }
@@ -262,7 +269,7 @@ struct ResetFactoryView: View {
                     // Main button
                     ColorButton(
                         color: isCompleted ? .green : (isResetting ? (hasError ? .orange : .gray) : .blue),
-                        title: isCompleted ? "Back" : (isResetting ? (hasError ? "Retry Connection" : "Resetting...") : "Start Factory Reset"),
+                        title: isCompleted ? "Back" : (isResetting ? (hasError ? "Retry Factory Reset" : "Resetting...") : "Start Factory Reset"),
                         textColor: .white,
                         action: {
                         if isCompleted {
@@ -316,15 +323,24 @@ struct ResetFactoryView: View {
             .padding(.bottom, isCompleted ? 20 : 0)
         }
         .frame(width: 500, height: 760) // Increased height for new buttons
+        .onAppear {
+            // Pause connection attempts when the ResetFactoryView appears
+            serialPortManager.pauseConnectionAttempts()
+        }
+        .onDisappear {
+            // Resume connection attempts when the ResetFactoryView disappears
+            serialPortManager.resumeConnectionAttempts()
+        }
     }
     
     func softRebootSerial() {
-        serialPortManager.resetHidChip()
+        // serialPortManager.resetHidChip()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             serialPortManager.closeSerialPort()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Resume connection attempts and restart
                 serialPortManager.tryOpenSerialPort()
             }
         }
@@ -336,13 +352,15 @@ struct ResetFactoryView: View {
         serialPortStatus = ""
         hasError = false  // Reset error state
         
+
+        
         // Use actual SerialPortManager for factory reset
         DispatchQueue.global(qos: .userInitiated).async {
             // Step 1: Check serial port connection
             DispatchQueue.main.async {
                 currentStep = 1
-                
-                
+
+                serialPortManager.openSerialPortForFactoryReset()
                 // Add delay to simulate checking process
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     guard let port = serialPortManager.serialPort, port.isOpen else {
@@ -350,6 +368,7 @@ struct ResetFactoryView: View {
                         serialPortStatus = "Serial port not connected or not open"
                         // Set error state
                         hasError = true
+
                         // Don't reset isResetting state, stay at current step
                         // Just update UI to show error
                         return
@@ -362,9 +381,8 @@ struct ResetFactoryView: View {
                     serialPortStatus = "Serial port connected, status normal\n (Port: \(port.path))"
                     
                     // Add more serial port info
-                    if let baudRate = port.baudRate as? NSNumber {
-                        serialPortStatus += "\nBaud rate: \(baudRate) bps"
-                    }
+                    let baudRate = port.baudRate
+                    serialPortStatus += "\nBaud rate: \(baudRate) bps"
                     
                     // Check data bits, stop bits and parity
                     serialPortStatus += "\nData bits: \(port.numberOfDataBits)"
@@ -395,33 +413,43 @@ struct ResetFactoryView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 currentStep = 3
                 
-                serialPortManager.isDeviceReady = false
-                serialPortManager.raiseRTS()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
-                    currentStep = 4
-                    serialPortManager.lowerRTS()
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        currentStep = 5
-                        serialPortManager.closeSerialPort()
-                        
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            currentStep = 6
-                            serialPortManager.tryOpenSerialPort(priorityBaudrate: SerialPortManager.ORIGINAL_BAUDRATE)
+                // Use the new resetHidChipToFactory method which handles RTS control with error checking
+                serialPortManager.resetHidChipToFactory { success in
+                    DispatchQueue.main.async {
+                        if success {
+                            // Factory reset succeeded, continue with the process
+                            self.currentStep = 4
                             
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-                                currentStep = 7
-                                softRebootSerial()
+                            // Set user baudrate to LOWBAUDRATE after factory reset
+                            UserSettings.shared.lastBaudrate = CH9329ControlChipset.LOWSPEED_BAUDRATE
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                self.currentStep = 5
+                                // Port should already be closed by resetHidChipToFactory
                                 
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-                                    currentStep = 8
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                    self.currentStep = 6
+                                    // Connection attempts should already be resumed by resetHidChipToFactory
+                                    // The method should have already tried to reopen with low baudrate
                                     
-                                    isResetting = false
-                                    isCompleted = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        self.currentStep = 7
+                                        self.softRebootSerial()
+                                        
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                            self.currentStep = 8
+                                            
+                                            self.isResetting = false
+                                            self.isCompleted = true
+                                        }
+                                    }
                                 }
                             }
+                        } else {
+                            // Factory reset failed due to RTS control issues
+                            self.hasError = true
+                            self.serialPortStatus = "Factory reset failed: Unable to control RTS signals"
+                            self.isResetting = false
                         }
                     }
                 }

@@ -1183,10 +1183,13 @@ struct ClipboardOCRSettingsView: View {
 // MARK: - Device & Connection Settings
 struct DeviceConnectionSettingsView: View {
     @ObservedObject private var hidManager = HIDManager.shared
+    @ObservedObject private var userSettings = UserSettings.shared
+    @ObservedObject private var serialPortManager = SerialPortManager.shared
     @State private var firmwareVersion = "Unknown"
     @State private var serialNumber = "Unknown"
     @State private var connectionAttempts = 0
     @State private var showingFirmwareUpdate = false
+    @State private var isUpdatingBaudrate = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -1236,6 +1239,69 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
             
+            GroupBox("Serial Port Configuration") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Preferred Baudrate:")
+                        Spacer()
+                        Picker("Baudrate", selection: $userSettings.preferredBaudrate) {
+                            ForEach(BaudrateOption.allCases, id: \.self) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                        .frame(width: 200)
+                        .onChange(of: userSettings.preferredBaudrate) { newBaudrate in
+                            if serialPortManager.isDeviceReady {
+                                isUpdatingBaudrate = true
+                                applyBaudrateChange()
+                            }
+                        }
+                    }
+                    
+                    Text(userSettings.preferredBaudrate.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        Text("Current Connection:")
+                        Spacer()
+                        if isUpdatingBaudrate {
+                            Text("Updating Baudrate...")
+                                .foregroundColor(.orange)
+                        } else if serialPortManager.isDeviceReady {
+                            Text("Connected at \(serialPortManager.baudrate) bps")
+                                .foregroundColor(.green)
+                        } else {
+                            Text("Disconnected")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .font(.caption)
+                    
+                    Text("Device will automatically reconnect when baudrate is changed")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("⚠️ Important: When changing baudrate:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.orange)
+                        
+                        Text("• Please wait a few seconds for the change to apply")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Text("• If keyboard and mouse stop working, disconnect all cables and reconnect")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(.vertical, 8)
+            }
+            
             GroupBox("Connection Management") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -1276,6 +1342,14 @@ struct DeviceConnectionSettingsView: View {
         .onAppear {
             loadDeviceInfo()
         }
+        .onChange(of: serialPortManager.isDeviceReady) { isReady in
+            // Reset the updating flag when device reconnects after baudrate change
+            if isReady && isUpdatingBaudrate {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isUpdatingBaudrate = false
+                }
+            }
+        }
         .sheet(isPresented: $showingFirmwareUpdate) {
             Text("Firmware Update Dialog")
                 .frame(width: 400, height: 300)
@@ -1286,6 +1360,55 @@ struct DeviceConnectionSettingsView: View {
         // Load device information
         firmwareVersion = "v1.0.0" // Placeholder
         serialNumber = "OT001234567" // Placeholder
+    }
+    
+    private func applyBaudrateChange() {
+        let currentBaudrate = serialPortManager.baudrate
+        let targetBaudrate = userSettings.preferredBaudrate.rawValue
+        
+        // Determine if this is a low-to-high or high-to-low change
+        let isLowToHigh = (currentBaudrate == SerialPortManager.LOWSPEED_BAUDRATE && 
+                          targetBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE)
+        let isHighToLow = (currentBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE && 
+                          targetBaudrate == SerialPortManager.LOWSPEED_BAUDRATE)
+        
+        // Give a brief moment for the port to close properly
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if isHighToLow {
+                // High speed to low speed requires factory reset
+                self.serialPortManager.resetHidChipToFactory { success in
+                    if success {
+                        // After factory reset, try to reconnect with the new baudrate
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.serialPortManager.tryOpenSerialPort(priorityBaudrate: targetBaudrate)
+                            // Reset the updating flag after attempting reconnection
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                self.isUpdatingBaudrate = false
+                            }
+                        }
+                    } else {
+                        // Reset the updating flag if factory reset failed
+                        DispatchQueue.main.async {
+                            self.isUpdatingBaudrate = false
+                        }
+                    }
+                }
+            } else if isLowToHigh {
+                // Low speed to high speed uses regular reset
+                self.serialPortManager.resetDeviceToBaudrate(targetBaudrate)
+                // Reset the updating flag after the reset operation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    self.isUpdatingBaudrate = false
+                }
+            } else {
+                // Same baudrate or other cases, use regular reset
+                self.serialPortManager.resetDeviceToBaudrate(targetBaudrate)
+                // Reset the updating flag after the reset operation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    self.isUpdatingBaudrate = false
+                }
+            }
+        }
     }
 }
 

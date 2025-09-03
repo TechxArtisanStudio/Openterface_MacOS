@@ -29,7 +29,7 @@ class Logger: LoggerProtocol {
     var KeyboardPrint = false
     var MouseEventPrint = false
     var ScrollPrint = false
-    var SerialDataPrint = false
+    var SerialDataPrint = true
     
     var logToFile = false
     

@@ -110,9 +110,9 @@ extension HIDManagerProtocol {
 }
 
 extension SerialPortManagerProtocol {
-    /// Default implementation with standard baudrate
+    /// Default implementation using last successful baudrate from user settings
     func tryOpenSerialPort() {
-        tryOpenSerialPort(priorityBaudrate: 115200)
+        tryOpenSerialPort(priorityBaudrate: nil)
     }
     
     /// Default implementation for command sending without force

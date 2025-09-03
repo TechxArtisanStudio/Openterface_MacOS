@@ -98,22 +98,28 @@ protocol SerialPortManagerProtocol: AnyObject {
     var baudrate: Int { get }
     var serialPort: ORSSerialPort? { get }
     
-    func tryOpenSerialPort(priorityBaudrate: Int)
+    func tryOpenSerialPort(priorityBaudrate: Int?)
     func tryOpenSerialPortForCH32V208()
+    func openSerialPortForFactoryReset() -> Bool 
     func closeSerialPort()
+    func openSerialPort( baudrate: Int)
+    func pauseConnectionAttempts()
+    func resumeConnectionAttempts()
+    func stopConnectionAttempts()
     func sendCommand(command: [UInt8], force: Bool)
     
     func getChipParameterCfg()
     func resetHidChip()
+    func resetHidChipToFactory(completion: @escaping (Bool) -> Void)
     func getHidInfo()
     
     // DTR/RTS control methods
     func setDTR(_ enabled: Bool)
     func lowerDTR()
     func raiseDTR()
-    func setRTS(_ enabled: Bool)
-    func lowerRTS()
-    func raiseRTS()
+    func setRTS(_ enabled: Bool) -> Bool
+    func lowerRTS() -> Bool
+    func raiseRTS() -> Bool
 }
 
 /// Protocol for audio streaming and management

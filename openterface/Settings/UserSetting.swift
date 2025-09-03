@@ -53,6 +53,13 @@ final class UserSettings: ObservableObject {
         // Load keyboard layout preference from UserDefaults
         let savedKeyboardLayout = UserDefaults.standard.string(forKey: "keyboardLayout")
         self.keyboardLayout = KeyboardLayout(rawValue: savedKeyboardLayout ?? "") ?? .mac
+        
+        // Load last successful baudrate from UserDefaults
+        self.lastBaudrate = UserDefaults.standard.object(forKey: "lastBaudrate") as? Int ?? 9600  // Default to LOWSPEED_BAUDRATE
+        
+        // Load preferred baudrate from UserDefaults
+        let savedPreferredBaudrate = UserDefaults.standard.object(forKey: "preferredBaudrate") as? Int
+        self.preferredBaudrate = BaudrateOption(rawValue: savedPreferredBaudrate ?? 115200) ?? .highSpeed
     }
     @Published var isSerialOutput: Bool
     @Published var MouseControl:MouseControlMode {
@@ -92,6 +99,20 @@ final class UserSettings: ObservableObject {
     @Published var pasteBehavior: PasteBehavior {
         didSet {
             UserDefaults.standard.set(pasteBehavior.rawValue, forKey: "pasteBehavior")
+        }
+    }
+    
+    // Last successful serial port baudrate persistence
+    @Published var lastBaudrate: Int {
+        didSet {
+            UserDefaults.standard.set(lastBaudrate, forKey: "lastBaudrate")
+        }
+    }
+    
+    // Preferred baudrate for serial port connection
+    @Published var preferredBaudrate: BaudrateOption {
+        didSet {
+            UserDefaults.standard.set(preferredBaudrate.rawValue, forKey: "preferredBaudrate")
         }
     }
 }
@@ -220,5 +241,29 @@ enum AspectRatioOption: String, CaseIterable {
     
     var toString: String {
         return self.rawValue
+    }
+}
+
+// Baudrate option enumeration
+enum BaudrateOption: Int, CaseIterable {
+    case lowSpeed = 9600
+    case highSpeed = 115200
+    
+    var displayName: String {
+        switch self {
+        case .lowSpeed:
+            return "9600 bps (Low Speed)"
+        case .highSpeed:
+            return "115200 bps (High Speed)"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .lowSpeed:
+            return "Slower, more reliable connection"
+        case .highSpeed:
+            return "Faster data transmission"
+        }
     }
 }

@@ -137,8 +137,8 @@ class BaseControlChipset: ControlChipsetProtocol {
 class CH9329ControlChipset: BaseControlChipset {
     private static let VENDOR_ID = 0x1A86
     private static let PRODUCT_ID = 0x7523
-    private static let DEFAULT_BAUDRATE = 115200
-    private static let ORIGINAL_BAUDRATE = 9600
+    public static let HIGHSPEED_BAUDRATE = 115200
+    public static let LOWSPEED_BAUDRATE = 9600
     
     private var lastCTSState: Bool?
     private var ctsMonitoringTimer: Timer?
@@ -171,7 +171,7 @@ class CH9329ControlChipset: BaseControlChipset {
     }
     
     override var supportedBaudRates: [Int] {
-        return [CH9329ControlChipset.ORIGINAL_BAUDRATE, CH9329ControlChipset.DEFAULT_BAUDRATE]
+        return [CH9329ControlChipset.LOWSPEED_BAUDRATE, CH9329ControlChipset.HIGHSPEED_BAUDRATE]
     }
     
     override func initialize() -> Bool {
@@ -223,7 +223,7 @@ class CH9329ControlChipset: BaseControlChipset {
     
     override func establishCommunication() -> Bool {
         // CH9329 requires baudrate detection and validation
-        serialManager.tryOpenSerialPort(priorityBaudrate: CH9329ControlChipset.DEFAULT_BAUDRATE)
+        serialManager.tryOpenSerialPort(priorityBaudrate: CH9329ControlChipset.HIGHSPEED_BAUDRATE)
         
         // Check if communication was established
         currentBaudRate = serialManager.baudrate
@@ -308,7 +308,7 @@ class CH9329ControlChipset: BaseControlChipset {
 class CH32V208ControlChipset: BaseControlChipset {
     private static let VENDOR_ID = 0x1A86
     private static let PRODUCT_ID = 0xFE0C
-    private static let DEFAULT_BAUDRATE = 115200
+    public static let HIGHSPEED_BAUDRATE = 115200
     
     init?() {
         let info = ChipsetInfo(
@@ -338,7 +338,7 @@ class CH32V208ControlChipset: BaseControlChipset {
     }
     
     override var supportedBaudRates: [Int] {
-        return [CH32V208ControlChipset.DEFAULT_BAUDRATE]
+        return [CH32V208ControlChipset.HIGHSPEED_BAUDRATE]
     }
     
     override func initialize() -> Bool {
@@ -382,14 +382,14 @@ class CH32V208ControlChipset: BaseControlChipset {
         serialManager.tryOpenSerialPortForCH32V208()
         
         currentBaudRate = serialManager.baudrate
-        return currentBaudRate == CH32V208ControlChipset.DEFAULT_BAUDRATE
+        return currentBaudRate == CH32V208ControlChipset.HIGHSPEED_BAUDRATE
     }
     
     override func configureDevice(baudRate: Int, mode: UInt8) -> Bool {
         // CH32V208 configuration might be different from CH9329
         // For now, it operates with fixed settings
-        if baudRate != CH32V208ControlChipset.DEFAULT_BAUDRATE {
-            logger.log(content: "⚠️ CH32V208 only supports \(CH32V208ControlChipset.DEFAULT_BAUDRATE) baud rate")
+        if baudRate != CH32V208ControlChipset.HIGHSPEED_BAUDRATE {
+            logger.log(content: "⚠️ CH32V208 only supports \(CH32V208ControlChipset.HIGHSPEED_BAUDRATE) baud rate")
             return false
         }
         
