@@ -1,0 +1,68 @@
+name: Updated Cask file on new releases
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: macos-14
+    env:
+      REPO_SLUG: TechxArtisanStudio/Openterface_MacOS
+      CASK_FILE: Casks/openterface.rb
+      ASSET_NAME: Openterface.dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version and asset URL
+        id: vars
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"  # strip leading v if present
+          ASSET_URL="https://github.com/${REPO_SLUG}/releases/download/${TAG}/${ASSET_NAME}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "asset_url=$ASSET_URL" >> $GITHUB_OUTPUT
+
+      - name: Download constant-named asset
+        shell: bash
+        run: |
+          curl -fL "${{ steps.vars.outputs.asset_url }}" -o "/tmp/${{ env.ASSET_NAME }}"
+
+      - name: Compute sha256
+        id: shasum
+        shell: bash
+        run: |
+          SHA256="$(shasum -a 256 "/tmp/${ASSET_NAME}" | awk '{print $1}')"
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Update cask file (version, sha256, url path)
+        shell: bash
+        run: |
+          V="${{ steps.vars.outputs.version }}"
+          S="${{ steps.shasum.outputs.sha256 }}"
+          TAG="${{ steps.vars.outputs.tag }}"
+          # version "..."
+          /usr/bin/sed -i '' -E "s/^(\s*version\s+\")([^\"]+)(\".*)/\1${V}\3/" "$CASK_FILE"
+          # sha256 "..."
+          /usr/bin/sed -i '' -E "s/^(\s*sha256\s+\")([0-9a-f]{64}|:no_check)(\".*)/\1${S}\3/" "$CASK_FILE"
+          # url ".../releases/download/<tag>/Openterface.dmg"
+          /usr/bin/sed -i '' -E \
+            "s#(url\s+\").*(/releases/download/).*(/)[^\"/]+(\")#\1https://github.com/${REPO_SLUG}\2${TAG}\3${ASSET_NAME}\4#" \
+            "$CASK_FILE"
+
+      - name: Show diff
+        run: git --no-pager diff -- "$CASK_FILE"
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$CASK_FILE"
+          git commit -m "cask(openterface): bump to ${{ steps.vars.outputs.version }} (constant asset name)"
+          git push
