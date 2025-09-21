@@ -50,10 +50,6 @@ jobs:
           /usr/bin/sed -i '' -E "s/^(\s*version\s+\")([^\"]+)(\".*)/\1${V}\3/" "$CASK_FILE"
           # sha256 "..."
           /usr/bin/sed -i '' -E "s/^(\s*sha256\s+\")([0-9a-f]{64}|:no_check)(\".*)/\1${S}\3/" "$CASK_FILE"
-          # url ".../releases/download/<tag>/Openterface.dmg"
-          /usr/bin/sed -i '' -E \
-            "s#(url\s+\").*(/releases/download/).*(/)[^\"/]+(\")#\1https://github.com/${REPO_SLUG}\2${TAG}\3${ASSET_NAME}\4#" \
-            "$CASK_FILE"
 
       - name: Show diff
         run: git --no-pager diff -- "$CASK_FILE"
