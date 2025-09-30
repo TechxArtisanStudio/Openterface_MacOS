@@ -52,12 +52,6 @@ struct openterfaceApp: App {
     init() {
         // Setup dependencies before UI construction to ensure they're available
         AppDelegate.setupDependencies(container: DependencyContainer.shared)
-        
-        // Initialize audio after dependencies are set up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let audioMgr = DependencyContainer.shared.resolve(AudioManagerProtocol.self)
-            audioMgr.initializeAudio()
-        }
     }
     
     @State private var logModeTitle = "No logging ✓"
@@ -91,6 +85,8 @@ struct openterfaceApp: App {
     // Add serial port information state variables
     @State private var _serialPortName: String = "N/A"
     @State private var _serialPortBaudRate: Int = 0
+
+    @State private var audioInitialized = false
 
     var log: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -325,6 +321,11 @@ struct openterfaceApp: App {
                         if _serialPortBaudRate != newSerialPortBaudRate {
                             _serialPortBaudRate = newSerialPortBaudRate
                             stateChanged = true
+                        }
+                        
+                        if !audioInitialized && newSerialPortName != "N/A" && !newSerialPortName.isEmpty {
+                            audioManager.initializeAudio()
+                            audioInitialized = true
                         }
                         
                         if _isAudioEnabled != newAudioEnabled {
@@ -721,7 +722,6 @@ struct openterfaceApp: App {
     
     func handleSwitchToggle(isOn: Bool) {
         logger.log(content: "🔄 USB switch toggle called: \(isOn ? "Target" : "Host")")
-        print("🔄 DEBUG: USB switch toggle called: \(isOn ? "Target" : "Host")") // Additional debug
         
         if isOn {
             logger.log(content: "Setting USB to Target")
@@ -735,13 +735,19 @@ struct openterfaceApp: App {
         AppStatus.isSwitchToggleOn = isOn
         logger.log(content: "Updated AppStatus.isSwitchToggleOn to: \(isOn)")
         
-        let ser = serialPortManager
-        logger.log(content: "Raising DTR signal")
-        ser.raiseDTR()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            self.logger.log(content: "Lowering DTR signal")
-            ser.lowerDTR()
+        // Only apply DTR signal for MS2109 chipset
+        if AppStatus.videoChipsetType == .ms2109 {
+            let ser = serialPortManager
+            logger.log(content: "Raising DTR signal")
+            ser.raiseDTR()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                self.logger.log(content: "Lowering DTR signal")
+                ser.lowerDTR()
+            }
+        }else{
+            //TODO: Consider adding support for other chipsets if needed
+            logger.log(content: "Skipping DTR signal for non-MS2109 chipset")
         }
     }
     
@@ -867,13 +873,15 @@ final class AppState: ObservableObject {
                 hidManager.setUSBtoHost()
             }
             
-            // Raise and lower DTR signal
-            self.logger.log(content: "Shortcut: Raising DTR signal")
-            serialPortManager.raiseDTR()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                self.logger.log(content: "Shortcut: Lowering DTR signal")
-                serialPortManager.lowerDTR()
+            // Raise and lower DTR signal only for MS2109 chipset
+            if AppStatus.videoChipsetType != .ms2109 {
+                self.logger.log(content: "Shortcut: Raising DTR signal")
+                serialPortManager.raiseDTR()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    self.logger.log(content: "Shortcut: Lowering DTR signal")
+                    serialPortManager.lowerDTR()
+                }
             }
         }
         
@@ -1148,7 +1156,7 @@ struct AudioSourceMenuContent: View {
             }
         }
         .onAppear {
-            audioManager.updateAvailableAudioDevices()
+//            audioManager.updateAvailableAudioDevices()
         }
     }
 }

@@ -572,6 +572,10 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     // MARK: - Key Press Handling
     
     private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+        if !AppStatus.isControlChipsetReady {
+            return event
+        }
+        
         let modifiers = event.modifierFlags
         let modifierDescription = modifierFlagsDescription(modifiers)
         
@@ -609,6 +613,10 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     }
     
     private func handleKeyUp(_ event: NSEvent) -> NSEvent? {
+        if !AppStatus.isControlChipsetReady {
+            return event
+        }
+        
         let modifiers = event.modifierFlags
         let modifierDescription = modifierFlagsDescription(modifiers)
         

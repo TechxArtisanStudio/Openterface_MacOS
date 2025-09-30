@@ -100,9 +100,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
     }
     
     // Get all available audio input and output devices
-    func updateAvailableAudioDevices() {
-        print("AudioManager: updateAvailableAudioDevices() called")
-        
+    func updateAvailableAudioDevices() {        
         // Test: Try to get default input device first
         var defaultInputDeviceID: AudioDeviceID = 0
         var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
@@ -123,10 +121,10 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         
         if defaultResult == noErr && defaultInputDeviceID != kAudioObjectUnknown {
             if let defaultDeviceName = getAudioDeviceName(for: defaultInputDeviceID) {
-                print("AudioManager: Default input device: \(defaultDeviceName) (ID: \(defaultInputDeviceID))")
+                logger.log(content: "AudioManager: Default input device: \(defaultDeviceName) (ID: \(defaultInputDeviceID))")
             }
         } else {
-            print("AudioManager: No default input device found or error: \(defaultResult)")
+            logger.log(content: "AudioManager: No default input device found or error: \(defaultResult)")
         }
         
         var propSize: UInt32 = 0
@@ -146,14 +144,14 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         )
         
         guard result == noErr else {
-            print("AudioManager: Failed to get property data size, error: \(result)")
+            logger.log(content: "AudioManager: Failed to get property data size, error: \(result)")
             return
         }
 
         // Calculate device count and prepare array
         let deviceCount = Int(propSize) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = Array<AudioDeviceID>(repeating: 0, count: deviceCount)
-        print("AudioManager: Found \(deviceCount) total audio devices")
+        logger.log(content: "AudioManager: Found \(deviceCount) total audio devices")
 
         // Get device IDs
         result = AudioObjectGetPropertyData(
@@ -166,7 +164,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         )
         
         guard result == noErr else {
-            print("AudioManager: Failed to get device IDs, error: \(result)")
+            logger.log(content: "AudioManager: Failed to get device IDs, error: \(result)")
             return
         }
 
@@ -179,8 +177,6 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             if let deviceName = getAudioDeviceName(for: deviceID) {
                 let isInput = isInputDevice(deviceID: deviceID)
                 let isOutput = isOutputDevice(deviceID: deviceID)
-                print("AudioManager: Device: \(deviceName) (ID: \(deviceID), Input: \(isInput), Output: \(isOutput))")
-                
 
                 if isInput {
                     let audioDevice = AudioDevice(deviceID: deviceID, name: deviceName, isInput: true)
@@ -188,12 +184,15 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                         continue
                     }
                     inputDevices.append(audioDevice)
-                    print("AudioManager: Added input device: \(deviceName)")
+                    logger.log(content: "Found input device: \(deviceName)")
                     
                     // Mark OpenterfaceA device for selection
                     if deviceName == "OpenterfaceA" {
                         openterfaceDevice = audioDevice
-                        print("AudioManager: OpenterfaceA device found!")
+                        logger.log(content: "AudioManager: OpenterfaceA device found!")
+                    }else if deviceName == "USB2 Digital Audio" {
+                        openterfaceDevice = audioDevice
+                        logger.log(content: "AudioManager: Opeterface KVM Go auddio device found!")
                     }
                 }
                 
@@ -203,33 +202,33 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                         continue
                     }
                     outputDevices.append(audioDevice)
-                    print("AudioManager: Added output device: \(deviceName)")
+                    logger.log(content: "Found output device: \(deviceName)")
                 }
             }
         }
         
-        print("AudioManager: Total input devices found: \(inputDevices.count)")
-        print("AudioManager: Total output devices found: \(outputDevices.count)")
-        
+        logger.log(content: "Total input devices found: \(inputDevices.count)")
+        logger.log(content: "Total output devices found: \(outputDevices.count)")
+
         // Update UI on main queue - both devices list and selection together
         DispatchQueue.main.async {
             self.availableInputDevices = inputDevices
             self.availableOutputDevices = outputDevices
             
-            print("AudioManager: Updated device arrays")
+            self.logger.log(content: "AudioManager: Updated device arrays")
             
             // Only auto-select OpenterfaceA if no input device is currently selected
             if let openterfaceDevice = openterfaceDevice, self.selectedInputDevice == nil {
                 self.selectedInputDevice = openterfaceDevice
 
-                print("AudioManager: Auto-selected OpenterfaceA as default audio input")
+                self.logger.log(content: "AudioManager: Auto-selected OpenterfaceA as default audio input")
                 self.logger.log(content: "Auto-selected OpenterfaceA as default audio input")
             }
             
             // Auto-select first available output device if none selected
             if self.selectedOutputDevice == nil && !outputDevices.isEmpty {
                 self.selectedOutputDevice = outputDevices.first!
-                print("AudioManager: Auto-selected first output device: \(outputDevices.first!.name)")
+                self.logger.log(content: "AudioManager: Auto-selected first output device: \(outputDevices.first!.name)")
                 self.logger.log(content: "Auto-selected first output device: \(outputDevices.first!.name)")
             }
         }

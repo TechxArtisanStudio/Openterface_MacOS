@@ -37,6 +37,13 @@ struct ClipboardItem: Hashable {
         self.source = source
     }
     
+    init(content: String, source: ClipboardSource, timestamp: Date) {
+        self.id = UUID()
+        self.content = content
+        self.timestamp = timestamp
+        self.source = source
+    }
+    
     // Hashable conformance
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -175,11 +182,12 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     
     private func loadHistoryFromUserDefaults() {
         if let data = UserDefaults.standard.data(forKey: "ClipboardHistory"),
-           let decoded = try? JSONDecoder().decode([ClipboardItemData].self, from: data) {
+           let decoded = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, ClipboardItemData.self], from: data) as? [ClipboardItemData] {
             clipboardHistory = decoded.map { itemData in
                 ClipboardItem(
                     content: itemData.content,
-                    source: ClipboardSource(rawValue: itemData.source) ?? .external
+                    source: ClipboardSource(rawValue: itemData.source) ?? .external,
+                    timestamp: itemData.timestamp
                 )
             }
         }
@@ -194,7 +202,7 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
             )
         }
         
-        if let encoded = try? JSONEncoder().encode(itemsData) {
+        if let encoded = try? NSKeyedArchiver.archivedData(withRootObject: itemsData, requiringSecureCoding: true) {
             UserDefaults.standard.set(encoded, forKey: "ClipboardHistory")
         }
     }
@@ -275,9 +283,32 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     }
 }
 
-// Helper struct for UserDefaults persistence
-private struct ClipboardItemData: Codable {
+// Helper class for UserDefaults persistence
+@objc(ClipboardItemData)
+private class ClipboardItemData: NSObject, NSSecureCoding {
+    static var supportsSecureCoding: Bool = true
+    
     let content: String
     let source: String
     let timestamp: Date
+    
+    init(content: String, source: String, timestamp: Date) {
+        self.content = content
+        self.source = source
+        self.timestamp = timestamp
+    }
+    
+    required init?(coder: NSCoder) {
+        // Use secure decoding with specific allowed classes
+        let allowedClasses = [NSString.self, NSDate.self]
+        content = coder.decodeObject(of: allowedClasses, forKey: "content") as? String ?? ""
+        source = coder.decodeObject(of: allowedClasses, forKey: "source") as? String ?? ""
+        timestamp = coder.decodeObject(of: allowedClasses, forKey: "timestamp") as? Date ?? Date()
+    }
+    
+    func encode(with coder: NSCoder) {
+        coder.encode(content, forKey: "content")
+        coder.encode(source, forKey: "source")
+        coder.encode(timestamp, forKey: "timestamp")
+    }
 }

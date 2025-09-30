@@ -34,8 +34,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     let MS2019_VID = 0x534D
     let MS2019_PID = 0x2109
 
-    let MS2130_VID = 0x345F
-    let MS2130_PID = 0x2130
+    let MS2130S_VID = MS2130SVideoChipset.VENDOR_ID
+    let MS2130S_PID = MS2130SVideoChipset.PRODUCT_ID
 
     let WCH_VID = 0x1A86
     let CH9329_PID = 0x7523
@@ -44,7 +44,11 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     // Hold references to specific chipset devices
     var videoChipDevice: USBDeviceInfo?
     var controlChipDevice: USBDeviceInfo?
-
+    
+    init(){
+        self.update()
+    }
+    
     func update() {
         // get usb devices info
         let _d: [USBDeviceInfo] = getUSBDevices()
@@ -135,7 +139,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     }
     
     func isOpenterfaceVideoChipset(vendorId:Int, productId:Int) -> Bool{
-        return (vendorId == MS2019_VID && productId == MS2019_PID) || (vendorId == MS2130_VID && productId == MS2130_PID)
+        return (vendorId == MS2019_VID && productId == MS2019_PID) || (vendorId == MS2130S_VID && productId == MS2130S_PID)
     }
 
     func isOpenterfaceControlChipset(vendorId:Int, productId:Int) -> Bool{
@@ -168,8 +172,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     func getVideoChipsetType(vendorId: Int, productId: Int) -> VideoChipsetType {
         if vendorId == MS2019_VID && productId == MS2019_PID {
             return .ms2109
-        } else if vendorId == MS2130_VID && productId == MS2130_PID {
-            return .ms2130
+        } else if vendorId == MS2130S_VID && productId == MS2130S_PID {
+            return .ms2130s
         } else {
             return .unknown
         }
@@ -273,10 +277,10 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         return AppStatus.videoChipsetType == .ms2109
     }
     
-    /// Check if the currently connected device is MS2130 video chipset
-    /// - Returns: True if MS2130 is connected, false otherwise
-    func isMS2130Connected() -> Bool {
-        return AppStatus.videoChipsetType == .ms2130
+    /// Check if the currently connected device is MS2130S video chipset
+    /// - Returns: True if MS2130S is connected, false otherwise
+    func isMS2130SConnected() -> Bool {
+        return AppStatus.videoChipsetType == .ms2130s
     }
     
     /// Check if the currently connected device is CH9329 control chipset
@@ -291,7 +295,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         return AppStatus.controlChipsetType == .ch32v208
     }
     
-    /// Check if any video chipset (MS2109 or MS2130) is connected
+    /// Check if any video chipset (MS2109 or MS2130S) is connected
     /// - Returns: True if any video chipset is connected, false otherwise
     func isVideoChipsetConnected() -> Bool {
         return AppStatus.videoChipsetType != .unknown
@@ -315,8 +319,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         switch AppStatus.videoChipsetType {
         case .ms2109:
             return "MS2109"
-        case .ms2130:
-            return "MS2130"
+        case .ms2130s:
+            return "MS2130S"
         case .unknown:
             return "Unknown"
         }
@@ -464,7 +468,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 for group in groupedDevices {
                     // Look for video device if not found yet
                     if defaultVideoDevice == nil {
-                        defaultVideoDevice = group.first { $0.productName.contains("Openterface") || $0.productName.contains("Capture Card")}
+                        defaultVideoDevice = group.first { $0.productName.contains("Openterface") || $0.productName.contains("Unknown Capture")}
                     }
                     
                     // Look for serial device if not found yet

@@ -30,7 +30,6 @@ class BaseControlChipset: ControlChipsetProtocol {
     let chipsetInfo: ChipsetInfo
     let capabilities: ChipsetCapabilities
     var isConnected: Bool = false
-    var isDeviceReady: Bool = false
     var currentBaudRate: Int = 0
     
     internal var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
@@ -51,13 +50,16 @@ class BaseControlChipset: ControlChipsetProtocol {
         fatalError("Must be implemented by subclass")
     }
     
+    var isDeviceReady: Bool {
+        return serialManager.isDeviceReady
+    }
+    
     func initialize() -> Bool {
         fatalError("Must be implemented by subclass")
     }
     
     func deinitialize() {
         isConnected = false
-        isDeviceReady = false
         logger.log(content: "🔄 Control Chipset \(chipsetInfo.name) deinitialized")
     }
     
@@ -187,8 +189,8 @@ class CH9329ControlChipset: BaseControlChipset {
             return true
         }
         
-        logger.log(content: "❌ CH9329 chipset initialization failed")
-        return false
+//        logger.log(content: "❌ CH9329 chipset initialization failed")
+        return true
     }
     
     override func deinitialize() {
@@ -213,17 +215,13 @@ class CH9329ControlChipset: BaseControlChipset {
         // Validate by sending a parameter configuration request
         serialManager.getChipParameterCfg()
         
-        // Wait briefly for response and check if device is ready
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.isDeviceReady = self?.serialManager.isDeviceReady ?? false
-        }
-        
+        // Connection validation is handled asynchronously by the serial manager
         return true
     }
     
     override func establishCommunication() -> Bool {
         // CH9329 requires baudrate detection and validation
-        serialManager.tryOpenSerialPort(priorityBaudrate: CH9329ControlChipset.HIGHSPEED_BAUDRATE)
+        serialManager.tryOpenSerialPort()
         
         // Check if communication was established
         currentBaudRate = serialManager.baudrate
@@ -349,7 +347,6 @@ class CH32V208ControlChipset: BaseControlChipset {
         
         if establishCommunication() {
             isConnected = true
-            isDeviceReady = true // CH32V208 is ready immediately after connection
             logger.log(content: "✅ CH32V208 chipset initialized successfully")
             return true
         }
@@ -382,7 +379,13 @@ class CH32V208ControlChipset: BaseControlChipset {
         serialManager.tryOpenSerialPortForCH32V208()
         
         currentBaudRate = serialManager.baudrate
-        return currentBaudRate == CH32V208ControlChipset.HIGHSPEED_BAUDRATE
+        let success = currentBaudRate == CH32V208ControlChipset.HIGHSPEED_BAUDRATE
+        
+        if success {
+            serialManager.isDeviceReady = true
+        }
+        
+        return success
     }
     
     override func configureDevice(baudRate: Int, mode: UInt8) -> Bool {

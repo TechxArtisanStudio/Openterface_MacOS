@@ -37,7 +37,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     
     var manager: IOHIDManager!
     @Published var device: IOHIDDevice?
-    @Published var isOpen: Bool?
+    @Published var isOpen: Bool = false
     
     private var timer: DispatchSourceTimer?
     private let queue = DispatchQueue(label: "com.openterface.hidCommunicator", qos: .background)
@@ -58,6 +58,10 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func startCommunication() {
+        if !self.isOpen {
+            self.startHID()
+        }
+        
         AppStatus.isSwitchToggleOn = self.getSwitchStatus()
   
         timer = DispatchSource.makeTimerSource(queue: queue)
@@ -68,24 +72,28 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             } else if AppStatus.isHIDOpen == false {
                 self?.logger.log(content: "HID device exists but failed to open - check device permissions and connectivity")
             } else {
-                // Get switch and HDMI status since HID device is now open and ready
-                //  HID has been opened!
-                self?.getSwitchStatus()
-                self?.getHDMIStatus()
-                if let _status = self?.getHardwareConnetionStatus() {
-                    AppStatus.isHardwareConnetionToTarget = _status
-                }
+                // Only perform regular checks for MS2109 chipset
+                // TODO will remove this limitation after testing with MS2130S
+                if AppStatus.videoChipsetType == .ms2109 {
+                    // Get switch and HDMI status since HID device is now open and ready
+                    //  HID has been opened!
+                    self?.getSwitchStatus()
+                    self?.getHDMIStatus()
+                    if let _status = self?.getHardwareConnetionStatus() {
+                        AppStatus.isHardwareConnetionToTarget = _status
+                    }
 
-                AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
-                AppStatus.hidReadFps = self?.getFps() ?? 0
-                AppStatus.MS2109Version = self?.getVersion() ?? ""
-                AppStatus.hidReadPixelClock = self?.getPixelClock() ?? 0
-                AppStatus.hidInputHTotal = UInt32(self?.getInputHTotal() ?? 0)
-                AppStatus.hidInputVTotal = UInt32(self?.getInputVTotal() ?? 0)
-                AppStatus.hidInputHst = UInt32(self?.getInputHst() ?? 0)
-                AppStatus.hidInputVst = UInt32(self?.getInputVst() ?? 0)
-                AppStatus.hidInputHsyncWidth = UInt32(self?.getInputHsyncWidth() ?? 0)
-                AppStatus.hidInputVsyncWidth = UInt32(self?.getInputVsyncWidth() ?? 0)
+                    AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
+                    AppStatus.hidReadFps = self?.getFps() ?? 0
+                    AppStatus.MS2109Version = self?.getVersion() ?? ""
+                    AppStatus.hidReadPixelClock = self?.getPixelClock() ?? 0
+                    AppStatus.hidInputHTotal = UInt32(self?.getInputHTotal() ?? 0)
+                    AppStatus.hidInputVTotal = UInt32(self?.getInputVTotal() ?? 0)
+                    AppStatus.hidInputHst = UInt32(self?.getInputHst() ?? 0)
+                    AppStatus.hidInputVst = UInt32(self?.getInputVst() ?? 0)
+                    AppStatus.hidInputHsyncWidth = UInt32(self?.getInputHsyncWidth() ?? 0)
+                    AppStatus.hidInputVsyncWidth = UInt32(self?.getInputVsyncWidth() ?? 0)
+                }
             }
         }
         timer?.resume()
@@ -125,7 +133,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
                     AppStatus.isHIDOpen = false
                 }
             } else {
-                self.isOpen = nil
+                self.isOpen = false
                 AppStatus.isHIDOpen = nil
             }
         }

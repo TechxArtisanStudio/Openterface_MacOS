@@ -61,7 +61,7 @@ protocol VideoManagerProtocol: AnyObject {
 /// Protocol for HID device communication and hardware control
 protocol HIDManagerProtocol: AnyObject {
     var device: IOHIDDevice? { get }
-    var isOpen: Bool? { get }
+    var isOpen: Bool { get }
     
     func startHID()
     func closeHID()

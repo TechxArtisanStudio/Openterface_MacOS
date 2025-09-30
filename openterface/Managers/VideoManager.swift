@@ -432,14 +432,19 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         
         logger.log(content: "Starting video session...")
         
-        // Start session directly in current thread, avoiding extra asynchronous operations
-        captureSession.startRunning()
-        
-        // Log record
-        logger.log(content: "Video session started successfully")
-        
-        // Reset start flag
-        isVideoSessionStarting = false
+        // Delay capture session start by 1 second to avoid crash
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self else { return }
+            
+            // Start session directly in current thread, avoiding extra asynchronous operations
+            self.captureSession.startRunning()
+            
+            // Log record
+            self.logger.log(content: "Video session started successfully")
+            
+            // Reset start flag
+            self.isVideoSessionStarting = false
+        }
     }
 
     /// Stops video capture session

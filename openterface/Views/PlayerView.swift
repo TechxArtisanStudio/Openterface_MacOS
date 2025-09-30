@@ -274,6 +274,10 @@ class PlayerView: NSView, NSWindowDelegate {
     }
 
     private func handleMouseMovement(with event: NSEvent, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
+        if !AppStatus.isControlChipsetReady {
+            return
+        }
+        
         if UserSettings.shared.MouseControl == .relativeHID {
             // In HID mode, events are handled by the HID monitor in MouseManager
             // Only handle cursor hiding/showing for clicks, but not the movement itself

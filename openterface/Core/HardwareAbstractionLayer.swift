@@ -179,12 +179,12 @@ class HardwareAbstractionLayer {
             }
         }
         
-        // Check for MS2130 chipset
-        if let ms2130 = MS2130VideoChipset() {
-            if ms2130.detectDevice() && ms2130.initialize() {
-                videoChipset = ms2130
-                AppStatus.videoChipsetType = .ms2130
-                logger.log(content: "✅ HAL: MS2130 video chipset detected and initialized")
+        // Check for MS2130S chipset
+        if let ms2130s = MS2130SVideoChipset() {
+            if ms2130s.detectDevice() && ms2130s.initialize() {
+                videoChipset = ms2130s
+                AppStatus.videoChipsetType = .ms2130s
+                logger.log(content: "✅ HAL: MS2130S video chipset detected and initialized")
                 return true
             }
         }

@@ -153,8 +153,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     override init(){
         super.init()
-
-        self.initializeSerialPort()
+        
+//        self.initializeSerialPort()
         self.observerSerialPortNotifications()
     }
     
@@ -162,6 +162,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         // If the usb device is connected, try to open the serial port
         if logger.SerialDataPrint { logger.log(content: "Initializing Serial Port") }
 
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self else { return }
+            self.tryConnectOpenterface()
+        }
+    }
+    
+    func tryConnectOpenterface(){
         USBDevicesManager.shared.update()
         if USBDevicesManager.shared.isOpenterfaceConnected(){
             // Check if CH32V208 is connected - if so, use direct connection
@@ -173,7 +180,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             }
         }
     }
-    
+
     private func observerSerialPortNotifications() {
         print("observerSerialPortNotifications")
         let serialPortNtf = NotificationCenter.default
@@ -184,14 +191,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     @objc func serialPortsWereConnected(_ notification: Notification) {
         if !self.isTrying && !self.isPaused {
-            // Check if CH32V208 is connected - if so, use direct connection
-            USBDevicesManager.shared.update()
-            if USBDevicesManager.shared.isCH32V208Connected() {
-                logger.log(content: "CH32V208 detected on port connection - using direct serial port connection")
-                self.tryOpenSerialPortForCH32V208()
-            } else {
-                self.tryOpenSerialPort()
-            }
+            self.tryConnectOpenterface()
         } else if self.isPaused {
             logger.log(content: "Serial port connected but connection attempts are paused")
         }
@@ -258,6 +258,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
 
         if logger.SerialDataPrint { logger.log(content: "Serial port was closed") }
+
     }
     
     /*
@@ -325,6 +326,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
             if chksum == checksum {
                 self.isDeviceReady = true
+                
                 handleSerialData(data: messageData)
             } else {
                 let errorDataString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
@@ -565,25 +567,33 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func openSerialPort( baudrate: Int) {
-
+        self.logger.log(content: "Opening serial port at baudrate: \(baudrate)")
         self.serialPort?.baudRate = NSNumber(value: baudrate)
         self.serialPort?.delegate = self
         
         if let port = self.serialPort {
-            port.open()
             if port.isOpen {
+                logger.log(content: "Serial is already opened.")
                 
-                
-                // update AppStatus info
-                AppStatus.serialPortBaudRate = port.baudRate.intValue
-                if let portPath = port.path as String? {
-                    AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
+            }else{
+                port.open()
+                if port.isOpen {
+
+                    // Successfully opened the serial port
+                    print("Serial port opened successfully")
+                    // update AppStatus info
+                    AppStatus.serialPortBaudRate = port.baudRate.intValue
+                    if let portPath = port.path as String? {
+                        AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
+                    }
+                    
+                    self.baudrate = port.baudRate.intValue
+                } else {
+                    print("the serial port fail to open")
                 }
-                
-                self.baudrate = port.baudRate.intValue
-            } else {
-                print("the serial port fail to open")
             }
+        } else {
+            print("no serial port selected")
         }
 
     }
@@ -678,12 +688,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func sendCommand(command: [UInt8], force: Bool = false) {
-        guard let serialPort = self.serialPort , serialPort.isOpen else {
+        guard let serialPort = self.serialPort else {
+            if logger.SerialDataPrint {
+                logger.log(content: "No Serial port for send command...")
+            }
+            return
+        }
+        if !serialPort.isOpen {
             if logger.SerialDataPrint {
                 logger.log(content: "Serial port is not open or not selected")
             }
             return
         }
+
     
         // Create a mutable command and append the checksum
         var mutableCommand = command
@@ -970,8 +987,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 self.isDeviceReady = true
                 logger.log(content: "CH32V208 serial port opened successfully and device is ready")
                 
-                // Start the CTS monitoring timer for HID event detection
-                self.startCTSMonitoring()
             } else {
                 logger.log(content: "Failed to open CH32V208 serial port")
             }

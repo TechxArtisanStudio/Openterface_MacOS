@@ -29,7 +29,7 @@ private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerPr
 // Enum to represent different video chipset types
 enum VideoChipsetType {
     case ms2109    // MS2019 VID with MS2109 PID
-    case ms2130    // MS2130 VID with MS2130 PID
+    case ms2130s    // MS2130S VID with MS2130S PID
     case unknown   // No video chipset detected or unknown type
 }
 

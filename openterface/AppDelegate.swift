@@ -68,6 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     static func setupDependencies(container: DependencyContainer) {
         // Register concrete implementations with their protocols
         container.register(LoggerProtocol.self, instance: Logger.shared as any LoggerProtocol)
+        container.register(USBDevicesManagerProtocol.self, instance: USBDevicesManager.shared as any USBDevicesManagerProtocol)
+        container.register(HIDManagerProtocol.self, instance: HIDManager.shared as any HIDManagerProtocol)
         container.register(AudioManagerProtocol.self, instance: AudioManager.shared as any AudioManagerProtocol)
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
         container.register(MouseManagerProtocol.self, instance: MouseManager.shared as any MouseManagerProtocol)
@@ -76,7 +78,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(HostManagerProtocol.self, instance: HostManager.shared as any HostManagerProtocol)
         container.register(StatusBarManagerProtocol.self, instance: StatusBarManager() as any StatusBarManagerProtocol)
         container.register(TipLayerManagerProtocol.self, instance: TipLayerManager() as any TipLayerManagerProtocol)
-        container.register(HIDManagerProtocol.self, instance: HIDManager.shared as any HIDManagerProtocol)
         container.register(ClipboardManagerProtocol.self, instance: ClipboardManager.shared as any ClipboardManagerProtocol)
         container.register(FloatingKeyboardManagerProtocol.self, instance: FloatingKeyboardManager() as any FloatingKeyboardManagerProtocol)
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
@@ -87,11 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if #available(macOS 12.3, *) {
             container.register(OCRManagerProtocol.self, instance: OCRManager.shared as any OCRManagerProtocol)
         }
-        
-        // USB Devices Manager (macOS 12.0+ only) - Register before VideoManager since VideoManager depends on it
-        if #available(macOS 12.0, *) {
-            container.register(USBDevicesManagerProtocol.self, instance: USBDevicesManager.shared as any USBDevicesManagerProtocol)
-        }
+    
         
         // Register VideoManager after USBDevicesManager to avoid dependency resolution issues
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
