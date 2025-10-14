@@ -61,42 +61,6 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         if !self.isOpen {
             self.startHID()
         }
-        
-        AppStatus.isSwitchToggleOn = self.getSwitchStatus()
-  
-        timer = DispatchSource.makeTimerSource(queue: queue)
-        timer?.schedule(deadline: .now(), repeating: .seconds(1))
-        timer?.setEventHandler { [weak self] in
-            if AppStatus.isHIDOpen == nil {
-                self?.logger.log(content: "No HID device detected during communication check")
-            } else if AppStatus.isHIDOpen == false {
-                self?.logger.log(content: "HID device exists but failed to open - check device permissions and connectivity")
-            } else {
-                // Only perform regular checks for MS2109 chipset
-                // TODO will remove this limitation after testing with MS2130S
-                if AppStatus.videoChipsetType == .ms2109 {
-                    // Get switch and HDMI status since HID device is now open and ready
-                    //  HID has been opened!
-                    self?.getSwitchStatus()
-                    self?.getHDMIStatus()
-                    if let _status = self?.getHardwareConnetionStatus() {
-                        AppStatus.isHardwareConnetionToTarget = _status
-                    }
-
-                    AppStatus.hidReadResolusion = self?.getResolution() ?? (width: 0, height: 0)
-                    AppStatus.hidReadFps = self?.getFps() ?? 0
-                    AppStatus.MS2109Version = self?.getVersion() ?? ""
-                    AppStatus.hidReadPixelClock = self?.getPixelClock() ?? 0
-                    AppStatus.hidInputHTotal = UInt32(self?.getInputHTotal() ?? 0)
-                    AppStatus.hidInputVTotal = UInt32(self?.getInputVTotal() ?? 0)
-                    AppStatus.hidInputHst = UInt32(self?.getInputHst() ?? 0)
-                    AppStatus.hidInputVst = UInt32(self?.getInputVst() ?? 0)
-                    AppStatus.hidInputHsyncWidth = UInt32(self?.getInputHsyncWidth() ?? 0)
-                    AppStatus.hidInputVsyncWidth = UInt32(self?.getInputVsyncWidth() ?? 0)
-                }
-            }
-        }
-        timer?.resume()
     }
 
 
@@ -154,29 +118,21 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     
     /// Stops all repeating HID operations while keeping the HID connection open
     /// This is used during firmware updates to prevent interference with EEPROM operations
+    /// Note: Periodic operations are now handled by HAL's PeriodicHALUpdates
     func stopAllHIDOperations() {
         logger.log(content: "Stopping all repeating HID operations for firmware update...")
         
-        // Stop the timer that performs repeated HID operations
-        timer?.cancel()
-        timer = nil
-        
-        logger.log(content: "All repeating HID operations stopped. HID connection remains open for firmware update.")
+        // Periodic operations are now managed by HAL
+        logger.log(content: "Periodic HID operations are handled by HAL's PeriodicHALUpdates.")
     }
     
     /// Restarts repeating HID operations after firmware update is complete
+    /// Note: Periodic operations are now handled by HAL's PeriodicHALUpdates
     func restartHIDOperations() {
         logger.log(content: "Restarting HID operations after firmware update...")
         
-        // Only restart if we have a valid HID device connection
-        guard device != nil, isOpen == true else {
-            logger.log(content: "Cannot restart HID operations - no valid HID device connection")
-            return
-        }
-        
-        // Restart the communication timer
-        startCommunication()
-        logger.log(content: "HID operations restarted successfully")
+        // Periodic operations are now managed by HAL
+        logger.log(content: "HID operations restarted via HAL's PeriodicHALUpdates.")
     }
     
     // read date from HID device
@@ -186,14 +142,17 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             return nil
         }
 
-        var report = [UInt8](repeating: 0, count: 9)
+        // Use larger buffer to accommodate different chipset report formats
+        // MS2109: 9 bytes, MS2130S: 11 bytes
+        var report = [UInt8](repeating: 0, count: 11)
         var reportLength = report.count
         
-        let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeInput, CFIndex(0), &report, &reportLength)
+        let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, self.getReportID(), &report, &reportLength)
         
         if result == kIOReturnSuccess {
             return Array(report[0..<reportLength])
         } else {
+            logger.log(content: "Failed to read HID report - error code: \(result). \(self.interpretIOReturn(result))")
             return nil
         }
     }
@@ -202,8 +161,13 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     func sendHIDReport(report: [UInt8]) {
         guard let device = self.device else { return }
         var report = report
+        let hexString = report.map { String(format: "%02X", $0) }.joined(separator: " ")
+        logger.log(content: "HID Input Report: \(hexString), with report ID: \(self.getReportID())  ")
 
-        _ = IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, CFIndex(0), &report, report.count)
+        let result = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, self.getReportID(), &report, report.count)
+        if result != kIOReturnSuccess {
+            logger.log(content: "Failed to send HID report - error code: \(result). \(self.interpretIOReturn(result))")
+        }
     }
     
     func sendAndReadHIDReport(_ report: [UInt8]) -> [UInt8]? {
@@ -211,6 +175,31 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         return readHIDReport()
     }
     
+    func sendAndReadHIDReportAsUInt8(_ report: [UInt8]) -> UInt8? {
+        guard let response = sendAndReadHIDReport(report) else { return nil }
+        //for ms2109, the value at index 3 is the data we want
+        //for ms2130s, the value at index 4 as 01 report id at index 0, command at index 1, address high at index 2, address low at index 3, data at index 4
+        let valueIndex = (getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2130s)) ? 4 : 3
+        return response.count > valueIndex ? response[valueIndex] : nil
+    }
+
+    func sendAndReadHIDReportAsUInt16(_ report: [UInt8]) -> UInt16? {
+        guard let response = sendAndReadHIDReport(report) else { return nil }
+        guard response.count > 4 else { return nil }
+        let valueIndex = (getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2130s)) ? 4 : 3
+        // For ms2109, only one byte is returned, so we need to read next address to get the full UInt16
+        if getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2109) {
+            // highByte first as it's big-endian
+            let highByte = response[valueIndex]
+            let lowReport = generateHIDReport(address: (UInt16(response[1]) << 8) | UInt16(response[2]) + 1)
+            guard let lowResponse = sendAndReadHIDReport(lowReport), lowResponse.count > valueIndex else { return nil }
+            let lowByte = lowResponse[valueIndex]
+            return (UInt16(highByte) << 8) | UInt16(lowByte)
+        }
+        return (UInt16(response[valueIndex]) << 8) | UInt16(response[valueIndex + 1])
+    }
+    
+    //TODO handle MS2109 case
     func setUSBtoHost() {
         logger.log(content: "🔄 HIDManager.setUSBtoHost() called - sending host report")
         self.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
@@ -250,7 +239,15 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func getHDMIStatus() -> Bool {
-        self.sendHIDReport(report: [181, 250, 140, 0, 0, 0, 0, 0, 0])
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for HDMI status reading")
+            AppStatus.hasHdmiSignal = nil
+            return false
+        }
+        
+        let hdmiStatusReport = generateHIDReport(address: hidRegisters.hdmiConnectionStatus)
+        self.sendHIDReport(report: hdmiStatusReport)
         
         if let report = self.readHIDReport() {
             let statusByte = report[3]
@@ -270,28 +267,24 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func getResolution() -> (width: Int, height: Int)? {
-        let widthHighReport = generateHIDReport(for: .inputResolutionWidthHigh)
-        let widthLowReport = generateHIDReport(for: .inputResolutionWidthLow)
-        let heightHighReport = generateHIDReport(for: .inputResolutionHeightHigh)
-        let heightLowReport = generateHIDReport(for: .inputResolutionHeightLow)
-        
-        guard let widthHighResponse = self.sendAndReadHIDReport(widthHighReport),
-              let widthLowResponse = self.sendAndReadHIDReport(widthLowReport),
-              let heightHighResponse = self.sendAndReadHIDReport(heightHighReport),
-              let heightLowResponse = self.sendAndReadHIDReport(heightLowReport) else {
-            logger.log(content: "Failed to read resolution data from HID device. Check if device is properly connected.")
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for resolution reading")
             return nil
         }
         
-        // width
-        let widthHigh = Int(widthHighResponse[3])
-        let widthLow = Int(widthLowResponse[3])
-        var width = (widthHigh << 8) | widthLow
+        let widthHighReport = generateHIDReport(address: hidRegisters.inputResolutionWidthHigh)
+        let widthLowReport = generateHIDReport(address: hidRegisters.inputResolutionWidthLow)
+        let heightHighReport = generateHIDReport(address: hidRegisters.inputResolutionHeightHigh)
+        let heightLowReport = generateHIDReport(address: hidRegisters.inputResolutionHeightLow)
         
-        // height
-        let heightHigh = Int(heightHighResponse[3])
-        let heightLow = Int(heightLowResponse[3])
-        var height = (heightHigh << 8) | heightLow
+        guard let widthU16 = self.sendAndReadHIDReportAsUInt16(widthHighReport),
+              let heightU16 = self.sendAndReadHIDReportAsUInt16(heightHighReport) else {
+            logger.log(content: "Failed to read resolution data from HID device. Check if device is properly connected.")
+            return nil
+        }
+        var width = Int(widthU16)
+        var height = Int(heightU16)
         
         // Cap resolution at 4K, default to 1920x1080 if exceeded
         if width > 4096 || height > 4096 {
@@ -320,23 +313,23 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func getFps() -> Float? {
-        let fpsHighReport = generateHIDReport(for: .fpsHigh)
-        let fpsLowReport = generateHIDReport(for: .fpsLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for FPS reading")
+            return nil
+        }
         
-        guard let fpsHighResponse = self.sendAndReadHIDReport(fpsHighReport),
-              let fpsLowResponse = self.sendAndReadHIDReport(fpsLowReport) else {
+        let fpsHighReport = generateHIDReport(address: hidRegisters.fpsHigh)
+        
+        guard let rawFps = self.sendAndReadHIDReportAsUInt16(fpsHighReport) else {
             logger.log(content: "Failed to read FPS data from HID device. Check if device is properly connected.")
             return nil
         }
         
-        let fpsHigh = Int(fpsHighResponse[3])
-        let fpsLow = Int(fpsLowResponse[3])
-        
-        let rawFps = (fpsHigh << 8) | fpsLow
         let fps = Float(rawFps) / 100.0
         
         // Round to 2 decimal places
-        let roundedFps = Float(String(format: "%.2f", fps)) ?? fps
+        let roundedFps = Float(String(format: "%.2f", Double(fps))) ?? fps
         if roundedFps == 59.99 {
             // Special case for 59.99 FPS, round to 60
             return 60.0
@@ -345,26 +338,31 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func getPixelClock() -> UInt32? {
-        let pixelClockHighReport = generateHIDReport(for: .pixelClockHigh)
-        let pixelClockLowReport = generateHIDReport(for: .pixelClockLow)
-        
-        guard let pixelClockHighResponse = self.sendAndReadHIDReport(pixelClockHighReport),
-              let pixelClockLowResponse = self.sendAndReadHIDReport(pixelClockLowReport) else {
-            logger.log(content: "Failed to read pixel clock data from HID device. Check if device is properly connected.")
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for pixel clock reading")
             return nil
         }
         
-        let pixelClockHigh = UInt32(pixelClockHighResponse[3])
-        let pixelClockLow = UInt32(pixelClockLowResponse[3])
+        let pixelClockHighReport = generateHIDReport(address: hidRegisters.pixelClockHigh)
         
-        let pixelClock = (pixelClockHigh << 8) | pixelClockLow
-        
-        return pixelClock
+        guard let pixelClock = self.sendAndReadHIDReportAsUInt16(pixelClockHighReport) else {
+            logger.log(content: "Failed to read pixel clock data from HID device. Check if device is properly connected.")
+            return nil
+        }
+
+        return UInt32(pixelClock)
     }
 
     func getInputHTotal() -> Int? {
-        let hTotalHighReport = generateHIDReport(for: .inputHTotalHigh)
-        let hTotalLowReport = generateHIDReport(for: .inputHTotalLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for HTotal reading")
+            return nil
+        }
+        
+        let hTotalHighReport = generateHIDReport(address: hidRegisters.inputHTotalHigh)
+        let hTotalLowReport = generateHIDReport(address: hidRegisters.inputHTotalLow)
 
         guard let hTotalHighResponse = self.sendAndReadHIDReport(hTotalHighReport),
               let hTotalLowResponse = self.sendAndReadHIDReport(hTotalLowReport) else {
@@ -379,8 +377,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 
     func getInputVTotal() -> Int? {
-        let vTotalHighReport = generateHIDReport(for: .inputResolutionHeightHigh)
-        let vTotalLowReport = generateHIDReport(for: .inputResolutionHeightLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for VTotal reading")
+            return nil
+        }
+        
+        let vTotalHighReport = generateHIDReport(address: hidRegisters.inputVTotalHigh)
+        let vTotalLowReport = generateHIDReport(address: hidRegisters.inputVTotalLow)
 
         guard let vTotalHighResponse = self.sendAndReadHIDReport(vTotalHighReport),
               let vTotalLowResponse = self.sendAndReadHIDReport(vTotalLowReport) else {
@@ -395,8 +399,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 
     func getInputHst() -> Int? {
-        let hstHighReport = generateHIDReport(for: .inputHstHigh)
-        let hstLowReport = generateHIDReport(for: .inputHstLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for HST reading")
+            return nil
+        }
+        
+        let hstHighReport = generateHIDReport(address: hidRegisters.inputHstHigh)
+        let hstLowReport = generateHIDReport(address: hidRegisters.inputHstLow)
 
         guard let hstHighResponse = self.sendAndReadHIDReport(hstHighReport),
               let hstLowResponse = self.sendAndReadHIDReport(hstLowReport) else {
@@ -411,8 +421,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 
     func getInputVst() -> Int? {
-        let vstHighReport = generateHIDReport(for: .inputVstHigh)
-        let vstLowReport = generateHIDReport(for: .inputVstLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for VST reading")
+            return nil
+        }
+        
+        let vstHighReport = generateHIDReport(address: hidRegisters.inputVstHigh)
+        let vstLowReport = generateHIDReport(address: hidRegisters.inputVstLow)
 
         guard let vstHighResponse = self.sendAndReadHIDReport(vstHighReport),
               let vstLowResponse = self.sendAndReadHIDReport(vstLowReport) else {
@@ -427,8 +443,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 
     func getInputHsyncWidth() -> Int? {
-        let hwHighReport = generateHIDReport(for: .inputHwHigh)
-        let hwLowReport = generateHIDReport(for: .inputHwLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for HW reading")
+            return nil
+        }
+        
+        let hwHighReport = generateHIDReport(address: hidRegisters.inputHwHigh)
+        let hwLowReport = generateHIDReport(address: hidRegisters.inputHwLow)
 
         guard let hwHighResponse = self.sendAndReadHIDReport(hwHighReport),
               let hwLowResponse = self.sendAndReadHIDReport(hwLowReport) else {
@@ -443,8 +465,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 
     func getInputVsyncWidth() -> Int? {
-        let vwHighReport = generateHIDReport(for: .inputVwHigh)
-        let vwLowReport = generateHIDReport(for: .inputVwLow)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for VW reading")
+            return nil
+        }
+        
+        let vwHighReport = generateHIDReport(address: hidRegisters.inputVwHigh)
+        let vwLowReport = generateHIDReport(address: hidRegisters.inputVwLow)
 
         guard let vwHighResponse = self.sendAndReadHIDReport(vwHighReport),
               let vwLowResponse = self.sendAndReadHIDReport(vwLowReport) else {
@@ -459,10 +487,16 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 
     func getVersion() -> String? {
-        let v1 = generateHIDReport(for: .version1)
-        let v2 = generateHIDReport(for: .version2)
-        let v3 = generateHIDReport(for: .version3)
-        let v4 = generateHIDReport(for: .version4)
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for version reading")
+            return nil
+        }
+        
+        let v1 = generateHIDReport(address: hidRegisters.version1)
+        let v2 = generateHIDReport(address: hidRegisters.version2)
+        let v3 = generateHIDReport(address: hidRegisters.version3)
+        let v4 = generateHIDReport(address: hidRegisters.version4)
         
         guard let _v1 = self.sendAndReadHIDReport(v1),
               let _v2 = self.sendAndReadHIDReport(v2),
@@ -497,15 +531,38 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         return Int(hexValue)
     }
     
-    func generateHIDReport(for subCommand: HIDSubCommand) -> [UInt8] {
-        let commandPrefix: UInt8 = 181
-        
-        let highByte = UInt8((subCommand.rawValue >> 8) & 0xFF)
-        let lowByte = UInt8(subCommand.rawValue & 0xFF)
-        
-        let report: [UInt8] = [commandPrefix, highByte, lowByte, 0, 0, 0, 0, 0, 0]
-        
-        return report
+    private func interpretIOReturn(_ result: IOReturn) -> String {
+        switch result {
+        case kIOReturnSuccess:
+            return "Success"
+        case kIOReturnNotOpen:
+            return "Device not open"
+        case kIOReturnUnsupported: // kIOReturnUnsupported
+            return "Operation not supported: The HID device does not support the requested operation."
+        case kIOReturnNotPermitted:
+            return "Operation not permitted: The HID device is not permitted to perform the requested operation."
+        case kIOReturnNoDevice:
+            return "No such device: The HID device is not available or has been disconnected."
+        case kIOReturnNotReady:
+            return "Device not ready: The HID device is not ready to accept commands."
+        case kIOReturnNotResponding:
+            return "Device not responding: The HID device is not responding to commands."
+        case kIOReturnBadArgument:
+            return "Invalid argument: One or more arguments to the HID operation are invalid."
+        case kIOReturnAborted:
+            return "Operation aborted: The HID operation was aborted."
+        case kIOReturnTimeout:
+            return "Operation timeout: The HID operation timed out."
+        case kIOReturnNotOpen:
+            return "Device not open: The HID device is not open."
+        default:
+            let hexCode = String(format: "0x%08X", UInt32(bitPattern: Int32(truncatingIfNeeded: result)))
+            if let machString = String(cString: mach_error_string(result), encoding: .utf8), !machString.isEmpty && machString != "(ipc/send) invalid destination port" {
+                return "Unknown error: \(machString) (code: \(hexCode))"
+            } else {
+                return "Unknown error (code: \(hexCode))"
+            }
+        }
     }
     
     // MARK: - EEPROM Operations for Firmware Update
@@ -779,62 +836,6 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
 }
 
-
-// define HID sub commands
-enum HIDSubCommand: UInt16 {
-    case inputResolutionWidthHigh = 0xC6AF
-    case inputResolutionWidthLow = 0xC6B0
-    case inputResolutionHeightHigh = 0xC6B1
-    case inputResolutionHeightLow = 0xC6B2
-
-    // new
-    // get input resolution data C6AF C6B0 C6B1 C6B2
-    // case inputWidthHigh = 0xC6AF
-    // case inputWidthLow = 0xC6B0
-    // case inputHeightHigh = 0xC6B1
-    // case inputHeightLow = 0xC6B2
-    
-    // old
-    // get FPS data C73E C73F
-    case fpsHigh = 0xC6B5
-    case fpsLow = 0xC6B6
-
-    // // new
-    // // get input FPS data C6B5 C6B6
-    // case inputFpsHigh = 0xC6B5
-    // case inputFpsLow = 0xC6B6
-
-    // get input pixel clock data C73C C73D
-    case pixelClockHigh = 0xC73C
-    case pixelClockLow = 0xC73D
-
-    case inputHTotalHigh = 0xC734 // Total Horizontal pixels per line (inclcuding active and blanking pixels)
-    case inputHTotalLow = 0xC735
-    case inputVTotalHigh = 0xC736 // Total Vertical lines per frame (inclcuding active and blanking lines)
-    case inputVTotalLow = 0xC737
-
-    case inputHstHigh = 0xC740 // Horizontal Sync Start Offset — how many pixels from line start until sync begins.
-    case inputHstLow = 0xC741
-    case inputVstHigh = 0xC742 // Vertical Sync Start Offset — how many lines from frame start until vertical sync begins.
-    case inputVstLow = 0xC743
-    case inputHwHigh = 0xC744 // Horizontal Sync Width in pixels.
-    case inputHwLow = 0xC745
-    case inputVwHigh = 0xC746 // Vertical Sync Width in lines.
-    case inputVwLow = 0xC747
-
-
-    // get MS2019 version CBDC CBDD CBDE CBDF
-    case version1 = 0xCBDC
-    case version2 = 0xCBDD
-    case version3 = 0xCBDE
-    case version4 = 0xCBDF
-    
-    // ADDR_HDMI_CONNECTION_STATUS
-    case HDMI_CONNECTION_STATUS = 0xFA8C
-
-}
-
-
 extension String {
     func padLeft(toLength: Int, withPad character: Character) -> String {
         let paddingLength = toLength - self.count
@@ -853,6 +854,40 @@ extension Notification.Name {
 // MARK: - HAL Integration Methods
 
 extension HIDManager {
+    /// Get the active video chipset that supports HID register mapping
+    private func getActiveVideoChipset() -> VideoChipsetProtocol? {
+        let hal = HardwareAbstractionLayer.shared
+        return hal.getCurrentVideoChipset()
+    }
+    
+    /// Generate HID report using HAL register address instead of enum
+    func generateHIDReport(address: UInt16) -> [UInt8] {
+        let commandPrefix: UInt8 = 0xB5
+        let highByte = UInt8((address >> 8) & 0xFF)
+        let lowByte = UInt8(address & 0xFF)
+
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            // Fallback to MS2109 format if no chipset detected
+            return [commandPrefix, highByte, lowByte, 0, 0, 0, 0]
+        }
+        
+
+        // MS2130S requires a prefix before commandPrefix
+        if chipset.chipsetInfo.chipsetType == ChipsetType.video(VideoChipsetType.ms2130s) {
+            return [0x01, commandPrefix, highByte, lowByte]
+        } else {
+            // MS2109 and other chipsets use the standard format
+            return [commandPrefix, highByte, lowByte, 0, 0, 0, 0]
+        }
+    }
+    
+    /// Get the report ID based on the chipset type
+    /// MS2109 uses report ID 0, MS2130S uses report ID 1
+    func getReportID() -> CFIndex {
+        return CFIndex(1)
+    }
+    
     /// Get HAL-aware chipset information
     func getHALChipsetInfo() -> ChipsetInfo? {
         // Try to get chipset info from the HAL
@@ -869,7 +904,7 @@ extension HIDManager {
                 productID: device.productID,
                 firmwareVersion: getVersion(),
                 manufacturer: "MacroSilicon",
-                chipsetType: .video(.ms2109)
+                chipsetType: ChipsetType.video(VideoChipsetType.ms2109)
             )
         }
         

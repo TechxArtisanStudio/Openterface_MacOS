@@ -29,6 +29,7 @@ import CoreAudio
 class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     private lazy var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private lazy var hidManager: HIDManagerProtocol = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+    private lazy var audioManager: AudioManagerProtocol = DependencyContainer.shared.resolve(AudioManagerProtocol.self)
     private var usbDevicesManager: USBDevicesManagerProtocol? {
         if #available(macOS 12.0, *) {
             return DependencyContainer.shared.resolve(USBDevicesManagerProtocol.self)
@@ -171,10 +172,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         self.audioPropertyListenerID = { (numberAddresses, addresses) in
             // Check for the presence of our audio device
             // This call seems to trigger system device refresh which helps with video reconnection
-            let audioDevice = self.getAudioDeviceByName(name: "OpenterfaceA")
+            let audioDevice = self.audioManager.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"])
             
             // Log the detection for debugging purposes
-            self.logger.log(content: "Audio device change detected: OpenterfaceA \(audioDevice != nil ? "connected" : "not found")")
+            self.logger.log(content: "Audio device change detected: OpenterfaceA or USB2 Digital Audio \(audioDevice != nil ? "connected" : "not found")")
             
             // When audio device changes are detected, check if we need to refresh video
             if AppStatus.isHDMIConnected == false {
@@ -503,102 +504,6 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         let maskedUniqueID = uniqueIDValue >> 32
         
         return maskedUniqueID == locationIDValue
-    }
-    
-    /// Gets an audio device by its name
-    func getAudioDeviceByName(name: String) -> AudioDeviceID? {
-        var propSize: UInt32 = 0
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        // Get the size of the property data
-        var result = AudioObjectGetPropertyDataSize(
-            AudioObjectID(kAudioObjectSystemObject), 
-            &address, 
-            0, 
-            nil, 
-            &propSize
-        )
-        
-        guard result == noErr else {
-            logger.log(content: "Error \(result) in AudioObjectGetPropertyDataSize")
-            return nil
-        }
-
-        // Calculate device count and prepare array
-        let deviceCount = Int(propSize) / MemoryLayout<AudioDeviceID>.size
-        var deviceIDs = Array<AudioDeviceID>(repeating: 0, count: deviceCount)
-
-        // Get the device IDs
-        result = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), 
-            &address, 
-            0, 
-            nil, 
-            &propSize, 
-            &deviceIDs
-        )
-        
-        guard result == noErr else {
-            logger.log(content: "Error \(result) in AudioObjectGetPropertyData")
-            return nil
-        }
-
-        // Search for device with matching name
-        for deviceID in deviceIDs {
-            let deviceName = getAudioDeviceName(for: deviceID)
-            
-            if deviceName == name {
-                return deviceID
-            }
-        }
-
-        return nil
-    }
-    
-    /// Gets the name of an audio device
-    private func getAudioDeviceName(for deviceID: AudioDeviceID) -> String? {
-        var nameSize = UInt32(MemoryLayout<CFString>.size)
-        var nameAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceNameCFString,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        // Get the size of the name property
-        let result = AudioObjectGetPropertyDataSize(
-            deviceID, 
-            &nameAddress, 
-            0, 
-            nil, 
-            &nameSize
-        )
-        
-        guard result == noErr else {
-            logger.log(content: "Error \(result) getting audio device name size")
-            return nil
-        }
-
-        // Get the device name
-        var deviceName: Unmanaged<CFString>?
-        let nameResult = AudioObjectGetPropertyData(
-            deviceID,
-            &nameAddress,
-            0,
-            nil,
-            &nameSize,
-            &deviceName
-        )
-        
-        guard nameResult == noErr else {
-            logger.log(content: "Error \(nameResult) getting audio device name")
-            return nil
-        }
-        
-        return deviceName?.takeRetainedValue() as String?
     }
     
     // MARK: - Notification Handlers

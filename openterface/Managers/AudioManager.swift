@@ -405,7 +405,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             if let selectedDevice = self.selectedInputDevice {
                 self.audioDeviceId = selectedDevice.deviceID
             } else {
-                self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
+                self.audioDeviceId = self.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"])
             }
             
             if self.audioDeviceId == nil {
@@ -451,7 +451,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                     if let selectedDevice = self.selectedInputDevice {
                         self.audioDeviceId = selectedDevice.deviceID
                     } else {
-                        self.audioDeviceId = self.getAudioDeviceByName(name: "OpenterfaceA")
+                        self.audioDeviceId = self.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"])
                     }
                 }
                 
@@ -622,8 +622,8 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         )
     }
     
-    // Get audio device by name
-    func getAudioDeviceByName(name: String) -> AudioDeviceID? {
+        // Get audio device by names (supports multiple names, returns first match)
+    func getAudioDeviceByNames(names: [String]) -> AudioDeviceID? {
         var propSize: UInt32 = 0
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
@@ -662,11 +662,11 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             return nil
         }
 
-        // Search for device with matching name
+        // Search for device with matching name from the list
         for deviceID in deviceIDs {
             let deviceName = getAudioDeviceName(for: deviceID)
             
-            if deviceName == name {
+            if let deviceName = deviceName, names.contains(deviceName) {
                 return deviceID
             }
         }
@@ -730,7 +730,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                 
                 // Check if the currently selected device is still available
                 if let selectedDevice = self.selectedInputDevice {
-                    let deviceStillExists = self.getAudioDeviceByName(name: selectedDevice.name) != nil
+                    let deviceStillExists = self.getAudioDeviceByNames(names: [selectedDevice.name]) != nil
                     
                     if !deviceStillExists {
                         DispatchQueue.main.async {
@@ -754,7 +754,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                     }
                 } else {
                     // No device selected, check if OpenterfaceA is available for initial auto-selection
-                    if self.getAudioDeviceByName(name: "OpenterfaceA") != nil {
+                    if self.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"]) != nil {
                         if let openterfaceDevice = self.availableInputDevices.first(where: { $0.name == "OpenterfaceA" }) {
                             DispatchQueue.main.async {
                                 self.selectedInputDevice = openterfaceDevice
@@ -818,7 +818,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                 deviceToUse = selectedDevice.deviceID
                 logger.log(content: "Using selected device: \(selectedDevice.name)")
             } else {
-                deviceToUse = getAudioDeviceByName(name: "OpenterfaceA")
+                deviceToUse = self.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"])
                 if deviceToUse != nil {
                     logger.log(content: "No device selected, falling back to OpenterfaceA")
                 }
