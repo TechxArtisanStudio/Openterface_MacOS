@@ -83,6 +83,15 @@ protocol HIDManagerProtocol: AnyObject {
     func writeEeprom(address: UInt16, data: Data, progressCallback: ((Double) -> Void)?) -> Bool
     func readEeprom(address: UInt16, length: UInt8) -> Data?
     
+    // Timing information methods
+    func getInputHTotal() -> Int?
+    func getInputVTotal() -> Int?
+    func getInputHst() -> Int?
+    func getInputVst() -> Int?
+    func getInputHsyncWidth() -> Int?
+    func getInputVsyncWidth() -> Int?
+    func getPixelClock() -> UInt32?
+    
     // MARK: - HAL Integration Methods (Optional - with default implementations)
     func getHALVideoSignalStatus() -> VideoSignalStatus?
     func getHALVideoTimingInfo() -> VideoTimingInfo?
@@ -150,6 +159,9 @@ protocol AudioManagerProtocol: AnyObject {
     // New device selection methods
     func selectInputDevice(_ device: AudioDevice)
     func selectOutputDevice(_ device: AudioDevice)
+    
+    // Audio device utilities
+    func getAudioDeviceByNames(names: [String]) -> AudioDeviceID?
 }
 
 /// Protocol for USB device enumeration and management

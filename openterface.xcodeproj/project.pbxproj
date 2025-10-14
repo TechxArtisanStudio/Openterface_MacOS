@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -40,7 +40,7 @@
 		53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */; };
 		53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */; };
 		6B60EB7F2E0E7C39006874D3 /* FirmwareUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */; };
-		6B637A142E8BDE4500C37E3D /* tryOpenSerialPort.txt in Resources */ = {isa = PBXBuildFile; fileRef = 6B637A132E8BDE4500C37E3D /* tryOpenSerialPort.txt */; };
+		6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */; };
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
@@ -117,7 +117,7 @@
 		53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareUpdateView.swift; sourceTree = "<group>"; };
-		6B637A132E8BDE4500C37E3D /* tryOpenSerialPort.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = tryOpenSerialPort.txt; sourceTree = "<group>"; };
+		6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManagerTests.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
@@ -143,6 +143,11 @@
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		6B99F5922E9A6C570073CDA2 /* Control */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Control; sourceTree = "<group>"; };
+		6B99F5932E9A6C650073CDA2 /* Video */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Video; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		53FBE7A72B3D66D2007785B0 /* Frameworks */ = {
@@ -243,6 +248,7 @@
 		53FBE7BE2B3D66D6007785B0 /* openterfaceTests */ = {
 			isa = PBXGroup;
 			children = (
+				6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */,
 				53FBE7BF2B3D66D6007785B0 /* openterfaceTests.swift */,
 				53CC660E2B8EE70C0081F927 /* LogTests.swift */,
 			);
@@ -315,9 +321,10 @@
 		BF98F73B2E35A1EA002EACD7 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				6B99F5932E9A6C650073CDA2 /* Video */,
+				6B99F5922E9A6C570073CDA2 /* Control */,
 				BF98F7302E35A1BC002EACD7 /* ControlChipsetHAL.swift */,
 				BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */,
-				6B637A132E8BDE4500C37E3D /* tryOpenSerialPort.txt */,
 				BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */,
 				BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */,
 				BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */,
@@ -348,6 +355,10 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6B99F5922E9A6C570073CDA2 /* Control */,
+				6B99F5932E9A6C650073CDA2 /* Video */,
 			);
 			name = openterface;
 			packageProductDependencies = (
@@ -448,7 +459,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				53FBE7B22B3D66D6007785B0 /* Assets.xcassets in Resources */,
-				6B637A142E8BDE4500C37E3D /* tryOpenSerialPort.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -528,6 +538,7 @@
 			files = (
 				53FBE7C02B3D66D6007785B0 /* openterfaceTests.swift in Sources */,
 				53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */,
+				6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -686,7 +697,7 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 61;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
@@ -703,7 +714,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -721,7 +732,7 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 61;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
@@ -738,7 +749,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -753,7 +764,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 368S6GT8T7;
+				DEVELOPMENT_TEAM = NXWD68TXUQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MARKETING_VERSION = 1.0;
@@ -790,7 +801,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 368S6GT8T7;
+				DEVELOPMENT_TEAM = NXWD68TXUQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = txa.openterfaceUITests;

@@ -238,3 +238,67 @@ extension HardwareAbstractionLayerTests {
         }
     }
 }
+
+// MARK: - HID Register Protocol Tests
+    
+    func testVideoChipsetHIDRegistersProtocol_MS2109() {
+        // Test MS2109 implements VideoChipsetHIDRegisters protocol correctly
+        let ms2109 = MS2109VideoChipset()
+        
+        if let chipset = ms2109 {
+            // Test all required register properties are implemented
+            XCTAssertEqual(chipset.resolution, 0xC6AF, "MS2109 resolution register should be 0xC6AF")
+            XCTAssertEqual(chipset.fps, 0xC6B1, "MS2109 fps register should be 0xC6B1")
+            XCTAssertEqual(chipset.pixelClock, 0xC6B3, "MS2109 pixel clock register should be 0xC6B3")
+            XCTAssertEqual(chipset.version, 0xC6B5, "MS2109 version register should be 0xC6B5")
+            XCTAssertEqual(chipset.inputHTotal, 0xC6B7, "MS2109 input H total register should be 0xC6B7")
+            XCTAssertEqual(chipset.inputVTotal, 0xC6B9, "MS2109 input V total register should be 0xC6B9")
+            XCTAssertEqual(chipset.inputHst, 0xC6BB, "MS2109 input H start register should be 0xC6BB")
+            XCTAssertEqual(chipset.inputVst, 0xC6BD, "MS2109 input V start register should be 0xC6BD")
+            XCTAssertEqual(chipset.inputHsyncWidth, 0xC6BF, "MS2109 input H sync width register should be 0xC6BF")
+            XCTAssertEqual(chipset.inputVsyncWidth, 0xC6C1, "MS2109 input V sync width register should be 0xC6C1")
+            XCTAssertEqual(chipset.hdmiConnectionStatus, 0xC6C3, "MS2109 HDMI status register should be 0xC6C3")
+        }
+    }
+    
+    func testVideoChipsetHIDRegistersProtocol_MS2130() {
+        // Test MS2130 implements VideoChipsetHIDRegisters protocol correctly
+        let ms2130 = MS2130VideoChipset()
+        
+        if let chipset = ms2130 {
+            // Test all required register properties are implemented
+            XCTAssertEqual(chipset.resolution, 0xD6AF, "MS2130 resolution register should be 0xD6AF")
+            XCTAssertEqual(chipset.fps, 0xD6B1, "MS2130 fps register should be 0xD6B1")
+            XCTAssertEqual(chipset.pixelClock, 0xD6B3, "MS2130 pixel clock register should be 0xD6B3")
+            XCTAssertEqual(chipset.version, 0xD6B5, "MS2130 version register should be 0xD6B5")
+            XCTAssertEqual(chipset.inputHTotal, 0xD6B7, "MS2130 input H total register should be 0xD6B7")
+            XCTAssertEqual(chipset.inputVTotal, 0xD6B9, "MS2130 input V total register should be 0xD6B9")
+            XCTAssertEqual(chipset.inputHst, 0xD6BB, "MS2130 input H start register should be 0xD6BB")
+            XCTAssertEqual(chipset.inputVst, 0xD6BD, "MS2130 input V start register should be 0xD6BD")
+            XCTAssertEqual(chipset.inputHsyncWidth, 0xD6BF, "MS2130 input H sync width register should be 0xD6BF")
+            XCTAssertEqual(chipset.inputVsyncWidth, 0xD6C1, "MS2130 input V sync width register should be 0xD6C1")
+            XCTAssertEqual(chipset.hdmiConnectionStatus, 0xD6C3, "MS2130 HDMI status register should be 0xD6C3")
+        }
+    }
+    
+    func testChipsetRegisterAddressRanges() {
+        // Test that MS2109 and MS2130 use different register address ranges
+        let ms2109 = MS2109VideoChipset()
+        let ms2130 = MS2130VideoChipset()
+        
+        if let ms2109Chipset = ms2109, let ms2130Chipset = ms2130 {
+            // MS2109 should use 0xC6AF-0xCBDF range
+            XCTAssertTrue(ms2109Chipset.resolution >= 0xC6AF && ms2109Chipset.resolution <= 0xCBDF, "MS2109 registers should be in 0xC6AF-0xCBDF range")
+            XCTAssertTrue(ms2109Chipset.fps >= 0xC6AF && ms2109Chipset.fps <= 0xCBDF, "MS2109 registers should be in 0xC6AF-0xCBDF range")
+            XCTAssertTrue(ms2109Chipset.hdmiConnectionStatus >= 0xC6AF && ms2109Chipset.hdmiConnectionStatus <= 0xCBDF, "MS2109 registers should be in 0xC6AF-0xCBDF range")
+            
+            // MS2130 should use 0xD6AF-0xDBDF range
+            XCTAssertTrue(ms2130Chipset.resolution >= 0xD6AF && ms2130Chipset.resolution <= 0xDBDF, "MS2130 registers should be in 0xD6AF-0xDBDF range")
+            XCTAssertTrue(ms2130Chipset.fps >= 0xD6AF && ms2130Chipset.fps <= 0xDBDF, "MS2130 registers should be in 0xD6AF-0xDBDF range")
+            XCTAssertTrue(ms2130Chipset.hdmiConnectionStatus >= 0xD6AF && ms2130Chipset.hdmiConnectionStatus <= 0xDBDF, "MS2130 registers should be in 0xD6AF-0xDBDF range")
+            
+            // Ranges should be different
+            XCTAssertNotEqual(ms2109Chipset.resolution, ms2130Chipset.resolution, "MS2109 and MS2130 should have different register addresses")
+            XCTAssertNotEqual(ms2109Chipset.fps, ms2130Chipset.fps, "MS2109 and MS2130 should have different register addresses")
+        }
+    }

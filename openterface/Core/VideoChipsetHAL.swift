@@ -131,7 +131,37 @@ class BaseVideoChipset: VideoChipsetProtocol {
     }
     
     func getTimingInfo() -> VideoTimingInfo? {
-        // This would use HID commands to get detailed timing information
+        // Check if this chipset supports HID commands for timing info
+        guard let hidRegisters = self as? VideoChipsetHIDRegisters,
+              hidRegisters.supportsHIDCommands else {
+            logger.log(content: "⚠️ Chipset \(chipsetInfo.name) does not support HID timing commands")
+            return nil
+        }
+        
+        // Use HIDManager to read timing information with chipset-specific registers
+        let hTotal = hidManager.getInputHTotal()
+        let vTotal = hidManager.getInputVTotal()
+        let hst = hidManager.getInputHst()
+        let vst = hidManager.getInputVst()
+        let hsw = hidManager.getInputHsyncWidth()
+        let vsw = hidManager.getInputVsyncWidth()
+        let pixelClock = hidManager.getPixelClock()
+        
+        // Return timing info if we have valid data
+        if let hTotal = hTotal, let vTotal = vTotal, let hst = hst, 
+           let vst = vst, let hsw = hsw, let vsw = vsw, let pixelClock = pixelClock {
+            return VideoTimingInfo(
+                horizontalTotal: UInt32(hTotal),
+                verticalTotal: UInt32(vTotal),
+                horizontalSyncStart: UInt32(hst),
+                verticalSyncStart: UInt32(vst),
+                horizontalSyncWidth: UInt32(hsw),
+                verticalSyncWidth: UInt32(vsw),
+                pixelClock: UInt32(pixelClock)
+            )
+        }
+        
+        logger.log(content: "⚠️ Failed to read complete timing info for \(chipsetInfo.name)")
         return nil
     }
     
@@ -141,225 +171,5 @@ class BaseVideoChipset: VideoChipsetProtocol {
         // Check if device matches this chipset's vendor/product ID
         // This is chipset-specific and would be implemented in subclasses
         return true
-    }
-}
-
-// MARK: - MS2109 Video Chipset Implementation
-
-class MS2109VideoChipset: BaseVideoChipset {
-    private static let VENDOR_ID = 0x534D
-    private static let PRODUCT_ID = 0x2109
-    
-    init?() {
-        let info = ChipsetInfo(
-            name: "MS2109",
-            vendorID: MS2109VideoChipset.VENDOR_ID,
-            productID: MS2109VideoChipset.PRODUCT_ID,
-            firmwareVersion: nil,
-            manufacturer: "MacroSilicon",
-            chipsetType: .video(.ms2109)
-        )
-        
-        let capabilities = ChipsetCapabilities(
-            supportsHDMI: true,
-            supportsAudio: true,
-            supportsHID: true,
-            supportsFirmwareUpdate: true,
-            supportsEEPROM: true,
-            maxDataTransferRate: 480_000_000, // USB 2.0 High Speed
-            features: ["HDMI Input", "Audio Capture", "Hardware Scaling", "EEPROM Access"]
-        )
-        
-        super.init(chipsetInfo: info, capabilities: capabilities)
-    }
-    
-    override var supportedResolutions: [VideoResolution] {
-        return [
-            VideoResolution(width: 1920, height: 1080, refreshRate: 60.0),
-            VideoResolution(width: 1920, height: 1080, refreshRate: 30.0),
-            VideoResolution(width: 1280, height: 720, refreshRate: 60.0),
-            VideoResolution(width: 1024, height: 768, refreshRate: 60.0),
-            VideoResolution(width: 800, height: 600, refreshRate: 60.0),
-            VideoResolution(width: 640, height: 480, refreshRate: 60.0)
-        ]
-    }
-    
-    override var maxFrameRate: Float {
-        return 60.0
-    }
-    
-    override func initialize() -> Bool {
-        guard detectDevice() else {
-            return false
-        }
-        
-        // Initialize MS2109-specific settings
-        if validateConnection() {
-            isConnected = true
-            logger.log(content: "✅ MS2109 chipset initialized successfully")
-            return true
-        }
-        
-        logger.log(content: "❌ MS2109 chipset initialization failed")
-        return false
-    }
-    
-    override func detectDevice() -> Bool {
-        _ = DependencyContainer.shared.resolve(USBDevicesManagerProtocol.self)
-        
-        // Check if MS2109 device is connected
-        for device in AppStatus.USBDevices {
-            if device.vendorID == MS2109VideoChipset.VENDOR_ID && 
-               device.productID == MS2109VideoChipset.PRODUCT_ID {
-                logger.log(content: "🔍 MS2109 device detected: \(device.productName)")
-                return true
-            }
-        }
-        
-        return false
-    }
-    
-    override func validateConnection() -> Bool {
-        // Validate MS2109 connection by checking HID communication
-        let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-        
-        if let version = hidManager.getVersion() {
-            logger.log(content: "📋 MS2109 version: \(version)")
-            return true
-        }
-        
-        return false
-    }
-    
-    override func getPixelClock() -> UInt32? {
-        // MS2109-specific pixel clock reading
-        // This would use specific HID commands for MS2109
-        return AppStatus.hidReadPixelClock
-    }
-    
-    override func getTimingInfo() -> VideoTimingInfo? {
-        return VideoTimingInfo(
-            horizontalTotal: AppStatus.hidInputHTotal,
-            verticalTotal: AppStatus.hidInputVTotal,
-            horizontalSyncStart: AppStatus.hidInputHst,
-            verticalSyncStart: AppStatus.hidInputVst,
-            horizontalSyncWidth: AppStatus.hidInputHsyncWidth,
-            verticalSyncWidth: AppStatus.hidInputVsyncWidth,
-            pixelClock: AppStatus.hidReadPixelClock
-        )
-    }
-}
-
-// MARK: - MS2130S Video Chipset Implementation
-
-class MS2130SVideoChipset: BaseVideoChipset {
-    public static let VENDOR_ID = 0x345F
-    public static let PRODUCT_ID = 0x2132
-    
-    init?() {
-        let info = ChipsetInfo(
-            name: "MS2130S",
-            vendorID: MS2130SVideoChipset.VENDOR_ID,
-            productID: MS2130SVideoChipset.PRODUCT_ID,
-            firmwareVersion: nil,
-            manufacturer: "MacroSilicon",
-            chipsetType: .video(.ms2130s)
-        )
-        
-        let capabilities = ChipsetCapabilities(
-            supportsHDMI: true,
-            supportsAudio: true,
-            supportsHID: false, // MS2130S has different HID capabilities
-            supportsFirmwareUpdate: false,
-            supportsEEPROM: false,
-            maxDataTransferRate: 480_000_000, // USB 2.0 High Speed
-            features: ["HDMI Input", "Audio Capture", "Hardware Scaling"]
-        )
-        
-        super.init(chipsetInfo: info, capabilities: capabilities)
-    }
-    
-    override var supportedResolutions: [VideoResolution] {
-        return [
-            VideoResolution(width: 1920, height: 1080, refreshRate: 60.0),
-            VideoResolution(width: 1920, height: 1080, refreshRate: 30.0),
-            VideoResolution(width: 1280, height: 720, refreshRate: 60.0),
-            VideoResolution(width: 1024, height: 768, refreshRate: 60.0),
-            VideoResolution(width: 800, height: 600, refreshRate: 60.0),
-            VideoResolution(width: 640, height: 480, refreshRate: 60.0)
-        ]
-    }
-    
-    override var maxFrameRate: Float {
-        return 60.0
-    }
-    
-    override func initialize() -> Bool {
-        guard detectDevice() else {
-            return false
-        }
-        
-        // Initialize MS2130SS-specific settings
-        if validateConnection() {
-            isConnected = true
-            logger.log(content: "✅ MS2130S chipset initialized successfully")
-            return true
-        }
-        
-        logger.log(content: "❌ MS2130S chipset initialization failed")
-        return false
-    }
-    
-    override func detectDevice() -> Bool {
-        _ = DependencyContainer.shared.resolve(USBDevicesManagerProtocol.self)
-        
-        // Check if MS2130S device is connected
-        for device in AppStatus.USBDevices {
-            if device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
-               device.productID == MS2130SVideoChipset.PRODUCT_ID {
-                logger.log(content: "🔍 MS2130S device detected: \(device.productName)")
-                return true
-            }
-        }
-        
-        return false
-    }
-    
-    override func validateConnection() -> Bool {
-        // MS2130S validation differs from MS2109
-        // May not have full HID capabilities, so use different validation
-        let videoDevices = getVideoDevices()
-        return !videoDevices.isEmpty
-    }
-    
-    override func getSignalStatus() -> VideoSignalStatus {
-        // MS2130S may have different signal detection methods
-        // For now, check if we have video devices available
-        let hasDevices = !getVideoDevices().isEmpty
-        
-        return VideoSignalStatus(
-            hasSignal: hasDevices,
-            signalStrength: hasDevices ? 1.0 : 0.0,
-            isStable: hasDevices,
-            errorRate: 0.0,
-            lastUpdate: Date()
-        )
-    }
-    
-    override func getTimingInfo() -> VideoTimingInfo? {
-        // MS2130S may not support detailed timing info via HID
-        // Return basic timing info if available
-        if let resolution = getResolution() {
-            return VideoTimingInfo(
-                horizontalTotal: UInt32(resolution.width),
-                verticalTotal: UInt32(resolution.height),
-                horizontalSyncStart: 0,
-                verticalSyncStart: 0,
-                horizontalSyncWidth: 0,
-                verticalSyncWidth: 0,
-                pixelClock: 0
-            )
-        }
-        return nil
     }
 }

@@ -72,6 +72,52 @@ protocol ControlChipsetProtocol: HardwareChipsetProtocol {
     func monitorHIDEvents() -> Bool
 }
 
+/// Protocol for chipset-specific HID register addresses
+/// This allows different video chipsets (MS2109, MS2130, etc.) to have
+/// different register mappings for HID operations
+protocol VideoChipsetHIDRegisters {
+    // MARK: - Resolution Registers
+    var inputResolutionWidthHigh: UInt16 { get }
+    var inputResolutionWidthLow: UInt16 { get }
+    var inputResolutionHeightHigh: UInt16 { get }
+    var inputResolutionHeightLow: UInt16 { get }
+    
+    // MARK: - Frame Rate Registers
+    var fpsHigh: UInt16 { get }
+    var fpsLow: UInt16 { get }
+    
+    // MARK: - Pixel Clock Registers
+    var pixelClockHigh: UInt16 { get }
+    var pixelClockLow: UInt16 { get }
+    
+    // MARK: - Timing Registers
+    var inputHTotalHigh: UInt16 { get }
+    var inputHTotalLow: UInt16 { get }
+    var inputVTotalHigh: UInt16 { get }
+    var inputVTotalLow: UInt16 { get }
+    var inputHstHigh: UInt16 { get }
+    var inputHstLow: UInt16 { get }
+    var inputVstHigh: UInt16 { get }
+    var inputVstLow: UInt16 { get }
+    var inputHwHigh: UInt16 { get }
+    var inputHwLow: UInt16 { get }
+    var inputVwHigh: UInt16 { get }
+    var inputVwLow: UInt16 { get }
+    
+    // MARK: - Version Registers
+    var version1: UInt16 { get }
+    var version2: UInt16 { get }
+    var version3: UInt16 { get }
+    var version4: UInt16 { get }
+    
+    // MARK: - Status Registers
+    var hdmiConnectionStatus: UInt16 { get }
+    
+    // MARK: - Chipset Capabilities
+    var supportsHIDCommands: Bool { get }
+    var supportsEEPROM: Bool { get }
+}
+
 // MARK: - Data Structures
 
 /// Chipset information structure
@@ -134,7 +180,7 @@ enum CommunicationInterface {
 }
 
 /// Chipset types
-enum ChipsetType {
+enum ChipsetType: Equatable {
     case video(VideoChipsetType)
     case control(ControlChipsetType)
 }
@@ -171,21 +217,29 @@ class HardwareAbstractionLayer {
     private func detectVideoChipset() -> Bool {
         // Check for MS2109 chipset
         if let ms2109 = MS2109VideoChipset() {
-            if ms2109.detectDevice() && ms2109.initialize() {
+            if ms2109.detectDevice() {
                 videoChipset = ms2109
                 AppStatus.videoChipsetType = .ms2109
-                logger.log(content: "✅ HAL: MS2109 video chipset detected and initialized")
-                return true
+                if ms2109.initialize() {
+                    logger.log(content: "✅ HAL: MS2109 video chipset detected and initialized")
+                    return true
+                } else {
+                    logger.log(content: "❌ HAL: MS2109 video chipset initialization failed")
+                }
             }
         }
         
         // Check for MS2130S chipset
         if let ms2130s = MS2130SVideoChipset() {
-            if ms2130s.detectDevice() && ms2130s.initialize() {
+            if ms2130s.detectDevice() {
                 videoChipset = ms2130s
                 AppStatus.videoChipsetType = .ms2130s
-                logger.log(content: "✅ HAL: MS2130S video chipset detected and initialized")
-                return true
+                if ms2130s.initialize() {
+                    logger.log(content: "✅ HAL: MS2130S video chipset detected and initialized")
+                    return true
+                } else {
+                    logger.log(content: "❌ HAL: MS2130S video chipset initialization failed")  
+                }
             }
         }
         
