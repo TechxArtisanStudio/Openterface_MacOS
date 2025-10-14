@@ -589,6 +589,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Stop audio operations
+        audioManager.stopAudioSession()
+        
         // Deinitialize Hardware Abstraction Layer
         deinitializeHAL()
         return .terminateNow
