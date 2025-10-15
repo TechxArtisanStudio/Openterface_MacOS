@@ -46,6 +46,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// Current video dimensions
     @Published var dimensions = CMVideoDimensions()
     
+    /// Desired video resolution (optional)
+    var desiredResolution: CMVideoDimensions?
+    
     /// Indicates if video is currently connected
     @Published var isVideoConnected: Bool = false
     
@@ -323,7 +326,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         // If devices found, set up video capture
         if !videoDevices.isEmpty {
-            setupVideoCapture(with: videoDevices[0])
+            let device = videoDevices[0]
+            
+            // Set to 1920x1080 resolution with highest FPS
+            setVideoResolution(width: 1920, height: 1080)
+            logger.log(content: "Setting video to 1920x1080 resolution with highest FPS")
+            
+            setupVideoCapture(with: device)
         } else {
             logger.log(content: "No matching video devices found")
             isVideoSessionStarting = false
@@ -391,6 +400,85 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             
             captureSession.addInput(input)
             
+            // Set desired resolution if specified
+            if let desiredRes = desiredResolution {
+                do {
+                    try device.lockForConfiguration()
+                    
+                    // List all supported formats before matching
+                    logger.log(content: "Listing all supported video formats for device: \(device.localizedName)")
+                    for (index, format) in device.formats.enumerated() {
+                        let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                        let pixelFormat = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                        let formatDescription = pixelFormatDescription(pixelFormat)
+                        logger.log(content: "Format \(index): \(formatDimensions.width)x\(formatDimensions.height) - \(formatDescription)")
+                    }
+                    
+                    // Print supported resolutions with frame rates
+                    logger.log(content: "Supported video resolutions and frame rates:")
+                    for (index, format) in device.formats.enumerated() {
+                        let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                        let pixelFormat = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                        let formatDescription = pixelFormatDescription(pixelFormat)
+                        
+                        // Get frame rate ranges for this format
+                        var frameRateInfo = "N/A"
+                        if let frameRateRanges = format.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
+                            let frameRates = frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", ")
+                            frameRateInfo = frameRates
+                        }
+                        
+                        logger.log(content: "Format \(index): \(formatDimensions.width)x\(formatDimensions.height) @ \(frameRateInfo) - \(formatDescription)")
+                    }
+                    
+                    // Find the best matching format for the desired resolution
+                    if let matchingFormat = device.formats.first(where: { format in
+                        let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                        return formatDimensions.width == desiredRes.width && formatDimensions.height == desiredRes.height
+                    }) {
+                        device.activeFormat = matchingFormat
+                        let pixelFormat = CMFormatDescriptionGetMediaSubType(matchingFormat.formatDescription)
+                        let formatDescription = pixelFormatDescription(pixelFormat)
+                        logger.log(content: "Set video resolution to \(desiredRes.width)x\(desiredRes.height) using format: \(formatDescription)")
+                        
+                        // Set to 144fps for 1920x1080 if available
+                        if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
+                            logger.log(content: "Available frame rate ranges for 1920x1080: \(frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", "))")
+                            
+                            // First try to find 144fps specifically
+                            if let fps144Range = frameRateRanges.first(where: { abs($0.maxFrameRate - 144.0) < 1.0 }) {
+                                device.activeVideoMinFrameDuration = fps144Range.minFrameDuration
+                                device.activeVideoMaxFrameDuration = fps144Range.maxFrameDuration
+                                logger.log(content: "Successfully set frame rate to 144fps for 1920x1080")
+                            } else {
+                                // Fall back to highest available frame rate
+                                let bestFrameRateRange = frameRateRanges.max(by: { $0.maxFrameRate < $1.maxFrameRate })!
+                                device.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration
+                                device.activeVideoMaxFrameDuration = bestFrameRateRange.maxFrameDuration
+                                logger.log(content: "144fps not found, using highest available frame rate \(bestFrameRateRange.maxFrameRate)fps for 1920x1080")
+                            }
+                        }
+                        
+                        // Update video data output to capture at the full resolution
+                        if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
+                            // Configure output to capture at the device's active resolution
+                            videoOutput.videoSettings = [
+                                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                                kCVPixelBufferWidthKey as String: desiredRes.width,
+                                kCVPixelBufferHeightKey as String: desiredRes.height
+                            ]
+                            logger.log(content: "Updated video output to capture at \(desiredRes.width)x\(desiredRes.height)")
+                        }
+                    } else {
+                        logger.log(content: "Desired resolution \(desiredRes.width)x\(desiredRes.height) not supported, using default")
+                    }
+                    
+                    device.unlockForConfiguration()
+                } catch {
+                    logger.log(content: "Failed to configure device resolution: \(error.localizedDescription)")
+                }
+            }
+            
             // Commit configuration changes
             captureSession.commitConfiguration()
             
@@ -414,12 +502,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             isVideoSessionStarting = false
         }
         
-        // print("Supported pixel format--------")
-        // for format in device.formats {
-        //     let description = format.formatDescription
-        //     let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
-        //     print("Supported pixel format: \(pixelFormat)")
-        // }
+        print("Supported pixel format--------")
+        for format in device.formats {
+            let description = format.formatDescription
+            let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
+            let formatDescription = pixelFormatDescription(pixelFormat)
+            print("Supported pixel format: \(formatDescription)")
+        }
     }
     
     /// Starts video capture session
@@ -504,6 +593,54 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         let maskedUniqueID = uniqueIDValue >> 32
         
         return maskedUniqueID == locationIDValue
+    }
+    
+    /// Converts a pixel format FourCC code to a human-readable name
+    private func pixelFormatDescription(_ pixelFormat: FourCharCode) -> String {
+        switch pixelFormat {
+        case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+            return "NV12 (YUV 4:2:0, Video Range)"
+        case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+            return "NV12 (YUV 4:2:0, Full Range)"
+        case kCVPixelFormatType_422YpCbCr8:
+            return "UYVY (YUV 4:2:2)"
+        case kCVPixelFormatType_32BGRA:
+            return "BGRA (32-bit)"
+        case kCVPixelFormatType_32ARGB:
+            return "ARGB (32-bit)"
+        case kCVPixelFormatType_24RGB:
+            return "RGB (24-bit)"
+        case kCVPixelFormatType_24BGR:
+            return "BGR (24-bit)"
+        case kCVPixelFormatType_420YpCbCr8Planar:
+            return "I420 (YUV 4:2:0 Planar)"
+        case kCVPixelFormatType_420YpCbCr8PlanarFullRange:
+            return "I420 (YUV 4:2:0 Planar, Full Range)"
+        default:
+            // Convert FourCC to string safely
+            let chars: [CChar] = [
+                CChar(pixelFormat >> 24 & 0xFF),
+                CChar(pixelFormat >> 16 & 0xFF),
+                CChar(pixelFormat >> 8 & 0xFF),
+                CChar(pixelFormat & 0xFF),
+                0 // Null terminator
+            ]
+            let fourCCString = String(cString: chars)
+            return "Unknown (\(fourCCString), \(pixelFormat))"
+        }
+    }
+    
+    /// Sets the desired video resolution
+    func setVideoResolution(width: Int32, height: Int32) {
+        desiredResolution = CMVideoDimensions(width: width, height: height)
+        logger.log(content: "Desired video resolution set to \(width)x\(height)")
+        
+        // If video is currently running, restart with new resolution
+        if captureSession.isRunning {
+            logger.log(content: "Restarting video session with new resolution")
+            stopVideoSession()
+            prepareVideo()
+        }
     }
     
     // MARK: - Notification Handlers

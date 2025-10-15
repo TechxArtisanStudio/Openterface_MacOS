@@ -36,8 +36,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var usbDevicesManager: (any USBDevicesManagerProtocol)?
     private var logger: any LoggerProtocol
     
-    // MARK: - Legacy Properties (to be migrated)
-    let aspectRatio = CGSize(width: 1080, height: 659)
+    //Use half of the screen width as initial window width
+    var initialContentSize: CGSize {
+        guard let screen = NSScreen.main else {
+            return CGSize(width: 1080, height: 659) // Default fallback
+        }
+        let halfScreenWidth = screen.frame.width / 2
+        _ = hidManager.getPixelClock()
+        if let resolution = hidManager.getResolution(),
+           resolution.width > 0, resolution.height > 0 {
+            let aspectRatioValue = CGFloat(resolution.width) / CGFloat(resolution.height)
+            let height = halfScreenWidth / aspectRatioValue
+            return CGSize(width: halfScreenWidth, height: height)
+        } else {
+            return CGSize(width: 1080, height: 659) // Default fallback
+        }
+    }
     private var isInitialLaunch = true
     
     // MARK: - Initialization
@@ -175,14 +189,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     
                     // Allow window resizing but maintain aspect ratio
                     window.styleMask.insert(.resizable)
+
+                    let toolbarHeight = window.frame.height - window.contentLayoutRect.height
+                    let fullInitialSize = NSSize(width: initialContentSize.width, height: initialContentSize.height + toolbarHeight)
+                    let initialFrame = NSRect(x: 0, y: 0, width: fullInitialSize.width, height: fullInitialSize.height)
+
+                    logger.log(content: "!!!!! initialContentSize: \(initialContentSize), fullInitialSize: \(fullInitialSize), initialContentSize with toolbar: \(initialFrame.size)")
+                    window.setFrame(initialFrame, display: false)
                     
-                    let initialSize = aspectRatio
-                    window.setContentSize(initialSize)
-                    
-                    // Set minimum size to prevent too small windows
-                    window.minSize = NSSize(width: aspectRatio.width / 2, height: aspectRatio.height / 2)
-                    // Set maximum size to something reasonable (2x initial size)
-                    window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
+                    // // Set minimum size to prevent too small windows
+                    // window.minSize = NSSize(width: aspectRatio.width / 2, height: aspectRatio.height / 2)
+                    // // Set maximum size to something reasonable (2x initial size)
+                    // window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
                     window.center()
                 }
             }
@@ -194,12 +212,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     private func setupNotificationObservers() {
         // Register for HID resolution change notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleHidResolutionChanged(_:)),
-            name: .hidResolutionChanged,
-            object: nil
-        )
         
         // Listen for window size update notifications
         NotificationCenter.default.addObserver(
@@ -231,64 +243,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"),
             object: nil
         )
-    }
-    
-    // Handle HID resolution change notifications
-    @objc func handleHidResolutionChanged(_ notification: Notification) {
-        // If this is the initial launch, ignore this notification
-        if isInitialLaunch {
-            // Only update window size silently without showing a prompt
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                if let window = NSApplication.shared.mainWindow {
-                    self.updateWindowSize(window: window)
-                }
-            }
-            return
-        }
         
-        // Ensure UI operations are performed on the main thread
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Check if the user has selected to not show the prompt again
-            if UserSettings.shared.doNotShowHidResolutionAlert {
-                // Update window size directly without showing a prompt
-                if let window = NSApplication.shared.mainWindow {
-                    self.updateWindowSize(window: window)
-                }
-                return
-            }
-            
-            // Prompt user to choose aspect ratio when HID resolution changes
-            guard let window = NSApplication.shared.mainWindow else { return }
-            
-            let alert = NSAlert()
-            alert.messageText = "Display Resolution Changed"
-            alert.informativeText = "Display resolution change detected. Would you like to use a custom screen aspect ratio?"
-            alert.addButton(withTitle: "Yes")
-            alert.addButton(withTitle: "No")
-            
-            // Add "Don't show again" checkbox
-            let doNotShowCheckbox = NSButton(checkboxWithTitle: "Don't show this prompt again", target: nil, action: nil)
-            doNotShowCheckbox.state = .off
-            alert.accessoryView = doNotShowCheckbox
-            
-            let response = alert.runModal()
-            
-            // Save user's "Don't show again" preference
-            if doNotShowCheckbox.state == .on {
-                UserSettings.shared.doNotShowHidResolutionAlert = true
-            }
-            
-            if response == .alertFirstButtonReturn {
-                // Show aspect ratio selection menu
-                self.showAspectRatioSelection()
-            }
-            
-            // Update window size based on new aspect ratio
-            self.updateWindowSize(window: window)
-        }
+        // Listen for video ready notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleVideoReady(_:)),
+            name: NSNotification.Name("StartVideoSession"),
+            object: nil
+        )
     }
     
     // Show aspect ratio selection menu
@@ -444,8 +406,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Calculate new window size
         let targetSize = NSSize(
-            width: screenFrame.width * 0.9,
-            height: screenFrame.height * 0.9
+            width: screenFrame.width * 0.6,
+            height: screenFrame.height * 0.6
         )
         
         // Calculate appropriate size
@@ -476,13 +438,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 AppStatus.currentWindow = window.frame
             }
         }
-        handleToolbarAutoHide()
+//        handleToolbarAutoHide()
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        let newSize = calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true)
-
-        return newSize
+        return calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true)
     }
 
     private func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, constraintToScreen: Bool) -> NSSize {
@@ -497,37 +457,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Use user custom ratio
             aspectRatioToUse = UserSettings.shared.customAspectRatio.widthToHeightRatio
         } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-            // Use HID ratio
-            let hidAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-            aspectRatioToUse = hidAspectRatio
+            // Use AppStatus resolution
+            aspectRatioToUse = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+        }  else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
+             aspectRatioToUse = CGFloat(resolution.width) / CGFloat(resolution.height)
         } else {
             // Use default ratio
-            let defaultAspectRatio = aspectRatio.width / aspectRatio.height
-            aspectRatioToUse = defaultAspectRatio
+            aspectRatioToUse = initialContentSize.width / initialContentSize.height
         }
         
         // Get the screen containing the window
         guard let screen = window.screen ?? NSScreen.main else { return targetSize }
-        let screenFrame = screen.visibleFrame
+        let screenFrame = screen.frame
         
         // Calculate new size maintaining content area aspect ratio
         var newSize = targetSize
-        // Adjust height calculation to account for the toolbar
-        let contentHeight = targetSize.height - toolbarHeight
-        let contentWidth = targetSize.width
-        
-        // Calculate content size based on aspect ratio
-        let heightFromWidth = (contentWidth / aspectRatioToUse)
-        let widthFromHeight = (contentHeight * aspectRatioToUse)
-        
-        // Choose the smaller size to ensure the window fits the screen
-        if heightFromWidth + toolbarHeight <= screenFrame.height {
-            newSize.height = heightFromWidth + toolbarHeight
-        } else {
-            newSize.width = widthFromHeight
-        }
 
+        // Adjust height calculation to account for the toolbar
+        let contentHeight = newSize.width / aspectRatioToUse
         
+        newSize.height = contentHeight + toolbarHeight
         return newSize
     }
 
@@ -536,7 +485,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
-        handleToolbarAutoHide()
+//        handleToolbarAutoHide()
     }
 
     // Handle window moving between screens
@@ -549,7 +498,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Calculate the current aspect ratio of the window
         let currentAspectRatio = currentFrame.width / currentFrame.height
-        let targetAspectRatio = aspectRatio.width / aspectRatio.height
+        let targetAspectRatio = initialContentSize.width / initialContentSize.height
         
         // Check if aspect ratio is significantly different (allowing for small floating point differences)
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
@@ -620,7 +569,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let toolbarHeight: CGFloat = (sender.toolbar?.isVisible == true) ? sender.frame.height - sender.contentLayoutRect.height : 0
         
         // If the window is in normal size, then zoom to max
-        if currentFrame.size.width <= aspectRatio.width {
+        if currentFrame.size.width <= initialContentSize.width {
             // Calculate the maximum possible size
             let maxWidth = screenFrame.width
             let maxHeight = screenFrame.height
@@ -654,8 +603,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             } else {
                 // Use default aspect ratio
                 normalSize = NSSize(
-                    width: aspectRatio.width,
-                    height: aspectRatio.height + toolbarHeight
+                    width: initialContentSize.width,
+                    height: initialContentSize.height + toolbarHeight
                 )
             }
             
@@ -679,6 +628,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // Handle window size update request
     @objc func handleWindowSizeUpdateRequest(_ notification: Notification) {
+        if let window = NSApplication.shared.mainWindow {
+            updateWindowSize(window: window)
+        }
+    }
+    
+    // Handle video ready notification
+    @objc func handleVideoReady(_ notification: Notification) {
         if let window = NSApplication.shared.mainWindow {
             updateWindowSize(window: window)
         }
@@ -873,7 +829,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
 extension NSWindow {
     var zoomedOrFullScreen: Bool {
-        return self.isZoomed || self.styleMask.contains(.fullScreen)
+//        return self.isZoomed || self.styleMask.contains(.fullScreen)
+        return self.isZoomed
     }
 }
 

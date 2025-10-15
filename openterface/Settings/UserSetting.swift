@@ -20,6 +20,7 @@
 * ========================================================================== *
 */
 import Foundation
+import AVFoundation
 
 final class UserSettings: ObservableObject {
     static let shared = UserSettings()
@@ -60,6 +61,10 @@ final class UserSettings: ObservableObject {
         // Load preferred baudrate from UserDefaults
         let savedPreferredBaudrate = UserDefaults.standard.object(forKey: "preferredBaudrate") as? Int
         self.preferredBaudrate = BaudrateOption(rawValue: savedPreferredBaudrate ?? 115200) ?? .highSpeed
+        
+        // Load gravity settings from UserDefaults
+        let savedGravity = UserDefaults.standard.string(forKey: "gravity")
+        self.gravity = GravityOption(rawValue: savedGravity ?? "") ?? .resizeAspect
     }
     @Published var isSerialOutput: Bool
     @Published var MouseControl:MouseControlMode {
@@ -113,6 +118,13 @@ final class UserSettings: ObservableObject {
     @Published var preferredBaudrate: BaudrateOption {
         didSet {
             UserDefaults.standard.set(preferredBaudrate.rawValue, forKey: "preferredBaudrate")
+        }
+    }
+    
+    // Gravity settings for both content and video layers
+    @Published var gravity: GravityOption = .resizeAspect {
+        didSet {
+            UserDefaults.standard.set(gravity.rawValue, forKey: "gravity")
         }
     }
 }
@@ -264,6 +276,57 @@ enum BaudrateOption: Int, CaseIterable {
             return "Slower, more reliable connection"
         case .highSpeed:
             return "Faster data transmission"
+        }
+    }
+}
+
+// Gravity option enumeration for video layer scaling
+enum GravityOption: String, CaseIterable {
+    case resize = "Stretch"
+    case resizeAspect = "Fit"
+    case resizeAspectFill = "Fill"
+    
+    var displayName: String {
+        switch self {
+        case .resize:
+            return "Stretch to Fit"
+        case .resizeAspect:
+            return "Fit (Maintain Aspect Ratio)"
+        case .resizeAspectFill:
+            return "Fill (Maintain Aspect Ratio)"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .resize:
+            return "Stretches content to fill the entire view"
+        case .resizeAspect:
+            return "Fits content while preserving aspect ratio"
+        case .resizeAspectFill:
+            return "Fills view while preserving aspect ratio (may crop)"
+        }
+    }
+    
+    var contentsGravity: CALayerContentsGravity {
+        switch self {
+        case .resize:
+            return .resize
+        case .resizeAspect:
+            return .resizeAspect
+        case .resizeAspectFill:
+            return .resizeAspectFill
+        }
+    }
+    
+    var videoGravity: AVLayerVideoGravity {
+        switch self {
+        case .resize:
+            return .resize
+        case .resizeAspect:
+            return .resizeAspect
+        case .resizeAspectFill:
+            return .resizeAspectFill
         }
     }
 }

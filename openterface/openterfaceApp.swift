@@ -364,13 +364,8 @@ struct openterfaceApp: App {
                                 _resolution.height = "?"
                                 _fps = "?"
                             } else {
-                                if pixelClockValue > 189.0 { // The magic value for MS2109 4K resolution correction
-                                    _resolution.width = AppStatus.hidReadResolusion.width == 4096 ? "\(AppStatus.hidReadResolusion.width)" : "\(AppStatus.hidReadResolusion.width*2)"
-                                    _resolution.height = AppStatus.videoChipsetType == .ms2109 ? "\(AppStatus.hidReadResolusion.height*2)" : "\(AppStatus.hidReadResolusion.height)"
-                                }else{
-                                    _resolution.width = "\(AppStatus.hidReadResolusion.width)"
-                                    _resolution.height = "\(AppStatus.hidReadResolusion.height)"
-                                }
+                                _resolution.width = "\(AppStatus.hidReadResolusion.width)"
+                                _resolution.height = "\(AppStatus.hidReadResolusion.height)"
                                 _fps = "\(AppStatus.hidReadFps)"
                             }
                         }

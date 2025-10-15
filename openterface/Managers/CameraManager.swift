@@ -84,17 +84,20 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             return
         }
         
-        // Get current frame from video manager
-        guard let currentFrame = captureCurrentFrame() else {
-            logger.log(content: "Failed to capture current frame")
-            statusMessage = "Failed to capture frame"
-            return
-        }
-        
-        // Save the image
-        let filename = generateFilename(extension: "png")
-        let fileURL = documentsDirectory.appendingPathComponent(filename)
-        
+    // Get current frame from video manager
+    guard let currentFrame = captureCurrentFrame() else {
+        logger.log(content: "Failed to capture current frame")
+        statusMessage = "Failed to capture frame"
+        return
+    }
+    
+    // Log the resolution of the captured picture
+    let imageSize = currentFrame.size
+    logger.log(content: "Captured picture resolution: \(Int(imageSize.width))x\(Int(imageSize.height))")
+    
+    // Save the image
+    let filename = generateFilename(extension: "png")
+    let fileURL = documentsDirectory.appendingPathComponent(filename)
         if saveImage(currentFrame, to: fileURL) {
             logger.log(content: "Picture saved to: \(fileURL.path)")
             statusMessage = "Picture saved successfully"
@@ -263,8 +266,15 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             return nil
         }
         
-        // Convert CGImage to NSImage
-        let image = NSImage(cgImage: cgImage, size: CGSize(width: cgImage.width, height: cgImage.height))
+        // Log the actual resolution of the captured frame
+        let frameWidth = cgImage.width
+        let frameHeight = cgImage.height
+        logger.log(content: "Captured frame resolution: \(frameWidth)x\(frameHeight)")
+        
+        // Convert CGImage to NSImage, ensuring we preserve the full resolution
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: frameWidth, height: frameHeight))
+        logger.log(content: "Created NSImage with size: \(image.size)")
+        
         return image
     }
     
@@ -275,17 +285,23 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
     }
     
     private func saveImage(_ image: NSImage, to url: URL) -> Bool {
+        // Get the best representation available
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            logger.log(content: "Failed to get CGImage from NSImage")
             return false
         }
         
+        logger.log(content: "Saving image with resolution: \(cgImage.width)x\(cgImage.height)")
+        
         let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
         guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+            logger.log(content: "Failed to create PNG representation")
             return false
         }
         
         do {
             try pngData.write(to: url)
+            logger.log(content: "Successfully saved image to: \(url.path)")
             return true
         } catch {
             logger.log(content: "Failed to save image: \(error)")
