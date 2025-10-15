@@ -97,7 +97,8 @@ class HALIntegrationManager {
     private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var hal: HardwareAbstractionLayer = HardwareAbstractionLayer.shared
     private var isInitialized: Bool = false
-    private var periodicUpdateTimer: Timer?
+    private var periodicUpdateTimer: DispatchSourceTimer?
+    private let timerQueue = DispatchQueue(label: "com.openterface.hal.timer", qos: .utility)
     
     private init() {}
     
@@ -530,31 +531,35 @@ class HALIntegrationManager {
     }
     
     private func setupPeriodicHALUpdates() {
-        // Invalidate any existing timer first
-        periodicUpdateTimer?.invalidate()
+        // Cancel any existing timer first
+        periodicUpdateTimer?.cancel()
         periodicUpdateTimer = nil
         
-        // Set up periodic updates for hardware monitoring
-        // Use a delayed start to ensure all components are fully initialized
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            guard let self = self, self.isInitialized else { return }
-            
-            self.periodicUpdateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
-                // Check if self and components still exist
-                guard let self = self, self.isInitialized else {
-                    timer.invalidate()
-                    return
-                }
-                self.performPeriodicHALUpdate()
+        // Use DispatchSourceTimer to avoid RunLoop conflicts with SwiftUI
+        // This runs on a background queue instead of the main thread
+        let timer = DispatchSource.makeTimerSource(queue: timerQueue)
+        
+        // Start after 2 seconds delay, then repeat every 2 seconds
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0, leeway: .milliseconds(100))
+        
+        timer.setEventHandler { [weak self] in
+            guard let self = self, self.isInitialized else {
+                timer.cancel()
+                return
             }
-            
-            self.logger.log(content: "⏰ Periodic HAL updates configured")
+            self.performPeriodicHALUpdate()
         }
+        
+        // Store the timer and activate it
+        periodicUpdateTimer = timer
+        timer.resume()
+        
+        logger.log(content: "⏰ Periodic HAL updates configured on background queue")
     }
     
     private func stopPeriodicHALUpdates() {
-        // Stop periodic updates by invalidating the timer
-        periodicUpdateTimer?.invalidate()
+        // Stop periodic updates by canceling the timer
+        periodicUpdateTimer?.cancel()
         periodicUpdateTimer = nil
         logger.log(content: "⏹️ Periodic HAL updates stopped")
     }
