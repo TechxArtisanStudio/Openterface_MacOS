@@ -63,13 +63,15 @@ class PlayerView: NSView, NSWindowDelegate {
         logger.log(content: "Setup layer start")
     
         self.previewLayer?.frame = self.frame
-        self.previewLayer?.contentsGravity = .resizeAspectFill
-        self.previewLayer?.videoGravity = .resizeAspectFill
+        // self.previewLayer?.contentsGravity = .resizeAspectFill
+        // self.previewLayer?.videoGravity = .resizeAspectFill
+        self.previewLayer?.contentsGravity = UserSettings.shared.gravity.contentsGravity
+        self.previewLayer?.videoGravity = UserSettings.shared.gravity.videoGravity
         self.previewLayer?.connection?.automaticallyAdjustsVideoMirroring = false
         
         if let image = NSImage(named: "content_dark_eng"), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             playerBackgroundImage.contents = cgImage
-            playerBackgroundImage.contentsGravity = .resizeAspect
+            playerBackgroundImage.contentsGravity = UserSettings.shared.gravity.contentsGravity
             self.playerBackgroundImage.zPosition = -2
         }
         self.previewLayer?.addSublayer(self.playerBackgroundImage)
@@ -87,6 +89,7 @@ class PlayerView: NSView, NSWindowDelegate {
         playViewNtf.addObserver(self, selector: #selector(handleDidEnterFullScreenNotification(_:)), name: NSWindow.didEnterFullScreenNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(promptUserHowToExitRelativeMode(_:)), name: .enableRelativeModeNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(handleHIDMouseEscaped(_:)), name: .hidMouseEscapedNotification, object: nil)
+        playViewNtf.addObserver(self, selector: #selector(handleGravitySettingsChanged(_:)), name: .gravitySettingsChanged, object: nil)
     }
     
         @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
@@ -100,6 +103,13 @@ class PlayerView: NSView, NSWindowDelegate {
         let tips = "Mouse capture released. Click on the video to re-capture."
         DispatchQueue.main.async {
             self.tipLayerManager.showTip(text: tips, yOffset: 1.5, window: NSApp.mainWindow)
+        }
+    }
+    
+    @objc func handleGravitySettingsChanged(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.setupLayer()
+            self.logger.log(content: "Updated gravity settings: \(UserSettings.shared.gravity.rawValue)")
         }
     }
     

@@ -27,8 +27,59 @@ final class WindowUtils {
     // Singleton mode
     static let shared = WindowUtils()
     private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var currentAspectRatioPopup: NSPopUpButton?
+    private var gravityDescLabel: NSTextField?
+    private var resolutionsLabel: NSTextField?
 
     private init() {}
+    
+    @objc private func toggleAspectRatioPopup(_ sender: NSButton) {
+        currentAspectRatioPopup?.isEnabled = sender.state == .on
+    }
+    
+    @objc private func updateGravityDescription(_ sender: NSPopUpButton) {
+        let selectedIndex = sender.indexOfSelectedItem
+        if selectedIndex >= 0 && selectedIndex < GravityOption.allCases.count {
+            let selectedOption = GravityOption.allCases[selectedIndex]
+            gravityDescLabel?.stringValue = selectedOption.description
+        }
+    }
+    
+    @objc private func updateAspectRatioResolutions(_ sender: NSPopUpButton) {
+        let selectedIndex = sender.indexOfSelectedItem
+        if selectedIndex >= 0 && selectedIndex < AspectRatioOption.allCases.count {
+            let selectedOption = AspectRatioOption.allCases[selectedIndex]
+            let resolutions = getCommonResolutions(for: selectedOption)
+            resolutionsLabel?.stringValue = "Common resolutions: \(resolutions)"
+        }
+    }
+    
+    private func getCommonResolutions(for aspectRatio: AspectRatioOption) -> String {
+        switch aspectRatio {
+        case .ratio16_9:
+            return "1920×1080, 2560×1440, 3840×2160"
+        case .ratio16_10:
+            return "1920×1200, 2560×1600, 1440×900"
+        case .ratio21_9:
+            return "2560×1080, 3440×1440"
+        case .ratio5_3:
+            return "2560×1536, 1920×1152"
+        case .ratio5_4:
+            return "1280×1024, 2560×2048"
+        case .ratio4_3:
+            return "1600×1200, 1920×1440, 2560×1920"
+        case .ratio9_16:
+            return "1080×1920, 1440×2560"
+        case .ratio9_19_5:
+            return "1080×2340"
+        case .ratio9_20:
+            return "1080×2400"
+        case .ratio9_21:
+            return "1080×2520"
+        case .ratio9_5:
+            return "4096×2160"
+        }
+    }
     
     /// Display the screen ratio selector window
     /// - Parameter completion: The callback after selection, passing in whether to update the window
@@ -48,14 +99,41 @@ final class WindowUtils {
         }
         
         let alert = NSAlert()
-        alert.messageText = "Select Aspect Ratio"
-        alert.informativeText = "Please select your preferred aspect ratio:"
+        alert.messageText = "Aspect Ratio & Video Settings"
+        alert.informativeText = "Please select your preferred aspect ratio and video scaling options:"
         
         // Create vertical stack view container
-        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 65))
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+        
+        // Add gravity label
+        let gravityLabel = NSTextField(frame: NSRect(x: 0, y: 155, width: 300, height: 20))
+        gravityLabel.stringValue = "Scaling:"
+        gravityLabel.isEditable = false
+        gravityLabel.isBordered = false
+        gravityLabel.backgroundColor = .clear
+        gravityLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        
+        // Add gravity dropdown menu
+        let gravityPopup = NSPopUpButton(frame: NSRect(x: 0, y: 130, width: 300, height: 25))
+        for option in GravityOption.allCases {
+            gravityPopup.addItem(withTitle: option.displayName)
+        }
+        gravityPopup.selectItem(at: GravityOption.allCases.firstIndex(of: UserSettings.shared.gravity)!)
+        gravityPopup.target = self
+        gravityPopup.action = #selector(updateGravityDescription(_:))
+        
+        // Add gravity description
+        let gravityDesc = NSTextField(frame: NSRect(x: 0, y: 105, width: 300, height: 20))
+        gravityDesc.stringValue = UserSettings.shared.gravity.description
+        gravityDesc.isEditable = false
+        gravityDesc.isBordered = false
+        gravityDesc.backgroundColor = .clear
+        gravityDesc.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        gravityDesc.textColor = .blue
+        self.gravityDescLabel = gravityDesc
         
         // Add aspect ratio dropdown menu
-        let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 30, width: 200, height: 25))
+        let aspectRatioPopup = NSPopUpButton(frame: NSRect(x: 0, y: 50, width: 300, height: 25))
         
         // Get the current resolution value
         var currentResolution = AppStatus.hidReadResolusion.width > 0 ? Float(AppStatus.hidReadResolusion.width) / Float(AppStatus.hidReadResolusion.height) : 0.0
@@ -64,7 +142,6 @@ final class WindowUtils {
         if currentResolution == 4096.0 / 2160.0 {
             currentResolution = 1.8 // Set to 9:5 aspect ratio
         }
-
 
         // Add all preset ratio options
         for option in AspectRatioOption.allCases {
@@ -80,14 +157,38 @@ final class WindowUtils {
             aspectRatioPopup.selectItem(at: index)
         }
         
-        // Add checkbox for HID resolution change alerts
-        let showHidAlertCheckbox = NSButton(checkboxWithTitle: "Show HID resolution change alerts", target: nil, action: nil)
-        showHidAlertCheckbox.state = UserSettings.shared.doNotShowHidResolutionAlert ? .off : .on
-        showHidAlertCheckbox.frame = NSRect(x: 0, y: 0, width: 200, height: 20)
+        aspectRatioPopup.isEnabled = UserSettings.shared.useCustomAspectRatio
+        aspectRatioPopup.target = self
+        aspectRatioPopup.action = #selector(updateAspectRatioResolutions(_:))
+        self.currentAspectRatioPopup = aspectRatioPopup
+        
+        // Add resolutions label
+        let resolutionsLabel = NSTextField(frame: NSRect(x: 0, y: 15, width: 300, height: 20))
+        let initialResolutions = getCommonResolutions(for: UserSettings.shared.customAspectRatio)
+        resolutionsLabel.stringValue = "Common resolutions: \(initialResolutions)"
+        resolutionsLabel.isEditable = false
+        resolutionsLabel.isBordered = false
+        resolutionsLabel.backgroundColor = .clear
+        resolutionsLabel.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        resolutionsLabel.textColor = .blue
+        self.resolutionsLabel = resolutionsLabel
+        
+        
+        // Add checkbox for using custom aspect ratio
+        let useCustomAspectRatioCheckbox = NSButton(checkboxWithTitle: "Use custom Aspect Ratio", target: nil, action: nil)
+        useCustomAspectRatioCheckbox.state = UserSettings.shared.useCustomAspectRatio ? .on : .off
+        useCustomAspectRatioCheckbox.frame = NSRect(x: 0, y: 80, width: 300, height: 20)
+        useCustomAspectRatioCheckbox.target = self
+        useCustomAspectRatioCheckbox.action = #selector(toggleAspectRatioPopup(_:))
         
         // Add controls to container view
+        containerView.addSubview(gravityLabel)
+        containerView.addSubview(gravityPopup)
+        containerView.addSubview(gravityDesc)
+        containerView.addSubview(useCustomAspectRatioCheckbox)
         containerView.addSubview(aspectRatioPopup)
-        containerView.addSubview(showHidAlertCheckbox)
+        containerView.addSubview(resolutionsLabel)
+//        containerView.addSubview(showHidAlertCheckbox)
         
         alert.accessoryView = containerView
         alert.addButton(withTitle: "OK")
@@ -96,24 +197,40 @@ final class WindowUtils {
         let response = alert.runModal()
         
         if response == .alertFirstButtonReturn {
-            let selectedIndex = aspectRatioPopup.indexOfSelectedItem
-            if selectedIndex >= 0 && selectedIndex < AspectRatioOption.allCases.count {
-                // Save user's aspect ratio selection
-                UserSettings.shared.customAspectRatio = AspectRatioOption.allCases[selectedIndex]
-                UserSettings.shared.useCustomAspectRatio = true
-                
-                // Save user's choice for HID resolution change alerts
-                UserSettings.shared.doNotShowHidResolutionAlert = (showHidAlertCheckbox.state == .off)
-                
-                // Notify caller to update window size
-                completion(true)
-            } else {
-                logger.log(content: "Invalid aspect ratio selection index: \(selectedIndex)")
-                completion(false)
+            // Save user's gravity selection
+            let gravityIndex = gravityPopup.indexOfSelectedItem
+            if gravityIndex >= 0 && gravityIndex < GravityOption.allCases.count {
+                UserSettings.shared.gravity = GravityOption.allCases[gravityIndex]
             }
+            
+            // Save user's choice for using custom aspect ratio
+            UserSettings.shared.useCustomAspectRatio = (useCustomAspectRatioCheckbox.state == .on)
+            
+            if UserSettings.shared.useCustomAspectRatio {
+                let selectedIndex = aspectRatioPopup.indexOfSelectedItem
+                if selectedIndex >= 0 && selectedIndex < AspectRatioOption.allCases.count {
+                    // Save user's aspect ratio selection
+                    UserSettings.shared.customAspectRatio = AspectRatioOption.allCases[selectedIndex]
+                } else {
+                    logger.log(content: "Invalid aspect ratio selection index: \(selectedIndex)")
+                }
+            }
+            
+            // Save user's choice for HID resolution change alerts
+//            UserSettings.shared.doNotShowHidResolutionAlert = (showHidAlertCheckbox.state == .off)
+            
+            // Notify that gravity settings have changed
+            NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
+            
+            // Notify caller to update window size
+            completion(true)
         } else {
             completion(false)
         }
+        
+        self.currentAspectRatioPopup = nil
+        self.gravityDescLabel = nil
+        self.resolutionsLabel = nil
     }
     
     /// Directly call the system notification to update the window size
@@ -161,4 +278,5 @@ final class WindowUtils {
 // Extension notification name
 extension Notification.Name {
     static let updateWindowSize = Notification.Name("UpdateWindowSizeNotification")
+    static let gravitySettingsChanged = Notification.Name("GravitySettingsChangedNotification")
 }

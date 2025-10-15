@@ -273,9 +273,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         }
         
         let widthHighReport = generateHIDReport(address: hidRegisters.inputResolutionWidthHigh)
-        let widthLowReport = generateHIDReport(address: hidRegisters.inputResolutionWidthLow)
         let heightHighReport = generateHIDReport(address: hidRegisters.inputResolutionHeightHigh)
-        let heightLowReport = generateHIDReport(address: hidRegisters.inputResolutionHeightLow)
         
         guard let widthU16 = self.sendAndReadHIDReportAsUInt16(widthHighReport),
               let heightU16 = self.sendAndReadHIDReportAsUInt16(heightHighReport) else {
@@ -291,7 +289,18 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             width = 1920
             height = 1080
         }
-
+        
+        let pixelClock = AppStatus.hidReadPixelClock / 100
+        if AppStatus.videoChipsetType == .ms2109 {
+            if pixelClock > 189 { // The magic value for MS2109 4K resolution correction
+                width = width == 4096 ? width : width*2
+            }
+        }else{
+            if width == 3840 && height == 1080 {
+                height = 2160
+            }
+        }
+        
         // Check if a resolution change notification needs to be sent
         let newResolution = (width, height)
         let oldResolution = AppStatus.hidReadResolusion
@@ -309,6 +318,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         }
         
         return (width, height)
+    }
+    
+    func getAspectRatio() -> Float? {
+        guard let resolution = getResolution(),
+              resolution.height > 0 else {
+            return nil
+        }
+        return Float(resolution.width) / Float(resolution.height)
     }
     
     func getFps() -> Float? {
@@ -349,8 +366,8 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             logger.log(content: "Failed to read pixel clock data from HID device. Check if device is properly connected.")
             return nil
         }
-
-        return UInt32(pixelClock)
+        AppStatus.hidReadPixelClock = UInt32(pixelClock)
+        return AppStatus.hidReadPixelClock
     }
 
     func getInputHTotal() -> Int? {
