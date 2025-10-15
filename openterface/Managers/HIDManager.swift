@@ -294,6 +294,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         if AppStatus.videoChipsetType == .ms2109 {
             if pixelClock > 189 { // The magic value for MS2109 4K resolution correction
                 width = width == 4096 ? width : width*2
+                height = height == 2160 ? height : height*2
             }
         }else{
             if width == 3840 && height == 1080 {
