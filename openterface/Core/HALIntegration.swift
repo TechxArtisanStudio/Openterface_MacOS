@@ -97,6 +97,7 @@ class HALIntegrationManager {
     private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var hal: HardwareAbstractionLayer = HardwareAbstractionLayer.shared
     private var isInitialized: Bool = false
+    private var periodicUpdateTimer: Timer?
     
     private init() {}
     
@@ -529,16 +530,32 @@ class HALIntegrationManager {
     }
     
     private func setupPeriodicHALUpdates() {
+        // Invalidate any existing timer first
+        periodicUpdateTimer?.invalidate()
+        periodicUpdateTimer = nil
+        
         // Set up periodic updates for hardware monitoring
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.performPeriodicHALUpdate()
+        // Use a delayed start to ensure all components are fully initialized
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self = self, self.isInitialized else { return }
+            
+            self.periodicUpdateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+                // Check if self and components still exist
+                guard let self = self, self.isInitialized else {
+                    timer.invalidate()
+                    return
+                }
+                self.performPeriodicHALUpdate()
+            }
+            
+            self.logger.log(content: "⏰ Periodic HAL updates configured")
         }
-        logger.log(content: "⏰ Periodic HAL updates configured")
     }
     
     private func stopPeriodicHALUpdates() {
-        // Stop periodic updates
-        // In a full implementation, you'd store the timer reference and invalidate it
+        // Stop periodic updates by invalidating the timer
+        periodicUpdateTimer?.invalidate()
+        periodicUpdateTimer = nil
         logger.log(content: "⏹️ Periodic HAL updates stopped")
     }
     
@@ -546,56 +563,74 @@ class HALIntegrationManager {
         // Perform periodic hardware status updates
         guard isInitialized else { return }
         
-        // Update video chipset status
-        if let videoChipset = hal.getCurrentVideoChipset() {
-            let signalStatus = videoChipset.getSignalStatus()
-            AppStatus.hasHdmiSignal = signalStatus.hasSignal
+        // Wrap all operations in autoreleasepool to prevent memory issues during callbacks
+        autoreleasepool {
+            // Update video chipset status with safety checks
+            if let videoChipset = hal.getCurrentVideoChipset() {
+                do {
+                    let signalStatus = videoChipset.getSignalStatus()
+                    let previousStatus = AppStatus.hasHdmiSignal
+                    AppStatus.hasHdmiSignal = signalStatus.hasSignal
+                    
+                    // Log video status changes if needed
+                    if previousStatus != signalStatus.hasSignal {
+                        logger.log(content: "📺 Video signal status changed: \(signalStatus.hasSignal ? "Connected" : "Disconnected")")
+                    }
+                } catch {
+                    // Silently handle errors to prevent crashes
+                }
+            }
             
-            // Log video status changes if needed
-            if AppStatus.hasHdmiSignal != signalStatus.hasSignal {
-                logger.log(content: "📺 Video signal status changed: \(signalStatus.hasSignal ? "Connected" : "Disconnected")")
+            // Update control chipset status with safety checks
+            if let controlChipset = hal.getCurrentControlChipset() {
+                do {
+                    let deviceStatus = controlChipset.getDeviceStatus()
+                    let wasConnected = AppStatus.isTargetConnected
+                    AppStatus.isTargetConnected = deviceStatus.isTargetConnected
+                    
+                    // Log control chipset status changes
+                    if wasConnected != deviceStatus.isTargetConnected {
+                        logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")
+                        logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
+                    }
+                    
+                    // Update control chipset specific status
+                    updateControlChipsetStatus(controlChipset)
+                } catch {
+                    // Silently handle errors to prevent crashes
+                }
             }
         }
         
-        // Update control chipset status
-        if let controlChipset = hal.getCurrentControlChipset() {
-            let deviceStatus = controlChipset.getDeviceStatus()
-            let wasConnected = AppStatus.isTargetConnected
-            AppStatus.isTargetConnected = deviceStatus.isTargetConnected
+        // Additional chipset-specific periodic checks with safety
+        autoreleasepool {
+            guard let videoChipset = hal.getCurrentVideoChipset() else { return }
             
-            // Log control chipset status changes
-            if wasConnected != deviceStatus.isTargetConnected {
-                logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")
-                logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
-            }
-            
-            // Update control chipset specific status
-            updateControlChipsetStatus(controlChipset)
-        }
-        
-        // Additional chipset-specific periodic checks
-        if let videoChipset = hal.getCurrentVideoChipset() {
-            // Get timing information from the video chipset (handles chipset-specific registers)
-            if let timingInfo = videoChipset.getTimingInfo() {
-                AppStatus.hidInputHTotal = timingInfo.horizontalTotal
-                AppStatus.hidInputVTotal = timingInfo.verticalTotal
-                AppStatus.hidInputHst = timingInfo.horizontalSyncStart
-                AppStatus.hidInputVst = timingInfo.verticalSyncStart
-                AppStatus.hidInputHsyncWidth = timingInfo.horizontalSyncWidth
-                AppStatus.hidInputVsyncWidth = timingInfo.verticalSyncWidth
-                AppStatus.hidReadPixelClock = timingInfo.pixelClock
-            }
-            
-            // Get other chipset-specific data
-            AppStatus.hidReadResolusion = videoChipset.getResolution() ?? (width: 0, height: 0)
-            AppStatus.hidReadFps = videoChipset.getFrameRate() ?? 0
-            
-            // Get version and connection status (these might still need HID manager for some chipsets)
-            if let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
-                _ = hidManager.getSwitchStatus()
-                let status = hidManager.getHardwareConnetionStatus()
-                AppStatus.isHardwareConnetionToTarget = status
-                AppStatus.MS2109Version = hidManager.getVersion() ?? ""
+            do {
+                // Get timing information from the video chipset (handles chipset-specific registers)
+                if let timingInfo = videoChipset.getTimingInfo() {
+                    AppStatus.hidInputHTotal = timingInfo.horizontalTotal
+                    AppStatus.hidInputVTotal = timingInfo.verticalTotal
+                    AppStatus.hidInputHst = timingInfo.horizontalSyncStart
+                    AppStatus.hidInputVst = timingInfo.verticalSyncStart
+                    AppStatus.hidInputHsyncWidth = timingInfo.horizontalSyncWidth
+                    AppStatus.hidInputVsyncWidth = timingInfo.verticalSyncWidth
+                    AppStatus.hidReadPixelClock = timingInfo.pixelClock
+                }
+                
+                // Get other chipset-specific data
+                AppStatus.hidReadResolusion = videoChipset.getResolution() ?? (width: 0, height: 0)
+                AppStatus.hidReadFps = videoChipset.getFrameRate() ?? 0
+                
+                // Get version and connection status (these might still need HID manager for some chipsets)
+                if let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
+                    _ = hidManager.getSwitchStatus()
+                    let status = hidManager.getHardwareConnetionStatus()
+                    AppStatus.isHardwareConnetionToTarget = status
+                    AppStatus.MS2109Version = hidManager.getVersion() ?? ""
+                }
+            } catch {
+                // Silently handle errors to prevent crashes
             }
         }
     }
