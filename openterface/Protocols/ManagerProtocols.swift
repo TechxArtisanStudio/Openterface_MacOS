@@ -82,6 +82,7 @@ protocol HIDManagerProtocol: AnyObject {
     func writeEeprom(address: UInt16, data: Data) -> Bool
     func writeEeprom(address: UInt16, data: Data, progressCallback: ((Double) -> Void)?) -> Bool
     func readEeprom(address: UInt16, length: UInt8) -> Data?
+    func readVideoNameFromEeprom() -> String?
     
     // Timing information methods
     func getInputHTotal() -> Int?

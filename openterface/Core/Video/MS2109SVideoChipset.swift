@@ -78,6 +78,8 @@ class MS2109SVideoChipset: BaseVideoChipset {
         if validateConnection() {
             isConnected = true
             logger.log(content: "✅ MS2109S chipset initialized successfully")
+
+
             return true
         }
 
@@ -106,6 +108,53 @@ class MS2109SVideoChipset: BaseVideoChipset {
 
         if let version = hidManager.getVersion() {
             logger.log(content: "📋 MS2109S version: \(version)")
+            
+            // Read video name from EEPROM once device is connected
+            if let videoName = hidManager.readVideoNameFromEeprom() {
+                logger.log(content: "📝 Video name from EEPROM: \(videoName)")
+                
+                // Only update USBDeviceInfo if video name is valid (not just spaces)
+                let trimmedName = videoName.trimmingCharacters(in: .whitespaces)
+                if !trimmedName.isEmpty {
+                    if var defaultDevice = AppStatus.DefaultVideoDevice {
+                        // Update the matching device in AppStatus.USBDevices array so the tree view reflects the change
+                        if let index = AppStatus.USBDevices.firstIndex(where: { device in
+                            device.vendorID == defaultDevice.vendorID &&
+                            device.productID == defaultDevice.productID &&
+                            device.locationID == defaultDevice.locationID
+                        }) {
+                            let existingDevice = AppStatus.USBDevices[index]
+                            let updatedDevice = USBDeviceInfo(
+                                productName: videoName,
+                                manufacturer: existingDevice.manufacturer,
+                                vendorID: existingDevice.vendorID,
+                                productID: existingDevice.productID,
+                                locationID: existingDevice.locationID,
+                                speed: existingDevice.speed
+                            )
+                            AppStatus.USBDevices[index] = updatedDevice
+                            logger.log(content: "✅ Updated USBDevices array with new product name for tree view")
+                        }
+                        
+                        // Also update DefaultVideoDevice
+                        defaultDevice = USBDeviceInfo(
+                            productName: videoName,
+                            manufacturer: defaultDevice.manufacturer,
+                            vendorID: defaultDevice.vendorID,
+                            productID: defaultDevice.productID,
+                            locationID: defaultDevice.locationID,
+                            speed: defaultDevice.speed
+                        )
+                        AppStatus.DefaultVideoDevice = defaultDevice
+                        logger.log(content: "✅ Updated DefaultVideoDevice productName with EEPROM video name")
+                    }
+                } else {
+                    logger.log(content: "⚠️ Video name is empty or contains only spaces, skipping update")
+                }
+            } else {
+                logger.log(content: "⚠️ Failed to read video name from EEPROM")
+            }
+            
             return true
         }
 

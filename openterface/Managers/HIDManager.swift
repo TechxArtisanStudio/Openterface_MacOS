@@ -729,6 +729,82 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         return readData
     }
     
+    /// Reads the video name from EEPROM
+    /// The video name is stored at address 0x0010 with a length of 16 bytes
+    /// Format: [length_byte][name_data][padding with 0xFF]
+    /// If no data is present, the name is wrapped with spaces
+    /// - Returns: The video name string, or nil if read failed
+    func readVideoNameFromEeprom() -> String? {
+        let videoNameAddress: UInt16 = 0x0010
+        let videoNameLength: UInt8 = 16
+        
+        guard let eepromData = readEeprom(address: videoNameAddress, length: videoNameLength) else {
+            logger.log(content: "Failed to read video name from EEPROM at address 0x\(String(format: "%04X", videoNameAddress))")
+            return nil
+        }
+        
+        logger.log(content: "Read video name data from EEPROM: \(eepromData.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        
+        // Convert Data to array for easier manipulation
+        let dataArray = [UInt8](eepromData)
+        
+        // First byte is the length of the actual name
+        guard dataArray.count > 0 else {
+            logger.log(content: "EEPROM data is empty")
+            return nil
+        }
+        
+        let nameLength = Int(dataArray[0])
+        logger.log(content: "Video name length from EEPROM: \(nameLength)")
+        
+        // Check if length is valid (should be between 1 and 15, since first byte is length)
+        if nameLength == 0 || nameLength > 15 {
+            logger.log(content: "Invalid name length: \(nameLength), returning spaces")
+            let videoName = "                " // 16 spaces
+            return videoName
+        }
+        
+        // Extract the name bytes (skip the first length byte, then take nameLength bytes)
+        // Make sure we don't go past the padding bytes (0xFF)
+        var nameBytes: [UInt8] = []
+        for i in 1...nameLength {
+            if i < dataArray.count && dataArray[i] != 0xFF {
+                nameBytes.append(dataArray[i])
+            } else if i < dataArray.count && dataArray[i] == 0xFF {
+                // Stop at first padding byte
+                break
+            }
+        }
+        
+        logger.log(content: "Extracted name bytes: \(nameBytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        logger.log(content: "Extracted name bytes as chars: \(nameBytes.map { String(format: "%c", $0) }.joined())")
+        
+        // If no valid bytes extracted, return spaces
+        if nameBytes.isEmpty {
+            logger.log(content: "No valid name bytes found")
+            let videoName = "                " // 16 spaces
+            return videoName
+        }
+        
+        // Convert bytes to string
+        if let videoName = String(data: Data(nameBytes), encoding: .utf8) {
+            logger.log(content: "✅ Successfully decoded video name from EEPROM: '\(videoName)'")
+            return videoName
+        } else {
+            logger.log(content: "⚠️ Failed to decode video name as UTF-8 string, trying ISO-8859-1 fallback")
+            // Try ISO-8859-1 encoding as fallback
+            if let videoName = String(data: Data(nameBytes), encoding: .isoLatin1) {
+                logger.log(content: "✅ Successfully decoded video name using ISO-8859-1: '\(videoName)'")
+                return videoName
+            } else {
+                logger.log(content: "Failed to decode with any encoding")
+                // Fallback: return spaces if decoding fails
+                let videoName = "                " // 16 spaces
+                return videoName
+            }
+        }
+    }
+    
     /// Reads a single chunk from EEPROM using HID feature report
     /// - Parameters:
     ///   - address: The address to read from

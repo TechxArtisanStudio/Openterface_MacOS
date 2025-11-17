@@ -99,14 +99,29 @@ class USBDevicesManager: USBDevicesManagerProtocol {
             // ProductID
             let productID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBProductID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int) ?? 0
 
-            if isOpenterfaceVideoChipset(vendorId: vendorID, productId: productID) && !productName.contains("Openterface") {
-                productName = "Unknown Capture Card"
-            }
-                
-            // LocationID
+            // LocationID (read early so we can use it for device lookup)
             let locationID = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertyLocationID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.uint32Value ?? 0
             let locationIDString = String(format: "0x%08x", locationID)
-            
+
+            if isOpenterfaceVideoChipset(vendorId: vendorID, productId: productID) && !productName.contains("Openterface") {
+                // Check if this device already has an updated product name in AppStatus
+                // (e.g., from EEPROM read during chipset initialization)
+                if let existingDevice = AppStatus.USBDevices.first(where: { device in
+                    device.vendorID == vendorID &&
+                    device.productID == productID &&
+                    device.locationID == locationIDString
+                }) {
+                    // Use the existing product name from AppStatus if it's not "Unknown Capture Card"
+                    if !existingDevice.productName.contains("Unknown Capture") {
+                        productName = existingDevice.productName
+                    } else {
+                        productName = "Unknown Capture Card"
+                    }
+                } else {
+                    productName = "Unknown Capture Card"
+                }
+            }
+                
             // USB Speed
             let speedValue = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertySpeed as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.intValue ?? 0
             let speedString = formatUSBSpeed(speedValue)
