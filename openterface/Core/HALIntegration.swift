@@ -632,7 +632,7 @@ class HALIntegrationManager {
                     _ = hidManager.getSwitchStatus()
                     let status = hidManager.getHardwareConnetionStatus()
                     AppStatus.isHardwareConnetionToTarget = status
-                    AppStatus.MS2109Version = hidManager.getVersion() ?? ""
+                //    AppStatus.videoFirmwareVersion = hidManager.getVersion() ?? ""
                 }
             } catch {
                 // Silently handle errors to prevent crashes

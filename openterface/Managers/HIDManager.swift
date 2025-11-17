@@ -176,7 +176,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     
     func sendAndReadHIDReportAsUInt8(_ report: [UInt8]) -> UInt8? {
         guard let response = sendAndReadHIDReport(report) else { return nil }
-        //for ms2109, the value at index 3 is the data we want
+        //for ms2109 or ms2109s, the value at index 3 is the data we want
         //for ms2130s, the value at index 4 as 01 report id at index 0, command at index 1, address high at index 2, address low at index 3, data at index 4
         let valueIndex = (getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2130s)) ? 4 : 3
         return response.count > valueIndex ? response[valueIndex] : nil
@@ -515,10 +515,10 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         let v3 = generateHIDReport(address: hidRegisters.version3)
         let v4 = generateHIDReport(address: hidRegisters.version4)
         
-        guard let _v1 = self.sendAndReadHIDReport(v1),
-              let _v2 = self.sendAndReadHIDReport(v2),
-              let _v3 = self.sendAndReadHIDReport(v3),
-              let _v4 = self.sendAndReadHIDReport(v4) else {
+        guard let _v1 = self.sendAndReadHIDReportAsUInt8(v1),
+              let _v2 = self.sendAndReadHIDReportAsUInt8(v2),
+              let _v3 = self.sendAndReadHIDReportAsUInt8(v3),
+              let _v4 = self.sendAndReadHIDReportAsUInt8(v4) else {
             logger.log(content: "Failed to read version data from HID device. Check if device is properly connected.")
             return nil
         }
@@ -526,10 +526,9 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         return parseVersionData([_v1,_v2,_v3,_v4])
     }
     
-    func parseVersionData(_ data: [[UInt8]]) -> String {
-        let versionParts = data.compactMap { report -> String? in
-            guard report.count >= 4 else { return nil }
-            return String(format: "%02d", report[3])
+    func parseVersionData(_ data: [UInt8]) -> String {
+        let versionParts = data.compactMap { verString -> String? in
+            return String(format: "%02d", verString)
         }
         
         return versionParts.joined()

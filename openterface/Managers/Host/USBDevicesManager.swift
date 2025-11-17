@@ -31,9 +31,12 @@ class USBDevicesManager: USBDevicesManagerProtocol {
 
     // Singleton instance
     static let shared = USBDevicesManager()
-    let MS2019_VID = 0x534D
-    let MS2019_PID = 0x2109
+    let MS2019_VID = MS2109VideoChipset.VENDOR_ID
+    let MS2019_PID = MS2109VideoChipset.PRODUCT_ID
 
+    let MS2019S_VID = MS2109SVideoChipset.VENDOR_ID
+    let MS2019S_PID = MS2109SVideoChipset.PRODUCT_ID
+    
     let MS2130S_VID = MS2130SVideoChipset.VENDOR_ID
     let MS2130S_PID = MS2130SVideoChipset.PRODUCT_ID
 
@@ -85,7 +88,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
             }
            
             // USB Product Name
-            var productName = IORegistryEntryCreateCFProperty(usbDevice, "USB Product Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknow"
+            var productName = IORegistryEntryCreateCFProperty(usbDevice, "USB Product Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknown"
 
             // USB Vendor Name (Manufacturer)
             let manufacturer = IORegistryEntryCreateCFProperty(usbDevice, "USB Vendor Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? "Unknown"
@@ -139,7 +142,9 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     }
     
     func isOpenterfaceVideoChipset(vendorId:Int, productId:Int) -> Bool{
-        return (vendorId == MS2019_VID && productId == MS2019_PID) || (vendorId == MS2130S_VID && productId == MS2130S_PID)
+        return (vendorId == MS2019_VID && productId == MS2019_PID) ||
+            (vendorId == MS2019S_VID && productId == MS2019S_PID) ||
+            (vendorId == MS2130S_VID && productId == MS2130S_PID)
     }
 
     func isOpenterfaceControlChipset(vendorId:Int, productId:Int) -> Bool{
@@ -319,6 +324,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         switch AppStatus.videoChipsetType {
         case .ms2109:
             return "MS2109"
+        case .ms2109s:
+            return "MS2109S"
         case .ms2130s:
             return "MS2130S"
         case .unknown:

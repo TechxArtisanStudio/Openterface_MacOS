@@ -165,10 +165,10 @@ extension MS2130SVideoChipset: VideoChipsetHIDRegisters {
     var inputVwLow: UInt16 { 0x1CFF }
 
     // MARK: - Version Registers
-    var version1: UInt16 { 0x1FC0 }
-    var version2: UInt16 { 0x1FC1 }
-    var version3: UInt16 { 0x1FC2 }
-    var version4: UInt16 { 0x1FC3 }
+    var version1: UInt16 { 0x1FDC }
+    var version2: UInt16 { 0x1FDD }
+    var version3: UInt16 { 0x1FDE }
+    var version4: UInt16 { 0x1FDF }
 
     // MARK: - Status Registers
     var hdmiConnectionStatus: UInt16 { 0xFA8D } // Different from MS2109

@@ -79,7 +79,6 @@ struct openterfaceApp: App {
     
     @State private var _resolution = (width: "", height: "")
     @State private var _fps = ""
-    @State private var _ms2109version = ""
     @State private var _pixelClock = ""
     
     // Add serial port information state variables

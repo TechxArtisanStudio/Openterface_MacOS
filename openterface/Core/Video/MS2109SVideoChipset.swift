@@ -25,20 +25,20 @@ import AVFoundation
 import IOKit
 import IOKit.hid
 
-// MARK: - MS2109 Video Chipset Implementation
+// MARK: - MS2109S Video Chipset Implementation
 
-class MS2109VideoChipset: BaseVideoChipset {
-    public static let VENDOR_ID = 0x534D
+class MS2109SVideoChipset: BaseVideoChipset {
+    public static let VENDOR_ID = 0x345F
     public static let PRODUCT_ID = 0x2109
 
     init?() {
         let info = ChipsetInfo(
-            name: "MS2109",
-            vendorID: MS2109VideoChipset.VENDOR_ID,
-            productID: MS2109VideoChipset.PRODUCT_ID,
+            name: "MS2109S",
+            vendorID: MS2109SVideoChipset.VENDOR_ID,
+            productID: MS2109SVideoChipset.PRODUCT_ID,
             firmwareVersion: nil,
             manufacturer: "MacroSilicon",
-            chipsetType: .video(.ms2109)
+            chipsetType: .video(.ms2109s)
         )
 
         let capabilities = ChipsetCapabilities(
@@ -74,25 +74,25 @@ class MS2109VideoChipset: BaseVideoChipset {
             return false
         }
 
-        // Initialize MS2109-specific settings
+        // Initialize MS2109S-specific settings
         if validateConnection() {
             isConnected = true
-            logger.log(content: "✅ MS2109 chipset initialized successfully")
+            logger.log(content: "✅ MS2109S chipset initialized successfully")
             return true
         }
 
-        logger.log(content: "❌ MS2109 chipset initialization failed")
+        logger.log(content: "❌ MS2109S chipset initialization failed")
         return false
     }
 
     override func detectDevice() -> Bool {
         _ = DependencyContainer.shared.resolve(USBDevicesManagerProtocol.self)
 
-        // Check if MS2109 device is connected
+        // Check if MS2109S device is connected
         for device in AppStatus.USBDevices {
-            if device.vendorID == MS2109VideoChipset.VENDOR_ID &&
-               device.productID == MS2109VideoChipset.PRODUCT_ID {
-                logger.log(content: "🔍 MS2109 device detected: \(device.productName)")
+            if device.vendorID == MS2109SVideoChipset.VENDOR_ID &&
+               device.productID == MS2109SVideoChipset.PRODUCT_ID {
+                logger.log(content: "🔍 MS2109S device detected: \(device.productName)")
                 return true
             }
         }
@@ -101,11 +101,11 @@ class MS2109VideoChipset: BaseVideoChipset {
     }
 
     override func validateConnection() -> Bool {
-        // Validate MS2109 connection by checking HID communication
+        // Validate MS2109S connection by checking HID communication
         let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
 
         if let version = hidManager.getVersion() {
-            logger.log(content: "📋 MS2109 version: \(version)")
+            logger.log(content: "📋 MS2109S version: \(version)")
             return true
         }
 
@@ -113,42 +113,42 @@ class MS2109VideoChipset: BaseVideoChipset {
     }
 
     override func getPixelClock() -> UInt32? {
-        // MS2109-specific pixel clock reading
-        // This would use specific HID commands for MS2109
+        // MS2109S-specific pixel clock reading
+        // This would use specific HID commands for MS2109S
         return AppStatus.hidReadPixelClock
     }
 }
 
-// MARK: - MS2109 HID Register Configuration
+// MARK: - MS2109S HID Register Configuration
 
-extension MS2109VideoChipset: VideoChipsetHIDRegisters {
+extension MS2109SVideoChipset: VideoChipsetHIDRegisters {
     // MARK: - Resolution Registers
-    var inputResolutionWidthHigh: UInt16 { 0xC6AF }
-    var inputResolutionWidthLow: UInt16 { 0xC6B0 }
-    var inputResolutionHeightHigh: UInt16 { 0xC6B1 }
-    var inputResolutionHeightLow: UInt16 { 0xC6B2 }
+    var inputResolutionWidthHigh: UInt16 { 0xC703 }
+    var inputResolutionWidthLow: UInt16 { 0xC704 }
+    var inputResolutionHeightHigh: UInt16 { 0xC705 }
+    var inputResolutionHeightLow: UInt16 { 0xC706 }
 
     // MARK: - Frame Rate Registers
     var fpsHigh: UInt16 { 0xC6B5 }
     var fpsLow: UInt16 { 0xC6B6 }
 
     // MARK: - Pixel Clock Registers
-    var pixelClockHigh: UInt16 { 0xC73C }
-    var pixelClockLow: UInt16 { 0xC73D }
+    var pixelClockHigh: UInt16 { 0xC6F2 }
+    var pixelClockLow: UInt16 { 0xC6F3 }
 
     // MARK: - Timing Registers
-    var inputHTotalHigh: UInt16 { 0xC734 }
-    var inputHTotalLow: UInt16 { 0xC735 }
-    var inputVTotalHigh: UInt16 { 0xC736 }
-    var inputVTotalLow: UInt16 { 0xC737 }
-    var inputHstHigh: UInt16 { 0xC740 }
-    var inputHstLow: UInt16 { 0xC741 }
-    var inputVstHigh: UInt16 { 0xC742 }
-    var inputVstLow: UInt16 { 0xC743 }
-    var inputHwHigh: UInt16 { 0xC744 }
-    var inputHwLow: UInt16 { 0xC745 }
-    var inputVwHigh: UInt16 { 0xC746 }
-    var inputVwLow: UInt16 { 0xC747 }
+    var inputHTotalHigh: UInt16 { 0xC6F2 }
+    var inputHTotalLow: UInt16 { 0xC6F3 }
+    var inputVTotalHigh: UInt16 { 0xC6F4 }
+    var inputVTotalLow: UInt16 { 0xC6F5 }
+    var inputHstHigh: UInt16 { 0xC6F6 }
+    var inputHstLow: UInt16 { 0xC700 }
+    var inputVstHigh: UInt16 { 0xC701 }
+    var inputVstLow: UInt16 { 0xC702 }
+    var inputHwHigh: UInt16 { 0xC703 }
+    var inputHwLow: UInt16 { 0xC704 }
+    var inputVwHigh: UInt16 { 0xC705 }
+    var inputVwLow: UInt16 { 0xC706 }
 
     // MARK: - Version Registers
     var version1: UInt16 { 0xCBDC }

@@ -113,6 +113,14 @@ struct FirmwareUpdateView: View {
                             Text(latestVersion)
                                 .foregroundColor(.blue)
                         }
+                        
+                        HStack {
+                            Text("Current chipset:")
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text(getCurrentChipsetDisplay())
+                                .foregroundColor(.secondary)
+                        }
                     }
                     
                     Divider()
@@ -132,12 +140,24 @@ struct FirmwareUpdateView: View {
                                 .padding(.horizontal, 16)
                                 .background(Color.green.opacity(0.1))
                                 .cornerRadius(8)
+                            } else if isCurrentVersionNewer() {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("Your firmware is newer than the latest available version!")
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .background(Color.orange.opacity(0.1))
+                                .cornerRadius(8)
                             }
                         }
                     }
                     
                     // Show important instructions only when update is available
-                    if currentVersion != latestVersion && currentVersion != "Unknown" && latestVersion != "Checking..." {
+                    if currentVersion != latestVersion && currentVersion != "Unknown" && latestVersion != "Checking..." && !isCurrentVersionNewer() {
                         // Important instructions
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Important:")
@@ -172,7 +192,7 @@ struct FirmwareUpdateView: View {
                     }
                     
                     // Show update process information only when update is available and not in progress
-                    if !firmwareManager.isBackupInProgress && currentVersion != "Unknown" && currentVersion != latestVersion && latestVersion != "Unknown" && latestVersion != "Checking..." {
+                    if !firmwareManager.isBackupInProgress && currentVersion != "Unknown" && currentVersion != latestVersion && latestVersion != "Unknown" && latestVersion != "Checking..." && !isCurrentVersionNewer() {
                         Divider()
                         
                         VStack(alignment: .leading, spacing: 12) {
@@ -213,7 +233,7 @@ struct FirmwareUpdateView: View {
                         
                         Spacer()
                         
-                        if currentVersion == latestVersion && currentVersion != "Unknown" && latestVersion != "Unknown" {
+                        if (currentVersion == latestVersion && currentVersion != "Unknown" && latestVersion != "Unknown") || isCurrentVersionNewer() {
                             Button("Close") {
                                 // For standalone windows, we need to close the actual window
                                 if let window = NSApp.keyWindow {
@@ -228,7 +248,7 @@ struct FirmwareUpdateView: View {
                                 showingConfirmation = true
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(currentVersion == latestVersion || currentVersion == "Unknown" || latestVersion == "Unknown" || firmwareManager.isBackupInProgress)
+                            .disabled(currentVersion == latestVersion || currentVersion == "Unknown" || latestVersion == "Unknown" || firmwareManager.isBackupInProgress || isCurrentVersionNewer())
                         }
                     }
                 }
@@ -278,7 +298,7 @@ struct FirmwareUpdateView: View {
                 .padding()
             }
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 500)
         .onAppear {
             loadFirmwareVersions()
             setupFirmwareManagerObservers()
@@ -618,6 +638,27 @@ struct FirmwareUpdateView: View {
         
         // Step 2: Use FirmwareManager to handle the restore process
         await firmwareManager.restoreFirmware(from: fileURL)
+    }
+    
+    private func getCurrentChipsetDisplay() -> String {
+        switch AppStatus.videoChipsetType {
+        case .ms2109:
+            return AppStatus.videoFirmwareVersion.isEmpty ? "MS2109" : AppStatus.videoFirmwareVersion
+        case .ms2109s:
+            return AppStatus.videoFirmwareVersion.isEmpty ? "MS2109S" : AppStatus.videoFirmwareVersion
+        case .ms2130s:
+            return "MS2130S"
+        case .unknown:
+            return "Unknown"
+        }
+    }
+    
+    private func isCurrentVersionNewer() -> Bool {
+        guard currentVersion != "Unknown", latestVersion != "Unknown", currentVersion != latestVersion else {
+            return false
+        }
+        // Assuming versions are comparable strings (e.g., date-based like "25022713")
+        return currentVersion > latestVersion
     }
 }
 

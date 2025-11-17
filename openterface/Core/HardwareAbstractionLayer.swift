@@ -229,6 +229,19 @@ class HardwareAbstractionLayer {
             }
         }
         
+        if let ms2109s = MS2109SVideoChipset() {
+            if ms2109s.detectDevice() {
+                videoChipset = ms2109s
+                AppStatus.videoChipsetType = .ms2109
+                if ms2109s.initialize() {
+                    logger.log(content: "✅ HAL: MS2109S video chipset detected and initialized")
+                    return true
+                } else {
+                    logger.log(content: "❌ HAL: MS2109S video chipset initialization failed")
+                }
+            }
+        }
+        
         // Check for MS2130S chipset
         if let ms2130s = MS2130SVideoChipset() {
             if ms2130s.detectDevice() {

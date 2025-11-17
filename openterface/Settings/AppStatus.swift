@@ -29,6 +29,7 @@ private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerPr
 // Enum to represent different video chipset types
 enum VideoChipsetType {
     case ms2109    // MS2019 VID with MS2109 PID
+    case ms2109s    // MS2019 VID with MS2109S PID
     case ms2130s    // MS2130S VID with MS2130S PID
     case unknown   // No video chipset detected or unknown type
 }
@@ -80,7 +81,7 @@ struct AppStatus {
     static var isSwitchToggleOn: Bool = false
     static var isLockSwitchOn: Bool = false
     
-    static var MS2109Version: String = ""
+    static var videoFirmwareVersion: String = ""
     static var hasHdmiSignal: Bool?
     
     static var isAudioEnabled: Bool = UserSettings.shared.isAudioEnabled
