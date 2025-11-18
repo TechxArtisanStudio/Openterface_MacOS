@@ -174,6 +174,10 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         
         // Search for input and output devices
         for deviceID in deviceIDs {
+            if (isAggregateDevice(deviceID: deviceID)) {
+                continue;
+            }
+            
             if let deviceName = getAudioDeviceName(for: deviceID) {
                 let isInput = isInputDevice(deviceID: deviceID)
                 let isOutput = isOutputDevice(deviceID: deviceID)
@@ -286,6 +290,31 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         }
         
         return bufferList.pointee.mNumberBuffers > 0
+    }
+    
+    private func isAggregateDevice(deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyClass,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        var propSize: UInt32 = 0
+        let result = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &propSize)
+        guard result == noErr && propSize > 0 else {
+            return false
+        }
+        
+        let bufferList = UnsafeMutablePointer<AudioClassID>.allocate(capacity: 1)
+        defer { bufferList.deallocate() }
+        
+        let getResult = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &propSize, bufferList)
+
+        guard getResult == noErr else {
+            return false;
+        }
+        
+        return bufferList.pointee == kAudioAggregateDeviceClassID
     }
     
     // Select an audio device for input
