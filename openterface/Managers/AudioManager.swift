@@ -180,7 +180,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
 
                 if isInput {
                     let audioDevice = AudioDevice(deviceID: deviceID, name: deviceName, isInput: true)
-                    if audioDevice.name.contains("CADefaultDeviceAggregate") {
+                    if isAggregateDevice(deviceID: deviceID) {
                         continue
                     }
                     inputDevices.append(audioDevice)
@@ -198,7 +198,7 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                 
                 if isOutput {
                     let audioDevice = AudioDevice(deviceID: deviceID, name: deviceName, isInput: false)
-                    if audioDevice.name.contains("CADefaultDeviceAggregate") {
+                    if isAggregateDevice(deviceID: deviceID) {
                         continue
                     }
                     outputDevices.append(audioDevice)
@@ -286,6 +286,31 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         }
         
         return bufferList.pointee.mNumberBuffers > 0
+    }
+    
+    // Check if device is an aggregate device
+    private func isAggregateDevice(deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyClass,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var propSize: UInt32 = 0
+        let result = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &propSize)
+        guard result == noErr && propSize > 0 else {
+            return false
+        }
+
+        let count = max(1, Int(propSize) / MemoryLayout<AudioClassID>.size)
+        let classIDPtr = UnsafeMutablePointer<AudioClassID>.allocate(capacity: count)
+        defer { classIDPtr.deallocate() }
+
+        var writablePropSize = propSize
+        let getResult = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &writablePropSize, classIDPtr)
+        guard getResult == noErr else { return false }
+
+        return classIDPtr.pointee == kAudioAggregateDeviceClassID
     }
     
     // Select an audio device for input
