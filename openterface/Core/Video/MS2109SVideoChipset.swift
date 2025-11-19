@@ -178,32 +178,36 @@ extension MS2109SVideoChipset: VideoChipsetHIDRegisters {
     var inputResolutionHeightLow: UInt16 { 0xC706 }
 
     // MARK: - Frame Rate Registers
-    var fpsHigh: UInt16 { 0xC6B5 }
-    var fpsLow: UInt16 { 0xC6B6 }
+    var fpsHigh: UInt16 { 0xC617 }
+    var fpsLow: UInt16 { 0xC618 }
 
     // MARK: - Pixel Clock Registers
-    var pixelClockHigh: UInt16 { 0xC6F2 }
-    var pixelClockLow: UInt16 { 0xC6F3 }
+    var pixelClockHigh: UInt16 { 0xC8C5 }
+    var pixelClockLow: UInt16 { 0xC8C6 }
 
     // MARK: - Timing Registers
-    var inputHTotalHigh: UInt16 { 0xC6F2 }
-    var inputHTotalLow: UInt16 { 0xC6F3 }
-    var inputVTotalHigh: UInt16 { 0xC6F4 }
-    var inputVTotalLow: UInt16 { 0xC6F5 }
-    var inputHstHigh: UInt16 { 0xC6F6 }
-    var inputHstLow: UInt16 { 0xC700 }
-    var inputVstHigh: UInt16 { 0xC701 }
-    var inputVstLow: UInt16 { 0xC702 }
-    var inputHwHigh: UInt16 { 0xC703 }
-    var inputHwLow: UInt16 { 0xC704 }
-    var inputVwHigh: UInt16 { 0xC705 }
-    var inputVwLow: UInt16 { 0xC706 }
+    var inputHTotalHigh: UInt16 { 0xC8BD }
+    var inputHTotalLow: UInt16 { 0xC8BE }
+    var inputVTotalHigh: UInt16 { 0xC8BF }
+    var inputVTotalLow: UInt16 { 0xC8C0 }
+    var inputHstHigh: UInt16 { 0xC8C9 }
+    var inputHstLow: UInt16 { 0xC8CA }
+    var inputVstHigh: UInt16 { 0xC8CB }
+    var inputVstLow: UInt16 { 0xC8CC }
+    var inputHwHigh: UInt16 { 0xC8CD }
+    var inputHwLow: UInt16 { 0xC8CE }
+    var inputVwHigh: UInt16 { 0xC8CF }
+    var inputVwLow: UInt16 { 0xC8D0 }
 
     // MARK: - Version Registers
     var version1: UInt16 { 0xCBDC }
     var version2: UInt16 { 0xCBDD }
     var version3: UInt16 { 0xCBDE }
     var version4: UInt16 { 0xCBDF }
+
+    // Not valid for MS2109s or MS2130s or later chips
+    var hardwareSwitchStatus: UInt16 { 0 }
+    var softwareSwitchStatus: UInt16 { 0 }
 
     // MARK: - Status Registers
     var hdmiConnectionStatus: UInt16 { 0xFD9C }

@@ -102,7 +102,7 @@ struct AppStatus {
     static var serialPortName: String = "N/A"
     static var serialPortBaudRate: Int = 0
     
-    static var isHardwareConnetionToTarget: Bool = true
+    static var isUSBSwitchConnectToTarget: Bool = true
     static var isHardwareSwitchOn: Bool = false {
         didSet {
             if oldValue != isHardwareSwitchOn {

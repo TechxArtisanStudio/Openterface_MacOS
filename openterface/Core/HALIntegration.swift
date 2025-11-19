@@ -630,8 +630,8 @@ class HALIntegrationManager {
                 // Get version and connection status (these might still need HID manager for some chipsets)
                 if let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
                     _ = hidManager.getSwitchStatus()
-                    let status = hidManager.getHardwareConnetionStatus()
-                    AppStatus.isHardwareConnetionToTarget = status
+                    let status = hidManager.getSoftwareSwitchStatus()
+                    AppStatus.isUSBSwitchConnectToTarget = status
                 //    AppStatus.videoFirmwareVersion = hidManager.getVersion() ?? ""
                 }
             } catch {

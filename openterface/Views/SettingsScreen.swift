@@ -999,13 +999,6 @@ struct MouseHIDSettingsView: View {
                     }
                     
                     HStack {
-                        Text("USB Switch Status:")
-                        Spacer()
-                        Text(switchStatus ? "Target" : "Host")
-                            .foregroundColor(switchStatus ? .blue : .orange)
-                    }
-                    
-                    HStack {
                         Text("HDMI Status:")
                         Spacer()
                         Text(hdmiStatus ? "Active" : "No Signal")
@@ -1033,7 +1026,7 @@ struct MouseHIDSettingsView: View {
     }
     
     private func updateHIDStatus() {
-        hidConnectionStatus = hidManager.getHardwareConnetionStatus()
+        hidConnectionStatus = hidManager.getSoftwareSwitchStatus()
         switchStatus = hidManager.getSwitchStatus()
         hdmiStatus = hidManager.getHDMIStatus()
         
@@ -1200,17 +1193,26 @@ struct DeviceConnectionSettingsView: View {
             GroupBox("Device Information") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Hardware Status:")
-                        Spacer()
-                        Text(hidManager.getHardwareConnetionStatus() ? "Connected" : "Disconnected")
-                            .foregroundColor(hidManager.getHardwareConnetionStatus() ? .green : .red)
-                    }
-                    
-                    HStack {
                         Text("Control Chipset Ready:")
                         Spacer()
                         Text(AppStatus.isControlChipsetReady ? "Ready" : "Not Ready")
                             .foregroundColor(AppStatus.isControlChipsetReady ? .green : .orange)
+                    }
+                    
+                    HStack {
+                        Text("Control Chipset:")
+                        Spacer()
+                        Text(getControlChipsetDisplayName())
+                            .foregroundColor(AppStatus.controlChipsetType != .unknown ? .green : .orange)
+                            .font(.system(.caption, design: .monospaced))
+                    }
+                    
+                    HStack {
+                        Text("Video Chipset:")
+                        Spacer()
+                        Text(getVideoChipsetDisplayName())
+                            .foregroundColor(AppStatus.videoChipsetType != .unknown ? .green : .orange)
+                            .font(.system(.caption, design: .monospaced))
                     }
                     
                     HStack {
@@ -1382,6 +1384,30 @@ struct DeviceConnectionSettingsView: View {
         // Load device information
         firmwareVersion = "v1.0.0" // Placeholder
         serialNumber = "OT001234567" // Placeholder
+    }
+    
+    private func getControlChipsetDisplayName() -> String {
+        switch AppStatus.controlChipsetType {
+        case .ch9329:
+            return "CH9329"
+        case .ch32v208:
+            return "CH32V208"
+        case .unknown:
+            return "Not Detected"
+        }
+    }
+    
+    private func getVideoChipsetDisplayName() -> String {
+        switch AppStatus.videoChipsetType {
+        case .ms2109:
+            return "MS2109"
+        case .ms2109s:
+            return "MS2109S"
+        case .ms2130s:
+            return "MS2130S"
+        case .unknown:
+            return "Not Detected"
+        }
     }
     
     private func applyBaudrateChange() {

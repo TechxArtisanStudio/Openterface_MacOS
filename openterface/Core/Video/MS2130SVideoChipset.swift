@@ -173,6 +173,10 @@ extension MS2130SVideoChipset: VideoChipsetHIDRegisters {
     // MARK: - Status Registers
     var hdmiConnectionStatus: UInt16 { 0xFA8D } // Different from MS2109
 
+    // Not valid for MS2109s or MS2130s or later chips
+    var hardwareSwitchStatus: UInt16 { 0 }
+    var softwareSwitchStatus: UInt16 { 0 }
+    
     // MARK: - Chipset Capabilities
     var supportsHIDCommands: Bool { true }
     var supportsEEPROM: Bool { false } // MS2130S doesn't support EEPROM

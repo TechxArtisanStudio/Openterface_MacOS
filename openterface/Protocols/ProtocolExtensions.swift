@@ -59,7 +59,7 @@ extension VideoManagerProtocol {
 
 extension HIDManagerProtocol {
     /// Default implementation for basic HID status
-    func getHardwareConnetionStatus() -> Bool {
+    func getSoftwareSwitchStatus() -> Bool {
         return isOpen ?? false
     }
     

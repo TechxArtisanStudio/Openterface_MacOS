@@ -199,19 +199,31 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         return (UInt16(highByte) << 8) | UInt16(lowByte)
     }
     
-    //TODO handle MS2109 case
     func setUSBtoHost() {
         logger.log(content: "🔄 HIDManager.setUSBtoHost() called - sending host report")
-        self.sendHIDReport(report: [182, 223, 1, 0, 1, 0, 0, 0]) // host
+        // Command: 0xB6 0xDF to set USB to host
+        // Report format: [0xB6, 0xDF, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00]
+        self.sendHIDReport(report: [0xB6, 0xDF, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00])
     }
     
     func setUSBtoTarget() {
         logger.log(content: "🔄 HIDManager.setUSBtoTarget() called - sending target report")
-        self.sendHIDReport(report: [182, 223, 1, 1, 1, 0, 0, 0]) // target
+        // Command: 0xB6 0xDF to set USB to target
+        // Report format: [0xB6, 0xDF, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00]
+        self.sendHIDReport(report: [0xB6, 0xDF, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00])
     }
     
-    func getHardwareConnetionStatus() -> Bool {
-        self.sendHIDReport(report: [181, 223, 1, 0, 0, 0, 0, 0])
+    func getSoftwareSwitchStatus() -> Bool {
+        // Command: 0xB5 0xDF to check hardware connection status
+        // Report format: [0xB5, 0xDF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "No active video chipset found for HDMI status reading")
+            AppStatus.hasHdmiSignal = nil
+            return false
+        }
+        let report = generateHIDReport(address: hidRegisters.softwareSwitchStatus)
+        self.sendHIDReport(report: report)
         if let report = self.readHIDReport() {
             if report[3] == 0 { // to host
                 return false
@@ -223,7 +235,9 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func getSwitchStatus() -> Bool {
-        self.sendHIDReport(report: [181, 223, 0, 1, 0, 0, 0, 0, 0])
+        // Command: 0xB5 0xDF to check switch/USB routing status
+        // Report format: [0xB5, 0xDF, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]
+        self.sendHIDReport(report: [0xB5, 0xDF, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
         
         if let report = self.readHIDReport() {
             if report[3] == 0 { // to host
@@ -292,8 +306,8 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         }
         
         let pixelClock = AppStatus.hidReadPixelClock / 100
-        if AppStatus.videoChipsetType == .ms2109 {
-            if pixelClock > 189 { // The magic value for MS2109 4K resolution correction
+        if AppStatus.videoChipsetType == .ms2109 || AppStatus.videoChipsetType == .ms2109s {
+            if pixelClock > 189 { // The magic value for MS2109 4K resovideoChipsetTypelution correction
                 width = width == 4096 ? width : width*2
                 height = height == 2160 ? height : height*2
             }

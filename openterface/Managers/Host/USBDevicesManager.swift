@@ -217,8 +217,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     /// Update the global chipset type flags based on connected devices
     private func updateChipsetTypeFlag() {
         // Reset to unknown first
-        AppStatus.videoChipsetType = .unknown
-        AppStatus.controlChipsetType = .unknown
+        // AppStatus.videoChipsetType = .unknown
+        // AppStatus.controlChipsetType = .unknown
         
         // Reset device references
         videoChipDevice = nil

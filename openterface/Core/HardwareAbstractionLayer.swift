@@ -112,6 +112,8 @@ protocol VideoChipsetHIDRegisters {
     
     // MARK: - Status Registers
     var hdmiConnectionStatus: UInt16 { get }
+    var softwareSwitchStatus: UInt16 { get }
+    var hardwareSwitchStatus: UInt16 { get }
     
     // MARK: - Chipset Capabilities
     var supportsHIDCommands: Bool { get }
@@ -232,7 +234,7 @@ class HardwareAbstractionLayer {
         if let ms2109s = MS2109SVideoChipset() {
             if ms2109s.detectDevice() {
                 videoChipset = ms2109s
-                AppStatus.videoChipsetType = .ms2109
+                AppStatus.videoChipsetType = .ms2109s
                 if ms2109s.initialize() {
                     logger.log(content: "✅ HAL: MS2109S video chipset detected and initialized")
                     return true
