@@ -86,6 +86,7 @@ struct openterfaceApp: App {
     @State private var _serialPortBaudRate: Int = 0
 
     @State private var audioInitialized = false
+    @State private var logModeInitialized = false
 
     var log: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -267,6 +268,25 @@ struct openterfaceApp: App {
                         // Initialize paste behavior title on first run
                         if pasteBehaviorTitle == "Ask Every Time" {
                             pasteBehaviorTitle = UserSettings.shared.pasteBehavior.menuDisplayName
+                        }
+                        
+                        // Initialize log mode on first run from user settings
+                        if !logModeInitialized {
+                            if UserSettings.shared.isLogMode {
+                                AppStatus.isLogMode = true
+                                logModeTitle = "Log to file ✓"
+                                if log.checkLogFileExist() {
+                                    log.openLogFile()
+                                } else {
+                                    log.createLogFile()
+                                }
+                                log.logToFile = true
+                            } else {
+                                AppStatus.isLogMode = false
+                                logModeTitle = "No logging ✓"
+                                log.logToFile = false
+                            }
+                            logModeInitialized = true
                         }
                         
                         // Add debounce mechanism to avoid frequent status updates
@@ -540,6 +560,7 @@ struct openterfaceApp: App {
                 Menu("Logging Setting"){
                     Button(action: {
                         AppStatus.isLogMode = false
+                        UserSettings.shared.isLogMode = false
                         logModeTitle = "No logging ✓"
                         log.writeLogFile(string: "Disable Log Mode!")
                         log.closeLogFile()
@@ -550,6 +571,7 @@ struct openterfaceApp: App {
                     
                     Button(action: {
                         AppStatus.isLogMode = true
+                        UserSettings.shared.isLogMode = true
                         logModeTitle = "Log to file ✓"
                         if log.checkLogFileExist() {
                             log.openLogFile()

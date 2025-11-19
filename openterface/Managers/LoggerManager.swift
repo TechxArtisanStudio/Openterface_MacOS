@@ -39,7 +39,8 @@ class Logger: LoggerProtocol {
     private let _logFileName = AppStatus.logFileName
 
     init() {
-        
+        // Load serial output logging setting from UserSettings
+        self.SerialDataPrint = UserSettings.shared.isSerialOutput
     }
     
     

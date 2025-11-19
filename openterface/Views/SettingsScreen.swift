@@ -1207,6 +1207,20 @@ struct DeviceConnectionSettingsView: View {
                     }
                     
                     HStack {
+                        Text("Control Chipset Ready:")
+                        Spacer()
+                        Text(AppStatus.isControlChipsetReady ? "Ready" : "Not Ready")
+                            .foregroundColor(AppStatus.isControlChipsetReady ? .green : .orange)
+                    }
+                    
+                    HStack {
+                        Text("Target Connected:")
+                        Spacer()
+                        Text(AppStatus.isTargetConnected ? "Connected" : "Disconnected")
+                            .foregroundColor(AppStatus.isTargetConnected ? .green : .red)
+                    }
+                    
+                    HStack {
                         Text("Firmware Version:")
                         Spacer()
                         Text(firmwareVersion)
@@ -1431,6 +1445,9 @@ struct AdvancedDebugSettingsView: View {
             GroupBox("Debug & Logging") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Enable serial output logging", isOn: $userSettings.isSerialOutput)
+                        .onChange(of: userSettings.isSerialOutput) { enabled in
+                            Logger.shared.SerialDataPrint = enabled
+                        }
                     
                     Text("Detailed logging helps troubleshoot connectivity and performance issues")
                         .font(.caption)
@@ -1539,6 +1556,10 @@ struct AdvancedDebugSettingsView: View {
             Button("OK") { }
         } message: {
             Text(errorMessage)
+        }
+        .onAppear {
+            // Load the serial output logging setting from Logger to sync with UI
+            Logger.shared.SerialDataPrint = userSettings.isSerialOutput
         }
     }
     

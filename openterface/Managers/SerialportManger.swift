@@ -267,7 +267,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
         if logger.SerialDataPrint {
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-            logger.log(content: "Serial port receive data: \(dataString)")
+            logger.log(content: "Serial port receive data(\(self.baudrate)): \(dataString)")
         }
         
         // Append new data to buffer
@@ -414,7 +414,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 return intPointer[0].bigEndian
             }
             self.baudrate = Int(baudrateInt32)
-            logger.log(content: "Current serial port baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
+            let portPath = self.serialPort?.path ?? "Unknown"
+            logger.log(content: "Serial Port: \(portPath), Baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
 
             // let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
             // if self.baudrate == preferredBaud && mode == 0x82 {
@@ -423,7 +424,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 AppStatus.serialPortBaudRate = self.baudrate
                 self.getHidInfo()
             // } else {
-            //     self.resetDeviceToBaudrate(preferredBaud)
+            //     self.resetDeviceToBaudr ate(preferredBaud)
             // }
             
         case 0x89:  // set para cfg
@@ -431,10 +432,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 let status = data[5]
                 logger.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
             }
-            
+        //Handle error command responses
+        case 0xC4:  // checksum error
+            if logger.SerialDataPrint {
+                let errorCode = data[5]
+                logger.log(content: "Checksum error response: \(String(format: "0x%02X", errorCode))")
+            }
         default:
             let hexCmd = String(format: "%02hhX", cmd)
-            logger.log(content: "Unknown command: \(hexCmd)")
+            let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+            logger.log(content: "Unknown command: \(hexCmd), full data: \(dataString)")
         }
     }
 

@@ -65,8 +65,26 @@ final class UserSettings: ObservableObject {
         // Load gravity settings from UserDefaults
         let savedGravity = UserDefaults.standard.string(forKey: "gravity")
         self.gravity = GravityOption(rawValue: savedGravity ?? "") ?? .resizeAspect
+        
+        // Load serial output logging preference from UserDefaults
+        self.isSerialOutput = UserDefaults.standard.object(forKey: "isSerialOutput") as? Bool ?? false
+        
+        // Load log mode preference from UserDefaults
+        self.isLogMode = UserDefaults.standard.object(forKey: "isLogMode") as? Bool ?? false
     }
-    @Published var isSerialOutput: Bool
+    @Published var isSerialOutput: Bool {
+        didSet {
+            UserDefaults.standard.set(isSerialOutput, forKey: "isSerialOutput")
+        }
+    }
+    
+    // Log mode preference persistence
+    @Published var isLogMode: Bool {
+        didSet {
+            UserDefaults.standard.set(isLogMode, forKey: "isLogMode")
+        }
+    }
+    
     @Published var MouseControl:MouseControlMode {
         didSet {
             UserDefaults.standard.set(MouseControl.rawValue, forKey: "MouseControl")

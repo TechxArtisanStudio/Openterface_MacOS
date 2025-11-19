@@ -24,8 +24,6 @@ import Foundation
 import AppKit
 
 class MouseManager: MouseManagerProtocol {
-
-    // 添加共享单例实例
     static let shared = MouseManager()
     
     // Protocol-based dependencies
@@ -36,11 +34,16 @@ class MouseManager: MouseManagerProtocol {
     var isRelativeMouseControlEnabled: Bool = false
     var accumulatedDeltaX = 0
     var accumulatedDeltaY = 0
+    /// Counter for tracking accumulated mouse movement events in Events mode.
+    /// Used in conjunction with `skipMoveBack` to prevent erratic cursor movement
+    /// when transitioning from a dragging state (button held down) to non-dragging state.
+    /// NOTE: This counter is currently set to 0 but never incremented in the code,
+    /// making it potentially vestigial. It may have been intended for rate-limiting
+    /// or filtering consecutive mouse events.
     var recordCount = 0
     var dragging = false
     var skipMoveBack = false
     
-    // 控制鼠标循环的变量
     private var isMouseLoopRunning = false
     
     // HID event monitoring variables
@@ -483,6 +486,10 @@ class MouseManager: MouseManagerProtocol {
         
         logger.log(content: "Accumulated deltas: X=\(accumulatedDeltaX), Y=\(accumulatedDeltaY)")
         
+        /// Prevents sending mouse events when skipMoveBack flag is set and recordCount > 0.
+        /// This guards against unwanted cursor repositioning that can occur when the mouse
+        /// button is released, as the relative positioning system may cause the cursor to
+        /// revert to a previous location.
         if self.skipMoveBack && recordCount > 0{
             logger.log(content: "Mouse event Skipped due to skipMoveBack logic")
             accumulatedDeltaX = 0
@@ -494,8 +501,8 @@ class MouseManager: MouseManagerProtocol {
         // When mouse left up, relative will go back to prevous location, should avoid it
         if self.dragging && !dragged {
             skipMoveBack = true
-            recordCount = 0
-            logger.log(content: "Reset mouse move counter - sending accumulated deltas")
+            recordCount = 1  // Mark that we've just transitioned from dragging to non-dragging
+            logger.log(content: "Reset mouse move counter - sending accumulated deltas, skipMoveBack enabled with recordCount=\(recordCount)")
             mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
         }
         self.dragging = dragged
@@ -504,9 +511,15 @@ class MouseManager: MouseManagerProtocol {
         mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
 
         // Reset the accumulated delta and the record count
+        /// recordCount is preserved if skipMoveBack is true to allow the skip logic on the next event.
+        /// It is only reset after the skip guard activates and clears skipMoveBack.
+        /// This ensures the erratic cursor movement event (next event after button release) gets filtered out.
         accumulatedDeltaX = 0
         accumulatedDeltaY = 0
-        recordCount = 0
+        // Only reset recordCount if we're not in skip mode - preserve it for the skip guard check
+        if !skipMoveBack {
+            recordCount = 0
+        }
         
         logger.log(content: "handleRelativeMouseActionInternal completed - deltas reset")
     }
