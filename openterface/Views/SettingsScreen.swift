@@ -1273,9 +1273,17 @@ struct DeviceConnectionSettingsView: View {
                         }
                     }
                     
-                    Text(userSettings.preferredBaudrate.description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        if serialPortManager.isDeviceReady {
+                            Text("Current connected: \(serialPortManager.baudrate) bps")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text(userSettings.preferredBaudrate.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                     
                     HStack {
                         Text("Current Connection:")

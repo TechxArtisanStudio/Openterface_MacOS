@@ -417,15 +417,15 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             let portPath = self.serialPort?.path ?? "Unknown"
             logger.log(content: "Serial Port: \(portPath), Baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
 
-            // let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
-            // if self.baudrate == preferredBaud && mode == 0x82 {
-            //     // Device matches the user's preferred baudrate and expected mode
+            let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
+            if self.baudrate == preferredBaud && mode == 0x82 {
+                // Device matches the user's preferred baudrate and expected mode
                 self.isDeviceReady = true
                 AppStatus.serialPortBaudRate = self.baudrate
                 self.getHidInfo()
-            // } else {
-            //     self.resetDeviceToBaudr ate(preferredBaud)
-            // }
+            } else {
+                self.resetDeviceToBaudrate(preferredBaud)
+            }
             
         case 0x89:  // set para cfg
             if logger.SerialDataPrint {
