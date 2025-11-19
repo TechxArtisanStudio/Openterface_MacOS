@@ -185,17 +185,18 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     func sendAndReadHIDReportAsUInt16(_ report: [UInt8]) -> UInt16? {
         guard let response = sendAndReadHIDReport(report) else { return nil }
         guard response.count > 4 else { return nil }
-        let valueIndex = (getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2130s)) ? 4 : 3
+        let isMs2130s = (getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2130s))
+        let valueIndex = isMs2130s ? 4 : 3
         // For ms2109, only one byte is returned, so we need to read next address to get the full UInt16
-        if getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2109) {
-            // highByte first as it's big-endian
-            let highByte = response[valueIndex]
-            let lowReport = generateHIDReport(address: (UInt16(response[1]) << 8) | UInt16(response[2]) + 1)
-            guard let lowResponse = sendAndReadHIDReport(lowReport), lowResponse.count > valueIndex else { return nil }
-            let lowByte = lowResponse[valueIndex]
-            return (UInt16(highByte) << 8) | UInt16(lowByte)
+        if isMs2130s {
+            return (UInt16(response[valueIndex]) << 8) | UInt16(response[valueIndex + 1])
         }
-        return (UInt16(response[valueIndex]) << 8) | UInt16(response[valueIndex + 1])
+        // highByte first as it's big-endian
+        let highByte = response[valueIndex]
+        let lowReport = generateHIDReport(address: (UInt16(response[1]) << 8) | UInt16(response[2]) + 1)
+        guard let lowResponse = sendAndReadHIDReport(lowReport), lowResponse.count > valueIndex else { return nil }
+        let lowByte = lowResponse[valueIndex]
+        return (UInt16(highByte) << 8) | UInt16(lowByte)
     }
     
     //TODO handle MS2109 case

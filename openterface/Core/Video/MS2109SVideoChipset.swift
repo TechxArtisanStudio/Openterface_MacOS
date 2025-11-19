@@ -206,7 +206,7 @@ extension MS2109SVideoChipset: VideoChipsetHIDRegisters {
     var version4: UInt16 { 0xCBDF }
 
     // MARK: - Status Registers
-    var hdmiConnectionStatus: UInt16 { 0xFA8C }
+    var hdmiConnectionStatus: UInt16 { 0xFD9C }
 
     // MARK: - Chipset Capabilities
     var supportsHIDCommands: Bool { true }
