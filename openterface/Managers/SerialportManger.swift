@@ -407,6 +407,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             }
             
         case 0x88:  // get para cfg
+            guard data.count >= 12 else {
+                logger.log(content: "Invalid data length for get para cfg command. Expected >= 12 bytes, got \(data.count)")
+                return
+            }
             let baudrateData = Data(data[8...11])
             let mode = data[5]
             let baudrateInt32 = baudrateData.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> Int32 in
