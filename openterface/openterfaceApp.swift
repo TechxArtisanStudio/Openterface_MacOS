@@ -708,6 +708,15 @@ struct openterfaceApp: App {
             }
             CommandGroup(after: CommandGroupPlacement.sidebar) {
                 Button(action: {
+                    AppStatus.showInputOverlay.toggle()
+                }) {
+                    Text(AppStatus.showInputOverlay ? "Hide Input Overlay" : "Show Input Overlay")
+                }
+                .keyboardShortcut("i", modifiers: .command)
+                
+                Divider()
+                
+                Button(action: {
                     showAspectRatioSelectionWindow()
                 }) {
                     Text("Target Aspect Ratio...")

@@ -34,6 +34,9 @@ class MouseManager: MouseManagerProtocol {
     var isRelativeMouseControlEnabled: Bool = false
     var accumulatedDeltaX = 0
     var accumulatedDeltaY = 0
+    // Track last sent deltas for display purposes
+    var lastSentDeltaX = 0
+    var lastSentDeltaY = 0
     /// Counter for tracking accumulated mouse movement events in Events mode.
     /// Used in conjunction with `skipMoveBack` to prevent erratic cursor movement
     /// when transitioning from a dragging state (button held down) to non-dragging state.
@@ -510,6 +513,10 @@ class MouseManager: MouseManagerProtocol {
         logger.log(content: "Sending to MouseMapper: dx=\(accumulatedDeltaX), dy=\(accumulatedDeltaY), mouseEvent=\(mouseEvent), wheelMovement=\(wheelMovement)")
         mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
 
+        // Store last sent deltas for display purposes
+        lastSentDeltaX = accumulatedDeltaX
+        lastSentDeltaY = accumulatedDeltaY
+        
         // Reset the accumulated delta and the record count
         /// recordCount is preserved if skipMoveBack is true to allow the skip logic on the next event.
         /// It is only reset after the skip guard activates and clears skipMoveBack.

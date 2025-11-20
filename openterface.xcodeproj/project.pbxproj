@@ -43,6 +43,7 @@
 		6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */; };
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
+		6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */; };
 		BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */; };
@@ -120,6 +121,7 @@
 		6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManagerTests.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
+		6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMonitorManager.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
 		BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
@@ -267,6 +269,7 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
 				BFB748FD2E35ED7D004F0DAE /* ClipboardManager.swift */,
 				BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */,
 				5394F9662B57DC4000DB44ED /* Target */,
@@ -490,6 +493,7 @@
 				53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */,
 				BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
+				6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
 				BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */,
 				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,

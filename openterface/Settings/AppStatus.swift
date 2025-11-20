@@ -56,6 +56,7 @@ struct AppStatus {
     static var isExit: Bool = false
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
+    static var showInputOverlay: Bool = false
     
     static var isKeyboardConnected: Bool? = false
     static var isMouseConnected: Bool? = false

@@ -279,6 +279,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
+    // Toggle input overlay visibility
+    @objc func toggleInputOverlay(_ sender: NSMenuItem) {
+        AppStatus.showInputOverlay.toggle()
+        sender.state = AppStatus.showInputOverlay ? .on : .off
+    }
+    
     // Select custom aspect ratio
     @objc func selectAspectRatio(_ sender: NSMenuItem) {
         guard let option = sender.representedObject as? AspectRatioOption else { return }
@@ -347,9 +353,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         
         // Add a separator
-        if viewMenu.items.count > 0 {
-            viewMenu.addItem(NSMenuItem.separator())
-        }
+        viewMenu.addItem(NSMenuItem.separator())
+        
+        // Add "Show Input Overlay" toggle menu item
+        let inputOverlayMenuItem = NSMenuItem(title: "Show Input Overlay", action: #selector(toggleInputOverlay(_:)), keyEquivalent: "i")
+        inputOverlayMenuItem.state = AppStatus.showInputOverlay ? .on : .off
+        viewMenu.addItem(inputOverlayMenuItem)
+        
+        // Add a separator
+        viewMenu.addItem(NSMenuItem.separator())
         
         // Add a "Screen Ratio" submenu
         let aspectRatioMenu = NSMenu(title: "Screen Ratio")
