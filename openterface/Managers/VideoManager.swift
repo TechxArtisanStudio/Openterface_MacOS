@@ -647,11 +647,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Handles when a video device is connected
     @objc func videoWasConnected(notification: NSNotification) {
-        if #available(macOS 12.0, *) {
-           usbDevicesManager?.update()
-        }
+        usbDevicesManager?.update()
         
-        if let defaultDevice = AppStatus.DefaultVideoDevice, 
+        if let defaultDevice = AppStatus.DefaultVideoDevice,
            let device = notification.object as? AVCaptureDevice, 
            matchesLocalID(device.uniqueID, defaultDevice.locationID) {
             

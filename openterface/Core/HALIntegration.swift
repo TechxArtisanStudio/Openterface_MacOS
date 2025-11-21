@@ -112,24 +112,21 @@ class HALIntegrationManager {
         }
         
         logger.log(content: "🚀 Initializing HAL Integration...")
+
+        hal.detectAndInitializeHardware()
         
-        // Initialize hardware detection and abstraction
-        if hal.detectAndInitializeHardware() {
-            setupHALCallbacks()
-            setupPeriodicHALUpdates()
-            
-            // Integrate with all managers
-            integrateWithAllManagers()
-            
-            isInitialized = true
-            
-            logSystemInfo()
-            logger.log(content: "✅ HAL Integration initialized successfully")
-            return true
-        } else {
-            logger.log(content: "❌ HAL Integration initialization failed")
-            return false
-        }
+        // Setup periodic updates regardless of device connection status
+        // This ensures continuous monitoring of hardware state
+        setupPeriodicHALUpdates()
+        
+        // Integrate with all managers
+        integrateWithAllManagers()
+        
+        isInitialized = true
+        
+        logSystemInfo()
+        logger.log(content: "✅ HAL Integration initialized successfully")
+        return true
     }
     
     /// Deinitialize HAL integration
@@ -143,6 +140,30 @@ class HALIntegrationManager {
         isInitialized = false
         
         logger.log(content: "✅ HAL Integration deinitialized")
+    }
+    
+    /// Re-integrate control chipset after selection
+    /// Call this after a control chipset has been selected and communication established
+    func reintegrateControlChipset() {
+        logger.log(content: "🔄 Re-integrating control chipset with managers...")
+        
+        guard let controlChipset = hal.getCurrentControlChipset() else {
+            logger.log(content: "❌ No control chipset available for re-integration")
+            return
+        }
+        
+        logger.log(content: "🎮 Re-integrating control chipset \(controlChipset.chipsetInfo.name) with managers...")
+        
+        // Integrate with HID Manager for control operations
+        integrateControlChipsetWithHIDManager(controlChipset)
+        
+        // Integrate with Serial Port Manager for communication
+        integrateControlChipsetWithSerialManager(controlChipset)
+        
+        // Integrate with any other managers that need control chipset access
+        integrateControlChipsetWithOtherManagers(controlChipset)
+        
+        logger.log(content: "✅ Control chipset re-integration completed")
     }
     
     // MARK: - Manager Integration

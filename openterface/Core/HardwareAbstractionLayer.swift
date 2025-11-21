@@ -263,17 +263,7 @@ class HardwareAbstractionLayer {
         return false
     }
     
-    private func detectControlChipset() -> Bool {
-        // Check for CH9329 chipset
-        if let ch9329 = CH9329ControlChipset() {
-            if ch9329.detectDevice() && ch9329.initialize() {
-                controlChipset = ch9329
-                AppStatus.controlChipsetType = .ch9329
-                logger.log(content: "✅ HAL: CH9329 control chipset detected and initialized")
-                return true
-            }
-        }
-        
+    private func detectControlChipset() -> Bool {        
         // Check for CH32V208 chipset
         if let ch32v208 = CH32V208ControlChipset() {
             if ch32v208.detectDevice() && ch32v208.initialize() {
@@ -284,6 +274,16 @@ class HardwareAbstractionLayer {
             }
         }
         
+        // Check for CH9329 chipset
+        if let ch9329 = CH9329ControlChipset() {
+            if ch9329.detectDevice() && ch9329.initialize() {
+                controlChipset = ch9329
+                AppStatus.controlChipsetType = .ch9329
+                logger.log(content: "✅ HAL: CH9329 control chipset detected and initialized")
+                return true
+            }
+        }
+
         AppStatus.controlChipsetType = .unknown
         logger.log(content: "⚠️ HAL: No supported control chipset detected")
         return false
@@ -292,11 +292,48 @@ class HardwareAbstractionLayer {
     // MARK: - Public Interface
     
     func getCurrentVideoChipset() -> VideoChipsetProtocol? {
+        if videoChipset == nil {
+            logger.log(content: "⚠️ HAL: Video chipset is null, attempting detection...")
+            detectVideoChipset()
+        }
         return videoChipset
     }
     
     func getCurrentControlChipset() -> ControlChipsetProtocol? {
         return controlChipset
+    }
+    
+    func getAvailableControlChipsets() -> [(chipset: ControlChipsetProtocol, type: ControlChipsetType)] {
+        var available: [(chipset: ControlChipsetProtocol, type: ControlChipsetType)] = []
+        
+        // Check for CH32V208 chipset
+        if let ch32v208 = CH32V208ControlChipset() {
+            if ch32v208.detectDevice() {
+                available.append((chipset: ch32v208, type: .ch32v208))
+            }
+        }
+        
+        // Check for CH9329 chipset
+        if let ch9329 = CH9329ControlChipset() {
+            if ch9329.detectDevice() {
+                available.append((chipset: ch9329, type: .ch9329))
+            }
+        }
+        
+        logger.log(content: "📋 HAL: Found \(available.count) available control chipset(s)")
+        return available
+    }
+    
+    func selectControlChipset(_ chipset: ControlChipsetProtocol, type: ControlChipsetType) -> Bool {
+        if chipset.initialize() {
+            controlChipset = chipset
+            AppStatus.controlChipsetType = type
+            logger.log(content: "✅ HAL: Control chipset \(chipset.chipsetInfo.name) selected and initialized")
+            return true
+        } else {
+            logger.log(content: "❌ HAL: Failed to initialize selected control chipset \(chipset.chipsetInfo.name)")
+            return false
+        }
     }
     
     func getVideoCapabilities() -> ChipsetCapabilities? {

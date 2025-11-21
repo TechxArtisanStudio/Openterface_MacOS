@@ -28,7 +28,6 @@ import ORSSerial
 class CH32V208ControlChipset: BaseControlChipset {
     private static let VENDOR_ID = 0x1A86
     private static let PRODUCT_ID = 0xFE0C
-    public static let HIGHSPEED_BAUDRATE = 115200
 
     init?() {
         let info = ChipsetInfo(
@@ -58,7 +57,7 @@ class CH32V208ControlChipset: BaseControlChipset {
     }
 
     override var supportedBaudRates: [Int] {
-        return [CH32V208ControlChipset.HIGHSPEED_BAUDRATE]
+        return [BaseControlChipset.LOWSPEED_BAUDRATE]
     }
 
     override func initialize() -> Bool {
@@ -101,10 +100,16 @@ class CH32V208ControlChipset: BaseControlChipset {
         serialManager.tryOpenSerialPortForCH32V208()
 
         currentBaudRate = serialManager.baudrate
-        let success = currentBaudRate == CH32V208ControlChipset.HIGHSPEED_BAUDRATE
+        let success = currentBaudRate == CH32V208ControlChipset.LOWSPEED_BAUDRATE
 
         if success {
             serialManager.isDeviceReady = true
+            logger.log(content: "✅ CH32V208 communication established at \(currentBaudRate) baud")
+            // Trigger HAL integration with managers after successful communication
+            HALIntegrationManager.shared.reintegrateControlChipset()
+        } else {
+            logger.log(content: "❌ CH32V208 communication establishment failed. Expected baudrate: \(CH32V208ControlChipset.HIGHSPEED_BAUDRATE), got: \(currentBaudRate)")
+            serialManager.isDeviceReady = false
         }
 
         return success

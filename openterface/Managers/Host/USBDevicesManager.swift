@@ -226,21 +226,56 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         
         // Check grouped Openterface devices first
         for deviceGroup in AppStatus.groupOpenterfaceDevices {
+            // Collect unique video and control types from this group
+            var videoTypesSet: Set<VideoChipsetType> = []
+            var controlTypesSet: Set<ControlChipsetType> = []
+            var devicesByControlType: [ControlChipsetType: USBDeviceInfo] = [:]
+            
             for device in deviceGroup {
                 let videoType = getVideoChipsetType(vendorId: device.vendorID, productId: device.productID)
                 let controlType = getControlChipsetType(vendorId: device.vendorID, productId: device.productID)
                 
-                if videoType != .unknown && videoChipDevice == nil {
-                    AppStatus.videoChipsetType = videoType
-                    videoChipDevice = device
-                    logger.log(content: "Detected video chipset type: \(videoType)")
+                if videoType != .unknown {
+                    videoTypesSet.insert(videoType)
                 }
                 
-                if controlType != .unknown && controlChipDevice == nil {
-                    AppStatus.controlChipsetType = controlType
-                    controlChipDevice = device
-                    logger.log(content: "Detected control chipset type: \(controlType)")
+                if controlType != .unknown {
+                    controlTypesSet.insert(controlType)
+                    // Store first device found for this control type
+                    if devicesByControlType[controlType] == nil {
+                        devicesByControlType[controlType] = device
+                    }
                 }
+            }
+            
+            // Set video chipset type if found and not already set
+            if !videoTypesSet.isEmpty && videoChipDevice == nil {
+                let videoType = videoTypesSet.first!
+                AppStatus.videoChipsetType = videoType
+                videoChipDevice = deviceGroup.first { device in
+                    getVideoChipsetType(vendorId: device.vendorID, productId: device.productID) != .unknown
+                }
+                logger.log(content: "Detected video chipset type: \(videoType)")
+            }
+            
+            // Determine control chipset type with CH32V208 priority
+            if !controlTypesSet.isEmpty && controlChipDevice == nil {
+                let controlType: ControlChipsetType
+                
+                // CH32V208 takes priority
+                if controlTypesSet.contains(.ch32v208) {
+                    controlType = .ch32v208
+                    controlChipDevice = devicesByControlType[.ch32v208]
+                } else if controlTypesSet.contains(.ch9329) {
+                    controlType = .ch9329
+                    controlChipDevice = devicesByControlType[.ch9329]
+                } else {
+                    controlType = controlTypesSet.first!
+                    controlChipDevice = devicesByControlType[controlType]
+                }
+                
+                AppStatus.controlChipsetType = controlType
+                logger.log(content: "Detected control chipset type: \(controlType) (detected types in group: \(Array(controlTypesSet)))")
             }
         }
         
@@ -248,7 +283,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         for device in AppStatus.USBDevices {
             let videoType = getVideoChipsetType(vendorId: device.vendorID, productId: device.productID)
             let controlType = getControlChipsetType(vendorId: device.vendorID, productId: device.productID)
-            
+                                                                         
             if videoType != .unknown && videoChipDevice == nil {
                 AppStatus.videoChipsetType = videoType
                 videoChipDevice = device

@@ -43,8 +43,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     public static let CMD_RESET: [UInt8] = [0x57, 0xAB, 0x00, 0x0F, 0x00]
     
     // Baudrate constants
-    public static let LOWSPEED_BAUDRATE = CH9329ControlChipset.LOWSPEED_BAUDRATE
-    public static let HIGHSPEED_BAUDRATE = CH9329ControlChipset.HIGHSPEED_BAUDRATE
+    public static let LOWSPEED_BAUDRATE = BaseControlChipset.LOWSPEED_BAUDRATE
+    public static let HIGHSPEED_BAUDRATE = BaseControlChipset.HIGHSPEED_BAUDRATE
     
     @objc let serialPortManager = ORSSerialPortManager.shared()
     
@@ -62,6 +62,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     @Published var serialPorts : [ORSSerialPort] = []
     
     var lastHIDEventTime: Date?
+    
+    /// Stores the timestamp of the latest serial data received.
+    /// 
+    /// This property tracks when the most recent data was received from the serial port,
+    /// allowing the application to monitor the activity and timing of serial communications.
+    /// 
+    /// **Usage:**
+    /// - Initially set to `nil` to indicate no data has been received yet
+    /// - Updated each time data is successfully received via `serialPort(_:didReceive:)`
+    /// - Can be used to detect communication gaps or device inactivity
+    /// - Useful for debugging and monitoring connection health
+    var lastSerialData: Date?
     
     /// Stores the previous state of the CTS (Clear To Send) pin for change detection.
     /// 
@@ -150,6 +162,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             pauseQueue.sync { _isPaused = newValue }
         }
     }
+    
+    /// Tracks whether an error alert has been shown to the user.
+    /// This ensures error alerts are displayed only once to avoid redundant notifications.
+    private let errorAlertQueue = DispatchQueue(label: "com.openterface.SerialPortManager.errorAlertQueue")
+    private var _errorAlertShown: Bool = false
+    private var errorAlertShown: Bool {
+        get {
+            return errorAlertQueue.sync { _errorAlertShown }
+        }
+        set {
+            errorAlertQueue.sync { _errorAlertShown = newValue }
+        }
+    }
 
     override init(){
         super.init()
@@ -169,13 +194,17 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func tryConnectOpenterface(){
-        USBDevicesManager.shared.update()
+//        USBDevicesManager.shared.update()
         if USBDevicesManager.shared.isOpenterfaceConnected(){
-            // Check if CH32V208 is connected - if so, use direct connection
-            if USBDevicesManager.shared.isCH32V208Connected() {
+            // Check the control chipset type and use appropriate connection method
+            if AppStatus.controlChipsetType == .ch32v208 {
                 logger.log(content: "CH32V208 detected - using direct serial port connection")
                 self.tryOpenSerialPortForCH32V208()
+            } else if AppStatus.controlChipsetType == .ch9329 {
+                logger.log(content: "CH9329 detected - using standard serial port connection with validation")
+                self.tryOpenSerialPort()
             } else {
+                logger.log(content: "Unknown control chipset type: \(AppStatus.controlChipsetType) - using standard connection method")
                 self.tryOpenSerialPort()
             }
         }
@@ -234,6 +263,28 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             return
         }
         
+        // Check for stale CH9329 chip state
+        // This occurs when lastSerialData is updated but lastHIDEventTime hasn't changed for 2+ seconds
+        // indicating the CH9329 chip is receiving data but not processing HID events properly
+        if let serialDataTime = lastSerialData, let hidEventTime = lastHIDEventTime {
+            let timeSinceLastHIDEvent = Date().timeIntervalSince(hidEventTime)
+            let timeSinceLastSerialData = Date().timeIntervalSince(serialDataTime)
+            
+            // If serial data is recent but HID event is stale (2+ seconds), chip is in stale state
+            if timeSinceLastSerialData < 1.0 && timeSinceLastHIDEvent > 10.0 {
+                logger.log(content: "CH9329 chip detected in stale state: serial data updated but no HID events. Serial data age: \(String(format: "%.1f", timeSinceLastSerialData))s, HID event age: \(String(format: "%.1f", timeSinceLastHIDEvent))s")
+                
+                // Show alert to user and offer automatic recovery
+                DispatchQueue.main.async { [weak self] in
+                    self?.promptUserForChipRecovery()
+                }
+                
+                // Reset the check timer to avoid repeated alerts
+                lastHIDEventTime = Date()
+                return
+            }
+        }
+        
         if let lastTime = lastHIDEventTime {
             if Date().timeIntervalSince(lastTime) > 5 {
 
@@ -265,6 +316,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
      * Receive data from serial
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
+        // Record the timestamp of this serial data reception
+        lastSerialData = Date()
+        
         if logger.SerialDataPrint {
             let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             logger.log(content: "Serial port receive data(\(self.baudrate)): \(dataString)")
@@ -326,6 +380,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
             if chksum == checksum {
                 self.isDeviceReady = true
+                self.errorAlertShown = false  // Reset error alert flag on successful connection
                 
                 handleSerialData(data: messageData)
             } else {
@@ -425,7 +480,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             if self.baudrate == preferredBaud && mode == 0x82 {
                 // Device matches the user's preferred baudrate and expected mode
                 self.isDeviceReady = true
+                self.errorAlertShown = false  // Reset error alert flag on successful connection
                 AppStatus.serialPortBaudRate = self.baudrate
+                AppStatus.isControlChipsetReady = true
                 self.getHidInfo()
             } else {
                 self.resetDeviceToBaudrate(preferredBaud)
@@ -457,6 +514,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         if logger.SerialDataPrint { logger.log(content: "SerialPort \(serialPort) encountered an error: \(error)") }
         self.closeSerialPort()
         
+        // Show user-friendly error alert for serial communication issues
+        DispatchQueue.main.async {
+            self.promptUserForSerialConnectionError(error: error)
+        }
     }
 
     func listSerialPorts() -> [ORSSerialPort] {
@@ -510,9 +571,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 }
                 
                 // Try to connect with priority baudrate first
-                let baudrates = effectivePriorityBaudrate == CH9329ControlChipset.LOWSPEED_BAUDRATE ? 
-                    [CH9329ControlChipset.LOWSPEED_BAUDRATE, CH9329ControlChipset.HIGHSPEED_BAUDRATE] :
-                    [CH9329ControlChipset.HIGHSPEED_BAUDRATE, CH9329ControlChipset.LOWSPEED_BAUDRATE]
+                let baudrates = effectivePriorityBaudrate == SerialPortManager.LOWSPEED_BAUDRATE ? 
+                [SerialPortManager.LOWSPEED_BAUDRATE, SerialPortManager.HIGHSPEED_BAUDRATE] :
+                [SerialPortManager.HIGHSPEED_BAUDRATE, SerialPortManager.LOWSPEED_BAUDRATE]
                     
                 
                 for baudrate in baudrates {
@@ -991,11 +1052,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "Opening CH32V208 serial port directly at default baudrate: \(CH9329ControlChipset.HIGHSPEED_BAUDRATE), path: \(serialPort.path)")
             
             // Open the serial port with default baudrate
-            self.openSerialPort(baudrate: CH9329ControlChipset.HIGHSPEED_BAUDRATE)
+            self.openSerialPort(baudrate: SerialPortManager.LOWSPEED_BAUDRATE)
             
             // For CH32V208, we don't need command validation - set device ready immediately
             if serialPort.isOpen {
                 self.isDeviceReady = true
+                self.errorAlertShown = false  // Reset error alert flag on successful connection
                 logger.log(content: "CH32V208 serial port opened successfully and device is ready")
                 
             } else {
@@ -1110,4 +1172,93 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         logger.log(content: "No USB serial ports found for device: \(usbDevice.productName)")
         return nil
     }
+    
+    /// Prompts the user about a stale CH9329 chip state and offers automatic recovery
+    /// 
+    /// When the CH9329 chip is detected in a stale state (receiving data but not processing HID events),
+    /// this method displays an alert to the user with options to:
+    /// - Auto recover (perform factory reset)
+    /// - Dismiss the alert
+    /// 
+    /// This ensures the user is aware of the issue while providing an automatic recovery path.
+    private func promptUserForChipRecovery() {
+        let alert = NSAlert()
+        alert.messageText = "CH9329 Chip Stale State Detected"
+        alert.informativeText = "The CH9329 control chip appears to be in a stale state and is not responding properly to HID events. Would you like to automatically recover by performing a factory reset?"
+        alert.addButton(withTitle: "Auto Recover")
+        alert.addButton(withTitle: "Dismiss")
+        
+        let response = alert.runModal()
+        
+        if response == .alertFirstButtonReturn {
+            // User chose to auto recover
+            self.logger.log(content: "User initiated automatic CH9329 chip recovery")
+            self.resetHidChipToFactory { [weak self] success in
+                DispatchQueue.main.async {
+                    if success {
+                        self?.logger.log(content: "CH9329 chip factory reset completed successfully")
+                        
+                        // Show success message
+                        let successAlert = NSAlert()
+                        successAlert.messageText = "Recovery Successful"
+                        successAlert.informativeText = "The CH9329 chip has been successfully recovered and reset to factory settings."
+                        successAlert.addButton(withTitle: "OK")
+                        successAlert.runModal()
+                    } else {
+                        self?.logger.log(content: "CH9329 chip factory reset failed")
+                        
+                        // Show failure message
+                        let failureAlert = NSAlert()
+                        failureAlert.messageText = "Recovery Failed"
+                        failureAlert.informativeText = "Failed to recover the CH9329 chip. Please try manually resetting the device."
+                        failureAlert.addButton(withTitle: "OK")
+                        failureAlert.runModal()
+                    }
+                }
+            }
+        } else {
+            self.logger.log(content: "User dismissed CH9329 chip stale state alert")
+        }
+    }
+    
+    /// Displays a user-friendly alert when a serial port communication error occurs.
+    /// 
+    /// This method detects various types of serial port errors and prompts the user to
+    /// reconnect their USB serial device. Common errors include:
+    /// - Invalid argument (Code 22, EINVAL): Often caused by USB disconnection/reconnection
+    /// - Device not found (Code 2, ENOENT): Serial device path is no longer available
+    /// - I/O error (Code 5, EIO): General communication failure
+    /// 
+    /// The alert provides clear guidance to the user about the USB connection issue.
+    private func promptUserForSerialConnectionError(error: Error) {
+        // Only show error alert once until a successful connection is made
+        if self.errorAlertShown {
+            return
+        }
+        
+        self.errorAlertShown = true
+        
+        let alert = NSAlert()
+        var messageText = "Serial Communication Error Detected"
+        var informativeText = "We detected an error in serial communication, likely a USB serial connection issue.\n\nPlease try to reconnect the device and ensure the USB cable is properly connected."
+        
+        // Check for "Resource busy" error (POSIX error code 16)
+        if let nsError = error as? NSError {
+            self.logger.log(content: "Serial port error - Domain: \(nsError.domain), Code: \(nsError.code), Description: \(nsError.localizedDescription)")
+            
+            // Handle EBUSY (Resource busy) error - indicates port is occupied by another application
+            if nsError.domain == NSPOSIXErrorDomain && nsError.code == 16 {
+                messageText = "Serial Port Occupied"
+                informativeText = "The serial port is currently occupied by another application.\n\nPlease check and close any other applications that might be using this serial port (e.g., other KVM software, serial monitors, or terminal applications), then try reconnecting the device."
+            }
+        }
+        
+        alert.messageText = messageText
+        alert.informativeText = informativeText
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        
+        alert.runModal()
+    }
 }
+

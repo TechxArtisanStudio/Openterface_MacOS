@@ -75,10 +75,57 @@ struct USBHub: Identifiable {
 struct USBDevicesView: View {
     @State private var expandedNodes: Set<String> = []
     @State private var selectedNode: TreeNode? = nil
+    @State private var availableControlChipsets: [(chipset: ControlChipsetProtocol, type: ControlChipsetType)] = []
     
     // Helper function to convert integers to hexadecimal strings
     func hexString(from value: Int) -> String {
         return String(format: "0x%04X", value)
+    }
+    
+    // Load available control chipsets
+    private func loadAvailableControlChipsets() {
+        let hal = HardwareAbstractionLayer.shared
+        availableControlChipsets = hal.getAvailableControlChipsets()
+    }
+    
+    // Select a control chipset
+    private func selectControlChipset(_ chipset: ControlChipsetProtocol, type: ControlChipsetType) {
+        AppStatus.controlChipsetType = type
+        let hal = HardwareAbstractionLayer.shared
+        if hal.selectControlChipset(chipset, type: type) {
+            // Successfully selected, refresh the available chipsets list
+            loadAvailableControlChipsets()
+            
+            // Trigger serial port reconnection with the new chipset
+            let serialManager = SerialPortManager.shared
+            
+            // Close any existing connection
+            serialManager.closeSerialPort()
+            
+            // Reset connection state and attempt to reconnect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                serialManager.tryConnectOpenterface()
+                
+                // Force UI refresh by triggering a state update
+                // This will update the serial port display in the tree
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    // Re-update USB devices to refresh serial port information in the display
+                    USBDevicesManager.shared.update()
+                }
+            }
+        }
+    }
+    
+    // Get display name for chipset type
+    private func getControlChipsetDisplayName(_ type: ControlChipsetType) -> String {
+        switch type {
+        case .ch9329:
+            return "CH9329"
+        case .ch32v208:
+            return "CH32V208"
+        case .unknown:
+            return "Unknown"
+        }
     }
     
     // Copy entire USB tree information to clipboard
@@ -542,6 +589,56 @@ struct USBDevicesView: View {
             // Divider
             Divider()
             
+            // Middle panel - Control Chipset Selection
+            if !availableControlChipsets.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Control Chipset Selection")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(availableControlChipsets, id: \.type) { item in
+                                let chipsetType = item.type
+                                let isSelected = AppStatus.controlChipsetType == chipsetType
+                                
+                                Button(action: {
+                                    selectControlChipset(item.chipset, type: item.type)
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(isSelected ? .green : .secondary)
+                                        
+                                        Text(getControlChipsetDisplayName(chipsetType))
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(isSelected ? .primary : .secondary)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(isSelected ? Color.green.opacity(0.1) : Color(.controlBackgroundColor))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(isSelected ? Color.green.opacity(0.5) : Color(.separatorColor), lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .help("Click to select \(getControlChipsetDisplayName(chipsetType)) chipset")
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .frame(height: 50)
+                }
+                .padding(.vertical, 8)
+                
+                // Divider
+                Divider()
+            }
+            
             // Bottom panel - Details view
             VStack(alignment: .leading, spacing: 12) {
                 Text("Device Details")
@@ -567,6 +664,9 @@ struct USBDevicesView: View {
             }
             .frame(minHeight: 200)
             .padding(.bottom)
+        }
+        .onAppear {
+            loadAvailableControlChipsets()
         }
     }
 }

@@ -28,8 +28,6 @@ import ORSSerial
 class CH9329ControlChipset: BaseControlChipset {
     private static let VENDOR_ID = 0x1A86
     private static let PRODUCT_ID = 0x7523
-    public static let HIGHSPEED_BAUDRATE = 115200
-    public static let LOWSPEED_BAUDRATE = 9600
 
     private var lastCTSState: Bool?
     private var lastCTSUpdateTime: Date?
@@ -63,7 +61,7 @@ class CH9329ControlChipset: BaseControlChipset {
     }
 
     override var supportedBaudRates: [Int] {
-        return [CH9329ControlChipset.LOWSPEED_BAUDRATE, CH9329ControlChipset.HIGHSPEED_BAUDRATE]
+        return [BaseControlChipset.LOWSPEED_BAUDRATE, BaseControlChipset.HIGHSPEED_BAUDRATE]
     }
 
     override func initialize() -> Bool {
@@ -79,8 +77,8 @@ class CH9329ControlChipset: BaseControlChipset {
             return true
         }
 
-//        logger.log(content: "❌ CH9329 chipset initialization failed")
-        return true
+        logger.log(content: "❌ CH9329 chipset initialization failed")
+        return false
     }
 
     override func deinitialize() {
@@ -115,7 +113,16 @@ class CH9329ControlChipset: BaseControlChipset {
 
         // Check if communication was established
         currentBaudRate = serialManager.baudrate
-        return currentBaudRate > 0
+        
+        if currentBaudRate > 0 {
+            logger.log(content: "✅ CH9329 communication established at \(currentBaudRate) baud")
+            // Trigger HAL integration with managers after successful communication
+            HALIntegrationManager.shared.reintegrateControlChipset()
+            return true
+        } else {
+            logger.log(content: "❌ CH9329 communication establishment failed. Baudrate: \(currentBaudRate)")
+            return false
+        }
     }
 
     override func configureDevice(baudRate: Int, mode: UInt8) -> Bool {

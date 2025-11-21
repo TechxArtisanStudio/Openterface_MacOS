@@ -27,6 +27,9 @@ import ORSSerial
 
 /// Base class for control chipset implementations
 class BaseControlChipset: ControlChipsetProtocol {
+    public static let HIGHSPEED_BAUDRATE = 115200
+    public static let LOWSPEED_BAUDRATE = 9600
+
     let chipsetInfo: ChipsetInfo
     let capabilities: ChipsetCapabilities
     var isConnected: Bool = false
