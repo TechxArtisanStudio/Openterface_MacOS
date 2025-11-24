@@ -21,6 +21,8 @@
 */
 
 import SwiftUI
+import Carbon
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     
@@ -141,6 +143,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         setupMainWindow()
         setupNotificationObservers()
         setupAspectRatioMenu()
+        
+        // Switch to U.S. English input method to ensure paste works correctly
+        switchToUSEnglishInputMethod()
         
         // Set a delay to mark initial launch as complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -836,6 +841,194 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         toolbarAutoHideTimer?.invalidate()
         toolbarAutoHideTimer = nil
+    }
+    
+    // Switch to U.S. English input method to ensure paste works correctly
+    private func switchToUSEnglishInputMethod() {
+        let ptr = TISCreateInputSourceList(nil, false)
+        // Debug: print the current input source for traceability
+        if let currentPtr = TISCopyCurrentKeyboardInputSource() {
+            let currentInput = currentPtr.takeRetainedValue()
+            var currentId: String = "unknown"
+            var currentName: String = "unknown"
+            if let idProp = TISGetInputSourceProperty(currentInput, kTISPropertyInputSourceID) {
+                currentId = Unmanaged<CFString>.fromOpaque(idProp).takeUnretainedValue() as String
+            }
+            if let nameProp = TISGetInputSourceProperty(currentInput, kTISPropertyLocalizedName) {
+                currentName = Unmanaged<CFString>.fromOpaque(nameProp).takeUnretainedValue() as String
+            }
+            logger.log(content: "🔤 Current keyboard input source: \(currentName) (\(currentId))")
+        } else {
+            logger.log(content: "🔤 Current keyboard input source: (none)")
+        }
+        if let ptr = ptr {
+            // TISCreateInputSourceList returns an Unmanaged<CFArray>; use takeRetainedValue() to obtain the CFArray
+            let array = ptr.takeRetainedValue()
+            let count = CFArrayGetCount(array)
+
+            // Build language search order based on user's preferred languages.
+            let preferredLangs = Locale.preferredLanguages
+            var languageSearchOrder: [String] = []
+            if let first = preferredLangs.first {
+                let components = first.split(separator: "-")
+                if components.count > 0 {
+                    let base = String(components[0])
+                    if base == "zh" {
+                        // Detect script or region for Traditional vs Simplified
+                        if components.count > 1 {
+                            let comp1 = String(components[1]).lowercased()
+                            if comp1.contains("hant") { languageSearchOrder.append("zh-Hant") }
+                            else if comp1.contains("hans") { languageSearchOrder.append("zh-Hans") }
+                            else if components.count > 2 {
+                                let region = String(components[2]).uppercased()
+                                if region == "TW" || region == "HK" { languageSearchOrder.append("zh-Hant") }
+                                else { languageSearchOrder.append("zh-Hans") }
+                            } else { languageSearchOrder.append("zh-Hans") }
+                        } else { languageSearchOrder.append("zh-Hans") }
+                    } else {
+                        languageSearchOrder.append(base)
+                    }
+                }
+            }
+            // Append English as a fallback
+            languageSearchOrder.append("en")
+
+            // Helper: find a preferred input source ID matching language codes
+            func findPreferredInputID() -> String? {
+                for i in 0..<count {
+                    let src = unsafeBitCast(CFArrayGetValueAtIndex(array, i), to: TISInputSource.self)
+                    // category must be keyboard
+                    if let categoryProp = TISGetInputSourceProperty(src, kTISPropertyInputSourceCategory) {
+                        let category = Unmanaged<CFString>.fromOpaque(categoryProp).takeUnretainedValue() as String
+                        if category != (kTISCategoryKeyboardInputSource as String) { continue }
+                    }
+                    if let langsProp = TISGetInputSourceProperty(src, kTISPropertyInputSourceLanguages) {
+                        let langsArr = Unmanaged<CFArray>.fromOpaque(langsProp).takeUnretainedValue()
+                        let langsCount = CFArrayGetCount(langsArr)
+                        for j in 0..<langsCount {
+                            if let langPtr = CFArrayGetValueAtIndex(langsArr, j) {
+                                let code = Unmanaged<CFString>.fromOpaque(langPtr).takeUnretainedValue() as String
+                                for target in languageSearchOrder {
+                                    if code.lowercased().starts(with: target.lowercased()) || target.lowercased().starts(with: code.lowercased()) {
+                                        if let idProp = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) {
+                                            let id = Unmanaged<CFString>.fromOpaque(idProp).takeUnretainedValue() as String
+                                            // ensure select-capable
+                                            if let selectableProp = TISGetInputSourceProperty(src, kTISPropertyInputSourceIsSelectCapable) {
+                                                let selectable = Unmanaged<CFBoolean>.fromOpaque(selectableProp).takeUnretainedValue() as! Bool
+                                                if selectable { return id }
+                                            } else {
+                                                return id
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return nil
+            }
+
+            let preferredID = findPreferredInputID()
+            logger.log(content: "🔤 languageSearchOrder: \(languageSearchOrder), preferredInputID: \(preferredID ?? "(none)")")
+
+            for i in 0..<count {
+                let inputSource = unsafeBitCast(CFArrayGetValueAtIndex(array, i), to: TISInputSource.self)
+                if let property = TISGetInputSourceProperty(inputSource, kTISPropertyInputSourceID) {
+                    let id = Unmanaged<CFString>.fromOpaque(property).takeUnretainedValue() as String
+                    // If we found a preferred ID, try to use it, otherwise fall back to US layout (ABC)
+                    if let pref = preferredID, id == pref {
+                        // Only actually select/notify if current input method is different
+                        var shouldSelect = true
+                        if let currentPtr = TISCopyCurrentKeyboardInputSource() {
+                            let currentInputSource = currentPtr.takeRetainedValue()
+                            if let curProp = TISGetInputSourceProperty(currentInputSource, kTISPropertyInputSourceID) {
+                                let curId = Unmanaged<CFString>.fromOpaque(curProp).takeUnretainedValue() as String
+                                shouldSelect = curId != id
+                            }
+                        }
+                        if shouldSelect {
+                            logger.log(content: "🔤 Changing input source to preferred layout (id=\(id))")
+                            TISSelectInputSource(inputSource)
+                            // Notify user that input method has been switched
+                            let localizedName: String
+                            if let nameProperty = TISGetInputSourceProperty(inputSource, kTISPropertyLocalizedName) {
+                                localizedName = Unmanaged<CFString>.fromOpaque(nameProperty).takeUnretainedValue() as String
+                            } else {
+                                localizedName = id
+                            }
+                            notifyUserInputSourceSwitched(to: localizedName)
+                        } else {
+                            // Debug: input source is already preferred
+                            logger.log(content: "🔤 Input source is already preferred (id=\(id)); no change needed")
+                        }
+                        break
+                    }
+                    else if id == "com.apple.keylayout.ABC" {
+                        // Fallback to selecting ABC (US) layout if no preferred found
+                        var shouldSelect = true
+                        if let currentPtr = TISCopyCurrentKeyboardInputSource() {
+                            let currentInputSource = currentPtr.takeRetainedValue()
+                            if let curProp = TISGetInputSourceProperty(currentInputSource, kTISPropertyInputSourceID) {
+                                let curId = Unmanaged<CFString>.fromOpaque(curProp).takeUnretainedValue() as String
+                                shouldSelect = curId != id
+                            }
+                        }
+                        if shouldSelect {
+                            logger.log(content: "🔤 Changing input source to US layout (id=\(id))")
+                            TISSelectInputSource(inputSource)
+                            // Notify user that input method has been switched
+                            let localizedName: String
+                            if let nameProperty = TISGetInputSourceProperty(inputSource, kTISPropertyLocalizedName) {
+                                localizedName = Unmanaged<CFString>.fromOpaque(nameProperty).takeUnretainedValue() as String
+                            } else {
+                                localizedName = id
+                            }
+                            notifyUserInputSourceSwitched(to: localizedName)
+                        } else {
+                            logger.log(content: "🔤 Input source is already US (id=\(id)); no change needed")
+                        }
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    /// Post a local notification (or fallback to logger) to inform user of input source switch
+    private func notifyUserInputSourceSwitched(to friendlyName: String) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { [weak self] settings in
+            guard let self = self else { return }
+            func postNotification() {
+                let content = UNMutableNotificationContent()
+                content.title = "Input Method Switched"
+                content.body = "Input method switched to \(friendlyName)"
+                content.sound = UNNotificationSound.default
+
+                // Deliver immediately
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                center.add(request) { error in
+                    if let error = error {
+                        DispatchQueue.main.async {
+                            self.logger.log(content: "Failed to post input method notification: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+
+            switch settings.authorizationStatus {
+            case .authorized:
+                postNotification()
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                    if granted { postNotification() }
+                    else { DispatchQueue.main.async { self.logger.log(content: "Input method switched to \(friendlyName)") } }
+                }
+            default:
+                DispatchQueue.main.async { self.logger.log(content: "Input method switched to \(friendlyName)") }
+            }
+        }
     }
 }
 
