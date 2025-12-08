@@ -538,7 +538,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             return nil
         }
 
-        return parseVersionData([_v1,_v2,_v3,_v4])
+        // If all version bytes are 0xFF, treat them as 0x00
+        var versionBytes = [_v1, _v2, _v3, _v4]
+        if _v1 == 255 && _v2 == 255 && _v3 == 255 && _v4 == 255 {
+            logger.log(content: "Version registers are all 0xFF, converting to 0x00.")
+            versionBytes = [0, 0, 0, 0]
+        }
+
+        return parseVersionData(versionBytes)
     }
     
     func parseVersionData(_ data: [UInt8]) -> String {

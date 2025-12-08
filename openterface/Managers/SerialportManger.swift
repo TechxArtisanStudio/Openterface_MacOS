@@ -101,6 +101,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @Published var baudrate:Int = 0
     
+    /// Tracks the number of complete retry cycles through all baudrates.
+    /// Incremented after each full cycle through both 9600 and 115200 baudrates.
+    /// After 2 complete cycles (trying both baudrates twice), triggers a factory reset.
+    var retryCounter: Int = 0
+    
     /// Indicates whether the Openterface Mini KVM device is properly connected, validated, and ready for communication.
     /// 
     /// This flag is set to `true` when:
@@ -228,6 +233,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
         logger.log(content: "Serial port Disconnected")
+        self.retryCounter = 0
         self.closeSerialPort()
     }
 
@@ -339,6 +345,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         while bufferBytes.count >= 6 { // Minimum message size: 5 bytes header + 1 byte checksum
             // Look for the next valid message start
             guard let prefixIndex = findNextMessageStart(in: bufferBytes, from: processedBytes) else {
+                logger.log(content: "No valid message start found in buffer, discarding \(bufferBytes.count) bytes")
                 // No valid message start found, keep remaining data in buffer
                 if processedBytes > 0 {
                     receiveBuffer = Data(bufferBytes[processedBytes...])
@@ -359,6 +366,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
             // Check if we have enough bytes for a complete message
             if bufferBytes.count < 6 {
+                logger.log(content: "Not enough data for complete message, waiting for more data")
                 break
             }
             
@@ -366,7 +374,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             let expectedMessageLength = Int(len) + 6 // 5 bytes header + length + 1 byte checksum
             
             if bufferBytes.count < expectedMessageLength {
-                // Incomplete message, wait for more data
+                logger.log(content: "Incomplete message in buffer, waiting for more data, expected length: \(expectedMessageLength), current length: \(bufferBytes.count)")
                 break
             }
             
@@ -425,6 +433,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
             AppStatus.isKeyboardConnected = isTargetConnected
             AppStatus.isMouseConnected = isTargetConnected
+            logger.log(content: isTargetConnected ? "The target computer keyboard and mouse are connected" : "The target computer keyboard and mouse are disconnected")
             
             let isNumLockOn = (data[7] & 0x01) == 0x01
             AppStatus.isNumLockOn = isNumLockOn
@@ -487,7 +496,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             } else {
                 self.resetDeviceToBaudrate(preferredBaud)
             }
-            
+
+        case 0x8F:
+            if logger.SerialDataPrint {
+                let status = data[5]
+                logger.log(content: "Device reset command response status: \(String(format: "0x%02X", status))")
+            }
         case 0x89:  // set para cfg
             if logger.SerialDataPrint {
                 let status = data[5]
@@ -588,12 +602,36 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                         logger.log(content: "Connected successfully with baudrate: \(baudrate)")
                         // Save the successful baudrate to user settings
                         UserSettings.shared.lastBaudrate = baudrate
+                        // Reset retry counter on successful connection
+                        self.retryCounter = 0
                         self.isTrying = false
                         return // Connection successful, exit the loop
                     }
                     
                     // Check if we should stop trying between baudrate attempts
                     if !self.isTrying {
+                        return
+                    }
+                }
+                
+                // Completed a full cycle through all baudrates
+                self.retryCounter += 1
+                logger.log(content: "Completed baudrate retry cycle \(self.retryCounter) of 2")
+                
+                // After trying both baudrates twice (2 complete cycles), trigger factory reset
+                if self.retryCounter >= 2 {
+                    logger.log(content: "Maximum retry attempts reached (tried 9600 and 115200 twice each). Performing factory reset of HID chip...")
+                    
+                    // Reset the counter for potential future attempts
+                    self.retryCounter = 0
+                    
+                    // Perform the factory reset
+                    if self.performFactoryResetInline() {
+                        logger.log(content: "Factory reset done, retrying connection attempts...")
+                        continue
+                    } else {
+                        logger.log(content: "Factory reset failed, exiting connection attempts")
+                        self.isTrying = false
                         return
                     }
                 }
@@ -635,6 +673,80 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         let expirationDate = Date(timeIntervalSinceNow: 2)
         while Date() < expirationDate {
             RunLoop.current.run(mode: .default, before: expirationDate)
+        }
+    }
+    
+    func blockMainThreadFor1Second() {
+        let expirationDate = Date(timeIntervalSinceNow: 1)
+        while Date() < expirationDate {
+            RunLoop.current.run(mode: .default, before: expirationDate)
+        }
+    }
+    
+    func blockMainThreadFor3_5Seconds() {
+        let expirationDate = Date(timeIntervalSinceNow: 3.5)
+        while Date() < expirationDate {
+            RunLoop.current.run(mode: .default, before: expirationDate)
+        }
+    }
+    
+    /// Performs a factory reset of the HID chip synchronously within the connection retry loop
+    /// Uses the existing performFactoryReset method with synchronous blocking
+    /// Ensures serial port is opened before attempting factory reset
+    /// - Returns: true if reset succeeded, false if it failed
+    private func performFactoryResetInline() -> Bool {
+        // Ensure serial port is open before attempting factory reset
+        if let port = serialPort, port.isOpen {
+            // Port is already open, proceed with factory reset
+            var resetSucceeded = false
+            let semaphore = DispatchSemaphore(value: 0)
+            
+            // Call the async performFactoryReset and wait for completion
+            performFactoryReset { success in
+                resetSucceeded = success
+                semaphore.signal()
+            }
+            
+            // Block until the factory reset completes
+            semaphore.wait()
+            
+            return resetSucceeded
+        } else {
+            // Port not open, try to open it
+            logger.log(content: "Serial port not open for factory reset, attempting to open it first")
+            
+            // Try to open the serial port
+            self.serialPort = getSerialPortPathFromUSBManager()
+            guard let serialPort = self.serialPort else {
+                logger.log(content: "Failed to get serial port for factory reset")
+                return false
+            }
+            
+            // Open with low baudrate (factory reset typically requires this)
+            serialPort.baudRate = NSNumber(value: CH9329ControlChipset.LOWSPEED_BAUDRATE)
+            serialPort.delegate = self
+            serialPort.open()
+            
+            guard serialPort.isOpen else {
+                logger.log(content: "Failed to open serial port for factory reset")
+                return false
+            }
+            
+            logger.log(content: "Serial port opened successfully for factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
+            
+            var resetSucceeded = false
+            let semaphore = DispatchSemaphore(value: 0)
+            
+            // Call the async performFactoryReset and wait for completion
+            performFactoryReset { success in
+                resetSucceeded = success
+                semaphore.signal()
+            }
+            
+            // Block until the factory reset completes
+            semaphore.wait()
+            
+            return resetSucceeded
         }
     }
     
@@ -683,6 +795,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         AppStatus.isTargetConnected = false
         AppStatus.isKeyboardConnected = false
         AppStatus.isMouseConnected = false
+    }
+    
+    func closeSerialPortAndResetRetry() {
+        self.closeSerialPort()
+        // Reset retry counter when explicitly closing port (not during retry loop)
+        self.retryCounter = 0
     }
     
     /// Pause all connection attempts
