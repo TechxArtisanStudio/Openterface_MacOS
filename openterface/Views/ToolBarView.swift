@@ -81,3 +81,20 @@ struct SerialInfoView: View {
         .frame(width: 120, alignment: .leading)
     }
 }
+
+// Caps Lock indicator view - shows a small icon and label with color indicating Caps state
+struct CapsLockIndicatorView: View {
+    @ObservedObject var keyboardManager = KeyboardManager.shared
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: keyboardManager.isCapsLockOn ? "lock.fill" : "lock.open")
+                .foregroundColor(keyboardManager.isCapsLockOn ? .blue : .secondary)
+                .font(.system(size: 12))
+            Text("CAPS")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(keyboardManager.isCapsLockOn ? .blue : .secondary)
+        }
+        .frame(width: 54, alignment: .center)
+        .help(keyboardManager.isCapsLockOn ? "Caps Lock is ON" : "Caps Lock is OFF")
+    }
+}

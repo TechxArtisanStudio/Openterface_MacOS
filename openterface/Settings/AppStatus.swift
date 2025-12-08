@@ -81,6 +81,8 @@ struct AppStatus {
     static var isControlChipsetReady: Bool = false
     static var isNumLockOn: Bool = false
     static var isCapLockOn: Bool = false
+    // Host machine Caps Lock state
+    static var isHostCapLockOn: Bool = false
     static var isScrollOn: Bool = false
     static var isSwitchToggleOn: Bool = false
     static var isLockSwitchOn: Bool = false

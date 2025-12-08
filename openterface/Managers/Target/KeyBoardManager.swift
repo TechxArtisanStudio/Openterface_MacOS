@@ -22,6 +22,7 @@
 
 import Cocoa
 import SwiftUI
+import CoreGraphics
 
 class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
@@ -44,7 +45,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     @Published var isRightCtrlHeld = false
     @Published var isLeftAltHeld = false
     @Published var isRightAltHeld = false
-    @Published var isCapsLockOn = false
+    @Published var isCapsLockOn = false {
+        didSet {
+            // Keep AppStatus host field in sync and log the change
+            AppStatus.isHostCapLockOn = isCapsLockOn
+            logger.log(content: "🔔 Host Caps Lock state updated: \(isCapsLockOn ? "ON" : "OFF")")
+        }
+    }
     
     // MARK: - Keyboard Layout Management
     
@@ -179,7 +186,20 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     
     init() {
         logger.log(content: "🎹 KeyboardManager initialized with layout: \(currentKeyboardLayout.rawValue)")
+        // Update caps lock state from the system at initialization
+        updateInitialCapsLockState()
         monitorKeyboardEvents()
+    }
+
+    /// Read the system modifier flags to determine the current Caps Lock state
+    /// and update internal state so the UI and other managers reflect the host state
+    private func updateInitialCapsLockState() {
+        // Use CoreGraphics event source to read the combined session flags
+        let flags = CGEventSource.flagsState(.combinedSessionState)
+        let capsLockActive = flags.contains(.maskAlphaShift)
+    isCapsLockOn = capsLockActive
+    AppStatus.isHostCapLockOn = capsLockActive
+        logger.log(content: "🔔 Initial Caps Lock state: \(capsLockActive ? "ON" : "OFF")")
     }
     
     // MARK: - Modifier Key State Management
@@ -229,6 +249,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         isCapsLockOn.toggle()
         // For Caps Lock, we typically want to send the key press regardless of the state
         sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.capsLock)
+    AppStatus.isHostCapLockOn = isCapsLockOn
     }
     
     func modifierFlagsDescription(_ flags: NSEvent.ModifierFlags) -> String {
@@ -414,9 +435,11 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 }
             }
             isCapsLockOn = true
+            AppStatus.isHostCapLockOn = true
         } else {
             if isCapsLockOn {
                 isCapsLockOn = false
+                AppStatus.isHostCapLockOn = false
             }
         }
     }

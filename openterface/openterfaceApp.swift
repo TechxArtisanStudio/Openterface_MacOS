@@ -114,7 +114,11 @@ struct openterfaceApp: App {
                             } label: {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
                             }
-                            
+
+                            // Caps Lock indicator placed next to the keyboard button
+                            CapsLockIndicatorView()
+                                .help("Host Caps Lock state - ON/OFF")
+
                             Button(action: {}) {
                                 Image(systemName: "poweron") // spacer
                             }
@@ -141,13 +145,7 @@ struct openterfaceApp: App {
                                     .frame(width: 16, height: 16)
                                     .foregroundColor(_isAudioEnabled ? .green : .red)
                             }
-                            .help("""
-                                Audio controls - Click to toggle audio or change settings
-                                
-                                Status: \(_isAudioEnabled ? "Enabled" : "Disabled")
-                                Input: \((audioManager as! AudioManager).selectedInputDevice?.name ?? "None")
-                                Output: \((audioManager as! AudioManager).selectedOutputDevice?.name ?? "None")
-                                """)
+                            // removed duplicate Caps Lock indicator previously misplaced here
                             
                             Button {
                                 cameraManager.takePicture()
