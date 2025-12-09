@@ -52,8 +52,8 @@ enum FirmwareError: LocalizedError {
 
 struct FirmwareUpdateView: View {
     @StateObject private var firmwareManager: FirmwareManager
-    @State private var currentVersion: String = "Unknown"
-    @State private var latestVersion: String = "Unknown"
+    @State private var currentVersion: String = "Checking..."
+    @State private var latestVersion: String = "Checking.."
     @State private var showingConfirmation: Bool = false
     @State private var showingBackupAlert: Bool = false
     @State private var backupAlertMessage: String = ""
