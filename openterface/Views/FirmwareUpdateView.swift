@@ -64,9 +64,6 @@ struct FirmwareUpdateView: View {
     @State private var selectedRestoreFile: URL?
     @Environment(\.dismiss) private var dismiss
     
-    // Protocol-based dependencies
-    private var  hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-    
     init() {
         self._firmwareManager = StateObject(wrappedValue: FirmwareManager.shared)
     }
@@ -370,7 +367,7 @@ struct FirmwareUpdateView: View {
     
     private func loadFirmwareVersions() {
         // Load current firmware version from device
-        currentVersion = getCurrentFirmwareVersion()
+        currentVersion = firmwareManager.getCurrentFirmwareVersion()
         
         // Load latest firmware version from remote URL
         Task {
@@ -378,77 +375,10 @@ struct FirmwareUpdateView: View {
         }
     }
     
-    private func getCurrentFirmwareVersion() -> String {
-        // Read firmware version from device using HID commands
-        // This would typically read from specific EEPROM addresses that contain version info
-        print("Reading current firmware version from device...")
-        return hidManager.getVersion() ?? "Unknown"
-    }
-    
     private func fetchLatestFirmwareVersion() async {
-        guard let url = URL(string: "https://assets.openterface.com/openterface/firmware/minikvm_latest_firmware2.txt") else {
-            await MainActor.run {
-                latestVersion = "Unknown"
-            }
-            return
-        }
-        
-        do {
-            // Create URLSession with configuration that allows outbound connections
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 30
-            config.timeoutIntervalForResource = 60
-            let session = URLSession(configuration: config)
-            
-            let (data, response) = try await session.data(from: url)
-            
-            // Check HTTP response
-            if let httpResponse = response as? HTTPURLResponse {
-                print("HTTP Status Code: \(httpResponse.statusCode)")
-                
-                if httpResponse.statusCode != 200 {
-                    await MainActor.run {
-                        latestVersion = "Unknown"
-                    }
-                    print("Failed to fetch firmware version: HTTP \(httpResponse.statusCode)")
-                    return
-                }
-            }
-            
-            if let responseString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                print("Firmware response: \(responseString)")
-                
-                // Parse the format: "25022713,Openterface_Firmware_250306.bin"
-                // Extract version number before the comma
-                let components = responseString.components(separatedBy: ",")
-                if let versionString = components.first, !versionString.isEmpty {
-                    await MainActor.run {
-                        latestVersion = versionString
-                    }
-                    print("Latest firmware version: \(versionString)")
-                } else {
-                    await MainActor.run {
-                        latestVersion = "Unknown"
-                    }
-                    print("Failed to parse firmware version from response")
-                }
-            } else {
-                await MainActor.run {
-                    latestVersion = "Unknown"
-                }
-                print("Failed to decode response data")
-            }
-        } catch {
-            await MainActor.run {
-                latestVersion = "Unknown"
-            }
-            print("Failed to fetch latest firmware version: \(error)")
-            if let urlError = error as? URLError {
-                print("URLError code: \(urlError.code)")
-                print("URLError description: \(urlError.localizedDescription)")
-            }
-            // TODO: Add logging when Logger scope issue is resolved
-            // Logger.shared.log(content: "Failed to fetch latest firmware version: \(error.localizedDescription)")
+        let version = await firmwareManager.fetchLatestFirmwareVersion()
+        await MainActor.run {
+            latestVersion = version
         }
     }
     
@@ -485,68 +415,6 @@ struct FirmwareUpdateView: View {
         
         await MainActor.run {
             firmwareManager.updateStatus = "All operations stopped. Ready for firmware update..."
-        }
-    }
-    
-    private func downloadLatestFirmware() async throws -> Data {
-        // First get the firmware info
-        guard let infoUrl = URL(string: "https://assets.openterface.com/openterface/firmware/minikvm_latest_firmware2.txt") else {
-            throw FirmwareError.invalidURL
-        }
-        
-        let (infoData, _) = try await URLSession.shared.data(from: infoUrl)
-        guard let infoString = String(data: infoData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
-            throw FirmwareError.invalidResponse
-        }
-        
-        // Parse format: "25022713,Openterface_Firmware_250306.bin"
-        let components = infoString.components(separatedBy: ",")
-        guard components.count >= 2,
-              let firmwareFileName = components.last?.trimmingCharacters(in: .whitespacesAndNewlines) else {
-            throw FirmwareError.invalidResponse
-        }
-        
-        // Download the firmware binary
-        let firmwareUrlString = "https://assets.openterface.com/openterface/firmware/\(firmwareFileName)"
-        guard let firmwareUrl = URL(string: firmwareUrlString) else {
-            throw FirmwareError.invalidURL
-        }
-        
-        print("Downloading firmware from: \(firmwareUrlString)")
-        let (firmwareData, response) = try await URLSession.shared.data(from: firmwareUrl)
-        
-        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-            throw FirmwareError.downloadFailed(httpResponse.statusCode)
-        }
-        
-        print("Firmware downloaded successfully, size: \(firmwareData.count) bytes")
-        return firmwareData
-    }
-    
-    private func writeFirmwareToEeprom(data: Data) async -> Bool {
-        print("Writing \(data.count) bytes to EEPROM using HID commands...")
-        
-        // Update progress to show start of EEPROM write
-        await MainActor.run {
-            firmwareManager.updateProgress = 0.4
-            firmwareManager.updateStatus = "Installing firmware to EEPROM..."
-        }
-        
-        // Use HID Manager directly with progress tracking
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .background).async {
-                let firmwareManagerRef = self.firmwareManager
-                let success = self.hidManager.writeEeprom(address: 0x0000, data: data)
-                
-                // Update progress on main thread
-                DispatchQueue.main.async {
-                    // Set completion progress
-                    firmwareManagerRef.updateProgress = 1.0
-                    firmwareManagerRef.updateStatus = "Firmware installation completed"
-                }
-                
-                continuation.resume(returning: success)
-            }
         }
     }
     

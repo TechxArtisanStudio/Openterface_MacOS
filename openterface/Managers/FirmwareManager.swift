@@ -145,10 +145,34 @@ class FirmwareManager: ObservableObject {
             throw FirmwareError.invalidResponse
         }
         
+        // Parse the firmware info based on chipset type
+        // Format: "25022713,Openterface_Firmware_250306.bin" for MS2109
+        //         "25052210,Openterface_Firmware_2130s_250522.bin,2130s" for MS2130S
+        let lines = infoString.components(separatedBy: .newlines)
+        var selectedLine: String?
+        
+        // Select the appropriate line based on current chipset
+        switch AppStatus.videoChipsetType {
+        case .ms2130s:
+            // Look for line containing "2130s"
+            selectedLine = lines.first { line in
+                line.contains("2130s")
+            }
+        default:
+            // For MS2109 and MS2109S, use the first line without chipset suffix
+            selectedLine = lines.first { line in
+                !line.contains("2130s")
+            }
+        }
+        
+        guard let selectedLine = selectedLine else {
+            throw FirmwareError.invalidResponse
+        }
+        
         // Parse format: "25022713,Openterface_Firmware_250306.bin"
-        let components = infoString.components(separatedBy: ",")
+        let components = selectedLine.components(separatedBy: ",")
         guard components.count >= 2,
-              let firmwareFileName = components.last?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+              let firmwareFileName = components[1].trimmingCharacters(in: .whitespacesAndNewlines) as String? else {
             throw FirmwareError.invalidResponse
         }
         
@@ -167,6 +191,83 @@ class FirmwareManager: ObservableObject {
         
         logger.log(content: "Firmware downloaded successfully, size: \(firmwareData.count) bytes")
         return firmwareData
+    }
+    
+    /// Fetches the latest firmware version information from the remote server
+    /// Selects the appropriate version based on current chipset type
+    func fetchLatestFirmwareVersion() async -> String {
+        guard let url = URL(string: "https://assets.openterface.com/openterface/firmware/minikvm_latest_firmware2.txt") else {
+            logger.log(content: "Invalid firmware info URL")
+            return "Unknown"
+        }
+        
+        do {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 30
+            config.timeoutIntervalForResource = 60
+            let session = URLSession(configuration: config)
+            
+            let (data, response) = try await session.data(from: url)
+            
+            // Check HTTP response
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode != 200 {
+                    logger.log(content: "Failed to fetch firmware version: HTTP \(httpResponse.statusCode)")
+                    return "Unknown"
+                }
+            }
+            
+            guard let responseString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                logger.log(content: "Failed to decode firmware info response")
+                return "Unknown"
+            }
+            
+            logger.log(content: "Firmware info response: \(responseString)")
+            
+            // Parse the firmware info based on chipset type
+            // Format: "25022713,Openterface_Firmware_250306.bin" for MS2109
+            //         "25052210,Openterface_Firmware_2130s_250522.bin,2130s" for MS2130S
+            let lines = responseString.components(separatedBy: .newlines)
+            var selectedLine: String?
+            
+            // Select the appropriate line based on current chipset
+            switch AppStatus.videoChipsetType {
+            case .ms2130s:
+                // Look for line containing "2130s"
+                selectedLine = lines.first { line in
+                    line.contains("2130s")
+                }
+            default:
+                // For MS2109 and MS2109S, use the first line without chipset suffix
+                selectedLine = lines.first { line in
+                    !line.contains("2130s")
+                }
+            }
+            
+            guard let selectedLine = selectedLine else {
+                logger.log(content: "Failed to find suitable firmware for current chipset")
+                return "Unknown"
+            }
+            
+            // Extract version number before the comma
+            let components = selectedLine.components(separatedBy: ",")
+            if let versionString = components.first, !versionString.isEmpty {
+                logger.log(content: "Latest firmware version: \(versionString)")
+                return versionString
+            } else {
+                logger.log(content: "Failed to parse firmware version from response")
+                return "Unknown"
+            }
+        } catch {
+            logger.log(content: "Failed to fetch latest firmware version: \(error.localizedDescription)")
+            return "Unknown"
+        }
+    }
+    
+    /// Reads the current firmware version from the device
+    func getCurrentFirmwareVersion() -> String {
+        logger.log(content: "Reading current firmware version from device...")
+        return hidManager.getVersion() ?? "Unknown"
     }
     
     // MARK: - EEPROM Writing
@@ -233,6 +334,21 @@ class FirmwareManager: ObservableObject {
         }
         
         return success
+    }
+    
+    /// Public method to write firmware data to EEPROM with progress tracking
+    /// This method is called from the View layer and handles progress updates
+    func writeFirmwareToEeprom(_ data: Data) async -> Bool {
+        logger.log(content: "Writing \(data.count) bytes to EEPROM using HID commands...")
+        
+        // Update progress to show start of EEPROM write
+        await MainActor.run {
+            self.updateProgress = 0.4
+            self.updateStatus = "Installing firmware to EEPROM..."
+        }
+        
+        // Use the internal writeEeprom method with progress tracking
+        return await writeEeprom(address: 0x0000, data: data)
     }
     
     // MARK: - Firmware Backup
