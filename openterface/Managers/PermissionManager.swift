@@ -67,7 +67,7 @@ class PermissionManager: ObservableObject, PermissionManagerProtocol {
             let alert = NSAlert()
             alert.messageText = "Accessibility Permission Required"
             alert.informativeText = """
-            Openterface Mini-KVM has been automatically added to the accessibility list in System Preferences.
+            Openterface KVM has been automatically added to the accessibility list in System Preferences.
             
             To complete the setup:
             1. A system dialog should have appeared asking for permission

@@ -174,12 +174,12 @@ class ClipboardWindowController: NSWindowController {
         }
         
         // Second, check window title
-        if window.title.contains("Openterface Mini-KVM") {
+        if window.title.contains("Openterface KVM") {
             return true
         }
         
         // Third, check if this is the main application window (not our clipboard window)
-        if window.title == "Openterface Mini-KVM" && window != self.window {
+        if window.title == "Openterface KVM" && window != self.window {
             return true
         }
         

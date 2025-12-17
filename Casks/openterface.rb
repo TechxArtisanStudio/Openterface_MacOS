@@ -6,7 +6,7 @@ cask "openterface" do
   verified: "github.com/TechxArtisanStudio/Openterface_MacOS"
 
   name "Openterface"
-  desc "Openterface Mini-KVM allows you to control a headless target device, such as a mini PC, kiosk, or server, directly from your laptop or desktop without the need for an extra keyboard, mouse, and monitor."
+  desc "Openterface KVM allows you to control a headless target device, such as a mini PC, kiosk, or server, directly from your laptop or desktop without the need for an extra keyboard, mouse, and monitor."
   homepage "https://openterface.com"
 
   livecheck do

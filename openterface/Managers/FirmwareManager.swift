@@ -122,7 +122,7 @@ class FirmwareManager: ObservableObject {
                         logger.log(content: "✓ Closing/hiding main window: \(window.title)")
                         window.orderOut(nil) // Hide the window
                     }
-                } else if window.title.contains("Openterface Mini-KVM") {
+                } else if window.title.contains("Openterface KVM") {
                     logger.log(content: "✓ Closing/hiding main window: \(window.title)")
                     window.orderOut(nil) // Hide the window
                 }
