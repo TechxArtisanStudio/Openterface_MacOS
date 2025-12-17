@@ -28,11 +28,20 @@ class InputMonitorManager: ObservableObject {
     @Published var hostKeys: String = ""
     @Published var targetKeys: String = ""
     @Published var targetMouse: String = "(Abs)(0,0)"
+    @Published var hostMouseButtons: String = ""
+    @Published var targetMouseButtons: String = ""
+    @Published var targetScanCodes: String = ""
     
     private var mouseMonitor: Any?
+    private var mouseButtonMonitor: Any?
     private var timer: Timer?
     private let keyboardManager = KeyboardManager.shared
     private let mouseManager = MouseManager.shared
+    private let keyboardMapper = KeyboardMapper()
+    private var leftMouseDown = false
+    private var rightMouseDown = false
+    private var middleMouseDown = false
+    private var lastScanCodes: String = ""
     
     init() {
         startMonitoring()
@@ -45,11 +54,61 @@ class InputMonitorManager: ObservableObject {
     }
     
     func startMonitoring() {
-        // Only monitor mouse position
+        // Monitor mouse position
         let mouseMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseMask) { [weak self] event in
             self?.mouseLocation = event.locationInWindow
             return event
+        }
+        
+        // Monitor mouse button events
+        let buttonMask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp]
+        mouseButtonMonitor = NSEvent.addLocalMonitorForEvents(matching: buttonMask) { [weak self] event in
+            self?.handleMouseButtonEvent(event)
+            return event
+        }
+    }
+    
+    private func handleMouseButtonEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            leftMouseDown = true
+        case .leftMouseUp:
+            leftMouseDown = false
+        case .rightMouseDown:
+            rightMouseDown = true
+        case .rightMouseUp:
+            rightMouseDown = false
+        case .otherMouseDown:
+            middleMouseDown = true
+        case .otherMouseUp:
+            middleMouseDown = false
+        default:
+            break
+        }
+        updateMouseButtonDisplay()
+    }
+    
+    private func updateMouseButtonDisplay() {
+        var hostButtons: [String] = []
+        if leftMouseDown { hostButtons.append("Left") }
+        if rightMouseDown { hostButtons.append("Right") }
+        if middleMouseDown { hostButtons.append("Middle") }
+        
+        let newHostMouseButtons = hostButtons.isEmpty ? "" : hostButtons.joined(separator: " + ")
+        if newHostMouseButtons != hostMouseButtons {
+            hostMouseButtons = newHostMouseButtons
+        }
+        
+        // For target, mouse buttons remain the same but with different naming
+        var targetButtons: [String] = []
+        if leftMouseDown { targetButtons.append("Left") }
+        if rightMouseDown { targetButtons.append("Right") }
+        if middleMouseDown { targetButtons.append("Middle") }
+        
+        let newTargetMouseButtons = targetButtons.isEmpty ? "" : targetButtons.joined(separator: " + ")
+        if newTargetMouseButtons != targetMouseButtons {
+            targetMouseButtons = newTargetMouseButtons
         }
     }
     
@@ -73,10 +132,14 @@ class InputMonitorManager: ObservableObject {
         
         // Get regular keys
         var regularKeys: [String] = []
+        var scanCodes: [String] = []
         let modifierKeyCodes: Set<UInt16> = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
         for keyCode in keyboardManager.pressedKeys where keyCode != 255 && !modifierKeyCodes.contains(keyCode) {
             let desc = keyDescription(forKeyCode: keyCode)
             regularKeys.append(desc)
+            if let scanCode = keyCodeToScanCode(keyCode) {
+                scanCodes.append(String(format: "0x%02X", scanCode))
+            }
         }
         
         // Combine for host display
@@ -160,6 +223,21 @@ class InputMonitorManager: ObservableObject {
         if newTargetMouse != targetMouse {
             targetMouse = newTargetMouse
         }
+        
+        // Update scan codes for target output
+        let newTargetScanCodes = scanCodes.isEmpty ? lastScanCodes : scanCodes.joined(separator: " ")
+        if newTargetScanCodes != targetScanCodes {
+            targetScanCodes = newTargetScanCodes
+        }
+        // Keep track of the last scan codes when keys are released
+        if !scanCodes.isEmpty {
+            lastScanCodes = newTargetScanCodes
+        }
+    }
+    
+    private func keyCodeToScanCode(_ keyCode: UInt16) -> UInt8? {
+        // Use the keyCodeMapping from KeyboardMapper
+        return keyboardMapper.keyCodeMapping[keyCode]
     }
     
     private func keyDescription(forKeyCode keyCode: UInt16) -> String {
@@ -256,6 +334,9 @@ class InputMonitorManager: ObservableObject {
     deinit {
         timer?.invalidate()
         if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = mouseButtonMonitor {
             NSEvent.removeMonitor(monitor)
         }
     }

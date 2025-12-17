@@ -28,6 +28,38 @@ class KeyboardMapper {
     private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var serialPortManager: SerialPortManagerProtocol { DependencyContainer.shared.resolve(SerialPortManagerProtocol.self) }
     
+    // macOS key code to character mapping based on Carbon.HIToolbox constants
+    static let macOSKeyCodeMap: [UInt16: String] = [
+        // Letters (kVK_ANSI_*)
+        0: "a", 1: "s", 2: "d", 3: "f", 4: "h", 5: "g", 6: "z", 7: "x", 8: "c", 9: "v",
+        11: "b", 12: "q", 13: "w", 14: "e", 15: "r", 16: "y", 17: "t",
+        31: "o", 32: "u", 34: "i", 35: "p", 37: "l", 38: "j", 40: "k", 45: "n", 46: "m",
+        
+        // Numbers
+        18: "1", 19: "2", 20: "3", 21: "4", 22: "6", 23: "5", 25: "9", 26: "7", 28: "8", 29: "0",
+        
+        // Symbols and special chars
+        24: "=", 27: "-", 30: "]", 33: "[", 39: "'", 41: ";", 42: "\\", 43: ",", 44: "/", 47: ".", 50: "`",
+        
+        // Function keys (kVK_F*)
+        122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6", 98: "F7", 100: "F8",
+        101: "F9", 109: "F10", 103: "F11", 111: "F12",
+        
+        // Special keys
+        48: "\t", 49: " ", 51: "\u{08}", 36: "\n", 53: "Esc",
+        
+        // Navigation keys
+        115: "Home", 116: "PageUp", 119: "End", 121: "PageDown",
+        123: "◀", 124: "▶", 125: "▼", 126: "▲",
+        
+        // Modifier keys
+        56: "Shift", 60: "RightShift", 59: "Ctrl", 62: "RightCtrl", 58: "Alt", 61: "RightAlt", 55: "Win",
+        
+        // Keypad
+        65: ".", 67: "*", 69: "+", 75: "/", 78: "-", 81: "=", 82: "0", 83: "1",
+        84: "2", 85: "3", 86: "4", 87: "5", 88: "6", 89: "7", 91: "8", 92: "9",
+    ]
+    
     let keyCodeMapping: [UInt16: UInt8] = [
         UInt16(kVK_ANSI_A): 0x04, // a
         UInt16(kVK_ANSI_B): 0x05, // b
@@ -56,7 +88,7 @@ class KeyboardMapper {
         UInt16(kVK_ANSI_Y): 0x1C, // y
         UInt16(kVK_ANSI_Z): 0x1D, // z
         
-        // 数字键
+        // Num keys
         UInt16(kVK_ANSI_1): 0x1E, UInt16(kVK_ANSI_Keypad1): 0x59, // 1
         UInt16(kVK_ANSI_2): 0x1F, UInt16(kVK_ANSI_Keypad2): 0x5A, // 2
         UInt16(kVK_ANSI_3): 0x20, UInt16(kVK_ANSI_Keypad3): 0x5B, // 3
@@ -69,7 +101,7 @@ class KeyboardMapper {
         UInt16(kVK_ANSI_0): 0x27, UInt16(kVK_ANSI_Keypad0): 0x62, // 0
 
         
-        // 功能键和特殊键
+        // Function keys and special keys
         UInt16(kVK_Return): 0x28, UInt16(kVK_ANSI_KeypadEnter): 0x58, // enter
         UInt16(kVK_Escape): 0x29, // esc
         UInt16(kVK_Delete): 0x2A, // backspace
@@ -88,7 +120,7 @@ class KeyboardMapper {
         UInt16(kVK_ANSI_Slash): 0x38, // /
         UInt16(kVK_CapsLock): 0x39, // caps lock
         
-        // F键
+        // Function keys
         UInt16(kVK_F1): 0x3A, // f1
         UInt16(kVK_F2): 0x3B, // f2
         UInt16(kVK_F3): 0x3C, // f3
@@ -102,7 +134,7 @@ class KeyboardMapper {
         UInt16(kVK_F11): 0x44, // f11
         UInt16(kVK_F12): 0x45, // f12
         
-        // 编辑键和导航键
+        // Editing and navigation keys
         UInt16(kVK_Help): 0x49, // Insert/Help
         UInt16(kVK_Home): 0x4A, // Home
         UInt16(kVK_PageUp): 0x4B, // Page Up
@@ -114,18 +146,18 @@ class KeyboardMapper {
         UInt16(kVK_DownArrow): 0x51, // Down Arrow
         UInt16(kVK_UpArrow): 0x52, // Up Arrow
         
-        // 数字键盘
+        // Numeric keypad
         UInt16(kVK_ANSI_KeypadClear): 0x53, // Numlock/Clear
         UInt16(kVK_ANSI_KeypadDivide): 0x54, // Keypad /
         UInt16(kVK_ANSI_KeypadMultiply): 0x55, // Keypad *
         UInt16(kVK_ANSI_KeypadMinus): 0x56, // Keypad -
         UInt16(kVK_ANSI_KeypadPlus): 0x57, // Keypad +
         
-        // 其他功能键
+        // Other function keys
         UInt16(kVK_F13): 0x46, // Print Screen (映射到F13)
         UInt16(kVK_F14): 0x65, // App (映射到F14)
         
-        // 修饰键
+        // Modifier keys
         UInt16(kVK_Shift): 0xE1, // Left Shift
         UInt16(kVK_RightShift): 0xE5, // Right Shift
         UInt16(kVK_Control): 0xE0, // Left Ctrl
@@ -234,6 +266,33 @@ class KeyboardMapper {
         case arrowDown = "arrowDown"
         case arrowUp = "arrowUp"
         case numLock = "numLock"
+        case sleep = "sleep"
+        case power = "power"
+        case wakeup = "wakeup"
+        case volumeMute = "volumeMute"
+        case volumeDown = "volumeDown"
+        case volumeUp = "volumeUp"
+        case mediaPlayPause = "mediaPlayPause"
+        case mediaPrevious = "mediaPrevious"
+        case mediaNext = "mediaNext"
+        case mediaStop = "mediaStop"
+        case mediaEject = "mediaEject"
+        case refresh = "refresh"
+        case wwwStop = "wwwStop"
+        case wwwForward = "wwwForward"
+        case wwwBack = "wwwBack"
+        case wwwHome = "wwwHome"
+        case wwwFavorites = "wwwFavorites"
+        case wwwSearch = "wwwSearch"
+        case email = "email"
+        case media = "media"
+        case explorer = "explorer"
+        case calculator = "calculator"
+        case screenSave = "screenSave"
+        case myComputer = "myComputer"
+        case minimize = "minimize"
+        case record = "record"
+        case rewind = "rewind"
     }
     
     var charToKeyCode: [UInt16: UInt8] = [:]
@@ -279,7 +338,7 @@ class KeyboardMapper {
     
 
     func sendKeyData(keyCode: [UInt16], isRelease: Bool, modifiers: NSEvent.ModifierFlags) {
-        var keyDat: [UInt8] = [0x57, 0xAB, 0x00, 0x02, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        var keyDat: [UInt8] = SerialPortManager.KEYBOARD_DATA_PREFIX
         for (index, kc) in keyCode.prefix(6).enumerated() {
             if let mappedValue = keyCodeMapping[kc] {
                 keyDat[7 + index] = mappedValue
@@ -300,6 +359,58 @@ class KeyboardMapper {
         // let _ = self.serialPortManager.writeByte(data:keyDat)
         //
         let _ = serialPortManager.sendCommand(command: keyDat)
+    }
+    
+    /// Sends multimedia key data to the device
+    /// Format for multimedia keys (Report ID 0x02):
+    /// [HEAD, ADDR, CMD, LEN, REPORT_ID, BYTE2, BYTE3, BYTE4, checksum]
+    /// Byte2: Bit0=Volume+, Bit1=Volume-, Bit2=Mute, Bit3=Play/Pause, Bit4=Next, Bit5=Prev, Bit6=CD Stop, Bit7=Eject
+    /// Byte3: Bit0=E-Mail, Bit1=Search, Bit2=Favorites, Bit3=Home, Bit4=Back, Bit5=Forward, Bit6=Stop, Bit7=Refresh
+    /// Byte4: Bit0=Media, Bit1=Explorer, Bit2=Calculator, Bit3=Screen Saver, Bit4=My Computer, Bit5=Minimize, Bit6=Record, Bit7=Rewind
+    func sendMultimediaKeyData(byte2: UInt8, byte3: UInt8 = 0, byte4: UInt8 = 0, isPress: Bool) {
+        var multimediaData: [UInt8] = Array(SerialPortManager.MULTIMEDIA_KEY_CMD_PREFIX)
+        
+        // Add Report ID for multimedia keys (0x02)
+        multimediaData.append(0x02)
+        
+        if isPress {
+            multimediaData.append(byte2)
+            multimediaData.append(byte3)
+            multimediaData.append(byte4)
+        } else {
+            multimediaData.append(0x00)  // All bits 0 (no keys pressed)
+            multimediaData.append(0x00)
+            multimediaData.append(0x00)
+        }
+        
+        let checksum = calculateChecksum(data: multimediaData)
+        multimediaData.append(checksum)
+        
+        let _ = serialPortManager.sendCommand(command: multimediaData)
+    }
+    
+    /// Sends ACPI key data to the device
+    /// Format for ACPI keys (Report ID 0x01):
+    /// [HEAD, ADDR, CMD, LEN, REPORT_ID, DATA, checksum]
+    /// Data: Bit0=Power, Bit1=Sleep, Bit2=Wake-up
+    func sendACPIKeyData(powerBit: Bool = false, sleepBit: Bool = false, wakeupBit: Bool = false) {
+        var acpiData: [UInt8] = Array(SerialPortManager.MULTIMEDIA_KEY_CMD_PREFIX)
+        
+        // Add Report ID for ACPI keys (0x01)
+        acpiData.append(0x01)
+        
+        var dataByte: UInt8 = 0
+        if powerBit { dataByte |= 0x01 }   // Bit 0
+        if sleepBit { dataByte |= 0x02 }   // Bit 1
+        if wakeupBit { dataByte |= 0x04 }  // Bit 2
+        
+        acpiData.append(dataByte)
+        acpiData.append(0x00)  // Padding byte
+        acpiData.append(0x00)  // Padding byte
+        let checksum = calculateChecksum(data: acpiData)
+        acpiData.append(checksum)
+        
+        let _ = serialPortManager.sendCommand(command: acpiData)
     }
     
     private func processModifierFlags(_ modifiers: NSEvent.ModifierFlags) -> UInt8 {
@@ -430,9 +541,123 @@ class KeyboardMapper {
             return 71
         } else if code == .esc {
             return 53
+        } else if code == .sleep {
+            return 71  // Sleep key
+        } else if code == .volumeMute {
+            return 74  // Mute key
+        } else if code == .volumeDown {
+            return 73  // Volume Down key
+        } else if code == .volumeUp {
+            return 72  // Volume Up key
+        } else if code == .mediaPlayPause {
+            return 75  // Play/Pause key
+        } else if code == .mediaPrevious {
+            return 67  // Previous Track key
+        } else if code == .mediaNext {
+            return 76  // Next Track key
         }
+        
+        // Multimedia-only keys that don't have standard HID key codes
+        // These use the multimedia protocol instead
+        if case .record = code { return nil }
+        if case .media = code { return nil }
+        if case .refresh = code { return nil }
+        if case .wwwStop = code { return nil }
+        if case .wwwForward = code { return nil }
+        if case .wwwBack = code { return nil }
+        if case .wwwHome = code { return nil }
+        if case .wwwFavorites = code { return nil }
+        if case .wwwSearch = code { return nil }
+        if case .email = code { return nil }
+        if case .rewind = code { return nil }
+        if case .power = code { return nil }
+        if case .wakeup = code { return nil }
+        if case .explorer = code { return nil }
+        if case .calculator = code { return nil }
+        if case .screenSave = code { return nil }
+        if case .myComputer = code { return nil }
+        if case .minimize = code { return nil }
+
         logger.log(content: "Warning: \(code.rawValue) is not mapped to a key code.")
         return nil
+    }
+    
+    /// Gets the multimedia key code for a special key
+    /// Returns a tuple with (byte2, byte3, byte4) for multimedia keys
+    /// Or returns nil if not a multimedia key
+    func getMultimediaKeyCode(for code: SpecialKey) -> (byte2: UInt8, byte3: UInt8, byte4: UInt8)? {
+        switch code {
+        // Byte 2 keys (Volume, Play/Pause, Track)
+        case .volumeUp:
+            return (0x01, 0x00, 0x00)      // Byte2 Bit0
+        case .volumeDown:
+            return (0x02, 0x00, 0x00)      // Byte2 Bit1
+        case .volumeMute:
+            return (0x04, 0x00, 0x00)      // Byte2 Bit2
+        case .mediaPlayPause:
+            return (0x08, 0x00, 0x00)      // Byte2 Bit3
+        case .mediaNext:
+            return (0x10, 0x00, 0x00)      // Byte2 Bit4
+        case .mediaPrevious:
+            return (0x20, 0x00, 0x00)      // Byte2 Bit5
+        case .mediaStop:
+            return (0x40, 0x00, 0x00)      // Byte2 Bit6
+        case .mediaEject:
+            return (0x80, 0x00, 0x00)      // Byte2 Bit7
+        
+        // Byte 3 keys (Web/Email)
+        case .email:
+            return (0x00, 0x01, 0x00)      // Byte3 Bit0
+        case .wwwSearch:
+            return (0x00, 0x02, 0x00)      // Byte3 Bit1
+        case .wwwFavorites:
+            return (0x00, 0x04, 0x00)      // Byte3 Bit2
+        case .wwwHome:
+            return (0x00, 0x08, 0x00)      // Byte3 Bit3
+        case .wwwBack:
+            return (0x00, 0x10, 0x00)      // Byte3 Bit4
+        case .wwwForward:
+            return (0x00, 0x20, 0x00)      // Byte3 Bit5
+        case .wwwStop:
+            return (0x00, 0x40, 0x00)      // Byte3 Bit6
+        case .refresh:
+            return (0x00, 0x80, 0x00)      // Byte3 Bit7
+        
+        // Byte 4 keys (Application Control)
+        case .media:
+            return (0x00, 0x00, 0x01)      // Byte4 Bit0
+        case .explorer:
+            return (0x00, 0x00, 0x02)      // Byte4 Bit1
+        case .calculator:
+            return (0x00, 0x00, 0x04)      // Byte4 Bit2
+        case .screenSave:
+            return (0x00, 0x00, 0x08)      // Byte4 Bit3
+        case .myComputer:
+            return (0x00, 0x00, 0x10)      // Byte4 Bit4
+        case .minimize:
+            return (0x00, 0x00, 0x20)      // Byte4 Bit5
+        case .record:
+            return (0x00, 0x00, 0x40)      // Byte4 Bit6
+        case .rewind:
+            return (0x00, 0x00, 0x80)      // Byte4 Bit7
+        
+        default:
+            return nil
+        }
+    }
+    
+    /// Checks if a special key is an ACPI key
+    func getACPIKeyBits(for code: SpecialKey) -> (power: Bool, sleep: Bool, wakeup: Bool)? {
+        switch code {
+        case .power:
+            return (true, false, false)    // Power bit
+        case .sleep:
+            return (false, true, false)    // Sleep bit
+        case .wakeup:
+            return (false, false, true)    // Wake-up bit
+        default:
+            return nil
+        }
     }
 }
 

@@ -89,23 +89,23 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
         let controller = NSHostingController(rootView: floatingKeysView)
         let window = NSWindow(contentViewController: controller)
         window.title = ""
-        window.styleMask = [.borderless]
+        window.styleMask = NSWindow.StyleMask([.borderless])
         window.setContentSize(NSSize(width: 800, height: 410))
         window.isMovableByWindowBackground = true
-        window.level = .floating
+        window.level = NSWindow.Level.floating
         window.backgroundColor = NSColor.clear
         window.isOpaque = false
         window.hasShadow = false
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.collectionBehavior = NSWindow.CollectionBehavior([.canJoinAllSpaces, .fullScreenAuxiliary])
         
         logger.log(content: "Making floating keyboard window key and ordering front")
-        window.makeKeyAndOrderFront(nil)
+        window.makeKeyAndOrderFront(nil as Any?)
         NSApp.activate(ignoringOtherApps: true)
 
         floatingKeyboardWindow = window
         logger.log(content: "Floating keyboard window created and stored")
 
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.logger.log(content: "Floating keyboard window will close notification received")
             self?.floatingKeyboardWindow = nil
         }
@@ -114,5 +114,15 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
     public func closeFloatingKeysWindow() {
         floatingKeyboardWindow?.close()
         floatingKeyboardWindow = nil
+    }
+    
+    public func setFloatingKeyboardHeight(_ height: CGFloat) {
+        guard let window = floatingKeyboardWindow else { return }
+        let currentFrame = window.frame
+        let newFrame = NSRect(x: currentFrame.origin.x,
+                             y: currentFrame.origin.y - (height - currentFrame.height),
+                             width: currentFrame.width,
+                             height: height)
+        window.setFrame(newFrame, display: true, animate: true)
     }
 }

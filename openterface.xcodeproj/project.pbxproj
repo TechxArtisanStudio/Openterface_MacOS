@@ -39,6 +39,7 @@
 		53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DC2B3D6AE5007785B0 /* PlayerContainerView.swift */; };
 		53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */; };
 		53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */; };
+		6B487A0F2EF24F2700CD664D /* InputOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */; };
 		6B60EB7F2E0E7C39006874D3 /* FirmwareUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */; };
 		6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */; };
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
@@ -117,6 +118,7 @@
 		53FBE7DC2B3D6AE5007785B0 /* PlayerContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerContainerView.swift; sourceTree = "<group>"; };
 		53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputOverlayView.swift; sourceTree = "<group>"; };
 		6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareUpdateView.swift; sourceTree = "<group>"; };
 		6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManagerTests.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
@@ -293,6 +295,7 @@
 		53FBE7DB2B3D6789007785B0 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */,
 				BFD4EA952E3643CA0029BFC2 /* PasteConfirmationView.swift */,
 				BFB748FF2E35ED92004F0DAE /* ClipboardView.swift */,
 				6BAFF00E2E03E8C9004331F6 /* KeysView.swift */,
@@ -521,6 +524,7 @@
 				BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */,
 				531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */,
 				BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */,
+				6B487A0F2EF24F2700CD664D /* InputOverlayView.swift in Sources */,
 				5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */,
 				BFD4EA982E369C870029BFC2 /* CameraManager.swift in Sources */,
 				53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */,
@@ -701,7 +705,7 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 61;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
@@ -736,7 +740,7 @@
 				CODE_SIGN_ENTITLEMENTS = openterface/openterface.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 61;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;

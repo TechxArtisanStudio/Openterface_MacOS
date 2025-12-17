@@ -258,6 +258,7 @@ protocol TipLayerManagerProtocol: AnyObject {
 protocol FloatingKeyboardManagerProtocol: AnyObject {
     func showFloatingKeysWindow()
     func closeFloatingKeysWindow()
+    func setFloatingKeyboardHeight(_ height: CGFloat)
 }
 
 /// Protocol for OCR (Optical Character Recognition) functionality

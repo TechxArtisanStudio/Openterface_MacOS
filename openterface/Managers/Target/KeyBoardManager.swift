@@ -35,7 +35,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     
     let kbm = KeyboardMapper()
     
-    // 新增一个数组用于存储同时按下的键
+    // store the currently pressed keys
     var pressedKeys: [UInt16] = [255,255,255,255,255,255]
     
     // State variables for modifier keys
@@ -53,6 +53,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
     }
     
+    // Track the currently pressed key for UI feedback
+    @Published var pressedKey: KeyboardMapper.SpecialKey? = nil
+    
+    // Track the currently pressed text character for UI feedback
+    @Published var pressedCharacter: String? = nil
+    
+    // Track host keyboard input for visual feedback
+    @Published var hostPressedKeyCodes: Set<UInt16> = []
+    
     // MARK: - Keyboard Layout Management
     
     // Access keyboard layout from UserSettings
@@ -68,6 +77,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     
     // Function to toggle between Windows and Mac keyboard layouts
     func toggleKeyboardLayout() {
+        objectWillChange.send()
         let oldLayout = currentKeyboardLayout
         switch currentKeyboardLayout {
         case .mac:
@@ -75,6 +85,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         case .windows:
             currentKeyboardLayout = .mac
         }
+        objectWillChange.send()
         logger.log(content: "🔄 Keyboard layout toggled: \(oldLayout.rawValue) → \(currentKeyboardLayout.rawValue)")
     }
     
@@ -610,6 +621,11 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         logger.log(content: "   Contains .option: \(modifiers.contains(.option))")
         logger.log(content: "   Contains .shift: \(modifiers.contains(.shift))")
         
+        // Update UI state to show pressed key from host keyboard
+        DispatchQueue.main.async {
+            self.hostPressedKeyCodes.insert(event.keyCode)
+        }
+        
         // Apply layout-aware modifier remapping for key combinations
         let adjustedModifiers = getAdjustedModifiersForKeyboard(modifiers)
         
@@ -645,6 +661,11 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         
         // Log the key release with its keycode
         logger.log(content: "Key released: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
+        
+        // Remove key from the set of currently pressed keys
+        DispatchQueue.main.async {
+            self.hostPressedKeyCodes.remove(event.keyCode)
+        }
         
         // Remove released key
         if let index = pressedKeys.firstIndex(of: event.keyCode) {
@@ -851,6 +872,11 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     func sendTextToKeyboard(text:String) {
         logger.log(content: "Sending text to keyboard: \(text)")
         
+        // Update UI state to show pressed character
+        DispatchQueue.main.async {
+            self.pressedCharacter = text
+        }
+        
         // Release all modifier keys before starting paste operation
         releaseAllModifierKeys()
         
@@ -868,10 +894,44 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             kbm.releaseKey(keys: self.pressedKeys) // Release all pressed keys
             Thread.sleep(forTimeInterval: 0.01) // Wait for 10 milliseconds
         }
+        
+        // Clear pressed character state
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.pressedCharacter = nil
+        }
     }
 
 
     func sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey) {
+        // Update UI state to show pressed key
+        DispatchQueue.main.async {
+            self.pressedKey = code
+        }
+        
+        // Check if this is an ACPI key
+        if let (power, sleep, wakeup) = kbm.getACPIKeyBits(for: code) {
+            kbm.sendACPIKeyData(powerBit: power, sleepBit: sleep, wakeupBit: wakeup)
+            Thread.sleep(forTimeInterval: 0.005) // 5 ms
+            kbm.sendACPIKeyData(powerBit: false, sleepBit: false, wakeupBit: false)
+            Thread.sleep(forTimeInterval: 0.01) // 10 ms
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.pressedKey = nil
+            }
+            return
+        }
+        
+        // Check if this is a multimedia key
+        if let (byte2, byte3, byte4) = kbm.getMultimediaKeyCode(for: code) {
+            kbm.sendMultimediaKeyData(byte2: byte2, byte3: byte3, byte4: byte4, isPress: true)
+            Thread.sleep(forTimeInterval: 0.005) // 5 ms
+            kbm.sendMultimediaKeyData(byte2: 0, byte3: 0, byte4: 0, isPress: false)
+            Thread.sleep(forTimeInterval: 0.01) // 10 ms
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.pressedKey = nil
+            }
+            return
+        }
+        
         if code == KeyboardMapper.SpecialKey.CtrlAltDel {
             if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
                 // In Windows mode, this should work as expected
@@ -880,6 +940,9 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 Thread.sleep(forTimeInterval: 0.005) // 1 ms
                 kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.pressedKey = nil
             }
         
         } else if code == KeyboardMapper.SpecialKey.CmdSpace {
@@ -897,8 +960,10 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
             }
-        }
-        else{
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.pressedKey = nil
+            }
+        } else {
             if let key = kbm.fromSpecialKeyToKeyCode(code: code) {
                 // Get currently held modifier keys for special keys
                 let modifiers = getCurrentModifiersForSpecialKey()
@@ -907,13 +972,14 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 kbm.releaseKey(keys: self.pressedKeys)
                 Thread.sleep(forTimeInterval: 0.01) // 5 ms
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.pressedKey = nil
+            }
         }
     }
-}
 
-// MARK: - KeyboardManagerProtocol Implementation
+    // MARK: - KeyboardManagerProtocol Implementation
 
-extension KeyboardManager {
     func sendKeyboardInput(_ input: KeyboardInput) {
         // Convert protocol input to existing method call
         // Implementation would depend on existing keyboard input methods
