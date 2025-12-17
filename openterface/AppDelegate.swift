@@ -484,9 +484,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         
         // Get the screen containing the window
-        guard let screen = window.screen ?? NSScreen.main else { return targetSize }
-        let screenFrame = screen.frame
-        
+        guard (window.screen ?? NSScreen.main) != nil else { return targetSize }
+                
         // Calculate new size maintaining content area aspect ratio
         var newSize = targetSize
 

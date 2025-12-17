@@ -344,7 +344,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     private func processBufferedMessages() {
-        let prefix: [UInt8] = [0x57, 0xAB, 0x00]
         var bufferBytes = [UInt8](receiveBuffer)
         var processedBytes = 0
         
@@ -426,7 +425,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     func handleSerialData(data: Data) {
         let cmd = data[3]
-        let len = data[4]
 
         switch cmd {
         case 0x81:  // HID info
