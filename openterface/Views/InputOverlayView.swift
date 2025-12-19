@@ -23,7 +23,7 @@
 import SwiftUI
 
 struct InputOverlayView: View {
-    @StateObject private var inputMonitor = InputMonitorManager()
+    @ObservedObject var inputMonitor = InputMonitorManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -58,6 +58,57 @@ struct InputOverlayView: View {
                     Text("  Scan: \(inputMonitor.targetScanCodes)")
                         .font(.system(.caption, design: .monospaced))
                 }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Acknowledgement latency section
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ack Latency:")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.bold)
+                Text("  Keyboard: \(String(format: "%.1f", inputMonitor.keyboardAckLatency))ms (Max: \(String(format: "%.1f", inputMonitor.keyboardMaxLatency))ms)")
+                    .font(.system(.caption, design: .monospaced))
+                Text("  Mouse: \(String(format: "%.1f", inputMonitor.mouseAckLatency))ms (Max: \(String(format: "%.1f", inputMonitor.mouseMaxLatency))ms)")
+                    .font(.system(.caption, design: .monospaced))
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Acknowledgement rate section
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ack Rate:")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.bold)
+                Text("  Keyboard: \(String(format: "%.1f", inputMonitor.keyboardAckRate))/s")
+                    .font(.system(.caption, design: .monospaced))
+                Text("  Mouse: \(String(format: "%.1f", inputMonitor.mouseAckRate))/s")
+                    .font(.system(.caption, design: .monospaced))
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Statistics section
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Statistics:")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.bold)
+                Text("  Mouse Input: \(String(format: "%.1f", inputMonitor.mouseEventsPerSecond))/s")
+                    .font(.system(.caption, design: .monospaced))
+                Text("  Mouse Output: \(String(format: "%.1f", inputMonitor.mouseOutputEventRate))/s")
+                    .font(.system(.caption, design: .monospaced))
+                Text("  Mouse Drop: \(String(format: "%.1f", inputMonitor.mouseEventDropRate))/s")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(inputMonitor.mouseEventDropRate > 0 ? .red : .white)
+                Text("  Queue: \(inputMonitor.mouseEventQueueSize)/10(Peak:\(inputMonitor.mouseEventQueuePeakSize))")
+                    .font(.system(.caption, design: .monospaced))
+                Text("  Mouse Clicks: \(String(format: "%.1f", inputMonitor.mouseClicksPerSecond))/s")
+                    .font(.system(.caption, design: .monospaced))
+                Text("  Key Events: \(String(format: "%.1f", inputMonitor.keyEventsPerSecond))/s")
+                    .font(.system(.caption, design: .monospaced))
             }
         }
         .fixedSize()

@@ -22,6 +22,21 @@
 
 import Foundation
 import AppKit
+import IOKit
+import IOKit.hid
+
+// MARK: - Mouse Event Queue Structure
+struct MouseEventQueueItem {
+    let deltaX: Int
+    let deltaY: Int
+    let mouseEvent: UInt8
+    let wheelMovement: UInt8
+    let isDragged: Bool
+    let timestamp: TimeInterval
+    let isAbsolute: Bool
+    let absoluteX: Int?
+    let absoluteY: Int?
+}
 
 class MouseManager: MouseManagerProtocol {
     static let shared = MouseManager()
@@ -49,14 +64,40 @@ class MouseManager: MouseManagerProtocol {
     
     private var isMouseLoopRunning = false
     
-    // HID event monitoring variables
-    private var hidEventMonitor: Any?
-    private var hidLocalMonitor: Any?
+    // Mouse event queue system
+    private let mouseEventQueue = DispatchQueue(label: "com.openterface.mouseEventQueue", qos: .userInteractive)
+    private var pendingMouseEvents: [MouseEventQueueItem] = []
+    private let maxQueueSize = 10
+    private var isProcessingQueue = false
+    
+    // Queue monitoring (size tracking - metrics calculated and displayed in InputMonitorManager)
+    private var peakQueueSize: Int = 0
+    
+    // Event drop tracking (counter only - rate calculated in InputMonitorManager)
+    private var droppedEventCount: Int = 0
+    
+    // Output event tracking (counter only - rate calculated in InputMonitorManager)
+    private var outputEventCount: Int = 0
+    
+    // Mouse event throttling properties - thread-safe with lock to prevent race conditions
+    private var lastEventProcessTime: TimeInterval = 0.0
+    private let throttleLock = NSLock() // Synchronizes access to throttle timer across threads
+    private var throttledEventDropCount: Int = 0
+    
+    // Overflow accumulation for smooth movement preservation
+    private var overflowAccumulatedDeltaX = 0
+    private var overflowAccumulatedDeltaY = 0
+    private var adaptiveAccumulationEnabled = false
+    
+    // IOKit HID Manager properties
+    private var hidManager: IOHIDManager?
+    private var hidDevices: [IOHIDDevice] = []
     private var isHIDMonitoringActive = false
     private var lastHIDPosition = CGPoint.zero
     private var isHIDMouseCaptured = false
     private var lastCenterTime: TimeInterval = 0
     private var centeringCooldown: TimeInterval = 0.1 // Minimum time between centering operations
+    private var hidEventQueue = DispatchQueue(label: "com.openterface.hidEventQueue", qos: .userInteractive)
     
     // ESC key escape mechanism for HID mode
     private var escapeKeyPressCount = 0
@@ -64,7 +105,7 @@ class MouseManager: MouseManagerProtocol {
     private var longPressTimer: Timer?
     private let escapeKeyTimeout: TimeInterval = 2.0 // Reset count after 2 seconds
     private let longPressThreshold: TimeInterval = 1.0 // Long press threshold in seconds
-    
+
     // Private initializer for dependency injection
     private init() {
         // Dependencies are now lazy and will be resolved when first accessed
@@ -74,7 +115,396 @@ class MouseManager: MouseManagerProtocol {
         stopHIDMouseMonitoring()
     }
     
-    // MARK: - HID Mouse Event Monitoring
+    // MARK: - Mouse Event Queue Management
+    
+    /// Public method to enqueue absolute mouse events (called from UI layers)
+    func enqueueAbsoluteMouseEvent(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+        let queueItem = MouseEventQueueItem(
+            deltaX: 0,
+            deltaY: 0,
+            mouseEvent: mouseEvent,
+            wheelMovement: wheelMovement,
+            isDragged: false,
+            timestamp: CACurrentMediaTime(),
+            isAbsolute: true,
+            absoluteX: x,
+            absoluteY: y
+        )
+        enqueueMouseEvent(queueItem)
+    }
+    
+    /// Public method to enqueue relative mouse events
+    func enqueueRelativeMouseEvent(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, isDragged: Bool = false) {
+        let queueItem = MouseEventQueueItem(
+            deltaX: dx,
+            deltaY: dy,
+            mouseEvent: mouseEvent,
+            wheelMovement: wheelMovement,
+            isDragged: isDragged,
+            timestamp: CACurrentMediaTime(),
+            isAbsolute: false,
+            absoluteX: nil,
+            absoluteY: nil
+        )
+        enqueueMouseEvent(queueItem)
+    }
+    
+    /// Public method to enqueue mouse events (called from UI or other managers)
+    func enqueueMouseEventPublic(_ event: MouseEventQueueItem) {
+        enqueueMouseEvent(event)
+    }
+    
+    /// Enqueue a mouse event for processing
+    /// Implements throttling based on Hz limit and strategic dropping when queue exceeds capacity
+    private func enqueueMouseEvent(_ event: MouseEventQueueItem) {
+        mouseEventQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.pendingMouseEvents.append(event)
+            let currentSize = self.pendingMouseEvents.count
+            
+            // Track peak queue size (keep accumulating, don't reset here)
+            if currentSize > self.peakQueueSize {
+                self.peakQueueSize = currentSize
+            }
+            
+            // Check if queue size exceeds maximum
+            if currentSize > self.maxQueueSize {
+                self.strategicDropEvents()
+            }
+            
+            // Start processing if not already running
+            if !self.isProcessingQueue {
+                self.processMouseEventQueue()
+            }
+        }
+    }
+    
+    /// Determine if an input event should be throttled based on the Hz limit
+    /// Returns true if event should be dropped, false if it should be enqueued
+    /// Uses NSLock to ensure thread-safe access to the throttle timer
+    private func shouldThrottleInputEvent() -> Bool {
+        let throttleHz = UserSettings.shared.mouseEventThrottleHz
+        let minTimeBetweenInputs = 1.0 / Double(throttleHz)
+        let currentTime = CACurrentMediaTime()
+        
+        throttleLock.lock()
+        defer { throttleLock.unlock() }
+        
+        if lastEventProcessTime == 0.0 {
+            // First event, always allow it
+            lastEventProcessTime = currentTime
+            return false
+        }
+        
+        let timeSinceLastInput = currentTime - lastEventProcessTime
+        
+        if timeSinceLastInput >= minTimeBetweenInputs {
+            lastEventProcessTime = currentTime
+            return false
+        }
+        
+        // Event should be throttled (logging disabled to reduce overhead)
+        return true
+    }
+    
+    /// Strategically drop events when queue is full while preserving movement continuity
+    private func strategicDropEvents() {
+        guard pendingMouseEvents.count > maxQueueSize else { return }
+        
+        let originalCount = pendingMouseEvents.count
+        
+        // Separate absolute and relative events
+        var absoluteEvents: [MouseEventQueueItem] = []
+        var relativeEvents: [MouseEventQueueItem] = []
+        
+        for event in pendingMouseEvents {
+            if event.isAbsolute {
+                absoluteEvents.append(event)
+            } else {
+                relativeEvents.append(event)
+            }
+        }
+        
+        logger.log(content: "Queue overflow detected. Absolute: \(absoluteEvents.count), Relative: \(relativeEvents.count). Applying smooth dropping...")
+        
+        // Strategy 1: Smart dropping for absolute events - prioritize dropping small deltas
+        if absoluteEvents.count > maxQueueSize / 2 {
+            let keepCount = maxQueueSize / 3
+            let dropCount = absoluteEvents.count - keepCount
+            
+            // Separate small delta and large delta absolute events
+            var smallDeltaEvents: [(index: Int, event: MouseEventQueueItem)] = []
+            var largeDeltaEvents: [(index: Int, event: MouseEventQueueItem)] = []
+            
+            for (index, event) in absoluteEvents.enumerated() {
+                guard let absX = event.absoluteX, let absY = event.absoluteY else {
+                    largeDeltaEvents.append((index, event))
+                    continue
+                }
+                
+                // Calculate delta from previous event if available
+                if index > 0, let prevX = absoluteEvents[index - 1].absoluteX, 
+                   let prevY = absoluteEvents[index - 1].absoluteY {
+                    let deltaX = abs(absX - prevX)
+                    let deltaY = abs(absY - prevY)
+                    
+                    // Small delta: both x and y changes are less than 10 pixels
+                    if deltaX < 10 && deltaY < 10 {
+                        smallDeltaEvents.append((index, event))
+                    } else {
+                        largeDeltaEvents.append((index, event))
+                    }
+                } else {
+                    // First event or can't calculate delta - treat as large
+                    largeDeltaEvents.append((index, event))
+                }
+            }
+            
+            var eventsToKeep: [MouseEventQueueItem] = []
+            var actualDropCount = 0
+            
+            // Drop small delta events first
+            if smallDeltaEvents.count >= dropCount {
+                // We have enough small delta events to drop
+                let smallToKeep = smallDeltaEvents.count - dropCount
+                eventsToKeep.append(contentsOf: smallDeltaEvents.suffix(smallToKeep).map { $0.event })
+                eventsToKeep.append(contentsOf: largeDeltaEvents.map { $0.event })
+                actualDropCount = dropCount
+                logger.log(content: "Dropped \(dropCount) small-delta absolute events (Δ<10px), kept \(keepCount) events")
+            } else {
+                // Drop all small delta events, then drop oldest large delta events
+                let remainingDrops = dropCount - smallDeltaEvents.count
+                let largeDeltasToKeep = max(0, largeDeltaEvents.count - remainingDrops)
+                eventsToKeep.append(contentsOf: largeDeltaEvents.suffix(largeDeltasToKeep).map { $0.event })
+                actualDropCount = smallDeltaEvents.count + (largeDeltaEvents.count - largeDeltasToKeep)
+                logger.log(content: "Dropped \(smallDeltaEvents.count) small-delta + \(remainingDrops) oldest absolute events, kept \(keepCount) events")
+            }
+            
+            // Sort by timestamp to maintain order
+            absoluteEvents = eventsToKeep.sorted { $0.timestamp < $1.timestamp }
+            droppedEventCount += actualDropCount
+        }
+        
+        // Strategy 2: Smart merging for relative movement events
+        if relativeEvents.count > 1 {
+            // Separate movement and action events
+            var pureMovements: [MouseEventQueueItem] = []
+            var actionEvents: [MouseEventQueueItem] = []
+            
+            for event in relativeEvents {
+                if event.mouseEvent == 0x00 && event.wheelMovement == 0 {
+                    pureMovements.append(event)
+                } else {
+                    actionEvents.append(event)
+                }
+            }
+            
+            var mergedRelatives: [MouseEventQueueItem] = []
+            
+            // If we have many pure movement events, use adaptive merging
+            if pureMovements.count > maxQueueSize / 2 {
+                // Calculate total movement delta
+                var totalDX = 0
+                var totalDY = 0
+                for event in pureMovements {
+                    totalDX += event.deltaX
+                    totalDY += event.deltaY
+                }
+                
+                // Calculate number of merged events we can afford
+                let availableSlots = maxQueueSize - actionEvents.count - absoluteEvents.count
+                let targetMovementEvents = max(2, availableSlots / 2) // Keep at least 2 movement events
+                
+                if pureMovements.count > targetMovementEvents {
+                    // Distribute the total movement across fewer events for smooth interpolation
+                    let deltaPerEvent = (
+                        dx: totalDX / targetMovementEvents,
+                        dy: totalDY / targetMovementEvents
+                    )
+                    let remainder = (
+                        dx: totalDX % targetMovementEvents,
+                        dy: totalDY % targetMovementEvents
+                    )
+                    
+                    // Create interpolated movement events
+                    for i in 0..<targetMovementEvents {
+                        let extraDX = i < abs(remainder.dx) ? (remainder.dx > 0 ? 1 : -1) : 0
+                        let extraDY = i < abs(remainder.dy) ? (remainder.dy > 0 ? 1 : -1) : 0
+                        
+                        let interpolatedEvent = MouseEventQueueItem(
+                            deltaX: deltaPerEvent.dx + extraDX,
+                            deltaY: deltaPerEvent.dy + extraDY,
+                            mouseEvent: 0x00,
+                            wheelMovement: 0,
+                            isDragged: false,
+                            timestamp: pureMovements[min(i * pureMovements.count / targetMovementEvents, pureMovements.count - 1)].timestamp,
+                            isAbsolute: false,
+                            absoluteX: nil,
+                            absoluteY: nil
+                        )
+                        mergedRelatives.append(interpolatedEvent)
+                    }
+                    
+                    let droppedMovements = pureMovements.count - targetMovementEvents
+                    droppedEventCount += droppedMovements
+                    logger.log(content: "Smooth interpolation: \(pureMovements.count) movements -> \(targetMovementEvents) events (dropped \(droppedMovements), preserved total Δ: (\(totalDX), \(totalDY)))")
+                } else {
+                    mergedRelatives.append(contentsOf: pureMovements)
+                }
+            } else {
+                mergedRelatives.append(contentsOf: pureMovements)
+            }
+            
+            // Add back all action events (clicks, drags, wheel) - these are never dropped
+            mergedRelatives.append(contentsOf: actionEvents)
+            
+            // Sort by timestamp to maintain event order
+            mergedRelatives.sort { $0.timestamp < $1.timestamp }
+            
+            relativeEvents = mergedRelatives
+        }
+        
+        // Final safety check: if still over limit, use overflow buffer
+        let totalEvents = absoluteEvents.count + relativeEvents.count
+        if totalEvents > maxQueueSize {
+            let excessCount = totalEvents - maxQueueSize
+            
+            // Separate action and movement events one more time
+            let movements = relativeEvents.filter { $0.mouseEvent == 0x00 && $0.wheelMovement == 0 }
+            let actions = relativeEvents.filter { $0.mouseEvent != 0x00 || $0.wheelMovement != 0 }
+            
+            if movements.count > excessCount {
+                // Drop oldest movements but preserve their deltas in overflow buffer
+                let movementsToDrop = movements.prefix(excessCount)
+                for event in movementsToDrop {
+                    overflowAccumulatedDeltaX += event.deltaX
+                    overflowAccumulatedDeltaY += event.deltaY
+                }
+                
+                let remainingMovements = Array(movements.dropFirst(excessCount))
+                droppedEventCount += excessCount
+                adaptiveAccumulationEnabled = true
+                
+                logger.log(content: "Overflow buffer: accumulated \(excessCount) movements → buffer: (Δx:\(overflowAccumulatedDeltaX), Δy:\(overflowAccumulatedDeltaY))")
+                
+                relativeEvents = remainingMovements + actions
+            } else {
+                // Not enough movements, accumulate all of them
+                for event in movements {
+                    overflowAccumulatedDeltaX += event.deltaX
+                    overflowAccumulatedDeltaY += event.deltaY
+                }
+                droppedEventCount += movements.count
+                adaptiveAccumulationEnabled = true
+                
+                logger.log(content: "All movements buffered: \(movements.count) events → buffer: (Δx:\(overflowAccumulatedDeltaX), Δy:\(overflowAccumulatedDeltaY))")
+                
+                relativeEvents = actions
+            }
+        }
+        
+        // Reconstruct queue
+        pendingMouseEvents = absoluteEvents + relativeEvents
+        let finalCount = pendingMouseEvents.count
+        logger.log(content: "Smooth drop completed: \(originalCount) → \(finalCount) events (peak reduction: \(originalCount - finalCount))")
+    }
+    
+    /// Record a filtered/dropped mouse event (pre-queue drop)
+    func recordFilteredMouseEvent() {
+        droppedEventCount += 1
+    }
+    
+    /// Get and reset drop event count (called by InputMonitorManager for rate calculation)
+    func getAndResetDropEventCount() -> Int {
+        let count = droppedEventCount
+        droppedEventCount = 0
+        return count
+    }
+    
+    /// Record an output mouse event (sent to serial/target)
+    func recordOutputMouseEvent() {
+        outputEventCount += 1
+    }
+    
+    /// Get and reset output event count (called by InputMonitorManager for rate calculation)
+    func getAndResetOutputEventCount() -> Int {
+        let count = outputEventCount
+        outputEventCount = 0
+        return count
+    }
+    
+    /// Get current queue size
+    func getCurrentQueueSize() -> Int {
+        return pendingMouseEvents.count
+    }
+    
+    /// Get and reset peak queue size (called by InputMonitorManager for peak tracking)
+    func getAndResetPeakQueueSize() -> Int {
+        let peak = peakQueueSize
+        peakQueueSize = 0
+        return peak
+    }
+    
+    /// Get and reset throttled event count (called by InputMonitorManager for throttling statistics)
+    func getAndResetThrottledEventCount() -> Int {
+        let count = throttledEventDropCount
+        throttledEventDropCount = 0
+        return count
+    }
+    
+    /// Process queued mouse events
+    private func processMouseEventQueue() {
+        isProcessingQueue = true
+        
+        mouseEventQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            while !self.pendingMouseEvents.isEmpty {
+                let event = self.pendingMouseEvents.removeFirst()
+                
+                // Process events directly on the queue thread (not on main thread)
+                if event.isAbsolute {
+                    // Absolute mode handling
+                    self.handleAbsoluteMouseAction(
+                        x: event.absoluteX ?? 0,
+                        y: event.absoluteY ?? 0,
+                        mouseEvent: event.mouseEvent,
+                        wheelMovement: event.wheelMovement
+                    )
+                } else {
+                    // Relative mode handling - distinguish between HID and Events mode
+                    let mouseMode = UserSettings.shared.MouseControl
+                    if mouseMode == .relativeHID {
+                        // HID mode: pass deltas directly without accumulation
+                        self.handleRelativeMouseActionHID(
+                            dx: event.deltaX,
+                            dy: event.deltaY,
+                            mouseEvent: event.mouseEvent,
+                            wheelMovement: event.wheelMovement
+                        )
+                    } else {
+                        // Events mode: use accumulation logic
+                        self.handleRelativeMouseActionEvents(
+                            dx: event.deltaX,
+                            dy: event.deltaY,
+                            mouseEvent: event.mouseEvent,
+                            wheelMovement: event.wheelMovement,
+                            dragged: event.isDragged
+                        )
+                    }
+                }
+                
+                // Enforce throttle rate by sleeping after processing each event
+                // This ensures we don't process events faster than the configured Hz
+                let throttleHz = UserSettings.shared.mouseEventThrottleHz
+                let minTimeBetweenEvents = 1.0 / Double(throttleHz)
+                Thread.sleep(forTimeInterval: minTimeBetweenEvents)
+            }
+            
+            self.isProcessingQueue = false
+        }
+    }
     
     func startHIDMouseMonitoring() {
         guard !isHIDMonitoringActive else {
@@ -82,20 +512,58 @@ class MouseManager: MouseManagerProtocol {
             return
         }
         
-        logger.log(content: "Starting HID mouse monitoring for Relative (HID) mode")
+        // Create IOKit HID Manager with no special options
+        hidManager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         
-        let eventMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
+        guard let manager = hidManager else {
+            logger.log(content: "❌ Failed to create IOHIDManager")
+            return
+        }
         
-        // Start with only local monitor (for app window detection)
-        hidLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
-            self?.handleHIDMouseEvent(event)
-            return event
-        })
+        logger.log(content: "✓ IOHIDManager created successfully")
         
-        isHIDMonitoringActive = true
-        isHIDMouseCaptured = false
+        // Set device matching for mouse/trackpad
+        let matchingDict: [String: Any] = [
+            kIOHIDDeviceUsagePageKey as String: kHIDPage_GenericDesktop,
+            kIOHIDDeviceUsageKey as String: kHIDUsage_GD_Mouse
+        ]
         
-        logger.log(content: "HID monitoring setup complete with local monitor only")
+        IOHIDManagerSetDeviceMatching(manager, matchingDict as CFDictionary)
+        logger.log(content: "✓ Device matching configured for GenericDesktop/Mouse")
+        
+        // Register device matching callback
+        let deviceMatchingContext = Unmanaged.passUnretained(self).toOpaque()
+        IOHIDManagerRegisterDeviceMatchingCallback(manager, { inContext, inResult, inSender, inDevice in
+            let this = Unmanaged<MouseManager>.fromOpaque(inContext!).takeUnretainedValue()
+            this.hidDeviceMatched(device: inDevice)
+        }, deviceMatchingContext)
+        logger.log(content: "✓ Device matching callback registered")
+        
+        // Register input value callback
+        let inputValueContext = Unmanaged.passUnretained(self).toOpaque()
+        IOHIDManagerRegisterInputValueCallback(manager, { inContext, inResult, inSender, inValue in
+            let this = Unmanaged<MouseManager>.fromOpaque(inContext!).takeUnretainedValue()
+            this.hidInputValueReceived(value: inValue)
+        }, inputValueContext)
+        logger.log(content: "✓ Input value callback registered")
+        
+        // Schedule on run loop
+        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+        logger.log(content: "✓ HID Manager scheduled on main run loop")
+        
+        // Open the manager with no special options
+        let ioReturnCode = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        
+        if ioReturnCode == kIOReturnSuccess {
+            isHIDMonitoringActive = true
+            isHIDMouseCaptured = false
+            logger.log(content: "✓ IOKit HID monitoring started successfully")
+            logger.log(content: "════════════════════════════════════════")
+        } else {
+            logger.log(content: "❌ Failed to open IOHIDManager: error code \(ioReturnCode)")
+            hidManager = nil
+            return
+        }
         
         // Force capture after a short delay to ensure we get mouse events
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -107,17 +575,128 @@ class MouseManager: MouseManagerProtocol {
         }
     }
     
+    private func hidDeviceMatched(device: IOHIDDevice) {
+        logger.log(content: "✓ HID mouse device matched and connected")
+        hidEventQueue.async { [weak self] in
+            self?.hidDevices.append(device)
+            self?.logger.log(content: "  → Total HID devices tracked: \(self?.hidDevices.count ?? 0)")
+        }
+    }
+    
+    private func hidInputValueReceived(value: IOHIDValue) {
+        let element = IOHIDValueGetElement(value)
+        let intValue = IOHIDValueGetIntegerValue(value)
+        let usagePage = IOHIDElementGetUsagePage(element)
+        let usage = IOHIDElementGetUsage(element)
+        
+        logger.log(content: "HID event received - UsagePage: \(usagePage), Usage: \(usage), Value: \(intValue), MouseCaptured: \(isHIDMouseCaptured), Mode: \(UserSettings.shared.MouseControl)")
+        
+        guard isHIDMouseCaptured else {
+            logger.log(content: "HID event ignored - mouse not captured")
+            return
+        }
+        guard UserSettings.shared.MouseControl == .relativeHID else {
+            logger.log(content: "HID event ignored - not in relativeHID mode")
+            return
+        }
+        
+        hidEventQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Handle mouse movement (X and Y axes)
+            if usagePage == kHIDPage_GenericDesktop {
+                if usage == kHIDUsage_GD_X {
+                    let deltaX = Int(intValue)
+                    self.logger.log(content: "✓ HID X movement captured: raw=\(deltaX)")
+                    
+                    // Enqueue mouse event with scaled delta
+                    let scaledDeltaX = deltaX * 2
+                    let queueItem = MouseEventQueueItem(
+                        deltaX: scaledDeltaX,
+                        deltaY: 0,
+                        mouseEvent: 0x00,
+                        wheelMovement: 0,
+                        isDragged: false,
+                        timestamp: CACurrentMediaTime(),
+                        isAbsolute: false,
+                        absoluteX: nil,
+                        absoluteY: nil
+                    )
+                    self.enqueueMouseEvent(queueItem)
+                    self.logger.log(content: "  → Enqueued X event: scaled=\(scaledDeltaX)")
+                    InputMonitorManager.shared.recordMouseMove()
+                    
+                } else if usage == kHIDUsage_GD_Y {
+                    let deltaY = Int(intValue)
+                    self.logger.log(content: "✓ HID Y movement captured: raw=\(deltaY)")
+                    
+                    // Enqueue mouse event with scaled delta
+                    let scaledDeltaY = deltaY * 2
+                    let queueItem = MouseEventQueueItem(
+                        deltaX: 0,
+                        deltaY: scaledDeltaY,
+                        mouseEvent: 0x00,
+                        wheelMovement: 0,
+                        isDragged: false,
+                        timestamp: CACurrentMediaTime(),
+                        isAbsolute: false,
+                        absoluteX: nil,
+                        absoluteY: nil
+                    )
+                    self.enqueueMouseEvent(queueItem)
+                    self.logger.log(content: "  → Enqueued Y event: scaled=\(scaledDeltaY)")
+                    InputMonitorManager.shared.recordMouseMove()
+                    
+                    // Re-center cursor occasionally
+                    let currentTime = CACurrentMediaTime()
+                    if currentTime - self.lastCenterTime > self.centeringCooldown {
+                        self.logger.log(content: "  → Re-centering cursor (cooldown elapsed)")
+                        self.centerMouseCursor()
+                        self.lastCenterTime = currentTime
+                    }
+                }
+            }
+            // Handle mouse buttons
+            else if usagePage == kHIDPage_Button {
+                let mouseEvent = UInt8(usage == 1 ? 0x01 : (usage == 2 ? 0x02 : 0x04))
+                let isPressed = intValue != 0
+                let buttonName = (usage == 1) ? "Left" : ((usage == 2) ? "Right" : "Middle")
+                
+                self.logger.log(content: "✓ HID button event: \(buttonName) (code: \(mouseEvent)), Pressed: \(isPressed)")
+                
+                if isPressed {
+                    let queueItem = MouseEventQueueItem(
+                        deltaX: 0,
+                        deltaY: 0,
+                        mouseEvent: mouseEvent,
+                        wheelMovement: 0,
+                        isDragged: true,
+                        timestamp: CACurrentMediaTime(),
+                        isAbsolute: false,
+                        absoluteX: nil,
+                        absoluteY: nil
+                    )
+                    self.enqueueMouseEvent(queueItem)
+                    self.logger.log(content: "  → Enqueued button event")
+                    InputMonitorManager.shared.recordHIDMouseClick()
+                }
+            } else {
+                self.logger.log(content: "⚠ Unhandled HID event - UsagePage: \(usagePage), Usage: \(usage)")
+            }
+        }
+    }
+    
     private func captureMouseForHID() {
         guard !isHIDMouseCaptured else { return }
         
         logger.log(content: "Capturing mouse for HID mode")
         
-        // Now add global monitor for capturing all mouse events
-        let eventMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
+        // // Now add global monitor for capturing all mouse events
+        // let eventMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
         
-        hidEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
-            self?.handleHIDMouseEvent(event)
-        })
+        // hidEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask, handler: { [weak self] event in
+        //     self?.handleHIDMouseEvent(event)
+        // })
         
         isHIDMouseCaptured = true
         NSCursor.hide()
@@ -133,36 +712,34 @@ class MouseManager: MouseManagerProtocol {
         
         logger.log(content: "Releasing mouse from HID capture")
         
-        // Remove global monitor to allow normal mouse movement
-        if let monitor = hidEventMonitor {
-            NSEvent.removeMonitor(monitor)
-            hidEventMonitor = nil
-        }
-        
         isHIDMouseCaptured = false
         NSCursor.unhide()
         AppStatus.isFouceWindow = false
         AppStatus.isCursorHidden = false
         
-        logger.log(content: "HID mouse released - global monitor removed")
+        logger.log(content: "HID mouse released")
     }
     
     func stopHIDMouseMonitoring() {
         guard isHIDMonitoringActive else { return }
         
-        logger.log(content: "Stopping HID mouse monitoring")
+        logger.log(content: "════════════════════════════════════════")
+        logger.log(content: "Stopping IOKit HID mouse monitoring")
+        logger.log(content: "════════════════════════════════════════")
         
-        // Remove global monitor if active
-        if let monitor = hidEventMonitor {
-            NSEvent.removeMonitor(monitor)
-            hidEventMonitor = nil
+        // Close and clean up IOKit HID Manager
+        if let manager = hidManager {
+            IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+            logger.log(content: "✓ HID Manager unscheduled from run loop")
+            
+            IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            logger.log(content: "✓ HID Manager closed")
         }
         
-        // Remove local monitor
-        if let localMonitor = hidLocalMonitor {
-            NSEvent.removeMonitor(localMonitor)
-            hidLocalMonitor = nil
-        }
+        hidManager = nil
+        let devicesCount = hidDevices.count
+        hidDevices.removeAll()
+        logger.log(content: "✓ Cleared \(devicesCount) tracked HID devices")
         
         isHIDMonitoringActive = false
         isHIDMouseCaptured = false
@@ -176,6 +753,9 @@ class MouseManager: MouseManagerProtocol {
         NSCursor.unhide()
         AppStatus.isFouceWindow = false
         AppStatus.isCursorHidden = false
+        
+        logger.log(content: "✓ IOKit HID monitoring stopped")
+        logger.log(content: "════════════════════════════════════════")
     }
     
     // MARK: - ESC Key Escape Mechanism for HID Mode
@@ -284,12 +864,10 @@ class MouseManager: MouseManagerProtocol {
             }
             
             // For all other events when not captured, do nothing (allow normal mouse behavior)
+            logger.log(content: "HID Event ignored - mouse not captured and event not from app window")
             return
         }
-        
-        // Mouse is captured - process events for KVM
-        logger.log(content: "Processing captured HID event")
-        
+
         // For movement events, use the event's deltaX and deltaY
         if event.type == .mouseMoved || event.type == .leftMouseDragged || event.type == .rightMouseDragged || event.type == .otherMouseDragged {
             let deltaX = event.deltaX
@@ -309,8 +887,22 @@ class MouseManager: MouseManagerProtocol {
                 
                 logger.log(content: "Processing HID Mouse: original dx=\(deltaX), dy=\(deltaY), scaled dx=\(scaledDeltaX), dy=\(scaledDeltaY), event=\(mouseEvent)")
                 
-                // Send to KVM using scaled HID deltas
-                handleRelativeMouseActionInternal(dx: scaledDeltaX, dy: scaledDeltaY, mouseEvent: mouseEvent, wheelMovement: 0, dragged: isDragEvent(event))
+                // Enqueue the mouse event instead of processing directly
+                let queueItem = MouseEventQueueItem(
+                    deltaX: scaledDeltaX,
+                    deltaY: scaledDeltaY,
+                    mouseEvent: mouseEvent,
+                    wheelMovement: 0,
+                    isDragged: isDragEvent(event),
+                    timestamp: CACurrentMediaTime(),
+                    isAbsolute: false,
+                    absoluteX: nil,
+                    absoluteY: nil
+                )
+                enqueueMouseEvent(queueItem)
+                
+                // Track the HID mouse move event in InputMonitorManager
+                InputMonitorManager.shared.recordMouseMove()
                 
                 // Only re-center occasionally, not on every movement
                 let currentTime = CACurrentMediaTime()
@@ -321,6 +913,8 @@ class MouseManager: MouseManagerProtocol {
                 }
             } else {
                 logger.log(content: "HID Event ignored - deltas too small: dx=\(deltaX), dy=\(deltaY)")
+                // Count filtered events as drops
+                recordFilteredMouseEvent()
             }
         } else {
             // Handle click and scroll events
@@ -329,8 +923,24 @@ class MouseManager: MouseManagerProtocol {
             
             logger.log(content: "Processing HID Click/Scroll: event=\(mouseEvent), wheel=\(wheelMovement)")
             
-            // Send click/scroll events without movement
-            handleRelativeMouseActionInternal(dx: 0, dy: 0, mouseEvent: mouseEvent, wheelMovement: UInt8(scrollWheelEventDeltaMapping(delta: wheelMovement)), dragged: isDragEvent(event))
+            // Track HID mouse click events
+            if mouseEvent != 0x00 && (event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown) {
+                InputMonitorManager.shared.recordHIDMouseClick()
+            }
+            
+            // Enqueue the click/scroll event
+            let queueItem = MouseEventQueueItem(
+                deltaX: 0,
+                deltaY: 0,
+                mouseEvent: mouseEvent,
+                wheelMovement: UInt8(scrollWheelEventDeltaMapping(delta: wheelMovement)),
+                isDragged: isDragEvent(event),
+                timestamp: CACurrentMediaTime(),
+                isAbsolute: false,
+                absoluteX: nil,
+                absoluteY: nil
+            )
+            enqueueMouseEvent(queueItem)
         }
     }
     
@@ -457,6 +1067,13 @@ class MouseManager: MouseManagerProtocol {
     }
     
     func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+        // Apply throttling at output stage
+        if shouldThrottleInputEvent() {
+            throttledEventDropCount += 1
+            return
+        }
+        
+        recordOutputMouseEvent()
         mouserMapper.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
     }
     
@@ -469,25 +1086,33 @@ class MouseManager: MouseManagerProtocol {
             return
         }
         
-        // Handle Events mode (the original logic)
-        handleRelativeMouseActionInternal(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: wheelMovement, dragged: dragged)
+        // Enqueue relative mouse event instead of processing directly
+        enqueueRelativeMouseEvent(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: wheelMovement, isDragged: dragged)
     }
     
-    private func handleRelativeMouseActionInternal(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged:Bool = false) {
-        logger.log(content: "handleRelativeMouseActionInternal called with dx=\(dx), dy=\(dy), mouseEvent=\(mouseEvent)")
-        
-        // Skip the complex accumulation logic for HID mode as it handles deltas directly
-        if UserSettings.shared.MouseControl == .relativeHID {
-            logger.log(content: "HID mode: sending deltas directly to MouseMapper")
-            mouserMapper.handleRelativeMouseAction(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
-            return
+    private func handleRelativeMouseActionEvents(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged:Bool = false) {
+        // Apply overflow deltas from dropped events (if any)
+        if adaptiveAccumulationEnabled && (overflowAccumulatedDeltaX != 0 || overflowAccumulatedDeltaY != 0) {
+            accumulatedDeltaX += overflowAccumulatedDeltaX
+            accumulatedDeltaY += overflowAccumulatedDeltaY
+            logger.log(content: "✓ Applied overflow buffer: (Δx:\(overflowAccumulatedDeltaX), Δy:\(overflowAccumulatedDeltaY)) → accumulated: (\(accumulatedDeltaX), \(accumulatedDeltaY))")
+            overflowAccumulatedDeltaX = 0
+            overflowAccumulatedDeltaY = 0
+            adaptiveAccumulationEnabled = false
         }
         
-        // Original Events mode logic with accumulation
+        // Events mode: always accumulate deltas first
         accumulatedDeltaX += dx
         accumulatedDeltaY += dy
         
-        logger.log(content: "Accumulated deltas: X=\(accumulatedDeltaX), Y=\(accumulatedDeltaY)")
+        // Apply throttling at output stage - only send if rate limit not exceeded
+        if shouldThrottleInputEvent() {
+            throttledEventDropCount += 1
+            // Deltas accumulated but not sent yet - will be sent in next non-throttled batch
+            return
+        }
+        
+        logger.log(content: "Events mode - Accumulated deltas: X=\(accumulatedDeltaX), Y=\(accumulatedDeltaY)")
         
         /// Prevents sending mouse events when skipMoveBack flag is set and recordCount > 0.
         /// This guards against unwanted cursor repositioning that can occur when the mouse
@@ -510,8 +1135,9 @@ class MouseManager: MouseManagerProtocol {
         }
         self.dragging = dragged
 
-        logger.log(content: "Sending to MouseMapper: dx=\(accumulatedDeltaX), dy=\(accumulatedDeltaY), mouseEvent=\(mouseEvent), wheelMovement=\(wheelMovement)")
+        logger.log(content: "Events mode - Sending to MouseMapper: dx=\(accumulatedDeltaX), dy=\(accumulatedDeltaY), mouseEvent=\(mouseEvent), wheelMovement=\(wheelMovement)")
         mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+        recordOutputMouseEvent()
 
         // Store last sent deltas for display purposes
         lastSentDeltaX = accumulatedDeltaX
@@ -528,7 +1154,26 @@ class MouseManager: MouseManagerProtocol {
             recordCount = 0
         }
         
-        logger.log(content: "handleRelativeMouseActionInternal completed - deltas reset")
+        logger.log(content: "Events mode - deltas reset")
+    }
+    
+    private func handleRelativeMouseActionHID(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+        // Apply throttling at output stage
+        if shouldThrottleInputEvent() {
+            throttledEventDropCount += 1
+            return
+        }
+        
+        // HID mode: pass deltas directly to serial without accumulation or complex logic
+        logger.log(content: "HID mode - Direct relative mouse action: dx=\(dx), dy=\(dy), mouseEvent=\(mouseEvent), wheelMovement=\(wheelMovement)")
+        mouserMapper.handleRelativeMouseAction(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+        recordOutputMouseEvent()
+        logger.log(content: "[DEBUG] HID mode - Event recorded")
+        // Store for display purposes
+        lastSentDeltaX = dx
+        lastSentDeltaY = dy
+        
+        logger.log(content: "HID mode - Event sent to serial")
     }
     
     func relativeMouse2TopLeft() {
@@ -568,22 +1213,22 @@ class MouseManager: MouseManagerProtocol {
                     while self.isMouseLoopRunning {
                         // Move in relative mode - use internal method to bypass HID mode restrictions
                         // Move up
-                        self.handleRelativeMouseActionInternal(dx: 0, dy: -50)
+                        self.handleRelativeMouseActionEvents(dx: 0, dy: -50)
                         Thread.sleep(forTimeInterval: 1.0)
                         if !self.isMouseLoopRunning { break }
                         
                         // Move down
-                        self.handleRelativeMouseActionInternal(dx: 0, dy: 50)
+                        self.handleRelativeMouseActionEvents(dx: 0, dy: 50)
                         Thread.sleep(forTimeInterval: 1.0)
                         if !self.isMouseLoopRunning { break }
                         
                         // Move left
-                        self.handleRelativeMouseActionInternal(dx: -50, dy: 0)
+                        self.handleRelativeMouseActionEvents(dx: -50, dy: 0)
                         Thread.sleep(forTimeInterval: 1.0)
                         if !self.isMouseLoopRunning { break }
                         
                         // Move right
-                        self.handleRelativeMouseActionInternal(dx: 50, dy: 0)
+                        self.handleRelativeMouseActionEvents(dx: 50, dy: 0)
                         Thread.sleep(forTimeInterval: 1.0)
                     }
                     
@@ -681,8 +1326,19 @@ class MouseManager: MouseManagerProtocol {
                     }
                 }
                 
-                // Update mouse position
-                self.handleAbsoluteMouseAction(x: x, y: y)
+                // Update mouse position via queue
+                let queueItem = MouseEventQueueItem(
+                    deltaX: 0,
+                    deltaY: 0,
+                    mouseEvent: 0x00,
+                    wheelMovement: 0,
+                    isDragged: false,
+                    timestamp: CACurrentMediaTime(),
+                    isAbsolute: true,
+                    absoluteX: x,
+                    absoluteY: y
+                )
+                self.enqueueMouseEvent(queueItem)
                 
                 // Wait for the next frame
                 Thread.sleep(forTimeInterval: framerate)

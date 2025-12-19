@@ -22,8 +22,11 @@
 
 import SwiftUI
 import AppKit
+import Foundation
 
 class InputMonitorManager: ObservableObject {
+    static let shared = InputMonitorManager()
+    
     @Published var mouseLocation: NSPoint = .zero
     @Published var hostKeys: String = ""
     @Published var targetKeys: String = ""
@@ -31,6 +34,31 @@ class InputMonitorManager: ObservableObject {
     @Published var hostMouseButtons: String = ""
     @Published var targetMouseButtons: String = ""
     @Published var targetScanCodes: String = ""
+    
+    // Statistics - Events per second
+    @Published var mouseEventsPerSecond: Double = 0.0
+    @Published var mouseClicksPerSecond: Double = 0.0
+    @Published var keyEventsPerSecond: Double = 0.0
+    
+    // Mouse queue and output event monitoring
+    @Published var mouseEventQueueSize: Int = 0  // Current queue depth
+    @Published var mouseEventQueuePeakSize: Int = 0  // Peak queue depth in last interval
+    @Published var mouseOutputEventRate: Double = 0.0  // Output events per second (to serial)
+    
+    // Acknowledgement latencies (in milliseconds)
+    @Published var keyboardAckLatency: Double = 0.0
+    @Published var mouseAckLatency: Double = 0.0
+    
+    // Max latencies in last 10 seconds (in milliseconds)
+    @Published var keyboardMaxLatency: Double = 0.0
+    @Published var mouseMaxLatency: Double = 0.0
+    
+    // ACK rates (per second)
+    @Published var keyboardAckRate: Double = 0.0
+    @Published var mouseAckRate: Double = 0.0
+    
+    // Mouse event drop rate (per second)
+    @Published var mouseEventDropRate: Double = 0.0
     
     private var mouseMonitor: Any?
     private var mouseButtonMonitor: Any?
@@ -42,11 +70,32 @@ class InputMonitorManager: ObservableObject {
     private var rightMouseDown = false
     private var middleMouseDown = false
     private var lastScanCodes: String = ""
+    private var lastTargetKeys: String = ""
     
-    init() {
+    // Event tracking for per-second calculation
+    private var mouseEventCount: Int = 0
+    private var mouseClickCount: Int = 0
+    private var keyEventCount: Int = 0
+    private var eventTrackingStartTime: TimeInterval = Date().timeIntervalSince1970
+    private let eventTrackingInterval: TimeInterval = 1.0 // Calculate per second
+    
+    // Output event rate tracking (centralized calculation)
+    private var outputTrackingStartTime: TimeInterval = Date().timeIntervalSince1970
+    private let outputTrackingInterval: TimeInterval = 1.0 // Calculate per second
+    
+    // Drop rate tracking (centralized calculation)
+    private var dropTrackingStartTime: TimeInterval = Date().timeIntervalSince1970
+    private let dropTrackingInterval: TimeInterval = 1.0 // Calculate per second
+    
+    // Queue peak tracking (centralized calculation)
+    private var queuePeakResetTime: TimeInterval = Date().timeIntervalSince1970
+    private let queuePeakResetInterval: TimeInterval = 1.0 // Calculate per second
+    
+    private init() {
         startMonitoring()
         startPollingKeyboardState()
         setupMouseTracking()
+        startStatsCalculation()
     }
     
     private func setupMouseTracking() {
@@ -54,13 +103,6 @@ class InputMonitorManager: ObservableObject {
     }
     
     func startMonitoring() {
-        // Monitor mouse position
-        let mouseMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
-        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseMask) { [weak self] event in
-            self?.mouseLocation = event.locationInWindow
-            return event
-        }
-        
         // Monitor mouse button events
         let buttonMask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp]
         mouseButtonMonitor = NSEvent.addLocalMonitorForEvents(matching: buttonMask) { [weak self] event in
@@ -73,14 +115,17 @@ class InputMonitorManager: ObservableObject {
         switch event.type {
         case .leftMouseDown:
             leftMouseDown = true
+            mouseClickCount += 1
         case .leftMouseUp:
             leftMouseDown = false
         case .rightMouseDown:
             rightMouseDown = true
+            mouseClickCount += 1
         case .rightMouseUp:
             rightMouseDown = false
         case .otherMouseDown:
             middleMouseDown = true
+            mouseClickCount += 1
         case .otherMouseUp:
             middleMouseDown = false
         default:
@@ -116,7 +161,21 @@ class InputMonitorManager: ObservableObject {
     private func startPollingKeyboardState() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             self?.updateKeysFromKeyboardManager()
+            self?.updateAcknowledgementLatencies()
         }
+    }
+    
+    private func updateAcknowledgementLatencies() {
+        let serialPort = SerialPortManager.shared
+        let mouseManager = MouseManager.shared
+        keyboardAckLatency = serialPort.keyboardAckLatency
+        mouseAckLatency = serialPort.mouseAckLatency
+        keyboardMaxLatency = serialPort.keyboardMaxLatency
+        mouseMaxLatency = serialPort.mouseMaxLatency
+        keyboardAckRate = serialPort.keyboardAckRateSmoothed  // Use smoothed value for display
+        mouseAckRate = serialPort.mouseAckRateSmoothed        // Use smoothed value for display
+        mouseEventQueueSize = mouseManager.getCurrentQueueSize()
+        // Note: mouseEventQueuePeakSize, mouseEventDropRate, and mouseOutputEventRate are calculated locally in calculateAndResetStats()
     }
     
     private func updateKeysFromKeyboardManager() {
@@ -135,7 +194,7 @@ class InputMonitorManager: ObservableObject {
         var scanCodes: [String] = []
         let modifierKeyCodes: Set<UInt16> = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
         for keyCode in keyboardManager.pressedKeys where keyCode != 255 && !modifierKeyCodes.contains(keyCode) {
-            let desc = keyDescription(forKeyCode: keyCode)
+            let desc = keyboardMapper.keyDescription(forKeyCode: keyCode)
             regularKeys.append(desc)
             if let scanCode = keyCodeToScanCode(keyCode) {
                 scanCodes.append(String(format: "0x%02X", scanCode))
@@ -219,6 +278,14 @@ class InputMonitorManager: ObservableObject {
         }
         if newTargetKeys != targetKeys {
             targetKeys = newTargetKeys
+            // Count key events when target keys change
+            if !newTargetKeys.isEmpty && newTargetKeys != lastTargetKeys {
+                keyEventCount += 1
+            } else if newTargetKeys.isEmpty && !lastTargetKeys.isEmpty {
+                // Key was released - also count this as an event
+                keyEventCount += 1
+            }
+            lastTargetKeys = newTargetKeys
         }
         if newTargetMouse != targetMouse {
             targetMouse = newTargetMouse
@@ -240,95 +307,66 @@ class InputMonitorManager: ObservableObject {
         return keyboardMapper.keyCodeMapping[keyCode]
     }
     
-    private func keyDescription(forKeyCode keyCode: UInt16) -> String {
-        switch keyCode {
-        // Modifier keys
-        case 54: return "Right Cmd"
-        case 55: return "Left Cmd"
-        case 56: return "Left Shift"
-        case 57: return "CapsLock"
-        case 58: return "Left Option"
-        case 59: return "Left Control"
-        case 60: return "Right Shift"
-        case 61: return "Right Option"
-        case 62: return "Right Control"
-        case 63: return "Function"
-        // Special keys
-        case 36: return "Return"
-        case 48: return "Tab"
-        case 49: return "Space"
-        case 51: return "Delete"
-        case 53: return "Esc"
-        case 123: return "Left"
-        case 124: return "Right"
-        case 125: return "Down"
-        case 126: return "Up"
-        // Function keys
-        case 122: return "F1"
-        case 120: return "F2"
-        case 99: return "F3"
-        case 118: return "F4"
-        case 96: return "F5"
-        case 97: return "F6"
-        case 98: return "F7"
-        case 100: return "F8"
-        case 101: return "F9"
-        case 109: return "F10"
-        case 103: return "F11"
-        case 111: return "F12"
-        // Number keys
-        case 18: return "1"
-        case 19: return "2"
-        case 20: return "3"
-        case 21: return "4"
-        case 23: return "5"
-        case 22: return "6"
-        case 26: return "7"
-        case 28: return "8"
-        case 25: return "9"
-        case 29: return "0"
-        // Letter keys
-        case 0: return "A"
-        case 1: return "S"
-        case 2: return "D"
-        case 3: return "F"
-        case 4: return "H"
-        case 5: return "G"
-        case 6: return "Z"
-        case 7: return "X"
-        case 8: return "C"
-        case 9: return "V"
-        case 11: return "B"
-        case 12: return "Q"
-        case 13: return "W"
-        case 14: return "E"
-        case 15: return "R"
-        case 16: return "Y"
-        case 17: return "T"
-        case 31: return "O"
-        case 32: return "U"
-        case 34: return "I"
-        case 35: return "P"
-        case 37: return "L"
-        case 38: return "J"
-        case 40: return "K"
-        case 45: return "N"
-        case 46: return "M"
-        // Symbol keys
-        case 24: return "="
-        case 27: return "-"
-        case 30: return "]"
-        case 33: return "["
-        case 39: return "'"
-        case 41: return ";"
-        case 42: return "\\"
-        case 43: return ","
-        case 44: return "/"
-        case 47: return "."
-        case 50: return "`"
-        default:
-            return "Key(\(keyCode))"
+    private func startStatsCalculation() {
+        // Calculate and publish stats every second
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.calculateAndResetStats()
         }
+    }
+    
+    private func calculateAndResetStats() {
+        let currentTime = Date().timeIntervalSince1970
+        let elapsed = currentTime - eventTrackingStartTime
+        
+        // Calculate events per second
+        if elapsed > 0 {
+            mouseEventsPerSecond = Double(mouseEventCount) / elapsed
+            mouseClicksPerSecond = Double(mouseClickCount) / elapsed
+            keyEventsPerSecond = Double(keyEventCount) / elapsed
+        }
+        
+        // Reset counters and timestamp every second for continuous calculation
+        if elapsed >= eventTrackingInterval {
+            mouseEventCount = 0
+            mouseClickCount = 0
+            keyEventCount = 0
+            eventTrackingStartTime = currentTime
+        }
+        
+        // Calculate output event rate (centralized)
+        let outputElapsed = currentTime - outputTrackingStartTime
+        if outputElapsed >= outputTrackingInterval {
+            let outputCount = mouseManager.getAndResetOutputEventCount()
+            mouseOutputEventRate = Double(outputCount) / outputElapsed
+            outputTrackingStartTime = currentTime
+        }
+        
+        // Calculate drop rate (centralized)
+        let dropElapsed = currentTime - dropTrackingStartTime
+        if dropElapsed >= dropTrackingInterval {
+            let dropCount = mouseManager.getAndResetDropEventCount()
+            mouseEventDropRate = Double(dropCount) / dropElapsed
+            dropTrackingStartTime = currentTime
+        }
+        
+        // Calculate and update queue peak (centralized)
+        let peakElapsed = currentTime - queuePeakResetTime
+        if peakElapsed >= queuePeakResetInterval {
+            let peak = mouseManager.getAndResetPeakQueueSize()
+            mouseEventQueuePeakSize = peak
+            queuePeakResetTime = currentTime
+        }
+    }
+    
+    // MARK: - Public methods for tracking HID mode events
+    /// Called by MouseManager to track HID mouse movement events
+    func recordMouseMove() {
+        mouseEventCount += 1
+    }
+    
+    /// Called by MouseManager to track HID mouse click events
+    func recordHIDMouseClick() {
+        mouseClickCount += 1
     }
     
     deinit {

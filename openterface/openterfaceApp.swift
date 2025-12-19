@@ -458,6 +458,38 @@ struct openterfaceApp: App {
                     }) {
                         Text("Check HID Permissions...")
                     }
+                    
+                    Divider()
+                    
+                    Menu("Performance Presets") {
+                        Button(action: {
+                            applyPerformancePreset(throttleHz: 30, baudrate: .lowSpeed, name: "Low Performance Target")
+                            appState.updatePerformancePresetTitles()
+                        }) {
+                            Text(appState.lowPerformanceTitle)
+                        }
+                        
+                        Button(action: {
+                            applyPerformancePreset(throttleHz: 60, baudrate: .lowSpeed, name: "Casual Use")
+                            appState.updatePerformancePresetTitles()
+                        }) {
+                            Text(appState.casualUseTitle)
+                        }
+                        
+                        Button(action: {
+                            applyPerformancePreset(throttleHz: 250, baudrate: .highSpeed, name: "Gaming")
+                            appState.updatePerformancePresetTitles()
+                        }) {
+                            Text(appState.gamingTitle)
+                        }
+                        
+                        Button(action: {
+                            applyPerformancePreset(throttleHz: 1000, baudrate: .highSpeed, name: "Max Performance")
+                            appState.updatePerformancePresetTitles()
+                        }) {
+                            Text(appState.maxPerformanceTitle)
+                        }
+                    }
                 }                         
                 Menu("Audio Control") {
                     Button(action: {
@@ -781,6 +813,64 @@ struct openterfaceApp: App {
         audioManager.setAudioEnabled(isEnabled)
     }
     
+    private func applyPerformancePreset(throttleHz: Int, baudrate: BaudrateOption, name: String) {
+        logger.log(content: "📊 Applying performance preset: \(name)")
+        
+        // Update throttle Hz
+        UserSettings.shared.mouseEventThrottleHz = throttleHz
+        logger.log(content: "  Set throttle: \(throttleHz) Hz")
+        
+        // Update baudrate if needed
+        let targetBaudrate = baudrate
+        if UserSettings.shared.preferredBaudrate != targetBaudrate {
+            UserSettings.shared.preferredBaudrate = targetBaudrate
+            logger.log(content: "  Set baudrate: \(targetBaudrate.rawValue)")
+            
+            if serialPortManager.isDeviceReady {
+                guard let serialMgr = serialPortManager as? SerialPortManager else {
+                    logger.log(content: "  ⚠️ Could not cast to SerialPortManager")
+                    return
+                }
+                
+                let currentBaudrate = serialPortManager.baudrate
+                let targetBaudrateValue = targetBaudrate.rawValue
+                let isCH32V208 = (AppStatus.controlChipsetType == .ch32v208)
+                
+                // Determine if this is a low-to-high or high-to-low change
+                let isLowToHigh = (currentBaudrate == SerialPortManager.LOWSPEED_BAUDRATE && 
+                                  targetBaudrateValue == SerialPortManager.HIGHSPEED_BAUDRATE)
+                let isHighToLow = (currentBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE && 
+                                  targetBaudrateValue == SerialPortManager.LOWSPEED_BAUDRATE)
+                
+                // Give a brief moment for the port to close properly
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if isHighToLow && !isCH32V208 {
+                        // High speed to low speed requires factory reset (except for CH32V208)
+                        serialMgr.resetHidChipToFactory { success in
+                            if success {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    self.serialPortManager.tryOpenSerialPort(priorityBaudrate: targetBaudrateValue)
+                                }
+                            }
+                        }
+                    } else if isLowToHigh || (isHighToLow && isCH32V208) {
+                        // Low speed to high speed uses regular reset
+                        // CH32V208 high to low also uses regular reset (no factory reset needed)
+                        serialMgr.resetDeviceToBaudrate(targetBaudrateValue)
+                        if isCH32V208 && isHighToLow {
+                            logger.log(content: "  CH32V208: High→Low baudrate change (no factory reset needed)")
+                        }
+                    } else {
+                        // Same baudrate or other cases
+                        serialMgr.resetDeviceToBaudrate(targetBaudrateValue)
+                        }
+                    }
+                }
+            }
+        
+        logger.log(content: "✅ Performance preset '\(name)' applied successfully")
+    }
+    
     func showAspectRatioSelectionWindow() {
         WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in
             if shouldUpdateWindow {
@@ -801,9 +891,16 @@ final class AppState: ObservableObject {
     @Published var relativeEventsTitle = "Relative (Events)"
     @Published var absoluteTitle = "Absolute ✓"
     
+    // Performance preset titles
+    @Published var lowPerformanceTitle = "🐢 Low Performance Target (30 Hz, 9600)"
+    @Published var casualUseTitle = "🖥️ Casual Use (60 Hz, 9600)"
+    @Published var gamingTitle = "🎮 Gaming (250 Hz, 115200)"
+    @Published var maxPerformanceTitle = "🐇 Max Performance (1000 Hz, 115200)"
+    
     init() {
         // Set initial menu titles based on current setting
         updateMenuTitles(for: UserSettings.shared.MouseControl)
+        updatePerformancePresetTitles()
         
         KeyboardShortcuts.onKeyUp(for: .exitRelativeMode) {
             self.logger.log(content: "Exit Relative Mode...")
@@ -930,6 +1027,23 @@ final class AppState: ObservableObject {
             relativeEventsTitle = "Relative (Events)"
             absoluteTitle = "Absolute ✓"
         }
+    }
+    
+    func updatePerformancePresetTitles() {
+        let currentHz = UserSettings.shared.mouseEventThrottleHz
+        let currentBaudrate = UserSettings.shared.preferredBaudrate
+        
+        // Check which preset matches current settings
+        let isLowPerformance = (currentHz == 30 && currentBaudrate == .lowSpeed)
+        let isCasualUse = (currentHz == 60 && currentBaudrate == .lowSpeed)
+        let isGaming = (currentHz == 250 && currentBaudrate == .highSpeed)
+        let isMaxPerformance = (currentHz == 1000 && currentBaudrate == .highSpeed)
+        
+        // Update titles with checkmarks
+        lowPerformanceTitle = isLowPerformance ? "🐢 Low Performance Target (30 Hz, 9600) ✓" : "🐢 Low Performance Target (30 Hz, 9600)"
+        casualUseTitle = isCasualUse ? "🖥️ Casual Use (60 Hz, 9600) ✓" : "🖥️ Casual Use (60 Hz, 9600)"
+        gamingTitle = isGaming ? "🎮 Gaming (250 Hz, 115200) ✓" : "🎮 Gaming (250 Hz, 115200)"
+        maxPerformanceTitle = isMaxPerformance ? "🐇 Max Performance (1000 Hz, 115200) ✓" : "🐇 Max Performance (1000 Hz, 115200)"
     }
 }
 

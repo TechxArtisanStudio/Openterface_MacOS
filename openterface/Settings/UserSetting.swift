@@ -71,6 +71,10 @@ final class UserSettings: ObservableObject {
         
         // Load log mode preference from UserDefaults
         self.isLogMode = UserDefaults.standard.object(forKey: "isLogMode") as? Bool ?? false
+        
+        // Load mouse event throttling Hz limit from UserDefaults
+        let savedMouseEventThrottleHz = UserDefaults.standard.object(forKey: "mouseEventThrottleHz") as? Int ?? 60
+        self.mouseEventThrottleHz = savedMouseEventThrottleHz
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -143,6 +147,13 @@ final class UserSettings: ObservableObject {
     @Published var gravity: GravityOption = .resizeAspect {
         didSet {
             UserDefaults.standard.set(gravity.rawValue, forKey: "gravity")
+        }
+    }
+    
+    // Mouse event throttling Hz limit (events per second)
+    @Published var mouseEventThrottleHz: Int = 60 {
+        didSet {
+            UserDefaults.standard.set(mouseEventThrottleHz, forKey: "mouseEventThrottleHz")
         }
     }
 }

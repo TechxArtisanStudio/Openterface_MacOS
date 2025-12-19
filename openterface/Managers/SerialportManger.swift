@@ -107,6 +107,27 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @Published var baudrate:Int = 0
     
+    // Acknowledgement latency tracking
+    @Published var keyboardAckLatency: Double = 0.0  // in milliseconds
+    @Published var mouseAckLatency: Double = 0.0     // in milliseconds
+    @Published var keyboardMaxLatency: Double = 0.0  // max latency in last 10 seconds (milliseconds)
+    @Published var mouseMaxLatency: Double = 0.0     // max latency in last 10 seconds (milliseconds)
+    private var lastKeyboardSendTime: Date?
+    private var lastMouseSendTime: Date?
+    private var keyboardMaxLatencyTrackingStart: TimeInterval = Date().timeIntervalSince1970
+    private var mouseMaxLatencyTrackingStart: TimeInterval = Date().timeIntervalSince1970
+    
+    // Acknowledgement rate tracking (ACK per second)
+    @Published var keyboardAckRate: Double = 0.0  // ACK per second
+    @Published var mouseAckRate: Double = 0.0     // ACK per second
+    @Published var keyboardAckRateSmoothed: Double = 0.0  // Smoothed display value
+    @Published var mouseAckRateSmoothed: Double = 0.0     // Smoothed display value
+    private var keyboardAckCount: Int = 0
+    private var mouseAckCount: Int = 0
+    private var ackTrackingStartTime: TimeInterval = Date().timeIntervalSince1970
+    private let ackTrackingInterval: TimeInterval = 5.0  // Calculate over 5 seconds
+    private let ackRateSmoothingFactor: Double = 0.3  // EMA smoothing factor (0-1, lower = smoother)
+    
     /// Tracks the number of complete retry cycles through all baudrates.
     /// Incremented after each full cycle through both 9600 and 115200 baudrates.
     /// After 2 complete cycles (trying both baudrates twice), triggers a factory reset.
@@ -452,6 +473,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
         case 0x82:  //Keyboard hid execution status 0 - success
             let kbStatus = data[5]
+            // Calculate keyboard acknowledgement latency
+            if let sendTime = lastKeyboardSendTime {
+                let latency = Date().timeIntervalSince(sendTime) * 1000  // Convert to milliseconds
+                keyboardAckLatency = latency
+                // Update max latency if current latency is higher
+                if latency > keyboardMaxLatency {
+                    keyboardMaxLatency = latency
+                }
+            }
+            // Track keyboard ACK count
+            keyboardAckCount += 1
+            updateAckRates()
+            
             if logger.SerialDataPrint  {
                 logger.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
             }
@@ -464,6 +498,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
         case 0x84, 0x85:  //Mouse hid execution status 0 - success
             let kbStatus = data[5]
+            // Calculate mouse acknowledgement latency
+            if let sendTime = lastMouseSendTime {
+                let latency = Date().timeIntervalSince(sendTime) * 1000  // Convert to milliseconds
+                mouseAckLatency = latency
+                // Update max latency if current latency is higher
+                if latency > mouseMaxLatency {
+                    mouseMaxLatency = latency
+                }
+            }
+            // Track mouse ACK count
+            mouseAckCount += 1
+            updateAckRates()
             if logger.SerialDataPrint {
                 logger.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
             }
@@ -658,8 +704,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         if self.serialPort != nil {
             logger.log(content: "Trying to connect with baudrate: \(baudrate), path: \(self.serialPort?.path ?? "Unknown")")
             self.openSerialPort(baudrate: baudrate)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.getChipParameterCfg()
+            
+            // For CH32V208, device is ready once port is opened (no command-response validation needed)
+            if AppStatus.controlChipsetType == .ch32v208 {
+                if self.serialPort?.isOpen == true {
+                    self.isDeviceReady = true
+                    self.errorAlertShown = false
+                    logger.log(content: "CH32V208: Port opened successfully, device ready")
+                }
+            } else {
+                // For CH9329, need to validate configuration via command-response
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.getChipParameterCfg()
+                }
             }
         }
         
@@ -906,10 +963,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         // Record the sent data
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        let threadName = Thread.current.isMainThread ? "main" : "background"
+        
+        // Track send time for latency measurement
+        let cmdType = command.count > 3 ? command[3] : 0
+        if cmdType == 0x02 {  // Keyboard command
+            lastKeyboardSendTime = Date()
+        } else if cmdType == 0x04 || cmdType == 0x05 {  // Mouse commands (absolute or relative)
+            lastMouseSendTime = Date()
+        }
 
         if self.isDeviceReady || force {
             if logger.SerialDataPrint {
-                logger.log(content: "Sending command: \(dataString)")
+                logger.log(content: "Sending command on \(threadName) thread: \(dataString)")
             }
             serialPort.send(data)
         } else {
@@ -953,43 +1019,74 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// This method reconfigures the CH9329 HID chip to use the preferred baudrate while maintaining
     /// the required communication mode (0x82) for proper HID operation.
     /// 
+    /// For CH32V208, it simply changes the baudrate and reopens the connection.
+    /// 
     /// **Parameters:**
     /// - `preferredBaud`: The target baudrate to configure (9600 or 115200)
     /// 
-    /// **What it does:**
-    /// 1. Builds a set-parameter command with the new baudrate
-    /// 2. Preserves existing configuration data from bytes 12-31
-    /// 3. Sends the reconfiguration command
-    /// 4. Resets the HID chip and restarts the serial port connection
+    /// **CH9329 Behavior:**
+    /// - Low → High (9600 → 115200): Direct set command
+    /// - High → Low (115200 → 9600): Factory reset required
     /// 
-    /// **Timing sequence:**
-    /// - Immediate: Send configuration command
-    /// - +0.5s: Reset HID chip
-    /// - +0.6s: Close serial port
-    /// - +0.8s: Attempt to reopen serial port
+    /// **CH32V208 Behavior:**
+    /// - Simply changes baudrate and reopens serial port
     /// 
     /// **Note:** This method uses `force: true` to ensure commands are sent during device reconfiguration.
     public func resetDeviceToBaudrate(_ preferredBaud: Int) {
-        logger.log(content: "Reset to baudrate \(preferredBaud) and mode 0x82...")
+        logger.log(content: "Reset to baudrate \(preferredBaud)")
         
-        // Build set-parameter command, inserting the preferred baudrate (big-endian)
-        var command: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? SerialPortManager.CMD_SET_PARA_CFG_PREFIX_9600 : SerialPortManager.CMD_SET_PARA_CFG_PREFIX_115200
+        // Check if this is CH32V208
+        let isCH32V208 = (AppStatus.controlChipsetType == .ch32v208)
         
-        // Keep structure similar to original payload
-        command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
-        
-        self.sendCommand(command: command, force: true)
-        logger.log(content: command.map { String(format: "%02X", $0) }.joined(separator: " "))
-        
-        // Reset HID chip and restart serial port after 0.5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.resetHidChip()
+        if isCH32V208 {
+            // For CH32V208, just close and reopen with new baudrate
+            logger.log(content: "CH32V208 detected: changing baudrate directly to \(preferredBaud)")
+            self.closeSerialPort()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.tryOpenSerialPort(priorityBaudrate: preferredBaud)
+            }
+        } else {
+            // For CH9329, check if high-to-low change requires factory reset
+            let currentBaudrate = self.baudrate
+            let targetBaudrate = preferredBaud
+            let isHighToLow = (currentBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE && 
+                              targetBaudrate == SerialPortManager.LOWSPEED_BAUDRATE)
             
-            // Restart the serial port
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.closeSerialPort()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    self.tryOpenSerialPort()
+            if isHighToLow {
+                // High speed to low speed requires factory reset for CH9329
+                logger.log(content: "CH9329: High-to-Low baudrate change detected, performing factory reset")
+                self.resetHidChipToFactory { success in
+                    if success {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                            self?.tryOpenSerialPort(priorityBaudrate: targetBaudrate)
+                        }
+                    }
+                }
+            } else {
+                // Low to high or same baudrate: direct set for CH9329
+                logger.log(content: "CH9329: Setting baudrate directly to \(preferredBaud) and mode 0x82")
+                
+                // Build set-parameter command
+                var command: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? 
+                    SerialPortManager.CMD_SET_PARA_CFG_PREFIX_9600 : 
+                    SerialPortManager.CMD_SET_PARA_CFG_PREFIX_115200
+                
+                command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
+                
+                self.sendCommand(command: command, force: true)
+                logger.log(content: command.map { String(format: "%02X", $0) }.joined(separator: " "))
+                
+                // Reset HID chip and restart serial port after 0.5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.resetHidChip()
+                    
+                    // Restart the serial port
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                        self?.closeSerialPort()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                            self?.tryOpenSerialPort()
+                        }
+                    }
                 }
             }
         }
@@ -1099,6 +1196,48 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
     }
             
+    
+    /// Update ACK rates (ACKs per second)
+    private func updateAckRates() {
+        let currentTime = Date().timeIntervalSince1970
+        let elapsed = currentTime - ackTrackingStartTime
+        
+        // For CH32V208, always mark keyboard and mouse as connected
+        if AppStatus.controlChipsetType == .ch32v208 {
+            AppStatus.isKeyboardConnected = true
+            AppStatus.isMouseConnected = true
+        }
+        
+        // Calculate ACK rates
+        if elapsed > 0 {
+            keyboardAckRate = Double(keyboardAckCount) / elapsed
+            mouseAckRate = Double(mouseAckCount) / elapsed
+            
+            // Apply exponential moving average smoothing for display
+            keyboardAckRateSmoothed = keyboardAckRateSmoothed * (1 - ackRateSmoothingFactor) + keyboardAckRate * ackRateSmoothingFactor
+            mouseAckRateSmoothed = mouseAckRateSmoothed * (1 - ackRateSmoothingFactor) + mouseAckRate * ackRateSmoothingFactor
+        }
+        
+        // Reset counters and timestamp every 5 seconds for continuous calculation
+        if elapsed >= ackTrackingInterval {
+            keyboardAckCount = 0
+            mouseAckCount = 0
+            ackTrackingStartTime = currentTime
+        }
+        
+        // Reset max latencies every 10 seconds
+        let keyboardMaxElapsed = currentTime - keyboardMaxLatencyTrackingStart
+        if keyboardMaxElapsed >= 10.0 {
+            keyboardMaxLatency = 0.0
+            keyboardMaxLatencyTrackingStart = currentTime
+        }
+        
+        let mouseMaxElapsed = currentTime - mouseMaxLatencyTrackingStart
+        if mouseMaxElapsed >= 10.0 {
+            mouseMaxLatency = 0.0
+            mouseMaxLatencyTrackingStart = currentTime
+        }
+    }
     
     func getHidInfo(){
         self.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO)

@@ -258,6 +258,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         )
     }
     
+    // MARK: - NSWindowDelegate: Window Focus Management
+    /// Called when the window gains focus
+    func windowDidBecomeKey(_ notification: Notification) {
+        // Resume HID mouse capture if in relative HID mode and window gets focus
+        if UserSettings.shared.MouseControl == .relativeHID {
+            let mouseManager = MouseManager.shared
+            if !mouseManager.isHIDMouseModeActive() {
+                mouseManager.startHIDMouseMonitoring()
+                logger.log(content: "Window gained focus: Resumed HID mouse monitoring")
+            }
+        }
+    }
+    
+    /// Called when the window loses focus
+    func windowDidResignKey(_ notification: Notification) {
+        // Release HID mouse capture when window loses focus in relative HID mode
+        if UserSettings.shared.MouseControl == .relativeHID {
+            let mouseManager = MouseManager.shared
+            if mouseManager.isHIDMouseModeActive() {
+                mouseManager.stopHIDMouseMonitoring()
+                logger.log(content: "Window lost focus: Stopped HID mouse monitoring")
+            }
+        }
+    }
+    
     // Show aspect ratio selection menu
     func showAspectRatioSelection() {
         WindowUtils.shared.showAspectRatioSelector { shouldUpdateWindow in

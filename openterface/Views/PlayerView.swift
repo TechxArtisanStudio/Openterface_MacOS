@@ -23,11 +23,13 @@
 import SwiftUI
 import AVFoundation
 import KeyboardShortcuts
+import QuartzCore
 
 class PlayerView: NSView, NSWindowDelegate {
     private let tipLayerManager = DependencyContainer.shared.resolve(TipLayerManagerProtocol.self)
     private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var  hostManager = DependencyContainer.shared.resolve(HostManagerProtocol.self)
+    private var  inputMonitorManager = InputMonitorManager.shared
     var previewLayer: AVCaptureVideoPreviewLayer?
     let playerBackgorundWarringLayer = CATextLayer()
     let playerBackgroundImage = CALayer()
@@ -35,8 +37,6 @@ class PlayerView: NSView, NSWindowDelegate {
     // Add these variables to track mouse movement
     private var lastMouseEventTimestamp: TimeInterval = 0
     private var lastMousePosition: NSPoint = .zero
-    private let minimumTimeBetweenEvents: TimeInterval = 0.016  // About 60fps
-    private let minimumMouseDelta: CGFloat = 1.0  // Minimum pixels moved to trigger event
     
     init(captureSession: AVCaptureSession) {
         super.init(frame: .zero)
@@ -237,18 +237,14 @@ class PlayerView: NSView, NSWindowDelegate {
         // Filter duplicate events
         let currentTime = ProcessInfo.processInfo.systemUptime
         let currentPosition = event.locationInWindow
+
+        handleMouseMovement(with: event, mouseEvent: 0x00)
         
-        // Check if enough time has passed and mouse has moved enough
-        let timeDelta = currentTime - lastMouseEventTimestamp
-        let positionDelta = hypot(currentPosition.x - lastMousePosition.x,
-                                currentPosition.y - lastMousePosition.y)
-        
-        if timeDelta >= minimumTimeBetweenEvents && positionDelta >= minimumMouseDelta {
-            handleMouseMovement(with: event, mouseEvent: 0x00)
-            
-            // Update tracking variables
-            lastMouseEventTimestamp = currentTime
-            lastMousePosition = currentPosition
+        // Update tracking variables
+        lastMouseEventTimestamp = currentTime
+        lastMousePosition = currentPosition
+        if UserSettings.shared.MouseControl != .relativeHID {
+            inputMonitorManager.recordMouseMove()
         }
     }
 
@@ -325,9 +321,14 @@ class PlayerView: NSView, NSWindowDelegate {
                 let mouseLocation = convert(event.locationInWindow, from: nil)
                 let mouseX = Float(mouseLocation.x) / Float(self.frame.width) * 4096.0
                 let mouseY = 4096.0 - Float(mouseLocation.y) / Float(self.frame.height) * 4096.0
-                hostManager.handleAbsoluteMouseAction(x: Int(mouseX), y: Int(mouseY), 
-                                                           mouseEvent: mouseEvent, 
-                                                           wheelMovement: wheelMovement)
+                
+                // Enqueue the mouse event instead of processing directly
+                MouseManager.shared.enqueueAbsoluteMouseEvent(
+                    x: Int(mouseX),
+                    y: Int(mouseY),
+                    mouseEvent: mouseEvent,
+                    wheelMovement: UInt8(wheelMovement)
+                )
             }
         }
     }
