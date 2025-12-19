@@ -337,11 +337,14 @@ struct ResetFactoryView: View {
         // serialPortManager.resetHidChip()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            
             serialPortManager.closeSerialPort()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 // Resume connection attempts and restart
+                serialPortManager.resumeConnectionAttempts()
                 serialPortManager.tryOpenSerialPort()
+                serialPortManager.pauseConnectionAttempts()
             }
         }
     }

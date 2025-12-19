@@ -75,6 +75,10 @@ final class UserSettings: ObservableObject {
         // Load mouse event throttling Hz limit from UserDefaults
         let savedMouseEventThrottleHz = UserDefaults.standard.object(forKey: "mouseEventThrottleHz") as? Int ?? 60
         self.mouseEventThrottleHz = savedMouseEventThrottleHz
+        
+        // Load control mode from UserDefaults
+        let savedControlMode = UserDefaults.standard.object(forKey: "controlMode") as? Int ?? 0x82
+        self.controlMode = ControlMode(rawValue: savedControlMode) ?? .compatibility
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -154,6 +158,13 @@ final class UserSettings: ObservableObject {
     @Published var mouseEventThrottleHz: Int = 60 {
         didSet {
             UserDefaults.standard.set(mouseEventThrottleHz, forKey: "mouseEventThrottleHz")
+        }
+    }
+    
+    // Control mode setting for the HID chip
+    @Published var controlMode: ControlMode {
+        didSet {
+            UserDefaults.standard.set(controlMode.rawValue, forKey: "controlMode")
         }
     }
 }
@@ -357,5 +368,42 @@ enum GravityOption: String, CaseIterable {
         case .resizeAspectFill:
             return .resizeAspectFill
         }
+    }
+}
+// Control mode enumeration for HID chip operation
+enum ControlMode: Int, CaseIterable {
+    case performance = 0x00        // Performance mode
+    case keyboardOnly = 0x01       // Keyboard only mode
+    case compatibility = 0x82      // Compatibility mode (default)
+    case customHID = 0x03          // Custom HID mode
+    
+    var displayName: String {
+        switch self {
+        case .performance:
+            return "Performance Mode"
+        case .keyboardOnly:
+            return "Keyboard Only"
+        case .compatibility:
+            return "Compatibility Mode"
+        case .customHID:
+            return "Custom HID"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .performance:
+            return "Optimized for maximum performance"
+        case .keyboardOnly:
+            return "Keyboard input only"
+        case .compatibility:
+            return "Maximum compatibility with target devices (default)"
+        case .customHID:
+            return "Custom HID configuration"
+        }
+    }
+    
+    var modeByteValue: UInt8 {
+        return UInt8(self.rawValue)
     }
 }

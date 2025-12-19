@@ -66,16 +66,24 @@ struct ResolutionView: View {
 struct SerialInfoView: View {
     let portName: String
     let baudRate: Int
+    let isConfiguring: Bool
     
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "cable.connector")
                 .font(.system(size: 16))
+                .foregroundColor(isConfiguring ? .orange : .primary)
             VStack(alignment: .leading, spacing: -2) {
-                Text("\(portName)")
-                    .font(.system(size: 9, weight: .medium))
-                Text("\(baudRate) ")
-                    .font(.system(size: 9, weight: .medium))
+                if isConfiguring {
+                    Text("Configuring...")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.orange)
+                } else {
+                    Text("\(portName)")
+                        .font(.system(size: 9, weight: .medium))
+                    Text("\(baudRate) ")
+                        .font(.system(size: 9, weight: .medium))
+                }
             }
         }
         .frame(width: 120, alignment: .leading)

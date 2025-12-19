@@ -321,6 +321,12 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         let newResolution = (width, height)
         let oldResolution = AppStatus.hidReadResolusion
         
+        // If new resolution width or height is less than 100, return old resolution
+        if width < 100 || height < 100 {
+            logger.log(content: "Invalid resolution detected: \(width)x\(height) (less than 100), returning old resolution: \(oldResolution.0)x\(oldResolution.1)")
+            return oldResolution
+        }
+        
         if (oldResolution.0 != 0 && oldResolution.1 != 0) && (newResolution.0 != oldResolution.0 || newResolution.1 != oldResolution.1) {
             logger.log(content: "HID input resolution changed: \(newResolution.0)x\(newResolution.1)")
             logger.log(content: "Old input resolution: \(oldResolution.0)x\(oldResolution.1)")
@@ -328,8 +334,10 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             if newResolution.0 > 0 && newResolution.1 > 0 {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
                 
-                // Reset user custom aspect ratio settings
-                UserSettings.shared.useCustomAspectRatio = false
+                // Reset user custom aspect ratio settings on main thread to avoid concurrent access
+                DispatchQueue.main.async {
+                    UserSettings.shared.useCustomAspectRatio = false
+                }
             }
         }
         

@@ -239,7 +239,11 @@ struct openterfaceApp: App {
                         
                         // Add serial port information display
                         ToolbarItem(placement: .automatic) {
-                            SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate)
+                            if let serialPortMgr = serialPortManager as? SerialPortManager {
+                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, isConfiguring: serialPortMgr.isConfiguring)
+                            } else {
+                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, isConfiguring: false)
+                            }
                         }
                         ToolbarItem(placement: .automatic) {
                             Button(action: {}) {

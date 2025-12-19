@@ -119,6 +119,11 @@ class MouseManager: MouseManagerProtocol {
     
     /// Public method to enqueue absolute mouse events (called from UI layers)
     func enqueueAbsoluteMouseEvent(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+        // Skip mouse events if in keyboard only mode
+        if UserSettings.shared.controlMode == .keyboardOnly {
+            return
+        }
+        
         let queueItem = MouseEventQueueItem(
             deltaX: 0,
             deltaY: 0,
@@ -135,6 +140,11 @@ class MouseManager: MouseManagerProtocol {
     
     /// Public method to enqueue relative mouse events
     func enqueueRelativeMouseEvent(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, isDragged: Bool = false) {
+        // Skip mouse events if in keyboard only mode
+        if UserSettings.shared.controlMode == .keyboardOnly {
+            return
+        }
+        
         let queueItem = MouseEventQueueItem(
             deltaX: dx,
             deltaY: dy,
@@ -1067,6 +1077,11 @@ class MouseManager: MouseManagerProtocol {
     }
     
     func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+        // Skip mouse events if in keyboard only mode
+        if UserSettings.shared.controlMode == .keyboardOnly {
+            return
+        }
+        
         // Apply throttling at output stage
         if shouldThrottleInputEvent() {
             throttledEventDropCount += 1
@@ -1078,6 +1093,11 @@ class MouseManager: MouseManagerProtocol {
     }
     
     func handleRelativeMouseAction(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged:Bool = false) {
+        // Skip mouse events if in keyboard only mode
+        if UserSettings.shared.controlMode == .keyboardOnly {
+            return
+        }
+        
         // Check the current mouse control mode
         if UserSettings.shared.MouseControl == .relativeHID {
             // For HID mode, the events should be handled by the HID monitor

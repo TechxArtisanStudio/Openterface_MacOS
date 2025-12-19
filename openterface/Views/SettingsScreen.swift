@@ -980,6 +980,16 @@ struct MouseHIDSettingsView: View {
             }
         }
         
+        var mouseMode: MouseControlMode {
+            switch self {
+            case .lowPerformance: return .absolute
+            case .casual: return .absolute
+            case .gaming: return .relativeHID
+            case .maxPerformance: return .relativeHID
+            case .custom: return .absolute // default
+            }
+        }
+        
         var icon: String {
             switch self {
             case .lowPerformance: return "tortoise.fill"
@@ -1202,6 +1212,20 @@ struct MouseHIDSettingsView: View {
         selectedPreset = preset
         userSettings.mouseEventThrottleHz = preset.throttleHz
         
+        // Set mouse mode for the preset
+        let targetMouseMode = preset.mouseMode
+        if userSettings.MouseControl != targetMouseMode {
+            userSettings.MouseControl = targetMouseMode
+            
+            // Set configuring state on serial port manager when mouse mode changes
+            if let serialMgr = serialPortManager as? SerialPortManager {
+                serialMgr.isConfiguring = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    serialMgr.isConfiguring = false
+                }
+            }
+        }
+        
         // Apply baudrate change if device is ready
         let targetBaudrate = preset.baudrate
         if userSettings.preferredBaudrate != targetBaudrate {
@@ -1211,6 +1235,7 @@ struct MouseHIDSettingsView: View {
                 isUpdatingBaudrate = true
                 applyBaudrateChange(targetBaudrate: targetBaudrate.rawValue)
             }
+
         }
     }
     
@@ -1520,6 +1545,75 @@ struct DeviceConnectionSettingsView: View {
                             .foregroundColor(.secondary)
                         
                         Text("• If keyboard and mouse stop working, disconnect all cables and reconnect")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(.vertical, 8)
+            }
+            
+            GroupBox("Control Mode Configuration") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Select the operation mode for the HID chip:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(ControlMode.allCases, id: \.self) { mode in
+                            Button(action: {
+                                userSettings.controlMode = mode
+                                // Send the mode change command to device
+                                if serialPortManager.isDeviceReady {
+                                    SerialPortManager.shared.setControlMode(mode)
+                                }
+                            }) {
+                                HStack(alignment: .top, spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(mode.displayName)
+                                            .font(.body)
+                                            .fontWeight(.medium)
+                                        
+                                        Text(mode.description)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Text("Mode: 0x\(String(format: "%02X", mode.rawValue))")
+                                            .font(.system(.caption2, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if userSettings.controlMode == mode {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                            .font(.title3)
+                                    } else {
+                                        Image(systemName: "circle")
+                                            .foregroundColor(.secondary)
+                                            .font(.title3)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(userSettings.controlMode == mode ? Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ℹ️ Note:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        
+                        Text("• When changing to Compatibility Mode from another mode, the device will automatically use mode byte 0x02")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Text("• The device will reconnect after mode change")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }

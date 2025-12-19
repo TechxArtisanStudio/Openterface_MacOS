@@ -161,6 +161,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// 
     /// The connection attempt loop continues until a successful connection is established
     /// (when `isDeviceReady` becomes true), at which point the background connection process exits.
+    
+    /// Indicates whether serial port configuration (baudrate or mode change) is in progress
+    /// This flag is set to true when starting a configuration change and false when complete
+    @Published var isConfiguring: Bool = false
     private let isTryingQueue = DispatchQueue(label: "com.openterface.SerialPortManager.isTryingQueue")
     private var _isTrying: Bool = false
     var isTrying: Bool {
@@ -213,6 +217,29 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
 //        self.initializeSerialPort()
         self.observerSerialPortNotifications()
+    }
+    
+    /// Normalizes control mode byte values to their canonical forms
+    /// Mode equivalences: 0x80=0x00, 0x81=0x01, 0x82=0x02, 0x83=0x03
+    /// - Parameter mode: The raw mode byte value
+    /// - Returns: The normalized mode byte (uses lower value of equivalent pairs)
+    private func normalizeMode(_ mode: UInt8) -> UInt8 {
+        switch mode {
+        case 0x80: return 0x00  // Normalize 0x80 to 0x00
+        case 0x81: return 0x01  // Normalize 0x81 to 0x01
+        case 0x82: return 0x02  // Normalize 0x82 to 0x02
+        case 0x83: return 0x03  // Normalize 0x83 to 0x03
+        default: return mode
+        }
+    }
+    
+    /// Checks if two mode bytes are equivalent after normalization
+    /// - Parameters:
+    ///   - mode1: First mode byte to compare
+    ///   - mode2: Second mode byte to compare
+    /// - Returns: true if modes are equivalent after normalization
+    private func modesAreEquivalent(_ mode1: UInt8, _ mode2: UInt8) -> Bool {
+        return normalizeMode(mode1) == normalizeMode(mode2)
     }
     
     func initializeSerialPort(){
@@ -536,14 +563,22 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "Serial Port: \(portPath), Baudrate: \(self.baudrate), Mode: \(String(format: "%02X", mode))")
 
             let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
-            if self.baudrate == preferredBaud && mode == 0x82 {
-                // Device matches the user's preferred baudrate and expected mode
+            let preferredMode = UserSettings.shared.controlMode.modeByteValue
+            
+            // Check if mode matches user's preference using normalization
+            // Mode equivalences: 0x80=0x00, 0x81=0x01, 0x82=0x02, 0x83=0x03
+            let modeMatches = modesAreEquivalent(mode, preferredMode)
+            
+            if self.baudrate == preferredBaud && modeMatches {
+                // Device matches the user's preferred baudrate and mode
                 self.isDeviceReady = true
                 self.errorAlertShown = false  // Reset error alert flag on successful connection
                 AppStatus.serialPortBaudRate = self.baudrate
                 AppStatus.isControlChipsetReady = true
                 self.getHidInfo()
             } else {
+                // Either baudrate or mode doesn't match user's preference
+                logger.log(content: "Device configuration mismatch. Expected: baudrate=\(preferredBaud) mode=0x\(String(format: "%02X", preferredMode)), Got: baudrate=\(self.baudrate) mode=0x\(String(format: "%02X", mode))")
                 self.resetDeviceToBaudrate(preferredBaud)
             }
 
@@ -975,7 +1010,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
         if self.isDeviceReady || force {
             if logger.SerialDataPrint {
-                logger.log(content: "Sending command on \(threadName) thread: \(dataString)")
+                logger.log(content: "Sending command on \(threadName) thread (baudrate: \(self.baudrate)): \(dataString)")
             }
             serialPort.send(data)
         } else {
@@ -1014,10 +1049,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.sendCommand(command: SerialPortManager.CMD_GET_PARA_CFG, force: true)
     }
     
-    /// Resets the device to the specified baudrate with mode 0x82.
+    /// Resets the device to the specified baudrate and user's preferred control mode.
     /// 
-    /// This method reconfigures the CH9329 HID chip to use the preferred baudrate while maintaining
-    /// the required communication mode (0x82) for proper HID operation.
+    /// This method reconfigures the CH9329 HID chip to use the preferred baudrate and
+    /// control mode as specified in user settings.
     /// 
     /// For CH32V208, it simply changes the baudrate and reopens the connection.
     /// 
@@ -1031,9 +1066,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// **CH32V208 Behavior:**
     /// - Simply changes baudrate and reopens serial port
     /// 
-    /// **Note:** This method uses `force: true` to ensure commands are sent during device reconfiguration.
+    /// **Note:** This method also applies the user's preferred control mode from UserSettings.
+    /// Uses `force: true` to ensure commands are sent during device reconfiguration.
     public func resetDeviceToBaudrate(_ preferredBaud: Int) {
         logger.log(content: "Reset to baudrate \(preferredBaud)")
+        self.isConfiguring = true
+        
+        // Get user's preferred control mode
+        let preferredMode = UserSettings.shared.controlMode
         
         // Check if this is CH32V208
         let isCH32V208 = (AppStatus.controlChipsetType == .ch32v208)
@@ -1044,6 +1084,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             self.closeSerialPort()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.tryOpenSerialPort(priorityBaudrate: preferredBaud)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.isConfiguring = false
+                }
             }
         } else {
             // For CH9329, check if high-to-low change requires factory reset
@@ -1055,26 +1098,41 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             if isHighToLow {
                 // High speed to low speed requires factory reset for CH9329
                 logger.log(content: "CH9329: High-to-Low baudrate change detected, performing factory reset")
-                self.resetHidChipToFactory { success in
+                self.resetHidChipToFactory { [weak self] success in
                     if success {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                             self?.tryOpenSerialPort(priorityBaudrate: targetBaudrate)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                                self?.isConfiguring = false
+                            }
+                        }
+                    } else {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            self?.isConfiguring = false
                         }
                     }
                 }
             } else {
                 // Low to high or same baudrate: direct set for CH9329
-                logger.log(content: "CH9329: Setting baudrate directly to \(preferredBaud) and mode 0x82")
+                logger.log(content: "CH9329: Setting baudrate directly to \(preferredBaud) and mode to \(preferredMode.displayName)")
                 
-                // Build set-parameter command
-                var command: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? 
+                // Determine the actual mode byte to use
+                var modeByteToUse = preferredMode.modeByteValue
+                
+                // Build set-parameter command with preferred mode
+                let prefix: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? 
                     SerialPortManager.CMD_SET_PARA_CFG_PREFIX_9600 : 
                     SerialPortManager.CMD_SET_PARA_CFG_PREFIX_115200
                 
+                var command: [UInt8] = prefix
+                // The mode byte is at index 5 in the prefix, so we replace it
+                if command.count > 5 {
+                    command[5] = modeByteToUse
+                }
                 command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
                 
                 self.sendCommand(command: command, force: true)
-                logger.log(content: command.map { String(format: "%02X", $0) }.joined(separator: " "))
+                logger.log(content: "Set param command: \(command.map { String(format: "%02X", $0) }.joined(separator: " "))")
                 
                 // Reset HID chip and restart serial port after 0.5 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -1084,7 +1142,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                         self?.closeSerialPort()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                            self?.tryOpenSerialPort()
+                            self?.tryOpenSerialPort(priorityBaudrate: targetBaudrate)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                                self?.isConfiguring = false
+                            }
                         }
                     }
                 }
@@ -1243,6 +1304,64 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO)
     }
     
+    /// Sets the control mode for the HID chip via the SET_PARA_CFG command
+    /// When changing FROM non-compatibility mode TO compatibility mode, automatically uses 0x02 instead of 0x82
+    /// - Parameter mode: The control mode to set
+    public func setControlMode(_ mode: ControlMode) {
+        logger.log(content: "Setting control mode to: \(mode.displayName) (0x\(String(format: "%02X", mode.rawValue)))")
+        self.isConfiguring = true
+        
+        // Determine the actual mode byte to use
+        var modeByteToUse = mode.modeByteValue
+        
+        // Special handling: if changing TO compatibility mode from a non-compatibility mode, use 0x02
+        if mode == .compatibility && self.baudrate != 0 {
+            // Check if current mode is not already compatibility mode
+            let currentModeIsCompatibility = (AppStatus.controlChipsetType == .ch9329)
+            if currentModeIsCompatibility {
+                // User is switching FROM non-compatibility TO compatibility, use 0x02
+                logger.log(content: "Switching to compatibility mode from non-compatibility - using mode byte 0x02 instead of 0x82")
+                modeByteToUse = 0x02
+            }
+        }
+        
+        // Build the SET_PARA_CFG command with the appropriate prefix for user's preferred baudrate
+        let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
+        let prefix: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? 
+            SerialPortManager.CMD_SET_PARA_CFG_PREFIX_9600 : 
+            SerialPortManager.CMD_SET_PARA_CFG_PREFIX_115200
+        
+        // Create command by combining prefix, mode byte, and postfix
+        var command: [UInt8] = prefix
+        // The mode byte is at index 5 in the prefix, so we replace it
+        if command.count > 5 {
+            command[5] = modeByteToUse
+        }
+        command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
+        
+        // Send the command
+        self.sendCommand(command: command, force: true)
+        
+        let dataString = command.map { String(format: "%02X", $0) }.joined(separator: " ")
+        logger.log(content: "Control mode command sent: \(dataString)")
+        
+        // After setting the mode, send a reset command and reconnect
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.resetHidChip()
+            
+            // Restart the serial port
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.closeSerialPort()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                    self?.tryOpenSerialPort()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        self?.isConfiguring = false
+                    }
+                }
+            }
+        }
+    }
+    
     func setDTR(_ enabled: Bool) {
         if let port = self.serialPort {
             port.dtr = enabled
@@ -1286,7 +1405,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         // Check if connection attempts are paused
         if self.isPaused {
-            logger.log(content: "Connection attempts are paused, returning early")
+            logger.log(content: "[CH32V208] Connection attempts are paused, returning early")
             return
         }
         
