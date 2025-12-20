@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -41,6 +41,11 @@
 		53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */; };
 		6B487A0F2EF24F2700CD664D /* InputOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */; };
 		6B60EB7F2E0E7C39006874D3 /* FirmwareUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */; };
+		6B99F5992E9A6C570073CDA2 /* CH32V208ControlChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */; };
+		6B99F59A2E9A6C570073CDA2 /* CH9329ControlChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */; };
+		6B99F59B2E9A6C650073CDA2 /* MS2109SVideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */; };
+		6B99F59C2E9A6C650073CDA2 /* MS2109VideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */; };
+		6B99F59D2E9A6C650073CDA2 /* MS2130SVideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */; };
 		6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */; };
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
@@ -54,6 +59,7 @@
 		BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */; };
 		BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */; };
 		BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */; };
+		BFABE3AE2EF678F300915509 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFABE3AD2EF678F300915509 /* AppVersion.swift */; };
 		BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */; };
 		BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB748FD2E35ED7D004F0DAE /* ClipboardManager.swift */; };
 		BFB749002E35ED92004F0DAE /* ClipboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB748FF2E35ED92004F0DAE /* ClipboardView.swift */; };
@@ -120,6 +126,11 @@
 		53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputOverlayView.swift; sourceTree = "<group>"; };
 		6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareUpdateView.swift; sourceTree = "<group>"; };
+		6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CH32V208ControlChipset.swift; sourceTree = "<group>"; };
+		6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CH9329ControlChipset.swift; sourceTree = "<group>"; };
+		6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2109SVideoChipset.swift; sourceTree = "<group>"; };
+		6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2109VideoChipset.swift; sourceTree = "<group>"; };
+		6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2130SVideoChipset.swift; sourceTree = "<group>"; };
 		6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManagerTests.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
@@ -137,6 +148,7 @@
 		BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HardwareAbstractionLayer.swift; path = openterface/Core/HardwareAbstractionLayer.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = VideoChipsetHAL.swift; path = openterface/Core/VideoChipsetHAL.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HALIntegration.swift; path = openterface/Core/HALIntegration.swift; sourceTree = SOURCE_ROOT; };
+		BFABE3AD2EF678F300915509 /* AppVersion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardWindowController.swift; sourceTree = "<group>"; };
 		BFB748FD2E35ED7D004F0DAE /* ClipboardManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardManager.swift; sourceTree = "<group>"; };
 		BFB748FF2E35ED92004F0DAE /* ClipboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ClipboardView.swift; path = openterface/Views/ClipboardView.swift; sourceTree = SOURCE_ROOT; };
@@ -147,11 +159,6 @@
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		6B99F5922E9A6C570073CDA2 /* Control */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Control; sourceTree = "<group>"; };
-		6B99F5932E9A6C650073CDA2 /* Video */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Video; sourceTree = "<group>"; };
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		53FBE7A72B3D66D2007785B0 /* Frameworks */ = {
@@ -234,6 +241,7 @@
 		53FBE7AC2B3D66D2007785B0 /* openterface */ = {
 			isa = PBXGroup;
 			children = (
+				BFABE3AD2EF678F300915509 /* AppVersion.swift */,
 				BFD4EA902E35EE970029BFC2 /* Protocols */,
 				BF98F73B2E35A1EA002EACD7 /* Core */,
 				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
@@ -324,6 +332,25 @@
 			path = ViewModels;
 			sourceTree = "<group>";
 		};
+		6B99F5922E9A6C570073CDA2 /* Control */ = {
+			isa = PBXGroup;
+			children = (
+				6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */,
+				6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */,
+			);
+			path = Control;
+			sourceTree = "<group>";
+		};
+		6B99F5932E9A6C650073CDA2 /* Video */ = {
+			isa = PBXGroup;
+			children = (
+				6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */,
+				6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */,
+				6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */,
+			);
+			path = Video;
+			sourceTree = "<group>";
+		};
 		BF98F73B2E35A1EA002EACD7 /* Core */ = {
 			isa = PBXGroup;
 			children = (
@@ -361,10 +388,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				6B99F5922E9A6C570073CDA2 /* Control */,
-				6B99F5932E9A6C650073CDA2 /* Video */,
 			);
 			name = openterface;
 			packageProductDependencies = (
@@ -519,6 +542,7 @@
 				BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */,
 				53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */,
 				53955CC02BF497D000FA4493 /* SettingsScreen.swift in Sources */,
+				BFABE3AE2EF678F300915509 /* AppVersion.swift in Sources */,
 				6B60EB7F2E0E7C39006874D3 /* FirmwareUpdateView.swift in Sources */,
 				5308F43E2B5A674E00BADF35 /* MouseManager.swift in Sources */,
 				BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */,
@@ -537,6 +561,11 @@
 				2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */,
 				BFB749002E35ED92004F0DAE /* ClipboardView.swift in Sources */,
 				53FBE7AE2B3D66D2007785B0 /* openterfaceApp.swift in Sources */,
+				6B99F5992E9A6C570073CDA2 /* CH32V208ControlChipset.swift in Sources */,
+				6B99F59A2E9A6C570073CDA2 /* CH9329ControlChipset.swift in Sources */,
+				6B99F59B2E9A6C650073CDA2 /* MS2109SVideoChipset.swift in Sources */,
+				6B99F59C2E9A6C650073CDA2 /* MS2109VideoChipset.swift in Sources */,
+				6B99F59D2E9A6C650073CDA2 /* MS2130SVideoChipset.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

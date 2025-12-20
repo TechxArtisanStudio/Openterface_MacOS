@@ -104,7 +104,7 @@ struct openterfaceApp: App {
                 .animation(.easeInOut(duration: 0.5), value: showButtons)
                 .zIndex(100)
                 ContentView()
-                    .navigationTitle("Openterface KVM")
+                    .navigationTitle("Openterface KVM - \(AppVersion.getVersionString())")
                     .toolbar {
                         ToolbarItemGroup(placement: .automatic) {
                             Button {
