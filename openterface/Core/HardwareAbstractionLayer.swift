@@ -64,7 +64,7 @@ protocol ControlChipsetProtocol: HardwareChipsetProtocol {
     var isDeviceReady: Bool { get }
     
     func establishCommunication() -> Bool
-    func sendCommand(_ command: [UInt8], force: Bool) -> Bool
+    func sendAsyncCommand(_ command: [UInt8], force: Bool) -> Bool
     func getDeviceStatus() -> ControlDeviceStatus
     func getVersion() -> String?
     func resetDevice() -> Bool

@@ -358,7 +358,7 @@ class KeyboardMapper {
         //
         // let _ = self.serialPortManager.writeByte(data:keyDat)
         //
-        let _ = serialPortManager.sendCommand(command: keyDat)
+        let _ = serialPortManager.sendAsyncCommand(command: keyDat)
     }
     
     /// Sends multimedia key data to the device
@@ -386,7 +386,7 @@ class KeyboardMapper {
         let checksum = calculateChecksum(data: multimediaData)
         multimediaData.append(checksum)
         
-        let _ = serialPortManager.sendCommand(command: multimediaData)
+        let _ = serialPortManager.sendAsyncCommand(command: multimediaData)
     }
     
     /// Sends ACPI key data to the device
@@ -410,7 +410,7 @@ class KeyboardMapper {
         let checksum = calculateChecksum(data: acpiData)
         acpiData.append(checksum)
         
-        let _ = serialPortManager.sendCommand(command: acpiData)
+        let _ = serialPortManager.sendAsyncCommand(command: acpiData)
     }
     
     private func processModifierFlags(_ modifiers: NSEvent.ModifierFlags) -> UInt8 {

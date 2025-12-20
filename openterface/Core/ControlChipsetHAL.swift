@@ -80,13 +80,13 @@ class BaseControlChipset: ControlChipsetProtocol {
     
     // MARK: - Common Control Operations
     
-    func sendCommand(_ command: [UInt8], force: Bool = false) -> Bool {
+    func sendAsyncCommand(_ command: [UInt8], force: Bool = false) -> Bool {
         guard isDeviceReady || force else {
             logger.log(content: "⚠️ Device not ready, command ignored: \(command.map { String(format: "%02X", $0) }.joined(separator: " "))")
             return false
         }
         
-        serialManager.sendCommand(command: command, force: force)
+        serialManager.sendAsyncCommand(command: command, force: force)
         return true
     }
     

@@ -85,7 +85,6 @@ struct openterfaceApp: App {
     @State private var _serialPortName: String = "N/A"
     @State private var _serialPortBaudRate: Int = 0
 
-    @State private var audioInitialized = false
     @State private var logModeInitialized = false
     @State private var _isAlwaysOnTop = UserSettings.shared.isAlwaysOnTop
 
@@ -343,11 +342,6 @@ struct openterfaceApp: App {
                         if _serialPortBaudRate != newSerialPortBaudRate {
                             _serialPortBaudRate = newSerialPortBaudRate
                             stateChanged = true
-                        }
-                        
-                        if !audioInitialized && newSerialPortName != "N/A" && !newSerialPortName.isEmpty {
-                            audioManager.initializeAudio()
-                            audioInitialized = true
                         }
                         
                         if _isAudioEnabled != newAudioEnabled {

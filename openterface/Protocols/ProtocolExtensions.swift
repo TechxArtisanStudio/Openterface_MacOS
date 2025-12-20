@@ -116,8 +116,8 @@ extension SerialPortManagerProtocol {
     }
     
     /// Default implementation for command sending without force
-    func sendCommand(command: [UInt8]) {
-        sendCommand(command: command, force: false)
+    func sendAsyncCommand(command: [UInt8]) {
+        sendAsyncCommand(command: command, force: false)
     }
 }
 

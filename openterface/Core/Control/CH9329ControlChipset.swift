@@ -142,7 +142,7 @@ class CH9329ControlChipset: BaseControlChipset {
             command.append(0x00)
         }
 
-        return sendCommand(command, force: true)
+        return sendAsyncCommand(command, force: true)
     }
 
     override func monitorHIDEvents() -> Bool {

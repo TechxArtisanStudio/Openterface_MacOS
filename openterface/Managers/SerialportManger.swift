@@ -107,6 +107,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @Published var baudrate:Int = 0
     
+    // Synchronous command response handling
+    private var syncResponseQueue = DispatchQueue(label: "com.openterface.SerialPortManager.syncResponse")
+    private var syncResponseData: Data?
+    private var syncResponseExpectedCmd: UInt8?
+    
     // Acknowledgement latency tracking
     @Published var keyboardAckLatency: Double = 0.0  // in milliseconds
     @Published var mouseAckLatency: Double = 0.0     // in milliseconds
@@ -379,8 +384,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         // Record the timestamp of this serial data reception
         lastSerialData = Date()
         
+        let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        
         if logger.SerialDataPrint {
-            let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             logger.log(content: "Serial port receive data(\(self.baudrate)): \(dataString)")
         }
         
@@ -394,6 +400,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     private func processBufferedMessages() {
         var bufferBytes = [UInt8](receiveBuffer)
         var processedBytes = 0
+        
+        logger.log(content: "PROCESS: Buffer size=\(bufferBytes.count)")
         
         while bufferBytes.count >= 6 { // Minimum message size: 5 bytes header + 1 byte checksum
             // Look for the next valid message start
@@ -443,6 +451,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 self.isDeviceReady = true
                 self.errorAlertShown = false  // Reset error alert flag on successful connection
                 
+                let msgString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
                 handleSerialData(data: messageData)
             } else {
                 let errorDataString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
@@ -473,6 +482,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     func handleSerialData(data: Data) {
         let cmd = data[3]
+        
+        // Check if we're waiting for a synchronous response
+        syncResponseQueue.sync {
+            let expectedCmd = self.syncResponseExpectedCmd
+            if let expectedCmd = expectedCmd, expectedCmd == cmd {
+                self.syncResponseData = data
+                let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+                logger.log(content: "SYNC: Captured response for cmd 0x\(String(format: "%02X", cmd)): \(dataString)")
+                return  // Exit early - don't process command normally for sync responses
+            } else {
+                logger.log(content: "SYNC: expectedCmd=\(expectedCmd?.description ?? "nil"), received cmd=0x\(String(format: "%02X", cmd))")
+            }
+        }
 
         switch cmd {
         case 0x81:  // HID info
@@ -575,7 +597,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 self.errorAlertShown = false  // Reset error alert flag on successful connection
                 AppStatus.serialPortBaudRate = self.baudrate
                 AppStatus.isControlChipsetReady = true
-                self.getHidInfo()
             } else {
                 // Either baudrate or mode doesn't match user's preference
                 logger.log(content: "Device configuration mismatch. Expected: baudrate=\(preferredBaud) mode=0x\(String(format: "%02X", preferredMode)), Got: baudrate=\(self.baudrate) mode=0x\(String(format: "%02X", mode))")
@@ -669,10 +690,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     break
                 }
                 
-                // Try to connect with priority baudrate first
-                let baudrates = effectivePriorityBaudrate == SerialPortManager.LOWSPEED_BAUDRATE ? 
-                [SerialPortManager.LOWSPEED_BAUDRATE, SerialPortManager.HIGHSPEED_BAUDRATE] :
-                [SerialPortManager.HIGHSPEED_BAUDRATE, SerialPortManager.LOWSPEED_BAUDRATE]
+                // Always try LOWSPEED (9600) first - it's more reliable for initial connection
+                // HIGHSPEED (115200) is only tried if LOWSPEED fails
+                let baudrates = [SerialPortManager.LOWSPEED_BAUDRATE, SerialPortManager.HIGHSPEED_BAUDRATE]
                     
                 
                 for baudrate in baudrates {
@@ -746,45 +766,105 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     self.isDeviceReady = true
                     self.errorAlertShown = false
                     logger.log(content: "CH32V208: Port opened successfully, device ready")
+                    return true
                 }
             } else {
-                // For CH9329, need to validate configuration via command-response
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // For CH9329, validate connection by getting HID info
+                // Give device time to stabilize after port opens (CH9329 can be slow to wake up)
+                Thread.sleep(forTimeInterval: 0.5)  // 500ms delay (on background queue, this is safe)
+                
+                // Send sync command to get HID info with longer timeout to account for device latency
+                let hidInfoResponse = self.sendSyncCommand(
+                    command: SerialPortManager.CMD_GET_HID_INFO,
+                    expectedResponseCmd: 0x81,
+                    timeout: 5.0,  // Increased timeout to 5 seconds
+                    force: true
+                )
+                
+                // Validate the HID info response
+                if self.validateHidInfoResponse(hidInfoResponse) {
+                    logger.log(content: "CH9329: Valid HID info received and validated at baudrate \(baudrate)")
+                    // Now send async command to get full parameter configuration
                     self.getChipParameterCfg()
+                    return true
+                } else {
+                    logger.log(content: "CH9329: Failed to validate HID info response at baudrate \(baudrate)")
+                    self.isDeviceReady = false
+                    return false
                 }
             }
         }
         
-        self.blockMainThreadFor2Seconds()
-        
-        if isDeviceReady { return true }
-        
-        self.closeSerialPort()
-        self.blockMainThreadFor2Seconds()
-        
         return false
     }
     
-    func blockMainThreadFor2Seconds() {
-        let expirationDate = Date(timeIntervalSinceNow: 2)
-        while Date() < expirationDate {
-            RunLoop.current.run(mode: .default, before: expirationDate)
+    /// Validates the HID info response from the device.
+    /// Checks:
+    /// - Response is not empty
+    /// - Message has minimum required length (8 bytes)
+    /// - Header prefix is correct [0x57, 0xAB, 0x00]
+    /// - Command byte is 0x81 (HID info response)
+    /// - Checksum is valid
+    /// - Extracts and stores the chip version and baudrate
+    ///
+    /// - Parameter response: The response data from the device
+    /// - Returns: true if response is valid and all checks pass, false otherwise
+    private func validateHidInfoResponse(_ response: Data) -> Bool {
+        // Check if response is empty or too short
+        guard !response.isEmpty && response.count >= 8 else {
+            logger.log(content: "Invalid HID info response: empty or too short (got \(response.count) bytes)")
+            return false
         }
+        
+        let responseBytes = [UInt8](response)
+        
+        // Check header prefix [0x57, 0xAB, 0x00]
+        guard responseBytes[0] == 0x57 && responseBytes[1] == 0xAB && responseBytes[2] == 0x00 else {
+            logger.log(content: "Invalid HID info response: incorrect header prefix")
+            return false
+        }
+        
+        // Check command byte (should be 0x81 for HID info response)
+        guard responseBytes[3] == 0x81 else {
+            logger.log(content: "Invalid HID info response: command byte is 0x\(String(format: "%02X", responseBytes[3])), expected 0x81")
+            return false
+        }
+        
+        // Verify checksum
+        let receivedChecksum = responseBytes[responseBytes.count - 1]
+        let calculatedChecksum = self.calculateChecksum(data: Array(responseBytes[0..<responseBytes.count - 1]))
+        
+        guard receivedChecksum == calculatedChecksum else {
+            let checksumHex = String(format: "%02X", calculatedChecksum)
+            let receivedHex = String(format: "%02X", receivedChecksum)
+            logger.log(content: "Invalid HID info response: checksum mismatch. Calculated: 0x\(checksumHex), Received: 0x\(receivedHex)")
+            return false
+        }
+        
+        // Extract and log chip version
+        let chipVersion: Int8 = Int8(bitPattern: responseBytes[5])
+        logger.log(content: "HID info validated - Chip version: \(chipVersion)")
+        
+        // Extract target connection status
+        let isTargetConnected = responseBytes[6] == 0x01
+        logger.log(content: "HID info - Target connected: \(isTargetConnected)")
+        
+        // Extract lock states
+        let isNumLockOn = (responseBytes[7] & 0x01) == 0x01
+        let isCapLockOn = (responseBytes[7] & 0x02) == 0x02
+        let isScrollOn = (responseBytes[7] & 0x04) == 0x04
+        logger.log(content: "HID info - NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
+        
+        // Store baudrate if we have it (from the current connection)
+        AppStatus.serialPortBaudRate = self.baudrate
+        
+        return true
     }
     
-    func blockMainThreadFor1Second() {
-        let expirationDate = Date(timeIntervalSinceNow: 1)
-        while Date() < expirationDate {
-            RunLoop.current.run(mode: .default, before: expirationDate)
-        }
-    }
-    
-    func blockMainThreadFor3_5Seconds() {
-        let expirationDate = Date(timeIntervalSinceNow: 3.5)
-        while Date() < expirationDate {
-            RunLoop.current.run(mode: .default, before: expirationDate)
-        }
-    }
+    /// NOTE: Removed blockMainThreadFor* functions
+    /// These functions blocked the main RunLoop, which prevented ORSSerial delegate callbacks
+    /// from ever firing. NEVER block the main thread's RunLoop when using async serial libraries.
+
     
     /// Performs a factory reset of the HID chip synchronously within the connection retry loop
     /// Uses the existing performFactoryReset method with synchronous blocking
@@ -973,7 +1053,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.isTrying = false
     }
     
-    func sendCommand(command: [UInt8], force: Bool = false) {
+    func sendAsyncCommand(command: [UInt8], force: Bool = false) {
         guard let serialPort = self.serialPort else {
             if logger.SerialDataPrint {
                 logger.log(content: "No Serial port for send command...")
@@ -1016,7 +1096,114 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         } else {
             logger.log(content: "Serial port is not ready")
         }
+    }
+    
+    /// Sends a command synchronously and waits for the response.
+    /// 
+    /// This method sends a command to the serial port and blocks until a response is received.
+    /// It's useful for request-response type operations where you need the device to respond
+    /// before continuing.
+    /// 
+    /// **Parameters:**
+    /// - `command`: The command bytes to send (without checksum, will be added automatically)
+    /// - `expectedResponseCmd`: The expected response command byte to wait for
+    /// - `timeout`: Maximum time to wait for response in seconds (default: 5 seconds)
+    /// - `force`: Whether to send even if device is not ready (default: false)
+    /// 
+    /// **Returns:**
+    /// - The complete response data if a matching response is received within timeout
+    /// - Empty Data if timeout occurs or no matching response is received
+    /// - Logs errors if serial port is not available
+    /// 
+    /// **Example:**
+    /// ```swift
+    /// let response = sendSyncCommand(
+    ///     command: SerialPortManager.CMD_GET_PARA_CFG,
+    ///     expectedResponseCmd: 0x88
+    /// )
+    /// if !response.isEmpty {
+    ///     // Process response
+    ///     let baudrate = response[8...11]
+    /// }
+    /// ```
+    func sendSyncCommand(command: [UInt8], expectedResponseCmd: UInt8, timeout: TimeInterval = 5.0, force: Bool = false) -> Data {
+        guard let serialPort = self.serialPort else {
+            if logger.SerialDataPrint {
+                logger.log(content: "No Serial port for sync command...")
+            }
+            return Data()
+        }
         
+        if !serialPort.isOpen {
+            if logger.SerialDataPrint {
+                logger.log(content: "Serial port is not open or not selected")
+            }
+            return Data()
+        }
+        
+        // Prepare to receive response - set expected command BEFORE sending
+        syncResponseQueue.sync {
+            self.syncResponseData = nil
+            self.syncResponseExpectedCmd = expectedResponseCmd
+        }
+        
+        // Send command
+        var mutableCommand = command
+        let checksum = self.calculateChecksum(data: command)
+        mutableCommand.append(checksum)
+        
+        let data = Data(mutableCommand)
+        let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        let threadName = Thread.current.isMainThread ? "main" : "background"
+        
+        // Track send time for latency measurement
+        let cmdType = command.count > 3 ? command[3] : 0
+        if cmdType == 0x02 {  // Keyboard command
+            lastKeyboardSendTime = Date()
+        } else if cmdType == 0x04 || cmdType == 0x05 {  // Mouse commands (absolute or relative)
+            lastMouseSendTime = Date()
+        }
+        
+        if self.isDeviceReady || force {
+            if logger.SerialDataPrint {
+                logger.log(content: "Sending sync command on \(threadName) thread (baudrate: \(self.baudrate)): \(dataString)")
+            }
+            serialPort.send(data)
+        } else {
+            logger.log(content: "Serial port is not ready for sync command")
+            return Data()
+        }
+        
+        // Poll for response within timeout
+        let startTime = Date()
+        var response = Data()
+        var pollCount = 0
+        
+        while Date().timeIntervalSince(startTime) < timeout {
+            // Check if we received a matching response
+            let receivedData = syncResponseQueue.sync { self.syncResponseData }
+            if let receivedData = receivedData {
+                response = receivedData
+                logger.log(content: "SYNC: Response received after \(pollCount) polls")
+                break
+            }
+            
+            pollCount += 1
+            // Small sleep to avoid busy waiting
+            usleep(10000) // 10ms
+        }
+        
+        if response.isEmpty {
+            logger.log(content: "SYNC: Timeout after \(pollCount) polls (expected cmd 0x\(String(format: "%02X", expectedResponseCmd)))")
+        }
+        
+        // Clean up
+        syncResponseQueue.sync {
+            self.syncResponseData = nil
+            self.syncResponseExpectedCmd = nil
+        }
+        
+        return response
     }
     
     func calculateChecksum(data: [UInt8]) -> UInt8 {
@@ -1046,7 +1233,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// **Note:** This method uses `force: true` to ensure the command is sent even if 
     /// `isDeviceReady` is false, as it's part of the device initialization process.
     func getChipParameterCfg(){
-        self.sendCommand(command: SerialPortManager.CMD_GET_PARA_CFG, force: true)
+        self.sendAsyncCommand(command: SerialPortManager.CMD_GET_PARA_CFG, force: true)
     }
     
     /// Resets the device to the specified baudrate and user's preferred control mode.
@@ -1131,7 +1318,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 }
                 command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
                 
-                self.sendCommand(command: command, force: true)
+                self.sendAsyncCommand(command: command, force: true)
                 logger.log(content: "Set param command: \(command.map { String(format: "%02X", $0) }.joined(separator: " "))")
                 
                 // Reset HID chip and restart serial port after 0.5 seconds
@@ -1155,7 +1342,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     // Software reset the CH9329 HID chip
     func resetHidChip(){
-        self.sendCommand(command: SerialPortManager.CMD_RESET, force: true)
+        self.sendAsyncCommand(command: SerialPortManager.CMD_RESET, force: true)
     }
     
     /// Performs a factory reset on the HID chip by raising RTS for 3.5 seconds then lowering it
@@ -1301,7 +1488,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func getHidInfo(){
-        self.sendCommand(command: SerialPortManager.CMD_GET_HID_INFO)
+        self.sendAsyncCommand(command: SerialPortManager.CMD_GET_HID_INFO)
     }
     
     /// Sets the control mode for the HID chip via the SET_PARA_CFG command
@@ -1340,7 +1527,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
         
         // Send the command
-        self.sendCommand(command: command, force: true)
+        self.sendAsyncCommand(command: command, force: true)
         
         let dataString = command.map { String(format: "%02X", $0) }.joined(separator: " ")
         logger.log(content: "Control mode command sent: \(dataString)")

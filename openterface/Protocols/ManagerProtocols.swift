@@ -116,7 +116,7 @@ protocol SerialPortManagerProtocol: AnyObject {
     func pauseConnectionAttempts()
     func resumeConnectionAttempts()
     func stopConnectionAttempts()
-    func sendCommand(command: [UInt8], force: Bool)
+    func sendAsyncCommand(command: [UInt8], force: Bool)
     
     func getChipParameterCfg()
     func resetHidChip()

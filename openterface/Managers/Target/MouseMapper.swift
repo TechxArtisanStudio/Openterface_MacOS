@@ -34,7 +34,7 @@ class MouseMapper {
         command.append(UInt8(y & 0xFF))
         command.append(UInt8((y >> 8) & 0xFF))
         command.append(wheelMovement) // scroll up 0x01-0x7F; scroll down: 0x81-0xFF
-        serialPortManager.sendCommand(command: command)
+        serialPortManager.sendAsyncCommand(command: command)
     }
     
     func handleRelativeMouseAction(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged: Bool = false) {
@@ -46,7 +46,7 @@ class MouseMapper {
         command.append(dxByte)
         command.append(dyByte)
         command.append(wheelMovement) // scroll up 0x01-0x7F; scroll down: 0x81-0xFF
-        serialPortManager.sendCommand(command: command)
+        serialPortManager.sendAsyncCommand(command: command)
     }
     
     func translateRelativeMovement(value: Int) -> UInt8 {

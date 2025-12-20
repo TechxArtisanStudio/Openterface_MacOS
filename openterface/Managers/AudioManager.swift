@@ -58,6 +58,12 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
     private var audioPropertyListenerID: AudioObjectPropertyListenerBlock?
     // Flag to control auto-start behavior
     private var autoStartEnabled: Bool = false
+    // Debounce timer for device change listener to prevent rapid re-triggers
+    private var deviceChangeDebounceTimer: Timer?
+    // Flag to track if listener has been set up to prevent duplicate registrations
+    private var isAudioListenerSetup: Bool = false
+    // Flag to track if audio has been initialized to prevent duplicate initialization
+    private var isAudioInitialized: Bool = false
     
     // Computed property to check if audio is currently enabled
     var isAudioEnabled: Bool {
@@ -82,11 +88,21 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
     
     deinit {
         stopAudioSession()
+        deviceChangeDebounceTimer?.invalidate()
         cleanupListeners()
     }
     
     // Explicitly separate initialization and audio check, requiring external call
     func initializeAudio() {
+        // Prevent multiple initialization calls
+        guard !isAudioInitialized else {
+            logger.log(content: "AudioManager: Already initialized, skipping duplicate initialization")
+            return
+        }
+        
+        isAudioInitialized = true
+        logger.log(content: "AudioManager: Initializing audio system")
+        
         // Check microphone permission first
         checkMicrophonePermission()
         
@@ -220,16 +236,13 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             // Only auto-select OpenterfaceA if no input device is currently selected
             if let openterfaceDevice = openterfaceDevice, self.selectedInputDevice == nil {
                 self.selectedInputDevice = openterfaceDevice
-
                 self.logger.log(content: "AudioManager: Auto-selected OpenterfaceA as default audio input")
-                self.logger.log(content: "Auto-selected OpenterfaceA as default audio input")
             }
             
             // Auto-select first available output device if none selected
             if self.selectedOutputDevice == nil && !outputDevices.isEmpty {
                 self.selectedOutputDevice = outputDevices.first!
                 self.logger.log(content: "AudioManager: Auto-selected first output device: \(outputDevices.first!.name)")
-                self.logger.log(content: "Auto-selected first output device: \(outputDevices.first!.name)")
             }
         }
     }
@@ -355,10 +368,11 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             self.microphonePermissionGranted = true
             DispatchQueue.main.async {
                 self.statusMessage = "Microphone permission granted"
-            }
-            setupAudioDeviceChangeListener()
-            if autoStartEnabled {
-                prepareAudio()
+                // Setup listener after permission is confirmed
+                self.setupAudioDeviceChangeListener()
+                if self.autoStartEnabled {
+                    self.prepareAudio()
+                }
             }
             
         case .notDetermined:
@@ -741,6 +755,12 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
     
     // Set up audio device change listener
     private func setupAudioDeviceChangeListener() {
+        // Prevent multiple listener registrations
+        guard !isAudioListenerSetup else {
+            logger.log(content: "⏭️ Audio device change listener already set up, skipping duplicate registration")
+            return
+        }
+        
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -749,44 +769,49 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
         
         // Save listener ID for later removal
         self.audioPropertyListenerID = { (numberAddresses, addresses) in
-            DispatchQueue.main.async {
-                // Update available devices list
-                self.updateAvailableAudioDevices()
-                
-                // Check if the currently selected device is still available
-                if let selectedDevice = self.selectedInputDevice {
-                    let deviceStillExists = self.getAudioDeviceByNames(names: [selectedDevice.name]) != nil
+            // Debounce: Cancel previous timer and schedule a new one
+            self.deviceChangeDebounceTimer?.invalidate()
+            
+            self.deviceChangeDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+                DispatchQueue.main.async {
+                    // Update available devices list
+                    self.updateAvailableAudioDevices()
                     
-                    if !deviceStillExists {
-                        DispatchQueue.main.async {
-                            self.statusMessage = "Selected audio device '\(selectedDevice.name)' disconnected"
-                            self.isAudioDeviceConnected = false
-                            self.audioDeviceId = nil
-                        }
-                        self.stopAudioSession()
-                    } else {
-                        DispatchQueue.main.async {
-                            self.statusMessage = "Audio device '\(selectedDevice.name)' connected"
-                            self.isAudioDeviceConnected = true
-                        }
-                        // Restart session if it was running and auto-start is enabled
-                        if self.autoStartEnabled && self.isAudioPlaying {
+                    // Check if the currently selected device is still available
+                    if let selectedDevice = self.selectedInputDevice {
+                        let deviceStillExists = self.getAudioDeviceByNames(names: [selectedDevice.name]) != nil
+                        
+                        if !deviceStillExists {
+                            DispatchQueue.main.async {
+                                self.statusMessage = "Selected audio device '\(selectedDevice.name)' disconnected"
+                                self.isAudioDeviceConnected = false
+                                self.audioDeviceId = nil
+                            }
                             self.stopAudioSession()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                self.startAudioSession()
+                        } else {
+                            DispatchQueue.main.async {
+                                self.statusMessage = "Audio device '\(selectedDevice.name)' connected"
+                                self.isAudioDeviceConnected = true
+                            }
+                            // Restart session if it was running and auto-start is enabled
+                            if self.autoStartEnabled && self.isAudioPlaying {
+                                self.stopAudioSession()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    self.startAudioSession()
+                                }
                             }
                         }
-                    }
-                } else {
-                    // No device selected, check if OpenterfaceA is available for initial auto-selection
-                    if self.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"]) != nil {
-                        if let openterfaceDevice = self.availableInputDevices.first(where: { $0.name == "OpenterfaceA" }) {
-                            DispatchQueue.main.async {
-                                self.selectedInputDevice = openterfaceDevice
-                                self.audioDeviceId = openterfaceDevice.deviceID
-                                self.statusMessage = "OpenterfaceA device auto-selected"
-                                self.isAudioDeviceConnected = true
-                                self.logger.log(content: "Auto-selected OpenterfaceA as no device was previously selected")
+                    } else {
+                        // No device selected, check if OpenterfaceA is available for initial auto-selection
+                        if self.getAudioDeviceByNames(names: ["OpenterfaceA", "USB2 Digital Audio"]) != nil {
+                            if let openterfaceDevice = self.availableInputDevices.first(where: { $0.name == "OpenterfaceA" }) {
+                                DispatchQueue.main.async {
+                                    self.selectedInputDevice = openterfaceDevice
+                                    self.audioDeviceId = openterfaceDevice.deviceID
+                                    self.statusMessage = "OpenterfaceA device auto-selected"
+                                    self.isAudioDeviceConnected = true
+                                    self.logger.log(content: "Auto-selected OpenterfaceA as no device was previously selected")
+                                }
                             }
                         }
                     }
@@ -800,6 +825,10 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             nil,
             self.audioPropertyListenerID!
         )
+        
+        // Mark listener as set up
+        isAudioListenerSetup = true
+        logger.log(content: "✅ Audio device change listener registered successfully")
     }
     
     // Clean up all listeners
@@ -819,6 +848,8 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                 listenerID
             )
             audioPropertyListenerID = nil
+            isAudioListenerSetup = false
+            isAudioInitialized = false
         }
     }
     
