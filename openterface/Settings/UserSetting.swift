@@ -79,6 +79,9 @@ final class UserSettings: ObservableObject {
         // Load control mode from UserDefaults
         let savedControlMode = UserDefaults.standard.object(forKey: "controlMode") as? Int ?? 0x82
         self.controlMode = ControlMode(rawValue: savedControlMode) ?? .compatibility
+        
+        // Load always on top preference from UserDefaults
+        self.isAlwaysOnTop = UserDefaults.standard.object(forKey: "isAlwaysOnTop") as? Bool ?? false
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -165,6 +168,13 @@ final class UserSettings: ObservableObject {
     @Published var controlMode: ControlMode {
         didSet {
             UserDefaults.standard.set(controlMode.rawValue, forKey: "controlMode")
+        }
+    }
+    
+    // Always on top window setting
+    @Published var isAlwaysOnTop: Bool {
+        didSet {
+            UserDefaults.standard.set(isAlwaysOnTop, forKey: "isAlwaysOnTop")
         }
     }
 }

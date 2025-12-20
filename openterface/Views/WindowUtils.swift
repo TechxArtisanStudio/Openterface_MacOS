@@ -238,6 +238,18 @@ final class WindowUtils {
         NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
     }
     
+    /// Toggle always on top window level
+    /// - Parameter isEnabled: Whether to enable always on top
+    func setAlwaysOnTop(_ isEnabled: Bool) {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue.contains(UserSettings.shared.mainWindownName) ?? false }) {
+            if isEnabled {
+                window.level = .floating
+            } else {
+                window.level = .normal
+            }
+        }
+    }
+    
     /// Display the HID resolution change alert settings dialog
     /// - Parameter completion: The callback after setting, passing in whether to update the window
     func showHidResolutionAlertSettings(completion: @escaping () -> Void = {}) {

@@ -87,6 +87,7 @@ struct openterfaceApp: App {
 
     @State private var audioInitialized = false
     @State private var logModeInitialized = false
+    @State private var _isAlwaysOnTop = UserSettings.shared.isAlwaysOnTop
 
     var log: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -741,6 +742,16 @@ struct openterfaceApp: App {
 
             }
             CommandGroup(after: CommandGroupPlacement.sidebar) {
+                Button(action: {
+                    _isAlwaysOnTop.toggle()
+                    UserSettings.shared.isAlwaysOnTop = _isAlwaysOnTop
+                    WindowUtils.shared.setAlwaysOnTop(_isAlwaysOnTop)
+                }) {
+                    Text(_isAlwaysOnTop ? "Always on Top ✓" : "Always on Top")
+                }
+                
+                Divider()
+                
                 Button(action: {
                     AppStatus.showInputOverlay.toggle()
                 }) {

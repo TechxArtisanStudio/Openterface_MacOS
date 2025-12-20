@@ -207,6 +207,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     // // Set maximum size to something reasonable (2x initial size)
                     // window.maxSize = NSSize(width: aspectRatio.width * 2, height: aspectRatio.height * 2)
                     window.center()
+                    
+                    // Apply always on top setting if enabled
+                    WindowUtils.shared.setAlwaysOnTop(UserSettings.shared.isAlwaysOnTop)
                 }
             }
         }
