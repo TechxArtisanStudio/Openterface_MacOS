@@ -22,6 +22,14 @@
 
 import Foundation
 
+// MARK: - DispatchQueue Extension
+extension DispatchQueue {
+    static var currentQueueLabel: String? {
+        let name = __dispatch_queue_get_label(nil)
+        return String(cString: name, encoding: .utf8)
+    }
+}
+
 class Logger: LoggerProtocol {
     static let shared = Logger()
     
@@ -100,13 +108,15 @@ class Logger: LoggerProtocol {
             thread = "main"
         } else if let name = Thread.current.name, !name.isEmpty {
             thread = name
+        } else if let queueLabel = DispatchQueue.currentQueueLabel {
+            thread = queueLabel
         } else {
             thread = String(format: "0x%llx", pthread_mach_thread_np(pthread_self()))
         }
 
-        print("[\(dateString)] [thread: \(thread)] " + content)
+        print("[\(dateString)] [\(thread)] " + content)
         if logToFile {
-            writeLogFile(string: "[thread: \(thread)] " + content)
+            writeLogFile(string: "[\(thread)] " + content)
         }
     }
     

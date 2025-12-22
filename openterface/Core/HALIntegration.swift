@@ -98,7 +98,7 @@ class HALIntegrationManager {
     private var hal: HardwareAbstractionLayer = HardwareAbstractionLayer.shared
     private var isInitialized: Bool = false
     private var periodicUpdateTimer: DispatchSourceTimer?
-    private let timerQueue = DispatchQueue(label: "com.openterface.hal.timer", qos: .utility)
+    private let timerQueue = DispatchQueue(label: "hardware-monitor", qos: .utility)
     
     private init() {}
     
@@ -589,10 +589,14 @@ class HALIntegrationManager {
         // Perform periodic hardware status updates
         guard isInitialized else { return }
         
+        // Get chipsets once at the start
+        let videoChipset = hal.getCurrentVideoChipset()
+        let controlChipset = hal.getCurrentControlChipset()
+        
         // Wrap all operations in autoreleasepool to prevent memory issues during callbacks
         autoreleasepool {
             // Update video chipset status with safety checks
-            if let videoChipset = hal.getCurrentVideoChipset() {
+            if let videoChipset = videoChipset {
                 do {
                     let signalStatus = videoChipset.getSignalStatus()
                     let previousStatus = AppStatus.hasHdmiSignal
@@ -608,7 +612,7 @@ class HALIntegrationManager {
             }
             
             // Update control chipset status with safety checks
-            if let controlChipset = hal.getCurrentControlChipset() {
+            if let controlChipset = controlChipset {
                 do {
                     let deviceStatus = controlChipset.getDeviceStatus()
                     let wasConnected = AppStatus.isTargetConnected
@@ -630,7 +634,7 @@ class HALIntegrationManager {
         
         // Additional chipset-specific periodic checks with safety
         autoreleasepool {
-            guard let videoChipset = hal.getCurrentVideoChipset() else { return }
+            guard let videoChipset = videoChipset else { return }
             
             do {
                 // Get timing information from the video chipset (handles chipset-specific registers)

@@ -259,7 +259,7 @@ class HardwareAbstractionLayer {
         }
         
         AppStatus.videoChipsetType = .unknown
-        logger.log(content: "⚠️ HAL: No supported video chipset detected")
+        logger.log(content: "HAL: No supported video chipset detected")
         return false
     }
     
@@ -293,7 +293,6 @@ class HardwareAbstractionLayer {
     
     func getCurrentVideoChipset() -> VideoChipsetProtocol? {
         if videoChipset == nil {
-            logger.log(content: "⚠️ HAL: Video chipset is null, attempting detection...")
             detectVideoChipset()
         }
         return videoChipset
