@@ -66,6 +66,7 @@ struct ResolutionView: View {
 struct SerialInfoView: View {
     let portName: String
     let baudRate: Int
+    let processingHz: Int
     let isConfiguring: Bool
     
     var body: some View {
@@ -81,12 +82,12 @@ struct SerialInfoView: View {
                 } else {
                     Text("\(portName)")
                         .font(.system(size: 9, weight: .medium))
-                    Text("\(baudRate) ")
+                    Text("\(baudRate)(\(processingHz)Hz)")
                         .font(.system(size: 9, weight: .medium))
                 }
             }
         }
-        .frame(width: 120, alignment: .leading)
+        .frame(width: 140, alignment: .leading)
     }
 }
 

@@ -240,9 +240,9 @@ struct openterfaceApp: App {
                         // Add serial port information display
                         ToolbarItem(placement: .automatic) {
                             if let serialPortMgr = serialPortManager as? SerialPortManager {
-                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, isConfiguring: serialPortMgr.isConfiguring)
+                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, processingHz: UserSettings.shared.mouseEventThrottleHz, isConfiguring: serialPortMgr.isConfiguring)
                             } else {
-                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, isConfiguring: false)
+                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, processingHz: UserSettings.shared.mouseEventThrottleHz, isConfiguring: false)
                             }
                         }
                         ToolbarItem(placement: .automatic) {

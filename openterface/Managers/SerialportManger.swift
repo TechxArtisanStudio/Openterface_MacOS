@@ -672,7 +672,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
         self.serialPorts = availablePorts // Get the list of available serial ports
         
-        let backgroundQueue = DispatchQueue(label: "com.openterface.background", qos: .background)
+        let backgroundQueue = DispatchQueue(label: "background", qos: .background)
         backgroundQueue.async { [weak self] in
             guard let self = self else { 
                 return 

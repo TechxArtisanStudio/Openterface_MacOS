@@ -199,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     let fullInitialSize = NSSize(width: initialContentSize.width, height: initialContentSize.height + toolbarHeight)
                     let initialFrame = NSRect(x: 0, y: 0, width: fullInitialSize.width, height: fullInitialSize.height)
 
-                    logger.log(content: "!!!!! initialContentSize: \(initialContentSize), fullInitialSize: \(fullInitialSize), initialContentSize with toolbar: \(initialFrame.size)")
+                    logger.log(content: "InitialContentSize: \(initialContentSize), fullInitialSize: \(fullInitialSize), initialContentSize with toolbar: \(initialFrame.size)")
                     window.setFrame(initialFrame, display: false)
                     
                     // // Set minimum size to prevent too small windows
