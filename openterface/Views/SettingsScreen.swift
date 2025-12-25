@@ -950,7 +950,7 @@ struct MouseHIDSettingsView: View {
             case .lowPerformance:
                 return "For Raspberry Pi and low-performance targets (30 Hz, 9600 baud)"
             case .casual:
-                return "Balanced settings for everyday use (60 Hz, 9600 baud)"
+                return "Balanced settings for everyday use (80 Hz, 9600 baud)"
             case .gaming:
                 return "Optimized for gaming and fast interactions (250 Hz, 115200 baud)"
             case .maxPerformance:
@@ -963,7 +963,7 @@ struct MouseHIDSettingsView: View {
         var throttleHz: Int {
             switch self {
             case .lowPerformance: return 30
-            case .casual: return 60
+            case .casual: return 80
             case .gaming: return 250
             case .maxPerformance: return 1000
             case .custom: return 60 // default

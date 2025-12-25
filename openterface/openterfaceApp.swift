@@ -469,7 +469,7 @@ struct openterfaceApp: App {
                         }
                         
                         Button(action: {
-                            applyPerformancePreset(throttleHz: 60, baudrate: .lowSpeed, name: "Casual Use")
+                            applyPerformancePreset(throttleHz: 80, baudrate: .lowSpeed, name: "Casual Use")
                             appState.updatePerformancePresetTitles()
                         }) {
                             Text(appState.casualUseTitle)
@@ -902,7 +902,7 @@ final class AppState: ObservableObject {
     
     // Performance preset titles
     @Published var lowPerformanceTitle = "🐢 Low Performance Target (30 Hz, 9600)"
-    @Published var casualUseTitle = "🖥️ Casual Use (60 Hz, 9600)"
+    @Published var casualUseTitle = "🖥️ Casual Use (80 Hz, 9600)"
     @Published var gamingTitle = "🎮 Gaming (250 Hz, 115200)"
     @Published var maxPerformanceTitle = "🐇 Max Performance (1000 Hz, 115200)"
     
@@ -1044,13 +1044,13 @@ final class AppState: ObservableObject {
         
         // Check which preset matches current settings
         let isLowPerformance = (currentHz == 30 && currentBaudrate == .lowSpeed)
-        let isCasualUse = (currentHz == 60 && currentBaudrate == .lowSpeed)
+        let isCasualUse = (currentHz == 80 && currentBaudrate == .lowSpeed)
         let isGaming = (currentHz == 250 && currentBaudrate == .highSpeed)
         let isMaxPerformance = (currentHz == 1000 && currentBaudrate == .highSpeed)
         
         // Update titles with checkmarks
         lowPerformanceTitle = isLowPerformance ? "🐢 Low Performance Target (30 Hz, 9600) ✓" : "🐢 Low Performance Target (30 Hz, 9600)"
-        casualUseTitle = isCasualUse ? "🖥️ Casual Use (60 Hz, 9600) ✓" : "🖥️ Casual Use (60 Hz, 9600)"
+        casualUseTitle = isCasualUse ? "🖥️ Casual Use (80 Hz, 9600) ✓" : "🖥️ Casual Use (80 Hz, 9600)"
         gamingTitle = isGaming ? "🎮 Gaming (250 Hz, 115200) ✓" : "🎮 Gaming (250 Hz, 115200)"
         maxPerformanceTitle = isMaxPerformance ? "🐇 Max Performance (1000 Hz, 115200) ✓" : "🐇 Max Performance (1000 Hz, 115200)"
     }
