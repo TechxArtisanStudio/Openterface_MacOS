@@ -30,7 +30,7 @@ struct MouseEventQueueItem {
     let deltaX: Int
     let deltaY: Int
     let mouseEvent: UInt8
-    let wheelMovement: UInt8
+    let wheelMovement: Int
     let isDragged: Bool
     let timestamp: TimeInterval
     let isAbsolute: Bool
@@ -118,7 +118,7 @@ class MouseManager: MouseManagerProtocol {
     // MARK: - Mouse Event Queue Management
     
     /// Public method to enqueue absolute mouse events (called from UI layers)
-    func enqueueAbsoluteMouseEvent(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+    func enqueueAbsoluteMouseEvent(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
         // Skip mouse events if in keyboard only mode
         if UserSettings.shared.controlMode == .keyboardOnly {
             return
@@ -139,7 +139,7 @@ class MouseManager: MouseManagerProtocol {
     }
     
     /// Public method to enqueue relative mouse events
-    func enqueueRelativeMouseEvent(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, isDragged: Bool = false) {
+    func enqueueRelativeMouseEvent(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00, isDragged: Bool = false) {
         // Skip mouse events if in keyboard only mode
         if UserSettings.shared.controlMode == .keyboardOnly {
             return
@@ -494,7 +494,6 @@ class MouseManager: MouseManagerProtocol {
                             wheelMovement: event.wheelMovement
                         )
                     } else {
-                        // Events mode: use accumulation logic
                         self.handleRelativeMouseActionEvents(
                             dx: event.deltaX,
                             dy: event.deltaY,
@@ -943,7 +942,7 @@ class MouseManager: MouseManagerProtocol {
                 deltaX: 0,
                 deltaY: 0,
                 mouseEvent: mouseEvent,
-                wheelMovement: UInt8(scrollWheelEventDeltaMapping(delta: wheelMovement)),
+                wheelMovement: Int(scrollWheelEventDeltaMapping(delta: wheelMovement)),
                 isDragged: isDragEvent(event),
                 timestamp: CACurrentMediaTime(),
                 isAbsolute: false,
@@ -1076,7 +1075,7 @@ class MouseManager: MouseManagerProtocol {
         return isMouseLoopRunning
     }
     
-    func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+    func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
         // Skip mouse events if in keyboard only mode
         if UserSettings.shared.controlMode == .keyboardOnly {
             return
@@ -1089,7 +1088,7 @@ class MouseManager: MouseManagerProtocol {
         }
         
         recordOutputMouseEvent()
-        mouserMapper.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+        mouserMapper.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: mouseEvent, wheelMovement: self.scrollWheelEventDeltaMapping(delta: wheelMovement))
     }
     
     func handleRelativeMouseAction(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged:Bool = false) {
@@ -1107,10 +1106,10 @@ class MouseManager: MouseManagerProtocol {
         }
         
         // Enqueue relative mouse event instead of processing directly
-        enqueueRelativeMouseEvent(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: wheelMovement, isDragged: dragged)
+        enqueueRelativeMouseEvent(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: Int(wheelMovement), isDragged: dragged)
     }
     
-    private func handleRelativeMouseActionEvents(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged:Bool = false) {
+    private func handleRelativeMouseActionEvents(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00, dragged:Bool = false) {
         // Apply overflow deltas from dropped events (if any)
         if adaptiveAccumulationEnabled && (overflowAccumulatedDeltaX != 0 || overflowAccumulatedDeltaY != 0) {
             accumulatedDeltaX += overflowAccumulatedDeltaX
@@ -1151,12 +1150,12 @@ class MouseManager: MouseManagerProtocol {
             skipMoveBack = true
             recordCount = 1  // Mark that we've just transitioned from dragging to non-dragging
             logger.log(content: "Reset mouse move counter - sending accumulated deltas, skipMoveBack enabled with recordCount=\(recordCount)")
-            mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+            mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: self.scrollWheelEventDeltaMapping(delta: wheelMovement))
         }
         self.dragging = dragged
 
         logger.log(content: "Events mode - Sending to MouseMapper: dx=\(accumulatedDeltaX), dy=\(accumulatedDeltaY), mouseEvent=\(mouseEvent), wheelMovement=\(wheelMovement)")
-        mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+        mouserMapper.handleRelativeMouseAction(dx: accumulatedDeltaX, dy: accumulatedDeltaY, mouseEvent: mouseEvent, wheelMovement: self.scrollWheelEventDeltaMapping(delta: wheelMovement))
         recordOutputMouseEvent()
 
         // Store last sent deltas for display purposes
@@ -1177,7 +1176,7 @@ class MouseManager: MouseManagerProtocol {
         logger.log(content: "Events mode - deltas reset")
     }
     
-    private func handleRelativeMouseActionHID(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
+    private func handleRelativeMouseActionHID(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: Int = 0x00) {
         // Apply throttling at output stage
         if shouldThrottleInputEvent() {
             throttledEventDropCount += 1
@@ -1186,7 +1185,7 @@ class MouseManager: MouseManagerProtocol {
         
         // HID mode: pass deltas directly to serial without accumulation or complex logic
         logger.log(content: "HID mode - Direct relative mouse action: dx=\(dx), dy=\(dy), mouseEvent=\(mouseEvent), wheelMovement=\(wheelMovement)")
-        mouserMapper.handleRelativeMouseAction(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
+        mouserMapper.handleRelativeMouseAction(dx: dx, dy: dy, mouseEvent: mouseEvent, wheelMovement: self.scrollWheelEventDeltaMapping(delta: wheelMovement))
         recordOutputMouseEvent()
         logger.log(content: "[DEBUG] HID mode - Event recorded")
         // Store for display purposes

@@ -59,7 +59,7 @@ class HostManager: ObservableObject, HostManagerProtocol {
         mm.handleAbsoluteMouseAction(x: Int(x),
                                     y: Int(y),
                                     mouseEvent: mouseEvent,
-                                    wheelMovement: scrollWheelEventDeltaMapping(delta: wheelMovement))
+                                    wheelMovement: wheelMovement)
     }
 
     func moveToAppCenter(){
