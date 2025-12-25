@@ -165,6 +165,15 @@ class BaseVideoChipset: VideoChipsetProtocol {
         return nil
     }
     
+    func updateConnectionStatus(_ isConnected: Bool) {
+        let previousStatus = self.isConnected
+        self.isConnected = isConnected
+        
+        if previousStatus != isConnected {
+            logger.log(content: "📺 Video chipset \(chipsetInfo.name) connection status: \(isConnected ? "Connected" : "Disconnected")")
+        }
+    }
+    
     // MARK: - Helper Methods
     
     private func matchesChipset(device: AVCaptureDevice) -> Bool {

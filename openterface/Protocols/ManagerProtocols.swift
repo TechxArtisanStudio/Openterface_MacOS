@@ -130,6 +130,7 @@ protocol SerialPortManagerProtocol: AnyObject {
     func setRTS(_ enabled: Bool) -> Bool
     func lowerRTS() -> Bool
     func raiseRTS() -> Bool
+    func getTargetConnectionStatusSync() -> (isKeyboardConnected: Bool, isMouseConnected: Bool)?
 }
 
 /// Protocol for audio streaming and management

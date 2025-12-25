@@ -54,6 +54,7 @@ protocol VideoChipsetProtocol: HardwareChipsetProtocol {
     func getPixelClock() -> UInt32?
     func getSignalStatus() -> VideoSignalStatus
     func getTimingInfo() -> VideoTimingInfo?
+    func updateConnectionStatus(_ isConnected: Bool)
 }
 
 /// Protocol for control chipsets (HID/Serial communication)
@@ -70,6 +71,7 @@ protocol ControlChipsetProtocol: HardwareChipsetProtocol {
     func resetDevice() -> Bool
     func configureDevice(baudRate: Int, mode: UInt8) -> Bool
     func monitorHIDEvents() -> Bool
+    func updateConnectionStatus(_ isConnected: Bool)
 }
 
 /// Protocol for chipset-specific HID register addresses
@@ -344,11 +346,13 @@ class HardwareAbstractionLayer {
     }
     
     func getSystemInfo() -> HardwareSystemInfo {
+        logger.log(content: "🔍 HAL: Gathering system hardware information...")
+        logger.log(content: "\(controlChipset?.isConnected ?? false) - \(AppStatus.isTargetConnected)")
         return HardwareSystemInfo(
             videoChipset: videoChipset?.chipsetInfo,
             controlChipset: controlChipset?.chipsetInfo,
             isVideoActive: videoChipset?.isConnected ?? false,
-            isControlActive: controlChipset?.isConnected ?? false,
+            isControlActive: controlChipset?.isConnected ?? false || AppStatus.isTargetConnected,
             systemCapabilities: getSystemCapabilities()
         )
     }

@@ -157,8 +157,6 @@ class HALIntegrationManager {
         // Integrate with HID Manager for control operations
         integrateControlChipsetWithHIDManager(controlChipset)
         
-        // Integrate with Serial Port Manager for communication
-        integrateControlChipsetWithSerialManager(controlChipset)
         
         // Integrate with any other managers that need control chipset access
         integrateControlChipsetWithOtherManagers(controlChipset)
@@ -283,7 +281,7 @@ class HALIntegrationManager {
         integrateControlChipsetWithHIDManager(controlChipset)
         
         // Integrate with Serial Port Manager for communication
-        integrateControlChipsetWithSerialManager(controlChipset)
+//        integrateControlChipsetWithSerialManager(controlChipset)
         
         // Integrate with any other managers that need control chipset access
         integrateControlChipsetWithOtherManagers(controlChipset)
@@ -461,9 +459,6 @@ class HALIntegrationManager {
         let status = controlChipset.getDeviceStatus()
         logger.log(content: "📊 Control chipset status: Target connected: \(status.isTargetConnected)")
         
-        // Update app status with control chipset information
-        AppStatus.isTargetConnected = status.isTargetConnected
-        
         logger.log(content: "✅ Control chipset integration with other managers completed")
     }
     
@@ -601,6 +596,7 @@ class HALIntegrationManager {
                     let signalStatus = videoChipset.getSignalStatus()
                     let previousStatus = AppStatus.hasHdmiSignal
                     AppStatus.hasHdmiSignal = signalStatus.hasSignal
+                    videoChipset.updateConnectionStatus(signalStatus.hasSignal)
                     
                     // Log video status changes if needed
                     if previousStatus != signalStatus.hasSignal {
@@ -616,8 +612,7 @@ class HALIntegrationManager {
                 do {
                     let deviceStatus = controlChipset.getDeviceStatus()
                     let wasConnected = AppStatus.isTargetConnected
-                    AppStatus.isTargetConnected = deviceStatus.isTargetConnected
-                    
+
                     // Log control chipset status changes
                     if wasConnected != deviceStatus.isTargetConnected {
                         logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")

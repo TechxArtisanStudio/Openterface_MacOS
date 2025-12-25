@@ -61,8 +61,13 @@ struct AppStatus {
     static var isAreaOCRing: Bool = false
     static var showInputOverlay: Bool = false
     
+    //Following two status check the CTS flipping status for Mini-KVM
     static var isKeyboardConnected: Bool? = false
     static var isMouseConnected: Bool? = false
+    
+    //This result come from HID info return status
+    static var isTargetConnected: Bool = false
+    
     static var isSwitchToHost: Bool?
     
     static var hidReadResolusion = (width: 0, height: 0)
@@ -77,7 +82,7 @@ struct AppStatus {
     static var hidInputVsyncWidth: UInt32 = 0
 
     static var chipVersion: Int8 = 0
-    static var isTargetConnected: Bool = false
+
     static var isControlChipsetReady: Bool = false
     static var isNumLockOn: Bool = false
     static var isCapLockOn: Bool = false

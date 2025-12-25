@@ -65,7 +65,7 @@ class MouseManager: MouseManagerProtocol {
     private var isMouseLoopRunning = false
     
     // Mouse event queue system
-    private let mouseEventQueue = DispatchQueue(label: "com.openterface.mouseEventQueue", qos: .userInteractive)
+    private let mouseEventQueue = DispatchQueue(label: "mouse", qos: .userInteractive)
     private var pendingMouseEvents: [MouseEventQueueItem] = []
     private let maxQueueSize = 10
     private var isProcessingQueue = false

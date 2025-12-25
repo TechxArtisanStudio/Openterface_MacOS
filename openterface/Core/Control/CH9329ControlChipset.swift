@@ -71,7 +71,6 @@ class CH9329ControlChipset: BaseControlChipset {
         }
 
         if establishCommunication() {
-            isConnected = true
             startCTSMonitoring()
             logger.log(content: "✅ CH9329 chipset initialized successfully")
             return true
@@ -115,14 +114,12 @@ class CH9329ControlChipset: BaseControlChipset {
         currentBaudRate = serialManager.baudrate
         
         if currentBaudRate > 0 {
-            logger.log(content: "✅ CH9329 communication established at \(currentBaudRate) baud")
-            // Trigger HAL integration with managers after successful communication
-            HALIntegrationManager.shared.reintegrateControlChipset()
-            return true
-        } else {
-            logger.log(content: "❌ CH9329 communication establishment failed. Baudrate: \(currentBaudRate)")
-            return false
+           // Check if the keyboard and mouse are connected
+           if let status = serialManager.getTargetConnectionStatusSync() {
+               self.isConnected = status.isKeyboardConnected || status.isMouseConnected
+           }
         }
+        return true
     }
 
     override func configureDevice(baudRate: Int, mode: UInt8) -> Bool {
@@ -184,6 +181,7 @@ class CH9329ControlChipset: BaseControlChipset {
 
         if lastCTSState == nil {
             lastCTSState = currentCTS
+            isConnected = false
             return
         }
 
@@ -191,6 +189,7 @@ class CH9329ControlChipset: BaseControlChipset {
             // CTS state changed - indicates HID activity
             AppStatus.isKeyboardConnected = true
             AppStatus.isMouseConnected = true
+            self.isConnected=true
             lastCTSState = currentCTS
             lastCTSUpdateTime = Date()
 
@@ -206,8 +205,10 @@ class CH9329ControlChipset: BaseControlChipset {
         // For MS2109, check if CTS was updated within 2 seconds
         if let lastTime = lastCTSUpdateTime, Date().timeIntervalSince(lastTime) <= 2.0 {
             isTargetConnected = true
+            isConnected = true
         } else {
             isTargetConnected = false
+            isConnected = false
         }
 
         return ControlDeviceStatus(

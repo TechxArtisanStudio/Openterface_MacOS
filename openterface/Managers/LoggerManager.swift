@@ -103,7 +103,7 @@ class Logger: LoggerProtocol {
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         let dateString = dateFormatter.string(from: Date())
 
-        let thread: String
+        var thread: String
         if Thread.isMainThread {
             thread = "main"
         } else if let name = Thread.current.name, !name.isEmpty {
@@ -112,6 +112,16 @@ class Logger: LoggerProtocol {
             thread = queueLabel
         } else {
             thread = String(format: "0x%llx", pthread_mach_thread_np(pthread_self()))
+        }
+
+        // Format thread to be exactly 10 characters
+        if thread.count > 10 {
+            // Truncate from left (keep rightmost 10 chars)
+            let startIndex = thread.index(thread.endIndex, offsetBy: -10)
+            thread = String(thread[startIndex...])
+        } else if thread.count < 10 {
+            // Pad with spaces on the right
+            thread = thread.padding(toLength: 10, withPad: " ", startingAt: 0)
         }
 
         print("[\(dateString)] [\(thread)] " + content)

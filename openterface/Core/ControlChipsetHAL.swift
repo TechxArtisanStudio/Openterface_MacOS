@@ -126,11 +126,15 @@ class BaseControlChipset: ControlChipsetProtocol {
         return false
     }
     
+    func updateConnectionStatus(_ isConnected: Bool) {
+        self.isConnected = isConnected
+        logger.log(content: "Control chipset connection status updated: \(isConnected ? "connected" : "disconnected")")
+    }
+    
     // MARK: - Helper Methods
     
     internal func updateConnectionStatus() {
         let status = getDeviceStatus()
-        AppStatus.isTargetConnected = status.isTargetConnected
         AppStatus.isKeyboardConnected = status.isKeyboardConnected
         AppStatus.isMouseConnected = status.isMouseConnected
         AppStatus.chipVersion = status.chipVersion

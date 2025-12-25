@@ -1734,12 +1734,37 @@ struct AdvancedDebugSettingsView: View {
     @State private var showingImportSuccess = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var showingDiagnostics = false
+    @StateObject private var diagnosticsViewModel = DiagnosticsViewModel()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Advanced & Debug Configuration")
                 .font(.title2)
                 .bold()
+            
+            GroupBox("Device Diagnostics") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Run comprehensive hardware and connection tests")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Button(action: {
+                        showingDiagnostics = true
+                    }) {
+                        HStack {
+                            Image(systemName: "stethoscope.circle")
+                            Text("Open Diagnostics Tool")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    
+                    Text("Tests include cable detection, serial connection, baudrate configuration, and stress testing")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
             
             GroupBox("Debug & Logging") {
                 VStack(alignment: .leading, spacing: 12) {
@@ -1840,6 +1865,9 @@ struct AdvancedDebugSettingsView: View {
         }
         .sheet(isPresented: $showingLogViewer) {
             LogViewerDialog()
+        }
+        .sheet(isPresented: $showingDiagnostics) {
+            DiagnosticsView(viewModel: diagnosticsViewModel)
         }
         .alert("Export Successful", isPresented: $showingExportSuccess) {
             Button("OK") { }
