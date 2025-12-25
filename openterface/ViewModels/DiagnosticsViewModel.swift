@@ -525,7 +525,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
                     self.addStatusMessage("")
                     self.addStatusMessage("⚠️ WARNING: Orange USB-C cable (host side) disconnected during test!")
                     self.addStatusMessage("❌ This indicates a hardware defect - the cables are internally shorted or damaged")
-                    self.addStatusMessage("🔴 DEVICE REQUIRES REPLACEMENT")
+                    self.addStatusMessage("🔴 DEVICE MAY REQUIRE REPLACEMENT")
                 }
             }
             
@@ -1370,7 +1370,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
             }
             
             // Create email subject and body
-            let emailSubject = "Defective Unit Report - Device Requires Replacement"
+            let emailSubject = "Defective Unit Report - Device May Require Replacement"
             
             let emailBody = """
             Hello Openterface Support,
@@ -1384,7 +1384,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
             TEST RESULT:
             ============
             ❌ Black USB-C Cable Test FAILED - Device Defective
-            🔴 DEVICE REQUIRES REPLACEMENT
+            🔴 DEVICE MAY REQUIRES REPLACEMENT
             
             DEVICE INFORMATION:
             ===================

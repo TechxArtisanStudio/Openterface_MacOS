@@ -234,8 +234,12 @@ struct DiagnosticsView: View {
                     Spacer()
                     
                     // Defect report button - shows when device is detected as defective
-                    // Triggered by either Target Black Cable test or Stress test + Target Port Checking
-                    if viewModel.isDefectiveUnitDetected && (viewModel.stepResults[.targetBlackCableTest] == false || viewModel.stepResults[.targetPortChecking] != nil) {
+                    // Triggered by either Target Black Cable test failure or after Stress test failure + Target Port Checking completion
+                    let stressTestFailed = viewModel.stepResults[.stressTest] == false
+                    let targetPortCheckingCompleted = viewModel.stepResults[.targetPortChecking] != nil
+                    let targetBlackCableFailed = viewModel.stepResults[.targetBlackCableTest] == false
+                    
+                    if viewModel.isDefectiveUnitDetected && (targetBlackCableFailed || (stressTestFailed && targetPortCheckingCompleted)) {
                         VStack(spacing: 0) {
                             Divider()
                             
