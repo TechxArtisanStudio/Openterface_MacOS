@@ -327,7 +327,7 @@ class PlayerView: NSView, NSWindowDelegate {
                     x: Int(mouseX),
                     y: Int(mouseY),
                     mouseEvent: mouseEvent,
-                    wheelMovement: UInt8(wheelMovement)
+                    wheelMovement: wheelMovement
                 )
             }
         }
