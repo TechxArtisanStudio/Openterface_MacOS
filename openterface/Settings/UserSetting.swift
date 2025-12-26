@@ -82,6 +82,10 @@ final class UserSettings: ObservableObject {
         
         // Load always on top preference from UserDefaults
         self.isAlwaysOnTop = UserDefaults.standard.object(forKey: "isAlwaysOnTop") as? Bool ?? false
+        
+        // Load target computer placement from UserDefaults
+        let savedTargetPlacement = UserDefaults.standard.string(forKey: "targetComputerPlacement")
+        self.targetComputerPlacement = TargetComputerPlacement(rawValue: savedTargetPlacement ?? "") ?? .right
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -175,6 +179,13 @@ final class UserSettings: ObservableObject {
     @Published var isAlwaysOnTop: Bool {
         didSet {
             UserDefaults.standard.set(isAlwaysOnTop, forKey: "isAlwaysOnTop")
+        }
+    }
+    
+    // Target computer placement setting
+    @Published var targetComputerPlacement: TargetComputerPlacement {
+        didSet {
+            UserDefaults.standard.set(targetComputerPlacement.rawValue, forKey: "targetComputerPlacement")
         }
     }
 }
@@ -415,5 +426,39 @@ enum ControlMode: Int, CaseIterable {
     
     var modeByteValue: UInt8 {
         return UInt8(self.rawValue)
+    }
+}
+
+// Target computer placement enumeration
+enum TargetComputerPlacement: String, CaseIterable {
+    case left = "left"
+    case right = "right"
+    case top = "top"
+    case bottom = "bottom"
+    
+    var displayName: String {
+        switch self {
+        case .left:
+            return "Left"
+        case .right:
+            return "Right"
+        case .top:
+            return "Top"
+        case .bottom:
+            return "Bottom"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .left:
+            return "Target computer positioned to the left"
+        case .right:
+            return "Target computer positioned to the right"
+        case .top:
+            return "Target computer positioned at the top"
+        case .bottom:
+            return "Target computer positioned at the bottom"
+        }
     }
 }

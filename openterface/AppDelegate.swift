@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var hidManager: any HIDManagerProtocol
     private var clipboardManager: any ClipboardManagerProtocol
     private var usbDevicesManager: (any USBDevicesManagerProtocol)?
+    private var parallelManager: any ParallelManagerProtocol
     private var logger: any LoggerProtocol
     
     //Use half of the screen width as initial window width
@@ -70,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         self.videoManager = container.resolve(VideoManagerProtocol.self)
         self.hidManager = container.resolve(HIDManagerProtocol.self)
         self.clipboardManager = container.resolve(ClipboardManagerProtocol.self)
+        self.parallelManager = container.resolve(ParallelManagerProtocol.self)
         self.logger = container.resolve(LoggerProtocol.self)
         
         // USB Devices Manager is only available on macOS 12.0+
@@ -92,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(KeyboardManagerProtocol.self, instance: KeyboardManager.shared as any KeyboardManagerProtocol)
         container.register(SerialPortManagerProtocol.self, instance: SerialPortManager.shared as any SerialPortManagerProtocol)
         container.register(HostManagerProtocol.self, instance: HostManager.shared as any HostManagerProtocol)
+        container.register(ParallelManagerProtocol.self, instance: ParallelManager() as any ParallelManagerProtocol)
         container.register(StatusBarManagerProtocol.self, instance: StatusBarManager() as any StatusBarManagerProtocol)
         container.register(TipLayerManagerProtocol.self, instance: TipLayerManager() as any TipLayerManagerProtocol)
         container.register(ClipboardManagerProtocol.self, instance: ClipboardManager.shared as any ClipboardManagerProtocol)
@@ -143,6 +146,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         setupMainWindow()
         setupNotificationObservers()
         setupAspectRatioMenu()
+        
+        // Setup status bar
+        statusBarManager.setupStatusBar()
         
         // Switch to U.S. English input method to ensure paste works correctly
         switchToUSEnglishInputMethod()
@@ -578,7 +584,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     // click on window close button to exit the programme
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        // Don't terminate if we're in parallel mode or exiting parallel mode
+        if parallelManager.shouldPreventTermination() {
+            return false
+        }
+        return true
     }
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

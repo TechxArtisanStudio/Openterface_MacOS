@@ -26,6 +26,7 @@ import AppKit
 struct ContentView: View {
     @StateObject var viewModel = PlayerViewModel() // Ensures the view model is initialized once
     @State private var showInputOverlay = AppStatus.showInputOverlay
+    @State private var overlayActive = AppStatus.showParallelOverlay
     
     @Environment(\.controlActiveState) var controlActiveState
     
@@ -35,18 +36,30 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            PlayerContainerView(captureSession: viewModel.captureSession)
-                .onTapGesture {
-                    // click in windows
-                    if AppStatus.isExit {
-                        AppStatus.isExit = false
-                    }
+        ZStack {
+            // Parallel overlay indicator: show orange dot at top-center when active
+            if overlayActive {
+                GeometryReader { geo in
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 12, height: 12)
+                        .position(x: geo.size.width / 2, y: 12)
+                        .allowsHitTesting(false)
                 }
-            
-            if showInputOverlay {
-                InputOverlayView()
-                    .padding()
+                .ignoresSafeArea()
+            }else{
+                PlayerContainerView(captureSession: viewModel.captureSession)
+                    .onTapGesture {
+                        // click in windows
+                        if AppStatus.isExit {
+                            AppStatus.isExit = false
+                        }
+                    }
+                
+                if showInputOverlay {
+                    InputOverlayView()
+                        .padding()
+                }
             }
         }
         .onAppear {
@@ -55,6 +68,9 @@ struct ContentView: View {
         .onReceive(timer) { _ in
             if showInputOverlay != AppStatus.showInputOverlay {
                 showInputOverlay = AppStatus.showInputOverlay
+            }
+            if overlayActive != AppStatus.showParallelOverlay {
+                overlayActive = AppStatus.showParallelOverlay
             }
         }
     }

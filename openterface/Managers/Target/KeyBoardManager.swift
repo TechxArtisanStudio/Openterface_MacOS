@@ -647,7 +647,6 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         
         kbm.pressKey(keys: pressedKeys, modifiers: adjustedModifiers)
-        logger.log(content: "   📤 Sent to target: keys=\(pressedKeys.filter { $0 != 255 }), modifiers=\(adjustedModifiers)")
         return nil
     }
     

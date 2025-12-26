@@ -353,3 +353,16 @@ enum OCRResult {
     case noTextFound
     case failed(Error)
 }
+
+// MARK: - Parallel Manager Protocol
+
+/// Protocol for parallel mode management functionality
+protocol ParallelManagerProtocol: AnyObject {
+    var isParallelModeEnabled: Bool { get }
+    var isMouseInTarget: Bool { get }
+    
+    func enterParallelMode()
+    func exitParallelMode()
+    func toggleParallelMode()
+    func shouldPreventTermination() -> Bool
+}

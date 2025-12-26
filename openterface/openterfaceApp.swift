@@ -36,7 +36,7 @@ struct openterfaceApp: App {
     
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
-    
+
     // Protocol-based dependencies - using computed properties since App structs are immutable
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     private var audioManager: AudioManagerProtocol { DependencyContainer.shared.resolve(AudioManagerProtocol.self) }
@@ -392,6 +392,10 @@ struct openterfaceApp: App {
                         }
                     }
             }
+        }
+
+        WindowGroup(id: "fullscreen") {
+            FullScreenView()
         }
         .commands {
             // Customize menu

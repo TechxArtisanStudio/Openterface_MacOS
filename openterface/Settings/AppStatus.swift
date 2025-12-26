@@ -60,6 +60,7 @@ struct AppStatus {
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
     static var showInputOverlay: Bool = false
+    static var showParallelOverlay: Bool = false
     
     //Following two status check the CTS flipping status for Mini-KVM
     static var isKeyboardConnected: Bool? = false
