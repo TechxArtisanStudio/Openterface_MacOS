@@ -44,7 +44,14 @@ struct ContentView: View {
                         .fill(Color.orange)
                         .frame(width: 12, height: 12)
                         .position(x: geo.size.width / 2, y: 12)
-                        .allowsHitTesting(false)
+                        // Allow hit testing so we can detect double-clicks to exit parallel mode
+                        .onTapGesture(count: 2) {
+                            DispatchQueue.main.async {
+                                let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
+                                pm.exitParallelMode()
+                            }
+                        }
+                        .contentShape(Circle())
                 }
                 .ignoresSafeArea()
             }else{

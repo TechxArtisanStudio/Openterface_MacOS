@@ -109,7 +109,6 @@ struct openterfaceApp: App {
                         ToolbarItemGroup(placement: .automatic) {
                             Button {
                                 logger.log(content: "🎹 Floating keyboard button pressed")
-                                print("🎹 DEBUG: Floating keyboard button pressed") // Additional debug
                                 floatingKeyboardManager.showFloatingKeysWindow()
                             } label: {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
