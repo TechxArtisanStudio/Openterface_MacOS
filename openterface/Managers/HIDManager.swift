@@ -161,7 +161,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     func sendHIDReport(report: [UInt8]) {
         guard let device = self.device else { return }
         var report = report
-        let hexString = report.map { String(format: "%02X", $0) }.joined(separator: " ")
+        _ = report.map { String(format: "%02X", $0) }.joined(separator: " ")
 
         let result = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, self.getReportID(), &report, report.count)
         if result != kIOReturnSuccess {

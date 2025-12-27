@@ -152,9 +152,18 @@ final class BlockingView: NSView {
                             let finderApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
                             if let finder = finderApps.first {
                                 finder.activate(options: .activateIgnoringOtherApps)
+                            } else if let finderURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.finder") {
+                                let config = NSWorkspace.OpenConfiguration()
+                                NSWorkspace.shared.openApplication(at: finderURL, configuration: config) { app, error in
+                                    if let error = error {
+                                        let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+                                        logger.log(content: "[BlockingView] Failed to launch Finder: \(error.localizedDescription)")
+                                    }
+                                }
                             } else {
-                                // Try launching Finder if it's not running
-                                NSWorkspace.shared.launchApplication("Finder")
+                                // Fallback: attempt to open Finder app bundle path
+                                let fallbackURL = URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app")
+                                NSWorkspace.shared.open(fallbackURL)
                             }
                         } else {
                             prevApp.activate(options: .activateIgnoringOtherApps)

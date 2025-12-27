@@ -539,10 +539,10 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
                     return
                 }
                 
-                // Connect nodes using compatible format with error handling
-                try self.engine.connect(inputNode, to: outputNode, format: validFormat)
+                // Connect nodes using compatible format
+                self.engine.connect(inputNode, to: outputNode, format: validFormat)
                 self.logger.log(content: "Connected audio nodes successfully")
-                
+
                 try self.engine.start()
                 self.logger.log(content: "Audio engine started successfully")
                 
@@ -580,20 +580,15 @@ class AudioManager: ObservableObject, AudioManagerProtocol {
             logger.log(content: "Audio engine not running, no need to stop")
         }
         
-        // Safely disconnect and reset
-        do {
-            // Disconnect all connections
-            let inputNode = engine.inputNode
-            engine.disconnectNodeOutput(inputNode)
-            logger.log(content: "Disconnected input node")
-            
-            // Reset engine
-            engine.reset()
-            logger.log(content: "Audio engine reset")
-            
-        } catch {
-            logger.log(content: "Error during audio cleanup: \(error)")
-        }
+        // Safely disconnect and reset (non-throwing operations)
+        // Disconnect all connections
+        let inputNode = engine.inputNode
+        engine.disconnectNodeOutput(inputNode)
+        logger.log(content: "Disconnected input node")
+
+        // Reset engine
+        engine.reset()
+        logger.log(content: "Audio engine reset")
         
         // Reset audio device ID
         self.audioDeviceId = nil

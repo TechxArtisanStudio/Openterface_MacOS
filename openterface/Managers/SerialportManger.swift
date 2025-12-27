@@ -452,7 +452,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 self.isDeviceReady = true
                 self.errorAlertShown = false  // Reset error alert flag on successful connection
                 
-                let msgString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+                _ = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
                 handleSerialData(data: messageData)
             } else {
                 let errorDataString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
@@ -680,7 +680,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func tryOpenSerialPort( priorityBaudrate: Int? = nil) {
 
         // Use priority baudrate if provided, otherwise use preferred baudrate from user settings
-        let effectivePriorityBaudrate = priorityBaudrate ?? UserSettings.shared.preferredBaudrate.rawValue
+        _ = priorityBaudrate ?? UserSettings.shared.preferredBaudrate.rawValue
         
         // Check if connection attempts are paused
         if self.isPaused {

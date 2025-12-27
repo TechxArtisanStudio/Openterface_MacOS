@@ -56,10 +56,10 @@ struct ContentView: View {
                         let rectHeight = rectWidth / aspect
 
                         ZStack(alignment: .topLeading) {
-                            Rectangle()
-                                .fill(Color.black)
+                            PlayerContainerView(captureSession: viewModel.captureSession)
                                 .frame(width: rectWidth, height: rectHeight)
                                 .cornerRadius(4)
+                                .clipped()
 
                             // Red/gray dot showing normalized mouse position inside the mini rectangle
                             let dotSize: CGFloat = 6.0

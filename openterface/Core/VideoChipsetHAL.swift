@@ -92,7 +92,7 @@ class BaseVideoChipset: VideoChipsetProtocol {
     
     func setupVideoCapture(device: AVCaptureDevice) -> Bool {
         do {
-            let input = try AVCaptureDeviceInput(device: device)
+            _ = try AVCaptureDeviceInput(device: device)
             // Additional setup logic would go here
             logger.log(content: "✅ Video capture setup successful for \(chipsetInfo.name)")
             isConnected = true

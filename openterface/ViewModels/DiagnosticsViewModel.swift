@@ -781,7 +781,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
     }
     
     private func retryFactoryResetVerification() {
-        guard let serialPortMgr = self.serialPortManager as? SerialPortManager else {
+        guard self.serialPortManager is SerialPortManager else {
             addStatusMessage("❌ Serial port manager not available")
             isTestRunning = false
             return
@@ -1522,7 +1522,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
     }
     
     private func showDefectReportDialog(emailSubject: String, emailBody: String, reportDir: URL, statusLogPath: URL, diagnosticsLogPath: URL) {
-        let result = DefectReportDialog.show(
+        _ = DefectReportDialog.show(
             emailSubject: emailSubject,
             emailBody: emailBody,
             reportDir: reportDir,
