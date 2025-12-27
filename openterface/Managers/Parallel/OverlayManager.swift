@@ -26,7 +26,8 @@ final class OverlayManager {
                                   defer: false,
                                   screen: screen)
 
-            window.level = .screenSaver
+            // Use the system maximum window level to ensure the overlay stays on top
+            window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
             window.isOpaque = false
             window.backgroundColor = NSColor.clear
             window.alphaValue = 1.0
@@ -44,10 +45,17 @@ final class OverlayManager {
             window.contentView = blocker
             window.acceptsMouseMovedEvents = true
 
+            // Ensure the window is frontmost and becomes key so the blocker receives events
             window.orderFrontRegardless()
             window.makeKeyAndOrderFront(nil)
             window.makeFirstResponder(blocker)
             window.orderFrontRegardless()
+
+            // Reinforce top-most ordering after a short delay to handle focus changes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
+                window.orderFrontRegardless()
+            }
             self.overlayWindow = window
 
             // Hide cursor at display level and via NSCursor balance
@@ -61,14 +69,18 @@ final class OverlayManager {
             self.mouseLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown]) { evt in
                 let pm: ParallelManagerProtocol = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
                 if pm.isMouseInTarget {
-                    CGDisplayHideCursor(CGMainDisplayID())
+                    // Ensure cursor is hidden on all displays when mouse is in target,
+                    // even if the overlay/window is not focused.
+                    self.hideCursorOnAllDisplays()
                 }
                 return evt
             }
             self.mouseGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown]) { evt in
                 let pm: ParallelManagerProtocol = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
                 if pm.isMouseInTarget {
-                    CGDisplayHideCursor(CGMainDisplayID())
+                    // Ensure cursor is hidden on all displays when mouse is in target,
+                    // even if the overlay/window is not focused.
+                    self.hideCursorOnAllDisplays()
                 }
             }
 

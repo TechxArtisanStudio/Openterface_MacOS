@@ -16,6 +16,9 @@ final class BlockingView: NSView {
     private let warpCooldown: TimeInterval = 0.5
     private let edgeThreshold: CGFloat = 5.0
     private var isMouseInTargetState: Bool = false
+    // Remember previous frontmost application and key window so we can restore focus
+    private var previousFrontmostApp: NSRunningApplication?
+    private var previousKeyWindow: NSWindow?
     // Track last modifier flags to detect presses/releases
     private var lastModifierFlags: NSEvent.ModifierFlags = []
 
@@ -25,9 +28,6 @@ final class BlockingView: NSView {
         checkAndWrapMouseAtEdges(globalPoint)
         // If we're not currently in the target state, do not forward mouse events to the target
         if !isMouseInTargetState {
-            let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
-            logger.log(content: "[BlockingView] Mouse event ignored because mouse not in target")
-
             showCursorOnAllDisplays()
             return
         }
@@ -43,11 +43,16 @@ final class BlockingView: NSView {
         let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
         logger.log(content: "[BlockingView][MouseInTarget:\(isMouseInTargetState)] Overlay mouse event -> code:\(mouseEventCode) x:\(clampedX) y:\(clampedY)")
         MouseManager.shared.enqueueAbsoluteMouseEvent(x: clampedX, y: clampedY, mouseEvent: mouseEventCode, wheelMovement: 0)
+        
+        // Post normalized remote mouse position for UI overlays (0..1, origin at top-left)
+        let normX = Double(clampedX) / 4096.0
+        let normY = Double(clampedY) / 4096.0
+        NotificationCenter.default.post(name: .remoteMouseMoved, object: nil, userInfo: ["x": normX, "y": normY])
 
     }
 
     private func checkAndWrapMouseAtEdges(_ mouseLocation: NSPoint) {
-        print("Checking mouse at location: \(mouseLocation)")
+        let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
         // Prevent rapid repeated warps
         if let last = lastWarpTime, Date().timeIntervalSince(last) < warpCooldown { return }
 
@@ -70,24 +75,34 @@ final class BlockingView: NSView {
                 }
             case .top:
                 if mouseLocation.y >= screenFrame.maxY - edgeThreshold {
-                    newLocation.y = screenFrame.minY + edgeThreshold
+                    newLocation.y = screenFrame.maxY - edgeThreshold
                 }
             case .bottom:
                 if mouseLocation.y <= screenFrame.minY + edgeThreshold {
-                    newLocation.y = screenFrame.maxY - edgeThreshold
+                    newLocation.y = screenFrame.minY + edgeThreshold
                 }
             }
 
             if newLocation != mouseLocation {
                 lastWarpTime = Date()
+                logger.log(content: "[BlockingView] Edge crossed — entering target via \(placement). Warping from \(mouseLocation) to \(newLocation)")
                 CGWarpMouseCursorPosition(newLocation)
                 isMouseInTargetState = true
                 // Hide cursor immediately (display-level + NSCursor) when entering target
                 hideCursorOnAllDisplays()
-                NSCursor.hide()
+                
+                // Remember previous app/window so we can restore focus later
+                previousFrontmostApp = NSWorkspace.shared.frontmostApplication
+                previousKeyWindow = NSApp.keyWindow
+
                 // Ensure the overlay window captures events when inside target
                 if let w = self.window {
                     w.ignoresMouseEvents = false
+                    // Bring the overlay window to front and make it key so it receives focus
+                    w.makeKeyAndOrderFront(nil)
+                    w.makeFirstResponder(self)
+                    // Ensure the app is active so the window can become key
+                    NSApp.activate(ignoringOtherApps: true)
                 }
                 NotificationCenter.default.post(name: .mouseEnteredTarget, object: nil)
             }
@@ -107,26 +122,52 @@ final class BlockingView: NSView {
                 }
             case .top:
                 if mouseLocation.y <= screenFrame.minY + edgeThreshold {
-                    newLocation.y = screenFrame.maxY - edgeThreshold
+                    newLocation.y = screenFrame.minY + edgeThreshold
                     isMouseInTargetState = false
                 }
             case .bottom:
                 if mouseLocation.y >= screenFrame.maxY - edgeThreshold {
-                    newLocation.y = screenFrame.minY + edgeThreshold
+                    newLocation.y = screenFrame.maxY - edgeThreshold
                     isMouseInTargetState = false
                 }
             }
 
             if newLocation != mouseLocation {
                 lastWarpTime = Date()
+                logger.log(content: "[BlockingView] Edge crossed — exiting target via \(placement). Warping from \(mouseLocation) to \(newLocation)")
                 CGWarpMouseCursorPosition(newLocation)
                 // Show cursor immediately when exiting target
                 showCursorOnAllDisplays()
-                NSCursor.unhide()
+
                 // Allow events to pass through to the system when not in target
                 if let w = self.window {
                     w.ignoresMouseEvents = true
                 }
+                // Restore previous frontmost application and key window so focus returns
+                if let prevApp = previousFrontmostApp {
+                    // Use a short delay to allow the warp and showCursor to complete
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        // If the previous frontmost app was this overlay/app itself, switch to the desktop (Finder)
+                        if prevApp.processIdentifier == NSRunningApplication.current.processIdentifier {
+                            let finderApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+                            if let finder = finderApps.first {
+                                finder.activate(options: .activateIgnoringOtherApps)
+                            } else {
+                                // Try launching Finder if it's not running
+                                NSWorkspace.shared.launchApplication("Finder")
+                            }
+                        } else {
+                            prevApp.activate(options: .activateIgnoringOtherApps)
+                            if let pk = self.previousKeyWindow {
+                                pk.makeKeyAndOrderFront(nil)
+                            }
+                        }
+                    }
+                }
+                // Clear saved references
+                previousFrontmostApp = nil
+                previousKeyWindow = nil
+
                 NotificationCenter.default.post(name: .mouseExitedTarget, object: nil)
             }
         }
@@ -148,8 +189,6 @@ final class BlockingView: NSView {
     }
 
     private func showCursorOnAllDisplays() {
-        let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
-        logger.log(content: "[BlockingView] Showing cursor on all displays")
         var activeCount: UInt32 = 0
         var result = CGGetActiveDisplayList(0, nil, &activeCount)
         if result != .success { return }

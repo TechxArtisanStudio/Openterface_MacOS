@@ -33,6 +33,7 @@ extension Notification.Name {
     static let mouseEnteredTarget = Notification.Name("MouseEnteredTargetNotification")
     static let mouseExitedTarget = Notification.Name("MouseExitedTargetNotification")
     static let escapePressed = Notification.Name("EscapePressedNotification")
+    static let remoteMouseMoved = Notification.Name("RemoteMouseMovedNotification")
 }
 
 class ParallelManager: ParallelManagerProtocol {

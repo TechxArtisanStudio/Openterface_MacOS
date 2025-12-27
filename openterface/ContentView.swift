@@ -27,6 +27,9 @@ struct ContentView: View {
     @StateObject var viewModel = PlayerViewModel() // Ensures the view model is initialized once
     @State private var showInputOverlay = AppStatus.showInputOverlay
     @State private var overlayActive = AppStatus.showParallelOverlay
+    @State private var showMiniIndicator: Bool = false
+    @State private var miniMousePos: CGPoint = CGPoint(x: 0.5, y: 0.5) // normalized (0..1), origin: top-left
+    @State private var isMouseInTarget: Bool = false
     
     @Environment(\.controlActiveState) var controlActiveState
     
@@ -40,18 +43,74 @@ struct ContentView: View {
             // Parallel overlay indicator: show orange dot at top-center when active
             if overlayActive {
                 GeometryReader { geo in
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 12, height: 12)
-                        .position(x: geo.size.width / 2, y: 12)
-                        // Allow hit testing so we can detect double-clicks to exit parallel mode
-                        .onTapGesture(count: 2) {
-                            DispatchQueue.main.async {
-                                let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
-                                pm.exitParallelMode()
-                            }
+                    // Show either the small orange dot (indicator) or a mini black rectangle
+                    if showMiniIndicator {
+                        // Determine video aspect ratio
+                        let videoDims = DependencyContainer.shared.resolve(VideoManagerProtocol.self).dimensions
+                        let videoW = CGFloat(videoDims.width)
+                        let videoH = CGFloat(videoDims.height)
+                        let aspect = (videoH > 0 && videoW > 0) ? (videoW / videoH) : (16.0 / 9.0)
+
+                        let baseWidth: CGFloat = 160.0
+                        let rectWidth = min(baseWidth, geo.size.width - 20)
+                        let rectHeight = rectWidth / aspect
+
+                        ZStack(alignment: .topLeading) {
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: rectWidth, height: rectHeight)
+                                .cornerRadius(4)
+
+                            // Red/gray dot showing normalized mouse position inside the mini rectangle
+                            let dotSize: CGFloat = 6.0
+                                Circle()
+                                    .fill(isMouseInTarget ? Color.red : Color.gray)
+                                .frame(width: dotSize, height: dotSize)
+                                .offset(x: max(0, min(rectWidth - dotSize, rectWidth * miniMousePos.x - dotSize / 2)),
+                                        y: max(0, min(rectHeight - dotSize, rectHeight * miniMousePos.y - dotSize / 2)))
                         }
-                        .contentShape(Circle())
+                        .position(x: geo.size.width / 2, y: rectHeight / 2 + 12)
+                        .onTapGesture {
+                            // single tap toggles back to orange dot
+                            showMiniIndicator = false
+                        }
+                    } else {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 12, height: 12)
+                            .position(x: geo.size.width / 2, y: 12)
+                            // Single click: show mini indicator
+                            .onTapGesture {
+                                showMiniIndicator = true
+                            }
+                            // Double-click to exit parallel mode
+                            .onTapGesture(count: 2) {
+                                DispatchQueue.main.async {
+                                    let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
+                                    pm.exitParallelMode()
+                                }
+                            }
+                            .contentShape(Circle())
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .remoteMouseMoved)) { notif in
+                    guard let info = notif.userInfo,
+                          let x = info["x"] as? Double,
+                          let y = info["y"] as? Double else { return }
+                    DispatchQueue.main.async {
+                        // Update normalized mouse position (origin: top-left)
+                        miniMousePos = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .mouseEnteredTarget)) { _ in
+                    DispatchQueue.main.async {
+                        isMouseInTarget = true
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .mouseExitedTarget)) { _ in
+                    DispatchQueue.main.async {
+                        isMouseInTarget = false
+                    }
                 }
                 .ignoresSafeArea()
             }else{

@@ -246,6 +246,57 @@ class PlayerView: NSView, NSWindowDelegate {
         if UserSettings.shared.MouseControl != .relativeHID {
             inputMonitorManager.recordMouseMove()
         }
+
+        // If parallel overlay indicator is active, post normalized mouse position
+        if AppStatus.showParallelOverlay {
+            // Compute normalized coordinates relative to the actual video display area
+            let videoManager = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
+            let videoDimensions = videoManager.dimensions
+            let videoWidth = CGFloat(videoDimensions.width)
+            let videoHeight = CGFloat(videoDimensions.height)
+
+            let playerSize = self.bounds.size
+
+            var actualVideoDisplaySize: CGSize
+            var videoOffsetInPlayer: CGPoint
+
+            if videoWidth <= 0 || videoHeight <= 0 || playerSize.width <= 0 || playerSize.height <= 0 {
+                // If missing info, fallback to full view
+                actualVideoDisplaySize = playerSize
+                videoOffsetInPlayer = CGPoint(x: 0, y: 0)
+            } else {
+                let videoAspectRatio = videoWidth / videoHeight
+                let playerAspectRatio = playerSize.width / playerSize.height
+
+                if abs(videoAspectRatio - playerAspectRatio) < 0.01 {
+                    actualVideoDisplaySize = playerSize
+                    videoOffsetInPlayer = CGPoint(x: 0, y: 0)
+                } else if videoAspectRatio > playerAspectRatio {
+                    actualVideoDisplaySize = CGSize(width: playerSize.width, height: playerSize.width / videoAspectRatio)
+                    videoOffsetInPlayer = CGPoint(x: 0, y: (playerSize.height - actualVideoDisplaySize.height) / 2)
+                } else {
+                    actualVideoDisplaySize = CGSize(width: playerSize.height * videoAspectRatio, height: playerSize.height)
+                    videoOffsetInPlayer = CGPoint(x: (playerSize.width - actualVideoDisplaySize.width) / 2, y: 0)
+                }
+            }
+
+            // Convert mouse location into playerView coordinates
+            let mouseLocation = convert(event.locationInWindow, from: nil)
+            let adjustedX = mouseLocation.x - videoOffsetInPlayer.x
+            let adjustedY = mouseLocation.y - videoOffsetInPlayer.y
+
+            // Clamp and normalize
+            let clampedX = max(0, min(adjustedX, actualVideoDisplaySize.width))
+            let clampedY = max(0, min(adjustedY, actualVideoDisplaySize.height))
+
+            let normX = actualVideoDisplaySize.width > 0 ? Double(clampedX / actualVideoDisplaySize.width) : 0.0
+            let normY = actualVideoDisplaySize.height > 0 ? Double(clampedY / actualVideoDisplaySize.height) : 0.0
+
+            // Convert to top-left origin for SwiftUI overlay (y = 0 at top)
+            let topOriginY = 1.0 - normY
+
+            NotificationCenter.default.post(name: .remoteMouseMoved, object: nil, userInfo: ["x": normX, "y": topOriginY])
+        }
     }
 
     override func mouseDragged(with event: NSEvent) {
