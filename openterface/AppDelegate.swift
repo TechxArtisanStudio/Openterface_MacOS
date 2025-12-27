@@ -80,6 +80,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         
         super.init()
+        // Observe menu-related notifications so AppDelegate can keep the main View menu in sync
+        NotificationCenter.default.addObserver(self, selector: #selector(handleParallelModeChanged(_:)), name: Notification.Name("ParallelModeChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePlacementChanged(_:)), name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Dependency Setup
@@ -145,8 +152,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         setupMainWindow()
         setupNotificationObservers()
-        setupAspectRatioMenu()
-        
+        // Defer menu setup so SwiftUI has a chance to build its menus first,
+        // then merge our custom items into the existing View menu.
+        DispatchQueue.main.async {
+            self.setupAspectRatioMenu()
+        }
+
         // Setup status bar
         statusBarManager.setupStatusBar()
         
@@ -486,6 +497,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Add a separator
         viewMenu.addItem(NSMenuItem.separator())
+
+        // --- Parallel Mode menu item (avoid duplicates) ---
+        if viewMenu.items.first(where: { $0.action == #selector(toggleParallelModeMenu(_:)) || $0.title == "Enter Parallel Mode" || $0.title == "Exit Parallel Mode" }) == nil {
+            let parallelMenuItem = NSMenuItem(title: parallelManager.isParallelModeEnabled ? "Exit Parallel Mode" : "Enter Parallel Mode", action: #selector(toggleParallelModeMenu(_:)), keyEquivalent: "")
+            parallelMenuItem.target = self
+            viewMenu.addItem(parallelMenuItem)
+        }
+
+        // --- Target Screen Placement submenu (avoid duplicates) ---
+        if viewMenu.items.first(where: { $0.title == "Target Screen Placement" }) == nil {
+            let placementMenu = NSMenu(title: "Target Screen Placement")
+            let placementMenuItem = NSMenuItem(title: "Target Screen Placement", action: nil, keyEquivalent: "")
+            placementMenuItem.submenu = placementMenu
+
+            let leftItem = NSMenuItem(title: "Left", action: #selector(setTargetPlacementLeftMenu(_:)), keyEquivalent: "")
+            leftItem.target = self
+            leftItem.state = UserSettings.shared.targetComputerPlacement == .left ? .on : .off
+            placementMenu.addItem(leftItem)
+
+            let rightItem = NSMenuItem(title: "Right", action: #selector(setTargetPlacementRightMenu(_:)), keyEquivalent: "")
+            rightItem.target = self
+            rightItem.state = UserSettings.shared.targetComputerPlacement == .right ? .on : .off
+            placementMenu.addItem(rightItem)
+
+            let topItem = NSMenuItem(title: "Top", action: #selector(setTargetPlacementTopMenu(_:)), keyEquivalent: "")
+            topItem.target = self
+            topItem.state = UserSettings.shared.targetComputerPlacement == .top ? .on : .off
+            placementMenu.addItem(topItem)
+
+            let bottomItem = NSMenuItem(title: "Bottom", action: #selector(setTargetPlacementBottomMenu(_:)), keyEquivalent: "")
+            bottomItem.target = self
+            bottomItem.state = UserSettings.shared.targetComputerPlacement == .bottom ? .on : .off
+            placementMenu.addItem(bottomItem)
+
+            viewMenu.addItem(placementMenuItem)
+        }
         
         // Add a "HID Resolution Change Alert Settings" menu item
         let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
@@ -506,6 +553,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let testDirectNotificationsItem = NSMenuItem(title: "Test Direct Notifications", action: #selector(testDirectNotifications(_:)), keyEquivalent: "")
         debugSubMenu.addItem(testDirectNotificationsItem)
         #endif
+    }
+
+    // MARK: - View menu handlers (Parallel Mode + Target Placement)
+
+    @objc func toggleParallelModeMenu(_ sender: NSMenuItem) {
+        parallelManager.toggleParallelMode()
+        // Update menu title immediately
+        updateParallelMenuItemTitle()
+        NotificationCenter.default.post(name: Notification.Name("ParallelModeChanged"), object: nil)
+    }
+
+    @objc func setTargetPlacementLeftMenu(_ sender: NSMenuItem) {
+        UserSettings.shared.targetComputerPlacement = .left
+        updatePlacementMenuItems()
+        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    @objc func setTargetPlacementRightMenu(_ sender: NSMenuItem) {
+        UserSettings.shared.targetComputerPlacement = .right
+        updatePlacementMenuItems()
+        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    @objc func setTargetPlacementTopMenu(_ sender: NSMenuItem) {
+        UserSettings.shared.targetComputerPlacement = .top
+        updatePlacementMenuItems()
+        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    @objc func setTargetPlacementBottomMenu(_ sender: NSMenuItem) {
+        UserSettings.shared.targetComputerPlacement = .bottom
+        updatePlacementMenuItems()
+        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    private func updatePlacementMenuItems() {
+        guard let mainMenu = NSApp.mainMenu,
+              let viewMenuItem = mainMenu.items.first(where: { $0.title == "View" }),
+              let viewMenu = viewMenuItem.submenu,
+              let placementMenuItem = viewMenu.items.first(where: { $0.title == "Target Screen Placement" }),
+              let placementMenu = placementMenuItem.submenu else { return }
+
+        for item in placementMenu.items {
+            switch item.action {
+            case #selector(setTargetPlacementLeftMenu(_:)):
+                item.state = UserSettings.shared.targetComputerPlacement == .left ? .on : .off
+            case #selector(setTargetPlacementRightMenu(_:)):
+                item.state = UserSettings.shared.targetComputerPlacement == .right ? .on : .off
+            case #selector(setTargetPlacementTopMenu(_:)):
+                item.state = UserSettings.shared.targetComputerPlacement == .top ? .on : .off
+            case #selector(setTargetPlacementBottomMenu(_:)):
+                item.state = UserSettings.shared.targetComputerPlacement == .bottom ? .on : .off
+            default:
+                break
+            }
+        }
+    }
+
+    private func updateParallelMenuItemTitle() {
+        guard let mainMenu = NSApp.mainMenu,
+              let viewMenuItem = mainMenu.items.first(where: { $0.title == "View" }),
+              let viewMenu = viewMenuItem.submenu else { return }
+
+        if let item = viewMenu.items.first(where: { $0.action == #selector(toggleParallelModeMenu(_:)) }) {
+            item.title = parallelManager.isParallelModeEnabled ? "Exit Parallel Mode" : "Enter Parallel Mode"
+        }
+    }
+
+    @objc private func handleParallelModeChanged(_ notification: Notification) {
+        updateParallelMenuItemTitle()
+    }
+
+    @objc private func handlePlacementChanged(_ notification: Notification) {
+        updatePlacementMenuItems()
     }
     
     // Update window size

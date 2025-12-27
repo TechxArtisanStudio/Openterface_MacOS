@@ -59,6 +59,7 @@
 		BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */; };
 		BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DC2EFFE72400FE5D0E /* OverlayManager.swift */; };
 		BF7752DF2EFFECE400FE5D0E /* ParallelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DE2EFFECE400FE5D0E /* ParallelManager.swift */; };
+		BF7752E12F00211200FE5D0E /* MenuNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752E02F00211200FE5D0E /* MenuNotifications.swift */; };
 		BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */; };
 		BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7222E34FC8D002EACD7 /* OCRManager.swift */; };
 		BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */; };
@@ -152,6 +153,7 @@
 		BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BlockingView.swift; sourceTree = "<group>"; };
 		BF7752DC2EFFE72400FE5D0E /* OverlayManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OverlayManager.swift; sourceTree = "<group>"; };
 		BF7752DE2EFFECE400FE5D0E /* ParallelManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ParallelManager.swift; sourceTree = "<group>"; };
+		BF7752E02F00211200FE5D0E /* MenuNotifications.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MenuNotifications.swift; sourceTree = "<group>"; };
 		BF98F7182E34C29E002EACD7 /* ProtocolExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ProtocolExtensions.swift; path = openterface/Protocols/ProtocolExtensions.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7192E34C29E002EACD7 /* ManagerProtocols.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ManagerProtocols.swift; path = openterface/Protocols/ManagerProtocols.swift; sourceTree = SOURCE_ROOT; };
 		BF98F71C2E34C805002EACD7 /* DependencyContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DependencyContainer.swift; path = openterface/Core/DependencyContainer.swift; sourceTree = SOURCE_ROOT; };
@@ -293,6 +295,7 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				BF7752E02F00211200FE5D0E /* MenuNotifications.swift */,
 				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
 				BFB748FD2E35ED7D004F0DAE /* ClipboardManager.swift */,
@@ -562,6 +565,7 @@
 				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
 				BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */,
 				6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */,
+				BF7752E12F00211200FE5D0E /* MenuNotifications.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
 				BF98F7362E35A1BD002EACD7 /* ControlChipsetHAL.swift in Sources */,

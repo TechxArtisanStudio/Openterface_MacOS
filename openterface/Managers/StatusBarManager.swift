@@ -31,6 +31,12 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
 
     override init() {
         super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(handleParallelModeChanged(_:)), name: Notification.Name("ParallelModeChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePlacementChanged(_:)), name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     func initBar() {
@@ -108,6 +114,14 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
             parallelModeMenuItem.title = "Enter Parallel Mode"
         }
     }
+
+    @objc private func handleParallelModeChanged(_ notification: Notification) {
+        if parallelManager.isParallelModeEnabled {
+            parallelModeMenuItem.title = "Exit Parallel Mode"
+        } else {
+            parallelModeMenuItem.title = "Enter Parallel Mode"
+        }
+    }
     
     @objc func setTargetPlacementLeft() {
         UserSettings.shared.targetComputerPlacement = .left
@@ -157,6 +171,13 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
                 }
             }
         }
+        
+        // If there is a View menu mirror, nothing extra needed here — the app posts notifications
+        // This method updates the status bar submenu states only.
+    }
+
+    @objc private func handlePlacementChanged(_ notification: Notification) {
+        updatePlacementMenuStates()
     }
     
     // MARK: - StatusBarManagerProtocol Implementation
