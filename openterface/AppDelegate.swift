@@ -158,6 +158,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             self.isInitialLaunch = false
         }
     }
+
+    // Remove extra system-provided items from the Edit menu we don't want exposed
+    private func removeEditMenuExtras() {
+        func doRemove() {
+            guard let mainMenu = NSApp.mainMenu,
+                  let editMenuItem = mainMenu.items.first(where: { $0.title == "Edit" }) else { return }
+            guard let editMenu = editMenuItem.submenu else { return }
+
+            // Collect indices to remove (avoid mutating while iterating)
+            var indicesToRemove: [Int] = []
+            for (index, item) in editMenu.items.enumerated() {
+                let title = item.title.lowercased()
+                var shouldRemove = false
+
+                // Title-based checks (covers many locales that include these words)
+                if title.contains("dictation") || title.contains("emoji") || title.contains("emoj") || title.contains("symbols") {
+                    shouldRemove = true
+                }
+
+                // Action-based checks for known system selectors
+                if !shouldRemove, let action = item.action {
+                    let actionName = String(describing: action).lowercased()
+                    if actionName.contains("orderfrontcharacterpalette") || actionName.contains("startdictation") || actionName.contains("toggleemojipanel") || actionName.contains("showemoji") {
+                        shouldRemove = true
+                    }
+                }
+
+                if shouldRemove {
+                    indicesToRemove.append(index)
+                }
+            }
+
+            // Remove items in reverse order so indices remain valid
+            for index in indicesToRemove.sorted(by: >) {
+                editMenu.removeItem(at: index)
+            }
+
+            // Also remove any adjacent separators left behind
+            for i in (0..<editMenu.items.count).reversed() {
+                if editMenu.items[i].isSeparatorItem {
+                    // If separator at start or end remove it
+                    if i == 0 || i == editMenu.items.count - 1 {
+                        editMenu.removeItem(at: i)
+                    } else {
+                        // If two separators in a row, remove the duplicate
+                        if editMenu.items[i - 1].isSeparatorItem {
+                            editMenu.removeItem(at: i)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Attempt removal now and again after a short delay because the system may modify menus after launch
+        doRemove()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            doRemove()
+        }
+    }
     
     // MARK: - Hardware Abstraction Layer
     private func initializeHAL() {
@@ -605,7 +664,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func applicationWillUpdate(_ notification: Notification) {
-        
+        // Remove unwanted system items from Edit menu (e.g., Dictation, Emoji)
+        removeEditMenuExtras()
     }
     
     // Add window zoom control
