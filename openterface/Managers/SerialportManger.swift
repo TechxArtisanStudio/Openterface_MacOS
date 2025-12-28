@@ -84,10 +84,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// Stores the previous state of the CTS (Clear To Send) pin for change detection.
     /// 
     /// The CTS pin is connected to the CH340 data flip pin on the Openterface Mini KVM device.
-    /// This connection allows the system to detect HID activity from the target computer:
+    /// This connection allows the system to detect HID activity from the Target Screen:
     /// 
     /// **How it works:**
-    /// - When the target computer sends HID data (keyboard/mouse input), the CH340 chip toggles its data flip pin
+    /// - When the Target Screen sends HID data (keyboard/mouse input), the CH340 chip toggles its data flip pin
     /// - This causes the CTS pin state to change, which can be monitored through the serial port
     /// - By comparing the current CTS state with `lastCts`, we can detect when new HID events occur
     /// 
@@ -99,7 +99,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     ///   - `AppStatus.isMouseConnected = true`
     ///   - `lastHIDEventTime` is refreshed
     /// 
-    /// This mechanism provides a hardware-level indication of target computer activity without
+    /// This mechanism provides a hardware-level indication of Target Screen activity without
     /// relying solely on software-based communication protocols.
     var lastCts: Bool?
     
@@ -452,7 +452,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 self.isDeviceReady = true
                 self.errorAlertShown = false  // Reset error alert flag on successful connection
                 
-                let msgString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+                _ = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
                 handleSerialData(data: messageData)
             } else {
                 let errorDataString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
@@ -512,7 +512,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             AppStatus.isMouseConnected = isTargetConnected
 
             
-            logger.log(content: isTargetConnected ? "The target computer keyboard and mouse are connected" : "The target computer keyboard and mouse are disconnected")
+            logger.log(content: isTargetConnected ? "The Target Screen keyboard and mouse are connected" : "The Target Screen keyboard and mouse are disconnected")
             
             let isNumLockOn = (data[7] & 0x01) == 0x01
             AppStatus.isNumLockOn = isNumLockOn
@@ -680,7 +680,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func tryOpenSerialPort( priorityBaudrate: Int? = nil) {
 
         // Use priority baudrate if provided, otherwise use preferred baudrate from user settings
-        let effectivePriorityBaudrate = priorityBaudrate ?? UserSettings.shared.preferredBaudrate.rawValue
+        _ = priorityBaudrate ?? UserSettings.shared.preferredBaudrate.rawValue
         
         // Check if connection attempts are paused
         if self.isPaused {

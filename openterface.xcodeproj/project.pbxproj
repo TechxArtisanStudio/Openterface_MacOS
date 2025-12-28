@@ -45,7 +45,6 @@
 		6B7A12692EFA42060056FC15 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */; };
 		6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A126A2EFA42320056FC15 /* DiagnosticsViewModel.swift */; };
 		6B7A126F2EFBDA440056FC15 /* DefectReportDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A126D2EFBDA440056FC15 /* DefectReportDialog.swift */; };
-		6B7A12AE2EFD4B210056FC15 /* ParallelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A12AD2EFD4B210056FC15 /* ParallelManager.swift */; };
 		6B99F5992E9A6C570073CDA2 /* CH32V208ControlChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */; };
 		6B99F59A2E9A6C570073CDA2 /* CH9329ControlChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */; };
 		6B99F59B2E9A6C650073CDA2 /* MS2109SVideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */; };
@@ -57,6 +56,9 @@
 		6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */; };
+		BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */; };
+		BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DC2EFFE72400FE5D0E /* OverlayManager.swift */; };
+		BF7752DF2EFFECE400FE5D0E /* ParallelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DE2EFFECE400FE5D0E /* ParallelManager.swift */; };
 		BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */; };
 		BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7222E34FC8D002EACD7 /* OCRManager.swift */; };
 		BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F72F2E35A1BC002EACD7 /* DependencyContainer.swift */; };
@@ -135,7 +137,6 @@
 		6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		6B7A126A2EFA42320056FC15 /* DiagnosticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsViewModel.swift; sourceTree = "<group>"; };
 		6B7A126D2EFBDA440056FC15 /* DefectReportDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefectReportDialog.swift; sourceTree = "<group>"; };
-		6B7A12AD2EFD4B210056FC15 /* ParallelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParallelManager.swift; sourceTree = "<group>"; };
 		6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CH32V208ControlChipset.swift; sourceTree = "<group>"; };
 		6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CH9329ControlChipset.swift; sourceTree = "<group>"; };
 		6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2109SVideoChipset.swift; sourceTree = "<group>"; };
@@ -148,6 +149,9 @@
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
 		BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
+		BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BlockingView.swift; sourceTree = "<group>"; };
+		BF7752DC2EFFE72400FE5D0E /* OverlayManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OverlayManager.swift; sourceTree = "<group>"; };
+		BF7752DE2EFFECE400FE5D0E /* ParallelManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ParallelManager.swift; sourceTree = "<group>"; };
 		BF98F7182E34C29E002EACD7 /* ProtocolExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ProtocolExtensions.swift; path = openterface/Protocols/ProtocolExtensions.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7192E34C29E002EACD7 /* ManagerProtocols.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ManagerProtocols.swift; path = openterface/Protocols/ManagerProtocols.swift; sourceTree = SOURCE_ROOT; };
 		BF98F71C2E34C805002EACD7 /* DependencyContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DependencyContainer.swift; path = openterface/Core/DependencyContainer.swift; sourceTree = SOURCE_ROOT; };
@@ -289,7 +293,7 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
-				6B7A12AD2EFD4B210056FC15 /* ParallelManager.swift */,
+				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
 				BFB748FD2E35ED7D004F0DAE /* ClipboardManager.swift */,
 				BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */,
@@ -364,6 +368,16 @@
 				6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */,
 			);
 			path = Video;
+			sourceTree = "<group>";
+		};
+		BF7752D92EFFE51000FE5D0E /* Parallel */ = {
+			isa = PBXGroup;
+			children = (
+				BF7752DE2EFFECE400FE5D0E /* ParallelManager.swift */,
+				BF7752DC2EFFE72400FE5D0E /* OverlayManager.swift */,
+				BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */,
+			);
+			path = Parallel;
 			sourceTree = "<group>";
 		};
 		BF98F73B2E35A1EA002EACD7 /* Core */ = {
@@ -537,6 +551,8 @@
 				6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
 				BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */,
+				BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */,
+				BF7752DF2EFFECE400FE5D0E /* ParallelManager.swift in Sources */,
 				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,
 				BFD4EA942E35EE970029BFC2 /* ProtocolExtensions.swift in Sources */,
 				6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */,
@@ -544,6 +560,7 @@
 				BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
 				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
+				BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */,
 				6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,
 				531BAC382B5E423600950525 /* KeyBoardMapper.swift in Sources */,
@@ -565,7 +582,6 @@
 				BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */,
 				531BAC3A2B5E47F000950525 /* MouseMapper.swift in Sources */,
 				BF98F7232E34FC8D002EACD7 /* OCRManager.swift in Sources */,
-				6B7A12AE2EFD4B210056FC15 /* ParallelManager.swift in Sources */,
 				6B487A0F2EF24F2700CD664D /* InputOverlayView.swift in Sources */,
 				5308F43C2B5A1A3800BADF35 /* UserSetting.swift in Sources */,
 				BFD4EA982E369C870029BFC2 /* CameraManager.swift in Sources */,

@@ -83,7 +83,7 @@ final class UserSettings: ObservableObject {
         // Load always on top preference from UserDefaults
         self.isAlwaysOnTop = UserDefaults.standard.object(forKey: "isAlwaysOnTop") as? Bool ?? false
         
-        // Load target computer placement from UserDefaults
+        // Load Target Screen placement from UserDefaults
         let savedTargetPlacement = UserDefaults.standard.string(forKey: "targetComputerPlacement")
         self.targetComputerPlacement = TargetComputerPlacement(rawValue: savedTargetPlacement ?? "") ?? .right
     }
@@ -182,7 +182,7 @@ final class UserSettings: ObservableObject {
         }
     }
     
-    // Target computer placement setting
+    // Target Screen placement setting
     @Published var targetComputerPlacement: TargetComputerPlacement {
         didSet {
             UserDefaults.standard.set(targetComputerPlacement.rawValue, forKey: "targetComputerPlacement")
@@ -429,7 +429,7 @@ enum ControlMode: Int, CaseIterable {
     }
 }
 
-// Target computer placement enumeration
+// Target Screen placement enumeration
 enum TargetComputerPlacement: String, CaseIterable {
     case left = "left"
     case right = "right"
@@ -452,13 +452,13 @@ enum TargetComputerPlacement: String, CaseIterable {
     var description: String {
         switch self {
         case .left:
-            return "Target computer positioned to the left"
+            return "Target Screen positioned to the left"
         case .right:
-            return "Target computer positioned to the right"
+            return "Target Screen positioned to the right"
         case .top:
-            return "Target computer positioned at the top"
+            return "Target Screen positioned at the top"
         case .bottom:
-            return "Target computer positioned at the bottom"
+            return "Target Screen positioned at the bottom"
         }
     }
 }

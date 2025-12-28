@@ -31,6 +31,12 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
 
     override init() {
         super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(handleParallelModeChanged(_:)), name: Notification.Name("ParallelModeChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePlacementChanged(_:)), name: Notification.Name("TargetPlacementChanged"), object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     func initBar() {
@@ -59,8 +65,8 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Target Computer Placement submenu
-        let placementMenuItem = NSMenuItem(title: "Target Computer Placement", action: nil, keyEquivalent: "")
+        // Target Screen Placement submenu
+        let placementMenuItem = NSMenuItem(title: "Target Screen Placement", action: nil, keyEquivalent: "")
         let placementSubmenu = NSMenu()
         
         let leftItem = NSMenuItem(title: "Left", action: #selector(setTargetPlacementLeft), keyEquivalent: "")
@@ -108,38 +114,46 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
             parallelModeMenuItem.title = "Enter Parallel Mode"
         }
     }
+
+    @objc private func handleParallelModeChanged(_ notification: Notification) {
+        if parallelManager.isParallelModeEnabled {
+            parallelModeMenuItem.title = "Exit Parallel Mode"
+        } else {
+            parallelModeMenuItem.title = "Enter Parallel Mode"
+        }
+    }
     
     @objc func setTargetPlacementLeft() {
         UserSettings.shared.targetComputerPlacement = .left
         updatePlacementMenuStates()
-        logger.log(content: "Target computer placement set to: Left")
+        logger.log(content: "Target Screen placement set to: Left")
         // TODO: Implement left placement logic
     }
     
     @objc func setTargetPlacementRight() {
         UserSettings.shared.targetComputerPlacement = .right
         updatePlacementMenuStates()
-        logger.log(content: "Target computer placement set to: Right")
+        logger.log(content: "Target Screen placement set to: Right")
         // TODO: Implement right placement logic
     }
     
     @objc func setTargetPlacementTop() {
         UserSettings.shared.targetComputerPlacement = .top
         updatePlacementMenuStates()
-        logger.log(content: "Target computer placement set to: Top")
+        logger.log(content: "Target Screen placement set to: Top")
         // TODO: Implement top placement logic
     }
     
     @objc func setTargetPlacementBottom() {
         UserSettings.shared.targetComputerPlacement = .bottom
         updatePlacementMenuStates()
-        logger.log(content: "Target computer placement set to: Bottom")
+        logger.log(content: "Target Screen placement set to: Bottom")
         // TODO: Implement bottom placement logic
     }
     
     private func updatePlacementMenuStates() {
         if let menu = statusBarItem?.menu,
-           let placementMenuItem = menu.items.first(where: { $0.title == "Target Computer Placement" }),
+           let placementMenuItem = menu.items.first(where: { $0.title == "Target Screen Placement" }),
            let submenu = placementMenuItem.submenu {
             
             for item in submenu.items {
@@ -157,6 +171,13 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
                 }
             }
         }
+        
+        // If there is a View menu mirror, nothing extra needed here — the app posts notifications
+        // This method updates the status bar submenu states only.
+    }
+
+    @objc private func handlePlacementChanged(_ notification: Notification) {
+        updatePlacementMenuStates()
     }
     
     // MARK: - StatusBarManagerProtocol Implementation

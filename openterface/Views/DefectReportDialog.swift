@@ -129,7 +129,13 @@ class DefectReportDialog {
         let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 250))
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
-        scrollView.borderType = .bezelBorder
+        // `borderType` was deprecated in macOS 10.15; use a layer-based border instead
+        scrollView.wantsLayer = true
+        if let layer = scrollView.layer {
+            layer.borderWidth = 1.0
+            layer.borderColor = NSColor.separatorColor.cgColor
+            layer.cornerRadius = 4.0
+        }
         
         let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 250))
         textView.isEditable = false
@@ -144,7 +150,13 @@ class DefectReportDialog {
         let infoBox = NSBox(frame: NSRect(x: 0, y: 0, width: 600, height: 100))
         infoBox.title = "📁 Log Files to Attach"
         infoBox.boxType = .primary
-        infoBox.borderType = .bezelBorder
+        // `borderType` is deprecated; use a layer-based border for similar appearance
+        infoBox.wantsLayer = true
+        if let layer = infoBox.layer {
+            layer.borderWidth = 1.0
+            layer.borderColor = NSColor.separatorColor.cgColor
+            layer.cornerRadius = 4.0
+        }
         
         // Path label
         let pathLabel = NSTextField(frame: NSRect(x: 12, y: 70, width: 576, height: 16))
@@ -310,8 +322,8 @@ class DefectReportDialog {
             let userName = nameField.stringValue.trimmingCharacters(in: .whitespaces)
             copyToClipboardButton.isEnabled = !orderID.isEmpty
             
-            var emailSubject = emailSubject
-            var emailBody = emailBody
+            let emailSubject = emailSubject
+            let emailBody = emailBody
             
             // Build signature with user name
             let signature = !userName.isEmpty ? userName : "Openterface User"

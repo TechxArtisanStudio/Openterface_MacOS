@@ -31,11 +31,37 @@ import CoreTransferable
 import AVFoundation
 import CoreAudio
 
+// Simple observable wrapper so SwiftUI menus can react to parallel-mode changes
+final class ParallelState: NSObject, ObservableObject {
+    @Published var isEnabled: Bool = false
+
+    override init() {
+        super.init()
+        // Read initial state from DI
+        let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
+        isEnabled = pm.isParallelModeEnabled
+
+        NotificationCenter.default.addObserver(self, selector: #selector(handleParallelChanged(_:)), name: Notification.Name("ParallelModeChanged"), object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleParallelChanged(_ n: Notification) {
+        let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
+        DispatchQueue.main.async {
+            self.isEnabled = pm.isParallelModeEnabled
+        }
+    }
+}
+
 @main
 struct openterfaceApp: App {
     
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
+    @StateObject private var parallelState = ParallelState()
 
     // Protocol-based dependencies - using computed properties since App structs are immutable
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
@@ -109,7 +135,6 @@ struct openterfaceApp: App {
                         ToolbarItemGroup(placement: .automatic) {
                             Button {
                                 logger.log(content: "🎹 Floating keyboard button pressed")
-                                print("🎹 DEBUG: Floating keyboard button pressed") // Additional debug
                                 floatingKeyboardManager.showFloatingKeysWindow()
                             } label: {
                                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
@@ -763,6 +788,50 @@ struct openterfaceApp: App {
                     showAspectRatioSelectionWindow()
                 }) {
                     Text("Target Aspect Ratio...")
+                }
+                
+                Divider()
+
+                // Parallel Mode toggle (mirrors status bar)
+                Button(action: {
+                    let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
+                    pm.toggleParallelMode()
+                    NotificationCenter.default.post(name: Notification.Name("ParallelModeChanged"), object: nil)
+                    // optimistic local update
+                    parallelState.isEnabled.toggle()
+                }) {
+                    Text(parallelState.isEnabled ? "Exit Parallel Mode" : "Enter Parallel Mode")
+                }
+
+                // Target Screen Placement submenu
+                Menu("Target Screen Placement") {
+                    Button(action: {
+                        UserSettings.shared.targetComputerPlacement = .left
+                        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+                    }) {
+                        Text("Left\(UserSettings.shared.targetComputerPlacement == .left ? " ✓" : "")")
+                    }
+
+                    Button(action: {
+                        UserSettings.shared.targetComputerPlacement = .right
+                        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+                    }) {
+                        Text("Right\(UserSettings.shared.targetComputerPlacement == .right ? " ✓" : "")")
+                    }
+
+                    Button(action: {
+                        UserSettings.shared.targetComputerPlacement = .top
+                        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+                    }) {
+                        Text("Top\(UserSettings.shared.targetComputerPlacement == .top ? " ✓" : "")")
+                    }
+
+                    Button(action: {
+                        UserSettings.shared.targetComputerPlacement = .bottom
+                        NotificationCenter.default.post(name: Notification.Name("TargetPlacementChanged"), object: nil)
+                    }) {
+                        Text("Bottom\(UserSettings.shared.targetComputerPlacement == .bottom ? " ✓" : "")")
+                    }
                 }
             }
         }
