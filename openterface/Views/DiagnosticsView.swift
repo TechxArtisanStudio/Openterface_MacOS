@@ -359,12 +359,16 @@ struct DiagnosticsView: View {
         .frame(minWidth: 900, minHeight: 600)
         .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white)
         .alert("Enable Diagnostic Logging", isPresented: $showLoggingAlert) {
-            Button("Enable", action: {
+            Button("Enable Both") {
                 viewModel.enableLogging()
-            })
+                viewModel.enableSerialLogging()
+            }
+            Button("Enable Logging Only") {
+                viewModel.enableLogging()
+            }
             Button("Later", role: .cancel) { }
         } message: {
-            Text("Enable logging to save detailed diagnostics for troubleshooting.\n\nLog file: \(viewModel.logFilePath)")
+            Text("Enable logging to save detailed diagnostics for troubleshooting.\n\nLog file: \(viewModel.logFilePath)\n\nWould you like to enable serial data logging as well?")
         }
     }
     
