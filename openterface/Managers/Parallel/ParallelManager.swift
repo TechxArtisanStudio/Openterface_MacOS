@@ -30,6 +30,8 @@ import CoreGraphics
 extension Notification.Name {
     static let overlayShown = Notification.Name("OverlayShownNotification")
     static let overlayHidden = Notification.Name("OverlayHiddenNotification")
+    static let parallelModeChanged = Notification.Name("ParallelModeChanged")
+    static let targetPlacementChanged = Notification.Name("TargetPlacementChanged")
     static let mouseEnteredTarget = Notification.Name("MouseEnteredTargetNotification")
     static let mouseExitedTarget = Notification.Name("MouseExitedTargetNotification")
     static let escapePressed = Notification.Name("EscapePressedNotification")

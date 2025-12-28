@@ -1,6 +1,5 @@
 import Foundation
 
-extension Notification.Name {
-    static let parallelModeChanged = Notification.Name("ParallelModeChanged")
-    static let targetPlacementChanged = Notification.Name("TargetPlacementChanged")
-}
+// Notification names moved to `ParallelManager.swift` to consolidate
+// parallel/overlay-related notifications. This file is retained for
+// historical reference.
