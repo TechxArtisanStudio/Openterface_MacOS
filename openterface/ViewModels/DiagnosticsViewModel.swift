@@ -32,6 +32,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
     private var mouseManager: MouseManagerProtocol = DependencyContainer.shared.resolve(MouseManagerProtocol.self)
     
     @Published var isLoggingEnabled: Bool = false
+    @Published var isSerialLoggingEnabled: Bool = false
     @Published var logFilePath: String = ""
     
     enum DiagnosticTestStep: Int, CaseIterable {
@@ -105,6 +106,8 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
         super.init()
         initializeResults()
         updateLogFilePath()
+        // Initialize serial logging state from logger
+        isSerialLoggingEnabled = logger.SerialDataPrint
     }
     
     private func initializeResults() {
@@ -136,6 +139,18 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
             logger.closeLogFile()
             isLoggingEnabled = false
         }
+    }
+
+    func enableSerialLogging() {
+        logger.SerialDataPrint = true
+        isSerialLoggingEnabled = true
+        addStatusMessage("🔌 Serial logging enabled")
+    }
+
+    func disableSerialLogging() {
+        logger.SerialDataPrint = false
+        isSerialLoggingEnabled = false
+        addStatusMessage("🔌 Serial logging disabled")
     }
     
     // MARK: - Helper Methods
