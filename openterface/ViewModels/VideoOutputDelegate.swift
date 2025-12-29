@@ -8,6 +8,10 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     
     // Store the latest video frame for OCR processing
     private var latestPixelBuffer: CVPixelBuffer?
+    // Flag to ensure we only analyze the very first frame once
+    private var hasAnalyzedFirstFrame: Bool = false
+    // Count incoming frames so we can analyze a specific one (e.g., 10th)
+    private var frameCounter: Int = 0
     private let bufferQueue = DispatchQueue(label: "VideoOutputDelegate.bufferQueue", qos: .userInitiated)
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -47,7 +51,102 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
 
     private func processPixelBuffer(_ pixelBuffer: CVPixelBuffer) {
-        // Add your custom processing logic here
+        // Analyze a chosen frame (10th) once and notify observers
+        guard !hasAnalyzedFirstFrame else { return }
+
+        frameCounter += 1
+        let targetFrame = 10
+        // Wait until the target frame number
+        guard frameCounter >= targetFrame else {
+            return
+        }
+
+        if let cgImage = createCGImage(from: pixelBuffer) {
+            let width = cgImage.width
+            let height = cgImage.height
+            print("🎯 First-frame resolution: \(width)x\(height)")
+            
+            // Detect active (non-black) area within the frame
+            var userInfo: [String: Any] = ["width": width, "height": height]
+            if let activeRect = detectActiveRect(from: cgImage) {
+                userInfo["activeX"] = Int(activeRect.origin.x)
+                userInfo["activeY"] = Int(activeRect.origin.y)
+                userInfo["activeWidth"] = Int(activeRect.size.width)
+                userInfo["activeHeight"] = Int(activeRect.size.height)
+                print("🎯 First-frame active rect: \(activeRect)")
+            } else {
+                print("ℹ️ No active (non-black) area detected in first frame")
+            }
+
+            NotificationCenter.default.post(name: Notification.Name("VideoFirstFrameResolution"), object: nil, userInfo: userInfo)
+
+            hasAnalyzedFirstFrame = true
+        } else {
+            print("❌ Failed to create CGImage for first-frame analysis")
+        }
+    }
+
+    /// Detects the bounding rect of non-black pixels in the image (image coordinates)
+    private func detectActiveRect(from cgImage: CGImage) -> CGRect? {
+        let width = cgImage.width
+        let height = cgImage.height
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        let bitsPerComponent = 8
+
+        guard let contextData = malloc(height * bytesPerRow) else { return nil }
+        defer { free(contextData) }
+
+        guard let context = CGContext(data: contextData,
+                                      width: width,
+                                      height: height,
+                                      bitsPerComponent: bitsPerComponent,
+                                      bytesPerRow: bytesPerRow,
+                                      space: colorSpace,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return nil
+        }
+
+        // Draw into RGBA context
+        let rect = CGRect(x: 0, y: 0, width: width, height: height)
+        context.draw(cgImage, in: rect)
+
+        let threshold: UInt8 = 16 // pixel > threshold considered active (not black)
+
+        var minX = width
+        var minY = height
+        var maxX: Int = 0
+        var maxY: Int = 0
+
+        let data = context.data!.assumingMemoryBound(to: UInt8.self)
+
+        for y in 0..<height {
+            let row = data.advanced(by: y * bytesPerRow)
+            for x in 0..<width {
+                let pixel = row.advanced(by: x * bytesPerPixel)
+                let r = pixel[0]
+                let g = pixel[1]
+                let b = pixel[2]
+
+                if r > threshold || g > threshold || b > threshold {
+                    if x < minX { minX = x }
+                    if x > maxX { maxX = x }
+                    if y < minY { minY = y }
+                    if y > maxY { maxY = y }
+                }
+            }
+        }
+
+        if minX <= maxX && minY <= maxY {
+            // Note: Core Graphics origin is bottom-left for drawing, but here we return image coordinates with origin at (0,0) top-left
+            let w = maxX - minX + 1
+            let h = maxY - minY + 1
+            return CGRect(x: minX, y: minY, width: w, height: h)
+        }
+
+        return nil
     }
     
     /// Gets the latest video frame for OCR processing

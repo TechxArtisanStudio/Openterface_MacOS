@@ -642,7 +642,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         )
         
         // Calculate appropriate size
-        let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
+        let newSize = WindowUtils.shared.calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
         
         // Calculate center position
         let newX = screenFrame.origin.x + (screenFrame.width - newSize.width) / 2
@@ -673,70 +673,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        return calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true)
-    }
-
-    private func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, constraintToScreen: Bool) -> NSSize {
-        // Get the height of the toolbar (if visible)
-        let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
-        
-        // Determine the aspect ratio to use
-        let aspectRatioToUse: CGFloat
-        
-        // Priority: 1. User custom ratio 2. HID ratio 3. Default ratio
-        if UserSettings.shared.useCustomAspectRatio {
-            // Use user custom ratio
-            aspectRatioToUse = UserSettings.shared.customAspectRatio.widthToHeightRatio
-        } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-            // Use AppStatus resolution
-            aspectRatioToUse = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-        }  else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
-             aspectRatioToUse = CGFloat(resolution.width) / CGFloat(resolution.height)
-        } else {
-            // Use default ratio
-            aspectRatioToUse = initialContentSize.width / initialContentSize.height
-        }
-        
-        // Get the screen containing the window
-        guard let screen = (window.screen ?? NSScreen.main) else { return targetSize }
-
-        // Calculate new size maintaining content area aspect ratio
-        var newSize = targetSize
-
-        // Adjust height calculation to account for the toolbar
-        var contentHeight = newSize.width / aspectRatioToUse
-        newSize.height = contentHeight + toolbarHeight
-
-        // If requested, constrain the window to the visible screen area
-        if constraintToScreen {
-            let screenFrame = screen.visibleFrame
-
-            // If the computed height exceeds the screen's visible height, clamp it
-            if newSize.height > screenFrame.height {
-                // Maximum content height available (excluding toolbar)
-                let maxContentHeight = max(screenFrame.height - toolbarHeight, 1)
-
-                // Compute width that preserves aspect ratio for the clamped height
-                var adjustedWidth = maxContentHeight * aspectRatioToUse
-                var adjustedHeight = maxContentHeight + toolbarHeight
-
-                // If the adjusted width also exceeds screen width, clamp width and recompute height
-                if adjustedWidth > screenFrame.width {
-                    adjustedWidth = screenFrame.width
-                    let contentHeightFromWidth = adjustedWidth / aspectRatioToUse
-                    adjustedHeight = contentHeightFromWidth + toolbarHeight
-                }
-
-                newSize.width = adjustedWidth
-                newSize.height = adjustedHeight
-            }
-        }
-
-        // Ensure we respect the window's minimum size
-        newSize.width = max(newSize.width, window.minSize.width)
-        newSize.height = max(newSize.height, window.minSize.height)
-
-        return newSize
+        return WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
     }
 
     func windowWillStartLiveResize(_ notification: Notification) {
@@ -768,7 +705,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             )
             
             // Use calculateConstrainedWindowSize function to calculate new size
-            let newSize = calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true)
+            let newSize = WindowUtils.shared.calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
             
             // Ensure the new size is not smaller than minimum allowed
             let finalSize = NSSize(
@@ -842,7 +779,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let targetSize = NSSize(width: maxWidth, height: maxHeight)
             
             // Use calculateConstrainedWindowSize to maintain the aspect ratio
-            let maxSize = calculateConstrainedWindowSize(for: sender, targetSize: targetSize, constraintToScreen: true)
+            let maxSize = WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
             
             // Calculate center position
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2

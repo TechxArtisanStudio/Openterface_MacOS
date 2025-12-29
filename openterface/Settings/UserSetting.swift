@@ -86,6 +86,12 @@ final class UserSettings: ObservableObject {
         // Load Target Screen placement from UserDefaults
         let savedTargetPlacement = UserDefaults.standard.string(forKey: "targetComputerPlacement")
         self.targetComputerPlacement = TargetComputerPlacement(rawValue: savedTargetPlacement ?? "") ?? .right
+
+        // Load persisted active video rect from UserDefaults
+        self.activeVideoX = UserDefaults.standard.object(forKey: "activeVideoX") as? Int ?? 0
+        self.activeVideoY = UserDefaults.standard.object(forKey: "activeVideoY") as? Int ?? 0
+        self.activeVideoWidth = UserDefaults.standard.object(forKey: "activeVideoWidth") as? Int ?? 0
+        self.activeVideoHeight = UserDefaults.standard.object(forKey: "activeVideoHeight") as? Int ?? 0
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -198,6 +204,25 @@ final class UserSettings: ObservableObject {
             UserDefaults.standard.set(targetComputerPlacement.rawValue, forKey: "targetComputerPlacement")
         }
     }
+
+    // Persisted active video area (stored in image pixels)
+    @Published var activeVideoX: Int {
+        didSet { UserDefaults.standard.set(activeVideoX, forKey: "activeVideoX") }
+    }
+    @Published var activeVideoY: Int {
+        didSet { UserDefaults.standard.set(activeVideoY, forKey: "activeVideoY") }
+    }
+    @Published var activeVideoWidth: Int {
+        didSet { UserDefaults.standard.set(activeVideoWidth, forKey: "activeVideoWidth") }
+    }
+    @Published var activeVideoHeight: Int {
+        didSet { UserDefaults.standard.set(activeVideoHeight, forKey: "activeVideoHeight") }
+    }
+
+    // Convenience computed rect
+    var activeVideoRect: CGRect {
+        return CGRect(x: activeVideoX, y: activeVideoY, width: activeVideoWidth, height: activeVideoHeight)
+    }
 }
 
 enum MouseControlMode: Int {
@@ -291,7 +316,7 @@ enum AspectRatioOption: String, CaseIterable {
     case ratio4_3 = "4:3"       //1.33333   (eg: 1600x1200, 1024x768)
     case ratio5_4 = "5:4"       //1.25      (eg: 1280x1024)
     case ratio9_16 = "9:16"     //0.5625        
-    case ratio9_19_5 = "9:19.5" // 0.46153846
+    case ratio9_19_5 = "9:19.5" // 0.46153846 
     case ratio9_20 = "9:20"     // 0.45
     case ratio9_21 = "9:21"     // 0.42857143
     

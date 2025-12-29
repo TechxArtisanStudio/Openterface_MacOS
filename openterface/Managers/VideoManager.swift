@@ -94,11 +94,20 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         
         self.setupBindings()
         setupSession()
+        // Listen for first-frame resolution analysis from VideoOutputDelegate
+        NotificationCenter.default.addObserver(self, selector: #selector(handleFirstFrameResolution(_:)), name: Notification.Name("VideoFirstFrameResolution"), object: nil)
         
         if AppStatus.isFristRun == false {
             // Add device notification observers
             self.observeDeviceNotifications()
             AppStatus.isFristRun = true
+        }
+
+        // Restore persisted active video rect from user settings if present
+        let savedRect = UserSettings.shared.activeVideoRect
+        if savedRect.width > 0 && savedRect.height > 0 {
+            AppStatus.activeVideoRect = savedRect
+            logger.log(content: "Restored active video rect from user settings: \(savedRect)")
         }
     }
     
@@ -212,6 +221,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         notificationCenter.removeObserver(self, name: .AVCaptureDeviceWasDisconnected, object: nil)
         notificationCenter.removeObserver(self, name: NSNotification.Name("StopVideoSession"), object: nil)
         notificationCenter.removeObserver(self, name: NSNotification.Name("StartVideoSession"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("VideoFirstFrameResolution"), object: nil)
         
         // Remove audio property listener
         if let listenerID = audioPropertyListenerID {
@@ -701,10 +711,70 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
            usbDevicesManager?.update()
         }
     }
+
+    /// Handle first-frame resolution notification and update dimensions
+    @objc private func handleFirstFrameResolution(_ notification: Notification) {
+        guard let info = notification.userInfo as? [String: Any],
+              let width = info["activeWidth"] as? Int,
+              let height = info["activeHeight"] as? Int else { return }
+
+        dimensions = CMVideoDimensions(width: Int32(width), height: Int32(height))
+        AppStatus.videoDimensions.width = CGFloat(width)
+        AppStatus.videoDimensions.height = CGFloat(height)
+        logger.log(content: "First frame resolution received: \(width)x\(height) - dimensions updated")
+
+        // Auto-match aspect ratio from first frame and update user settings
+        let aspect = CGFloat(width) / max(1.0, CGFloat(height))
+        let tolerance: CGFloat = 0.02 // 2% tolerance
+        var matched: AspectRatioOption? = nil
+        for option in AspectRatioOption.allCases {
+            let r = option.widthToHeightRatio
+            if abs(r - aspect) / aspect <= tolerance {
+                matched = option
+                break
+            }
+        }
+
+        if let matched = matched {
+            UserSettings.shared.customAspectRatio = matched
+            UserSettings.shared.useCustomAspectRatio = true
+            logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", aspect)))")
+            // Notify UI to apply new gravity/aspect settings immediately
+            NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+            }
+        } else {
+            // No match: revert to default aspect handling
+            UserSettings.shared.useCustomAspectRatio = false
+            UserSettings.shared.gravity = .resizeAspect
+            logger.log(content: "No aspect ratio match (aspect=\(String(format: "%.3f", aspect))). Reverting to default gravity: resizeAspect")
+            NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+            }
+        }
+
+        // If active rect provided, update AppStatus and log
+        if let ax = info["activeX"] as? Int,
+           let ay = info["activeY"] as? Int,
+           let aw = info["activeWidth"] as? Int,
+           let ah = info["activeHeight"] as? Int {
+            let rect = CGRect(x: ax, y: ay, width: aw, height: ah)
+            AppStatus.activeVideoRect = rect
+            logger.log(content: "First frame active video area: \(rect), aspect ratio: \(String(format: "%.2f", rect.width / rect.height))")
+
+            // Persist to user settings so it's remembered
+            UserSettings.shared.activeVideoX = ax
+            UserSettings.shared.activeVideoY = ay
+            UserSettings.shared.activeVideoWidth = aw
+            UserSettings.shared.activeVideoHeight = ah
+        }
+    }
     
     // MARK: - Firmware Update Video Session Control
     
-    /// Handles notification to stop video session for firmware update
+    /// Handles notification to stop video session for firmware updatecalculateConstrainedWindowSize
     @objc func handleStopVideoSession(_ notification: Notification) {
         logger.log(content: "Received request to stop video session for firmware update")
         logger.log(content: "Current video session state: isRunning=\(self.captureSession.isRunning), isVideoSessionStarting=\(self.isVideoSessionStarting)")

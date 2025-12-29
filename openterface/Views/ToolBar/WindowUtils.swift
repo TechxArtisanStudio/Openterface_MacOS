@@ -97,7 +97,7 @@ final class WindowUtils {
             }
             return
         }
-        
+
         let alert = NSAlert()
         alert.messageText = "Aspect Ratio & Video Settings"
         alert.informativeText = "Please select your preferred aspect ratio and video scaling options:"
@@ -236,6 +236,72 @@ final class WindowUtils {
     /// Directly call the system notification to update the window size
     func updateWindowSizeThroughNotification() {
         NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+    }
+
+    /// Calculate a window size constrained to an aspect ratio and screen bounds.
+    /// - Parameters:
+    ///   - window: The window being resized
+    ///   - targetSize: The desired target size
+    ///   - constraintToScreen: Whether to clamp to the visible screen area
+    ///   - initialContentSize: The default content size / aspect ratio to use when none is available
+    func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, constraintToScreen: Bool, initialContentSize: CGSize) -> NSSize {
+        // Get the height of the toolbar (if visible)
+        let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
+        
+        // Determine the aspect ratio to use
+        let aspectRatioToUse: CGFloat
+
+        // Priority: 1. User custom ratio 2. HID ratio 3. Default ratio
+        if UserSettings.shared.useCustomAspectRatio {
+            aspectRatioToUse = UserSettings.shared.customAspectRatio.widthToHeightRatio
+        } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+            aspectRatioToUse = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+        } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
+            aspectRatioToUse = CGFloat(resolution.width) / CGFloat(resolution.height)
+        } else {
+            aspectRatioToUse = initialContentSize.width / initialContentSize.height
+        }
+
+        // Get the screen containing the window
+        guard let screen = (window.screen ?? NSScreen.main) else { return targetSize }
+
+        // Calculate new size maintaining content area aspect ratio
+        var newSize = targetSize
+
+        // Adjust height calculation to account for the toolbar
+        var contentHeight = newSize.width / aspectRatioToUse
+        newSize.height = contentHeight + toolbarHeight
+
+        // If requested, constrain the window to the visible screen area
+        if constraintToScreen {
+            let screenFrame = screen.visibleFrame
+
+            // If the computed height exceeds the screen's visible height, clamp it
+            if newSize.height > screenFrame.height {
+                // Maximum content height available (excluding toolbar)
+                let maxContentHeight = max(screenFrame.height - toolbarHeight, 1)
+
+                // Compute width that preserves aspect ratio for the clamped height
+                var adjustedWidth = maxContentHeight * aspectRatioToUse
+                var adjustedHeight = maxContentHeight + toolbarHeight
+
+                // If the adjusted width also exceeds screen width, clamp width and recompute height
+                if adjustedWidth > screenFrame.width {
+                    adjustedWidth = screenFrame.width
+                    let contentHeightFromWidth = adjustedWidth / aspectRatioToUse
+                    adjustedHeight = contentHeightFromWidth + toolbarHeight
+                }
+
+                newSize.width = adjustedWidth
+                newSize.height = adjustedHeight
+            }
+        }
+
+        // Ensure we respect the window's minimum size
+        newSize.width = max(newSize.width, window.minSize.width)
+        newSize.height = max(newSize.height, window.minSize.height)
+
+        return newSize
     }
     
     /// Toggle always on top window level
