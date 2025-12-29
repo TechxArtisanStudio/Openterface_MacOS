@@ -132,164 +132,27 @@ struct openterfaceApp: App {
                 ContentView()
                     .navigationTitle("Openterface KVM - \(AppVersion.getVersionString())")
                     .toolbar {
-                        ToolbarItemGroup(placement: .automatic) {
-                            Button {
-                                logger.log(content: "🎹 Floating keyboard button pressed")
-                                floatingKeyboardManager.showFloatingKeysWindow()
-                            } label: {
-                                Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
-                            }
-
-                            // Caps Lock indicator placed next to the keyboard button
-                            CapsLockIndicatorView()
-                                .help("Host Caps Lock state - ON/OFF")
-
-                            Button(action: {}) {
-                                Image(systemName: "poweron") // spacer
-                            }
-                            .disabled(true)
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Menu {
-                                Button(action: {
-                                    toggleAudio(isEnabled: !_isAudioEnabled)
-                                }) {
-                                    Label(_isAudioEnabled ? "Mute Audio" : "Unmute Audio", 
-                                          systemImage: _isAudioEnabled ? "speaker.slash" : "speaker.wave.3")
-                                }
-                                
-                                Divider()
-
-                                Menu("Audio Settings") {
-                                    AudioSourceMenuContent(audioManager: audioManager as! AudioManager)
-                                }
-                            } label: {
-                                Image(systemName: _isAudioEnabled ? "speaker.wave.3.fill" : "speaker.slash.fill")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 16, height: 16)
-                                    .foregroundColor(_isAudioEnabled ? .green : .red)
-                            }
-                            // removed duplicate Caps Lock indicator previously misplaced here
-                            
-                            Button {
-                                cameraManager.takePicture()
-                            } label: {
-                                Image(systemName: "camera.fill")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 16, height: 16)
-                                    .foregroundColor(_canTakePicture ? .blue : .gray)
-                            }
-                            .help("Take Picture")
-                            .disabled(!_canTakePicture)
-                            
-                            Button {
-                                if _isRecording {
-                                    cameraManager.stopVideoRecording()
-                                } else {
-                                    cameraManager.startVideoRecording()
-                                }
-                            } label: {
-                                Image(systemName: _isRecording ? "record.circle.fill" : "record.circle")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 16, height: 16)
-                                    .foregroundColor(_isRecording ? .red : (_canTakePicture ? .blue : .gray))
-                            }
-                            .help(_isRecording ? "Stop Recording" : "Start Video Recording")
-                            .disabled(!_canTakePicture)
-                            
-                            Button(action: {
-                                showAspectRatioSelectionWindow()
-                            }) {
-                                Image(systemName: "display")
-                                    .resizable()
-                                    .frame(width: 14, height: 14)
-                                    .foregroundColor(colorForConnectionStatus(_hasHdmiSignal))
-                            }
-                            .help("Click to view Target Aspect Ratio...")
-                        }
-                        
-                        ToolbarItem(placement: .primaryAction) {
-                            ResolutionView(
-                                width: _resolution.width, 
-                                height: _resolution.height,
-                                fps: _fps,
-                                helpText:   "Input Resolution: \(_resolution.width)x\(_resolution.height)\n" +
-                                            "Capture Resolution: 1920x1080\n" +
-                                            "Refresh Rate: \(_fps) Hz\n" +
-                                            "Pixel Clock: \(_pixelClock) MHz\n" +
-                                            "HTotal: \(AppStatus.hidInputHTotal)\n" + 
-                                            "VTotal: \(AppStatus.hidInputVTotal)\n" +
-                                            "Hst: \(AppStatus.hidInputHst)\n" +
-                                            "Vst: \(AppStatus.hidInputVst)\n" +
-                                            "Hsync Width: \(AppStatus.hidInputHsyncWidth)\n" +
-                                            "Vsync Width: \(AppStatus.hidInputVsyncWidth)"
-                            )
-                        }
-                        
-                        ToolbarItem(placement: .automatic) {
-                            Button(action: {
-                                // Add your code to execute when the button is clicked, e.g., open a window
-                                showUSBDevicesWindow()
-                            }) {
-                                HStack {
-                                    Image(systemName: "keyboard.fill")
-                                        .resizable()
-                                        .frame(width: 16, height: 12)
-                                        .foregroundColor(colorForConnectionStatus(_isKeyboardConnected))
-                                    Image(systemName: _isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
-                                        .resizable()
-                                        .frame(width: _isMouseLoopRunning ? 14 : 10, height: 12)
-                                        .foregroundColor(colorForConnectionStatus(_isMouseConnected))
-                                }
-                            }
-                            .help(
-                                """
-                                KeyBoard: \(
-                                    _isKeyboardConnected == true ? "Connected" :
-                                    _isKeyboardConnected == false ? "Not found" : "Unknown"
-                                )
-                                Mouse: \(
-                                    _isMouseConnected == true ? "Connected" :
-                                    _isMouseConnected == false ? "Not found" : "Unknown"
-                                )
-
-                                Click to view USB device details
-                                """
-                            )
-                        }
-                    
-                        
-                        // Add serial port information display
-                        ToolbarItem(placement: .automatic) {
-                            if let serialPortMgr = serialPortManager as? SerialPortManager {
-                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, processingHz: UserSettings.shared.mouseEventThrottleHz, isConfiguring: serialPortMgr.isConfiguring)
-                            } else {
-                                SerialInfoView(portName: _serialPortName, baudRate: _serialPortBaudRate, processingHz: UserSettings.shared.mouseEventThrottleHz, isConfiguring: false)
-                            }
-                        }
-                        ToolbarItem(placement: .automatic) {
-                            Button(action: {}) {
-                                Image(systemName: "poweron") // spacer
-                            }
-                            .disabled(true)
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        ToolbarItemGroup(placement: .automatic) {
-                            Toggle(isOn: $_isSwitchToggleOn) {
-                                Image(_isSwitchToggleOn ? "Target_icon" : "Host_icon")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 20, height: 15)
-                                Text(_isSwitchToggleOn ? "Target" : "Host")
-                            }
-                            .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-                            .onChange(of: _isSwitchToggleOn) { newValue in
-                                handleSwitchToggle(isOn: newValue)
-                            }
-                        }
+                        ToolbarContentView(
+                            showButtons: $showButtons,
+                            isSwitchToggleOn: $_isSwitchToggleOn,
+                            isAudioEnabled: _isAudioEnabled,
+                            canTakePicture: _canTakePicture,
+                            isRecording: _isRecording,
+                            hasHdmiSignal: _hasHdmiSignal,
+                            isKeyboardConnected: _isKeyboardConnected,
+                            isMouseConnected: _isMouseConnected,
+                            isMouseLoopRunning: _isMouseLoopRunning,
+                            resolutionWidth: _resolution.width,
+                            resolutionHeight: _resolution.height,
+                            fps: _fps,
+                            pixelClock: _pixelClock,
+                            serialPortName: _serialPortName,
+                            serialPortBaudRate: _serialPortBaudRate,
+                            handleSwitchToggle: handleSwitchToggle,
+                            toggleAudio: toggleAudio,
+                            showAspectRatioSelection: showAspectRatioSelectionWindow,
+                            showUSBDevices: showUSBDevicesWindow
+                        )
                     }
                     .onReceive(timer) { _ in
                         // Initialize paste behavior title on first run

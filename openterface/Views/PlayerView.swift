@@ -73,8 +73,13 @@ class PlayerView: NSView, NSWindowDelegate {
             playerBackgroundImage.contents = cgImage
             playerBackgroundImage.contentsGravity = UserSettings.shared.gravity.contentsGravity
             self.playerBackgroundImage.zPosition = -2
+            // Ensure background color is red when using an image (fallback overlay)
+            self.playerBackgroundImage.backgroundColor = NSColor.gray.cgColor
         }
         self.previewLayer?.addSublayer(self.playerBackgroundImage)
+
+        // Set preview layer background to red (replace default black)
+        self.previewLayer?.backgroundColor = NSColor.gray.cgColor
 
         layer = self.previewLayer
 

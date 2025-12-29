@@ -68,7 +68,7 @@ struct SerialInfoView: View {
     let baudRate: Int
     let processingHz: Int
     let isConfiguring: Bool
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "cable.connector")
@@ -107,3 +107,4 @@ struct CapsLockIndicatorView: View {
         .help(keyboardManager.isCapsLockOn ? "Caps Lock is ON" : "Caps Lock is OFF")
     }
 }
+

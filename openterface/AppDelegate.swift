@@ -698,15 +698,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         
         // Get the screen containing the window
-        guard (window.screen ?? NSScreen.main) != nil else { return targetSize }
-                
+        guard let screen = (window.screen ?? NSScreen.main) else { return targetSize }
+
         // Calculate new size maintaining content area aspect ratio
         var newSize = targetSize
 
         // Adjust height calculation to account for the toolbar
-        let contentHeight = newSize.width / aspectRatioToUse
-        
+        var contentHeight = newSize.width / aspectRatioToUse
         newSize.height = contentHeight + toolbarHeight
+
+        // If requested, constrain the window to the visible screen area
+        if constraintToScreen {
+            let screenFrame = screen.visibleFrame
+
+            // If the computed height exceeds the screen's visible height, clamp it
+            if newSize.height > screenFrame.height {
+                // Maximum content height available (excluding toolbar)
+                let maxContentHeight = max(screenFrame.height - toolbarHeight, 1)
+
+                // Compute width that preserves aspect ratio for the clamped height
+                var adjustedWidth = maxContentHeight * aspectRatioToUse
+                var adjustedHeight = maxContentHeight + toolbarHeight
+
+                // If the adjusted width also exceeds screen width, clamp width and recompute height
+                if adjustedWidth > screenFrame.width {
+                    adjustedWidth = screenFrame.width
+                    let contentHeightFromWidth = adjustedWidth / aspectRatioToUse
+                    adjustedHeight = contentHeightFromWidth + toolbarHeight
+                }
+
+                newSize.width = adjustedWidth
+                newSize.height = adjustedHeight
+            }
+        }
+
+        // Ensure we respect the window's minimum size
+        newSize.width = max(newSize.width, window.minSize.width)
+        newSize.height = max(newSize.height, window.minSize.height)
+
         return newSize
     }
 

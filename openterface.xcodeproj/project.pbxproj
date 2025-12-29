@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		29267D572DACB7E3006D5107 /* WindowUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29267D562DACB7E2006D5107 /* WindowUtils.swift */; };
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
 		295DCFB62D76A8A20034BB1E /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManager.swift */; };
 		296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */; };
@@ -21,7 +20,6 @@
 		5351254D2B59177F0002A91E /* HostManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5351254C2B59177F0002A91E /* HostManager.swift */; };
 		53696FE62BF3700F00250B28 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 53696FE52BF3700F00250B28 /* KeyboardShortcuts */; };
 		537F65D22B4E561200825B4F /* AppStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537F65D12B4E561200825B4F /* AppStatus.swift */; };
-		538F5E262C8AB1F50014CFB0 /* ToolBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */; };
 		53A6E1BF2B3E943300B652A5 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A6E1BE2B3E943300B652A5 /* PlayerView.swift */; };
 		53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */; };
 		53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC66092B8EDB390081F927 /* LoggerManager.swift */; };
@@ -53,6 +51,9 @@
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */; };
+		6BC364662F025DD4001B9A07 /* WindowUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC364632F025DD4001B9A07 /* WindowUtils.swift */; };
+		6BC364682F026235001B9A07 /* ToolbarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC364672F026235001B9A07 /* ToolbarContentView.swift */; };
+		6BC3646A2F02646D001B9A07 /* ToolBarComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC364692F02646D001B9A07 /* ToolBarComponents.swift */; };
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */; };
 		BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */; };
@@ -106,7 +107,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		29267D562DACB7E2006D5107 /* WindowUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowUtils.swift; sourceTree = "<group>"; };
 		2950CB502CE33C8D00888267 /* USBDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBDevicesView.swift; sourceTree = "<group>"; };
 		295DCFB52D76A8A20034BB1E /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoManager.swift; sourceTree = "<group>"; };
@@ -119,7 +119,6 @@
 		531BAC392B5E47F000950525 /* MouseMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseMapper.swift; sourceTree = "<group>"; };
 		5351254C2B59177F0002A91E /* HostManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostManager.swift; sourceTree = "<group>"; };
 		537F65D12B4E561200825B4F /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
-		538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolBarView.swift; sourceTree = "<group>"; };
 		53A6E1BE2B3E943300B652A5 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		53CC66092B8EDB390081F927 /* LoggerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerManager.swift; sourceTree = "<group>"; };
@@ -154,6 +153,9 @@
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMonitorManager.swift; sourceTree = "<group>"; };
+		6BC364632F025DD4001B9A07 /* WindowUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowUtils.swift; sourceTree = "<group>"; };
+		6BC364672F026235001B9A07 /* ToolbarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarContentView.swift; sourceTree = "<group>"; };
+		6BC364692F02646D001B9A07 /* ToolBarComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolBarComponents.swift; sourceTree = "<group>"; };
 		6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipLayerManager.swift; sourceTree = "<group>"; };
 		BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
@@ -336,6 +338,7 @@
 		53FBE7DB2B3D6789007785B0 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				6BC364642F025DD4001B9A07 /* ToolBar */,
 				BF7752E22F00FDDD00FE5D0E /* Settings */,
 				6B2450A22EFE5FA500BE14D8 /* FullScreenView.swift */,
 				6B7A126D2EFBDA440056FC15 /* DefectReportDialog.swift */,
@@ -349,10 +352,8 @@
 				53A6E1BE2B3E943300B652A5 /* PlayerView.swift */,
 				BF98F7192E34C29E002EACD7 /* ManagerProtocols.swift */,
 				BF98F7182E34C29E002EACD7 /* ProtocolExtensions.swift */,
-				538F5E252C8AB1F40014CFB0 /* ToolBarView.swift */,
 				2950CB502CE33C8D00888267 /* USBDevicesView.swift */,
 				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
-				29267D562DACB7E2006D5107 /* WindowUtils.swift */,
 				6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */,
 				BFDE57CD2E116383000BB8BB /* EdidNameView.swift */,
 			);
@@ -386,6 +387,16 @@
 				6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */,
 			);
 			path = Video;
+			sourceTree = "<group>";
+		};
+		6BC364642F025DD4001B9A07 /* ToolBar */ = {
+			isa = PBXGroup;
+			children = (
+				6BC364692F02646D001B9A07 /* ToolBarComponents.swift */,
+				6BC364672F026235001B9A07 /* ToolbarContentView.swift */,
+				6BC364632F025DD4001B9A07 /* WindowUtils.swift */,
+			);
+			path = ToolBar;
 			sourceTree = "<group>";
 		};
 		BF7752D92EFFE51000FE5D0E /* Parallel */ = {
@@ -587,6 +598,7 @@
 				BFA4457C2F017758005D2937 /* LogViewerDialog.swift in Sources */,
 				6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */,
 				6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */,
+				6BC3646A2F02646D001B9A07 /* ToolBarComponents.swift in Sources */,
 				BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */,
 				BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */,
 				BF7752DF2EFFECE400FE5D0E /* ParallelManager.swift in Sources */,
@@ -597,6 +609,7 @@
 				BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */,
 				BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
+				6BC364662F025DD4001B9A07 /* WindowUtils.swift in Sources */,
 				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
 				BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */,
 				6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */,
@@ -607,7 +620,6 @@
 				BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */,
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,
 				53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */,
-				29267D572DACB7E3006D5107 /* WindowUtils.swift in Sources */,
 				BFD4EA962E3643CA0029BFC2 /* PasteConfirmationView.swift in Sources */,
 				53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */,
 				BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */,
@@ -634,7 +646,6 @@
 				53A6E1BF2B3E943300B652A5 /* PlayerView.swift in Sources */,
 				6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */,
 				5351254D2B59177F0002A91E /* HostManager.swift in Sources */,
-				538F5E262C8AB1F50014CFB0 /* ToolBarView.swift in Sources */,
 				2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */,
 				BFB749002E35ED92004F0DAE /* ClipboardView.swift in Sources */,
 				6B2450A32EFE5FA500BE14D8 /* FullScreenView.swift in Sources */,
@@ -643,6 +654,7 @@
 				6B99F5992E9A6C570073CDA2 /* CH32V208ControlChipset.swift in Sources */,
 				6B99F59A2E9A6C570073CDA2 /* CH9329ControlChipset.swift in Sources */,
 				6B99F59B2E9A6C650073CDA2 /* MS2109SVideoChipset.swift in Sources */,
+				6BC364682F026235001B9A07 /* ToolbarContentView.swift in Sources */,
 				6B99F59C2E9A6C650073CDA2 /* MS2109VideoChipset.swift in Sources */,
 				6B99F59D2E9A6C650073CDA2 /* MS2130SVideoChipset.swift in Sources */,
 				BF7752EE2F01328900FE5D0E /* MouseHIDSettingsView.swift in Sources */,

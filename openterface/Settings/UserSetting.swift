@@ -114,7 +114,15 @@ final class UserSettings: ObservableObject {
     
     // User custom screen ratio settings
     @Published var useCustomAspectRatio: Bool = false
-    @Published var customAspectRatio: AspectRatioOption = .ratio16_9
+    @Published var customAspectRatio: AspectRatioOption = .ratio16_9 {
+        didSet {
+            // If the selected aspect ratio is vertical (height > width),
+            // switch to Fill (maintain aspect ratio) to avoid pillarboxing
+            if customAspectRatio.widthToHeightRatio < 1.0 {
+                gravity = .resizeAspectFill
+            }
+        }
+    }
     
     // Whether to show HID resolution change alert
     @Published var doNotShowHidResolutionAlert: Bool = false
@@ -158,6 +166,8 @@ final class UserSettings: ObservableObject {
     @Published var gravity: GravityOption = .resizeAspect {
         didSet {
             UserDefaults.standard.set(gravity.rawValue, forKey: "gravity")
+            // Notify interested parties (e.g., PlayerView) about gravity change
+            NotificationCenter.default.post(name: Notification.Name.gravitySettingsChanged, object: nil)
         }
     }
     
