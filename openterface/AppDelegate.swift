@@ -537,22 +537,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Add a "HID Resolution Change Alert Settings" menu item
         let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
         viewMenu.addItem(hidAlertMenuItem)
-        
-        // Add debug menu items (only in debug builds)
-        #if DEBUG
-        viewMenu.addItem(NSMenuItem.separator())
-        
-        let debugSubMenu = NSMenu(title: "Debug")
-        let debugMenuItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
-        debugMenuItem.submenu = debugSubMenu
-        viewMenu.addItem(debugMenuItem)
-        
-        let testVideoSessionItem = NSMenuItem(title: "Test Video Session Control", action: #selector(testVideoSessionControl(_:)), keyEquivalent: "")
-        debugSubMenu.addItem(testVideoSessionItem)
-        
-        let testDirectNotificationsItem = NSMenuItem(title: "Test Direct Notifications", action: #selector(testDirectNotifications(_:)), keyEquivalent: "")
-        debugSubMenu.addItem(testDirectNotificationsItem)
-        #endif
     }
 
     // MARK: - View menu handlers (Parallel Mode + Target Placement)
@@ -845,58 +829,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func showHidResolutionAlertSettings(_ sender: NSMenuItem) {
         WindowUtils.shared.showHidResolutionAlertSettings()
     }
-    
-    // MARK: - Debug Menu Actions
-    #if DEBUG
-    @objc func testVideoSessionControl(_ sender: NSMenuItem) {
-        logger.log(content: "Test Video Session Control menu item clicked")
-        testFirmwareUpdateVideoSessionControl()
-    }
-    
-    @objc func testDirectNotifications(_ sender: NSMenuItem) {
-        logger.log(content: "Test Direct Notifications menu item clicked")
-        testDirectVideoSessionNotifications()
-    }
-    
-    /// Test the firmware update notification flow
-    /// This simulates what happens during a real firmware update
-    private func testFirmwareUpdateVideoSessionControl() {
-        logger.log(content: "=== Starting Firmware Update Video Session Test ===")
-        
-        // Simulate firmware update start
-        logger.log(content: "Simulating firmware update start...")
-        NotificationCenter.default.post(name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"), object: nil)
-        
-        // Wait a moment to allow the notification to be processed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.logger.log(content: "Simulating firmware update completion...")
-            NotificationCenter.default.post(name: NSNotification.Name("ReopenContentViewAfterFirmwareUpdate"), object: nil)
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                self.logger.log(content: "=== Firmware Update Video Session Test Complete ===")
-            }
-        }
-    }
-    
-    /// Test just the video session stop/start notifications directly
-    private func testDirectVideoSessionNotifications() {
-        logger.log(content: "=== Starting Direct Video Session Notification Test ===")
-        
-        // Test stop notification
-        logger.log(content: "Sending StopVideoSession notification...")
-        NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
-        
-        // Wait and test start notification
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.logger.log(content: "Sending StartVideoSession notification...")
-            NotificationCenter.default.post(name: NSNotification.Name("StartVideoSession"), object: nil)
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.logger.log(content: "=== Direct Video Session Notification Test Complete ===")
-            }
-        }
-    }
-    #endif
     
     // MARK: - Firmware Update Notification Handlers
     

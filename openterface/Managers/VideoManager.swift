@@ -95,7 +95,8 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         self.setupBindings()
         setupSession()
         // Listen for first-frame resolution analysis from VideoOutputDelegate
-        NotificationCenter.default.addObserver(self, selector: #selector(handleFirstFrameResolution(_:)), name: Notification.Name("VideoFirstFrameResolution"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleFirstFrameResolution(_:)), 
+                name: Notification.Name("checkActiveResolution"), object: nil)
         
         if AppStatus.isFristRun == false {
             // Add device notification observers
@@ -221,7 +222,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         notificationCenter.removeObserver(self, name: .AVCaptureDeviceWasDisconnected, object: nil)
         notificationCenter.removeObserver(self, name: NSNotification.Name("StopVideoSession"), object: nil)
         notificationCenter.removeObserver(self, name: NSNotification.Name("StartVideoSession"), object: nil)
-        notificationCenter.removeObserver(self, name: Notification.Name("VideoFirstFrameResolution"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("checkActiveResolution"), object: nil)
         
         // Remove audio property listener
         if let listenerID = audioPropertyListenerID {
@@ -735,23 +736,41 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             }
         }
 
+        // Determine if applying the matched aspect ratio would change current settings
+        let previousAspect = UserSettings.shared.customAspectRatio
+        let previousUseCustom = UserSettings.shared.useCustomAspectRatio
+        let previousGravity = UserSettings.shared.gravity
+
         if let matched = matched {
-            UserSettings.shared.customAspectRatio = matched
-            UserSettings.shared.useCustomAspectRatio = true
+            var didChange = false
+            if previousUseCustom == false || previousAspect != matched {
+                UserSettings.shared.customAspectRatio = matched
+                UserSettings.shared.useCustomAspectRatio = true
+                didChange = true
+            }
+
             logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", aspect)))")
-            // Notify UI to apply new gravity/aspect settings immediately
-            NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+
+            if didChange {
+                NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+                }
+            } else {
+                logger.log(content: "Auto-matched aspect ratio matches current settings; no UI update posted")
             }
         } else {
-            // No match: revert to default aspect handling
-            UserSettings.shared.useCustomAspectRatio = false
-            UserSettings.shared.gravity = .resizeAspect
-            logger.log(content: "No aspect ratio match (aspect=\(String(format: "%.3f", aspect))). Reverting to default gravity: resizeAspect")
-            NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+            // No match: revert to default aspect handling only if it represents a change
+            if previousUseCustom == true || previousGravity != .resizeAspect {
+                UserSettings.shared.useCustomAspectRatio = false
+                UserSettings.shared.gravity = .resizeAspect
+                logger.log(content: "No aspect ratio match (aspect=\(String(format: "%.3f", aspect))). Reverting to default gravity: resizeAspect")
+                NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
+                }
+            } else {
+                logger.log(content: "No aspect ratio match and settings unchanged; no UI update posted")
             }
         }
 

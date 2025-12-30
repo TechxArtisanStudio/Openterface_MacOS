@@ -73,6 +73,7 @@ struct AudioVideoSettingsView: View {
                         get: { !userSettings.doNotShowHidResolutionAlert },
                         set: { userSettings.doNotShowHidResolutionAlert = !$0 }
                     ))
+                    Toggle("Enable active resolution checking (auto-detect video area)", isOn: $userSettings.doActiveResolutionCheck)
                 }
                 .padding(.vertical, 8)
             }

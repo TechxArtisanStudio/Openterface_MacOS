@@ -215,10 +215,7 @@ final class WindowUtils {
                     logger.log(content: "Invalid aspect ratio selection index: \(selectedIndex)")
                 }
             }
-            
-            // Save user's choice for HID resolution change alerts
-//            UserSettings.shared.doNotShowHidResolutionAlert = (showHidAlertCheckbox.state == .off)
-            
+
             // Notify that gravity settings have changed
             NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
             

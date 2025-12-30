@@ -92,6 +92,8 @@ final class UserSettings: ObservableObject {
         self.activeVideoY = UserDefaults.standard.object(forKey: "activeVideoY") as? Int ?? 0
         self.activeVideoWidth = UserDefaults.standard.object(forKey: "activeVideoWidth") as? Int ?? 0
         self.activeVideoHeight = UserDefaults.standard.object(forKey: "activeVideoHeight") as? Int ?? 0
+
+        // (doActiveResolutionCheck is loaded from UserDefaults in its declaration)
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -137,6 +139,14 @@ final class UserSettings: ObservableObject {
     @Published var isAudioEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isAudioEnabled, forKey: "isAudioEnabled")
+        }
+    }
+    
+    // Whether to perform active resolution checking (detect active video area and auto-match aspect)
+    // Default is false to avoid unexpected UI changes
+    @Published var doActiveResolutionCheck: Bool = UserDefaults.standard.object(forKey: "doActiveResolutionCheck") as? Bool ?? false {
+        didSet {
+            UserDefaults.standard.set(doActiveResolutionCheck, forKey: "doActiveResolutionCheck")
         }
     }
     

@@ -8,10 +8,8 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     
     // Store the latest video frame for OCR processing
     private var latestPixelBuffer: CVPixelBuffer?
-    // Flag to ensure we only analyze the very first frame once
-    private var hasAnalyzedFirstFrame: Bool = false
-    // Count incoming frames so we can analyze a specific one (e.g., 10th)
-    private var frameCounter: Int = 0
+    // Timestamp of the last processed frame (seconds)
+    private var lastProcessedTime: TimeInterval? = nil
     private let bufferQueue = DispatchQueue(label: "VideoOutputDelegate.bufferQueue", qos: .userInitiated)
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -46,43 +44,49 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             self?.latestPixelBuffer = pixelBuffer
         }
 
-        // Process the pixel buffer (e.g., pass it to another method or store it)
-        processPixelBuffer(pixelBuffer)
+        // Process the pixel buffer using the sample buffer's presentation timestamp
+        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        processPixelBuffer(pixelBuffer, timestamp: timestamp)
     }
+    
+    private func processPixelBuffer(_ pixelBuffer: CVPixelBuffer, timestamp: CMTime) {
+        let currentTime = CMTimeGetSeconds(timestamp)
+        guard !currentTime.isNaN else { return }
 
-    private func processPixelBuffer(_ pixelBuffer: CVPixelBuffer) {
-        // Analyze a chosen frame (10th) once and notify observers
-        guard !hasAnalyzedFirstFrame else { return }
+        // Respect user setting: only run active resolution checking when enabled
+        if !UserSettings.shared.doActiveResolutionCheck {
+            return
+        }
 
-        frameCounter += 1
-        let targetFrame = 10
-        // Wait until the target frame number
-        guard frameCounter >= targetFrame else {
+        // Use a shorter interval for the very first processing (1s),
+        // then a 5s interval for subsequent processing
+        let interval: TimeInterval = (lastProcessedTime == nil) ? 1.0 : 5.0
+        if let last = lastProcessedTime, currentTime - last < interval {
             return
         }
 
         if let cgImage = createCGImage(from: pixelBuffer) {
             let width = cgImage.width
             let height = cgImage.height
-            print("🎯 First-frame resolution: \(width)x\(height)")
-            
+            print("🎯 Processed-frame resolution at \(currentTime)s: \(width)x\(height)")
+
             // Detect active (non-black) area within the frame
-            var userInfo: [String: Any] = ["width": width, "height": height]
+            var userInfo: [String: Any] = ["width": width, "height": height, "timestamp": currentTime]
             if let activeRect = detectActiveRect(from: cgImage) {
                 userInfo["activeX"] = Int(activeRect.origin.x)
                 userInfo["activeY"] = Int(activeRect.origin.y)
                 userInfo["activeWidth"] = Int(activeRect.size.width)
                 userInfo["activeHeight"] = Int(activeRect.size.height)
-                print("🎯 First-frame active rect: \(activeRect)")
+                print("🎯 Active rect at \(currentTime)s: \(activeRect)")
             } else {
-                print("ℹ️ No active (non-black) area detected in first frame")
+                print("ℹ️ No active (non-black) area detected at \(currentTime)s")
             }
 
-            NotificationCenter.default.post(name: Notification.Name("VideoFirstFrameResolution"), object: nil, userInfo: userInfo)
+            NotificationCenter.default.post(name: Notification.Name("checkActiveResolution"), object: nil, userInfo: userInfo)
 
-            hasAnalyzedFirstFrame = true
+            lastProcessedTime = currentTime
         } else {
-            print("❌ Failed to create CGImage for first-frame analysis")
+            print("❌ Failed to create CGImage for frame analysis at \(currentTime)s")
         }
     }
 
