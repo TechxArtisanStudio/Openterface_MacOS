@@ -100,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(MouseManagerProtocol.self, instance: MouseManager.shared as any MouseManagerProtocol)
         container.register(KeyboardManagerProtocol.self, instance: KeyboardManager.shared as any KeyboardManagerProtocol)
         container.register(SerialPortManagerProtocol.self, instance: SerialPortManager.shared as any SerialPortManagerProtocol)
+        container.register(SwitchableUSBManagerProtocol.self, instance: SwitchableUSBManager.shared as any SwitchableUSBManagerProtocol)
         container.register(HostManagerProtocol.self, instance: HostManager.shared as any HostManagerProtocol)
         container.register(ParallelManagerProtocol.self, instance: ParallelManager() as any ParallelManagerProtocol)
         container.register(StatusBarManagerProtocol.self, instance: StatusBarManager() as any StatusBarManagerProtocol)

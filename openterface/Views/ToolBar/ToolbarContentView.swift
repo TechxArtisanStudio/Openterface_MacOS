@@ -3,7 +3,7 @@ import SwiftUI
 struct ToolbarContentView: ToolbarContent {
     // Bindings and values provided by the parent App
     @Binding var showButtons: Bool
-    @Binding var isSwitchToggleOn: Bool
+    @Binding var switchToTarget: Bool
 
     var isAudioEnabled: Bool
     var canTakePicture: Bool
@@ -179,17 +179,17 @@ struct ToolbarContentView: ToolbarContent {
         }
 
         ToolbarItemGroup(placement: .automatic) {
-            Toggle(isOn: $isSwitchToggleOn) {
+            Toggle(isOn: $switchToTarget) {
                 HStack {
-                    Image(isSwitchToggleOn ? "Target_icon" : "Host_icon")
+                    Image(switchToTarget ? "Target_icon" : "Host_icon")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 20, height: 15)
-                    Text(isSwitchToggleOn ? "Target" : "Host")
+                    Text(switchToTarget ? "Target" : "Host")
                 }
             }
             .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-            .onChange(of: isSwitchToggleOn) { newValue in
+            .onChange(of: switchToTarget) { newValue in
                 handleSwitchToggle(newValue)
             }
         }
@@ -214,7 +214,7 @@ struct ToolbarContentView_Previews: PreviewProvider {
             .toolbar {
                 ToolbarContentView(
                     showButtons: .constant(false),
-                    isSwitchToggleOn: .constant(false),
+                    switchToTarget: .constant(false),
                     isAudioEnabled: true,
                     canTakePicture: false,
                     isRecording: false,
