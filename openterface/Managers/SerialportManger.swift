@@ -47,6 +47,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     public static let CMD_SET_PARA_CFG_PREFIX_9600: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x25, 0x80, 0x00]
     public static let CMD_SET_PARA_CFG_POSTFIX: [UInt8] = [0x08, 0x00, 0x00, 0x03, 0x86, 0x1A, 0x29, 0xE1, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
     public static let CMD_RESET: [UInt8] = [0x57, 0xAB, 0x00, 0x0F, 0x00]
+    // CH32V208 SD card switch commands
+    // Base: header + cmd 0x17 + len 0x05 + 4 zero bytes (payload prefix)
+    public static let CMD_SD_SWITCH_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x17, 0x05, 0x00, 0x00, 0x00, 0x00]
     
     // Baudrate constants
     public static let LOWSPEED_BAUDRATE = BaseControlChipset.LOWSPEED_BAUDRATE
@@ -328,28 +331,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         if _isPaused {
             return
         }
-        
-        // Check for stale CH9329 chip state
-        // This occurs when lastSerialData is updated but lastHIDEventTime hasn't changed for 2+ seconds
-        // indicating the CH9329 chip is receiving data but not processing HID events properly
-        // if let serialDataTime = lastSerialData, let hidEventTime = lastHIDEventTime {
-        //     let timeSinceLastHIDEvent = Date().timeIntervalSince(hidEventTime)
-        //     let timeSinceLastSerialData = Date().timeIntervalSince(serialDataTime)
-            
-        //     // If serial data is recent but HID event is stale (2+ seconds), chip is in stale state
-        //     if timeSinceLastSerialData < 1.0 && timeSinceLastHIDEvent > 10.0 {
-        //         logger.log(content: "CH9329 chip detected in stale state: serial data updated but no HID events. Serial data age: \(String(format: "%.1f", timeSinceLastSerialData))s, HID event age: \(String(format: "%.1f", timeSinceLastHIDEvent))s")
-                
-        //         // Show alert to user and offer automatic recovery
-        //         DispatchQueue.main.async { [weak self] in
-        //             self?.promptUserForChipRecovery()
-        //         }
-                
-        //         // Reset the check timer to avoid repeated alerts
-        //         lastHIDEventTime = Date()
-        //         return
-        //     }
-        // }
         
         if let lastTime = lastHIDEventTime {
             if Date().timeIntervalSince(lastTime) > 5 {
@@ -644,6 +625,23 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             if logger.SerialDataPrint {
                 let status = data[5]
                 logger.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
+            }
+        case 0x97: // CH32V208 SD card direction response
+            guard data.count >= 6 else {
+                logger.log(content: "Invalid SD direction response length: \(data.count)")
+                break
+            }
+            let dir = data[5]
+            switch dir {
+            case 0x00:
+                AppStatus.sdCardDirection = SDCardDirection.host
+                logger.log(content: "CH32V208: SD card pointing to HOST")
+            case 0x01:
+                AppStatus.sdCardDirection = SDCardDirection.target
+                logger.log(content: "CH32V208: SD card pointing to TARGET")
+            default:
+                AppStatus.sdCardDirection = SDCardDirection.unknown
+                logger.log(content: "CH32V208: SD card direction unknown (0x\(String(format: "%02X", dir)))")
             }
         //Handle error command responses
         case 0xC4:  // checksum error
@@ -1274,6 +1272,49 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// `isDeviceReady` is false, as it's part of the device initialization process.
     func getChipParameterCfg(){
         self.sendAsyncCommand(command: SerialPortManager.CMD_GET_PARA_CFG, force: true)
+    }
+
+    // MARK: - CH32V208 SD switch helpers
+    /// Set SD card to host (CH32V208)
+    public func setSdToHost(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        var cmd = SerialPortManager.CMD_SD_SWITCH_PREFIX
+        cmd.append(0x00) // data byte 0x00 => HOST
+        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: 0x97, timeout: 2.0, force: force)
+        if !response.isEmpty && response.count >= 6 {
+            let dir = response[5]
+            completion?(dir == 0x00)
+        } else {
+            completion?(false)
+        }
+    }
+
+    /// Set SD card to target (CH32V208)
+    public func setSdToTarget(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        var cmd = SerialPortManager.CMD_SD_SWITCH_PREFIX
+        cmd.append(0x01) // data byte 0x01 => TARGET
+        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: 0x97, timeout: 2.0, force: force)
+        if !response.isEmpty && response.count >= 6 {
+            let dir = response[5]
+            completion?(dir == 0x01)
+        } else {
+            completion?(false)
+        }
+    }
+
+    /// Query SD card direction synchronously. Returns SDCardDirection or nil on failure.
+    public func querySdDirectionSync(timeout: TimeInterval = 2.0, force: Bool = false) -> SDCardDirection? {
+        var cmd = SerialPortManager.CMD_SD_SWITCH_PREFIX
+        cmd.append(0x03) // data byte 0x03 => query
+        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: 0x97, timeout: timeout, force: force)
+        guard !response.isEmpty && response.count >= 6 else {
+            return nil
+        }
+        let dir = response[5]
+        switch dir {
+        case 0x00: return SDCardDirection.host
+        case 0x01: return SDCardDirection.target
+        default: return SDCardDirection.unknown
+        }
     }
     
     /// Resets the device to the specified baudrate and user's preferred control mode.

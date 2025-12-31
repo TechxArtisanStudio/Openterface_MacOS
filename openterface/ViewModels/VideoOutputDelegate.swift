@@ -68,7 +68,6 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         if let cgImage = createCGImage(from: pixelBuffer) {
             let width = cgImage.width
             let height = cgImage.height
-            print("🎯 Processed-frame resolution at \(currentTime)s: \(width)x\(height)")
 
             // Detect active (non-black) area within the frame
             var userInfo: [String: Any] = ["width": width, "height": height, "timestamp": currentTime]
@@ -77,7 +76,6 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
                 userInfo["activeY"] = Int(activeRect.origin.y)
                 userInfo["activeWidth"] = Int(activeRect.size.width)
                 userInfo["activeHeight"] = Int(activeRect.size.height)
-                print("🎯 Active rect at \(currentTime)s: \(activeRect)")
             } else {
                 print("ℹ️ No active (non-black) area detected at \(currentTime)s")
             }

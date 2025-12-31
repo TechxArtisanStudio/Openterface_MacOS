@@ -42,6 +42,7 @@
 		6B7A12692EFA42060056FC15 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */; };
 		6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A126A2EFA42320056FC15 /* DiagnosticsViewModel.swift */; };
 		6B7A126F2EFBDA440056FC15 /* DefectReportDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A126D2EFBDA440056FC15 /* DefectReportDialog.swift */; };
+		6B8B06412F04C7500040BEBF /* SwitchableUSBManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */; };
 		6B99F5992E9A6C570073CDA2 /* CH32V208ControlChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */; };
 		6B99F59A2E9A6C570073CDA2 /* CH9329ControlChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */; };
 		6B99F59B2E9A6C650073CDA2 /* MS2109SVideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */; };
@@ -144,6 +145,7 @@
 		6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		6B7A126A2EFA42320056FC15 /* DiagnosticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsViewModel.swift; sourceTree = "<group>"; };
 		6B7A126D2EFBDA440056FC15 /* DefectReportDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefectReportDialog.swift; sourceTree = "<group>"; };
+		6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitchableUSBManager.swift; sourceTree = "<group>"; };
 		6B99F5942E9A6C570073CDA2 /* CH32V208ControlChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CH32V208ControlChipset.swift; sourceTree = "<group>"; };
 		6B99F5952E9A6C570073CDA2 /* CH9329ControlChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CH9329ControlChipset.swift; sourceTree = "<group>"; };
 		6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2109SVideoChipset.swift; sourceTree = "<group>"; };
@@ -313,6 +315,7 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */,
 				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
 				BFB748FD2E35ED7D004F0DAE /* ClipboardManager.swift */,
@@ -611,6 +614,7 @@
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
 				6BC364662F025DD4001B9A07 /* WindowUtils.swift in Sources */,
 				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
+				6B8B06412F04C7500040BEBF /* SwitchableUSBManager.swift in Sources */,
 				BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */,
 				6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */,
 				53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */,

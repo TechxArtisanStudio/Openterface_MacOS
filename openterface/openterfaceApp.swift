@@ -74,6 +74,7 @@ struct openterfaceApp: App {
     private var tipLayerManager: TipLayerManagerProtocol { DependencyContainer.shared.resolve(TipLayerManagerProtocol.self) }
     private var cameraManager: CameraManagerProtocol { DependencyContainer.shared.resolve(CameraManagerProtocol.self) }
     private var permissionManager: PermissionManagerProtocol { DependencyContainer.shared.resolve(PermissionManagerProtocol.self) }
+    private var switchableUSBManager: SwitchableUSBManagerProtocol { DependencyContainer.shared.resolve(SwitchableUSBManagerProtocol.self) }
     
     init() {
         // Setup dependencies before UI construction to ensure they're available
@@ -84,8 +85,7 @@ struct openterfaceApp: App {
     @State private var mouseHideTitle = "Auto-hide in Control Mode"
     @State private var pasteBehaviorTitle = "Ask Every Time"
     
-    @State private var _isSwitchToggleOn = false
-    @State private var _isLockSwitch = true
+    @State private var _switchToTarget = false
     @State private var _isRecording = false
     @State private var _canTakePicture = false
     @State private var _isAudioEnabled = UserSettings.shared.isAudioEnabled  // Initialize with saved preference
@@ -134,7 +134,7 @@ struct openterfaceApp: App {
                     .toolbar {
                         ToolbarContentView(
                             showButtons: $showButtons,
-                            isSwitchToggleOn: $_isSwitchToggleOn,
+                            switchToTarget: $_switchToTarget,
                             isAudioEnabled: _isAudioEnabled,
                             canTakePicture: _canTakePicture,
                             isRecording: _isRecording,
@@ -188,7 +188,7 @@ struct openterfaceApp: App {
                         // Only update UI variables when status actually changes
                         let newKeyboardConnected = AppStatus.isKeyboardConnected
                         let newMouseConnected = AppStatus.isMouseConnected
-                        let newSwitchToggleOn = AppStatus.isSwitchToggleOn
+                        let newSwitchToggleOn = AppStatus.switchToTarget
                         let newHdmiSignal = AppStatus.hasHdmiSignal
                         let newSerialPortName = AppStatus.serialPortName
                         let newSerialPortBaudRate = AppStatus.serialPortBaudRate
@@ -212,8 +212,8 @@ struct openterfaceApp: App {
                             stateChanged = true
                         }
                         
-                        if _isSwitchToggleOn != newSwitchToggleOn {
-                            _isSwitchToggleOn = newSwitchToggleOn
+                        if _switchToTarget != newSwitchToggleOn {
+                            _switchToTarget = newSwitchToggleOn
                             stateChanged = true
                         }
                         
@@ -720,35 +720,9 @@ struct openterfaceApp: App {
         }
     }
     
-    func handleSwitchToggle(isOn: Bool) {
-        logger.log(content: "🔄 USB switch toggle called: \(isOn ? "Target" : "Host")")
-        
-        if isOn {
-            logger.log(content: "Setting USB to Target")
-            hidManager.setUSBtoTarget()
-        } else {
-            logger.log(content: "Setting USB to Host")
-            hidManager.setUSBtoHost()
-        }
-        
-        // update AppStatus
-        AppStatus.isSwitchToggleOn = isOn
-        logger.log(content: "Updated AppStatus.isSwitchToggleOn to: \(isOn)")
-        
-        // Only apply DTR signal for MS2109 chipset
-        if AppStatus.videoChipsetType == .ms2109 {
-            let ser = serialPortManager
-            logger.log(content: "Raising DTR signal")
-            ser.raiseDTR()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                self.logger.log(content: "Lowering DTR signal")
-                ser.lowerDTR()
-            }
-        }else{
-            //TODO: Consider adding support for other chipsets if needed
-            logger.log(content: "Skipping DTR signal for non-MS2109 chipset")
-        }
+    func handleSwitchToggle(toTarget: Bool) {
+        // Delegate USB switching and any chipset-specific DTR handling to the SwitchableUSBManager
+        switchableUSBManager.toggleUSB(toTarget: toTarget)
     }
     
     private func toggleAudio(isEnabled: Bool) {
@@ -920,34 +894,12 @@ final class AppState: ObservableObject {
             self.logger.log(content: "USB Switch Toggle shortcut triggered")
             
             // Get current toggle state and flip it
-            let currentState = AppStatus.isSwitchToggleOn
+            let currentState = AppStatus.switchToTarget
             let newState = !currentState
             
-            // Update the global app state 
-            AppStatus.isSwitchToggleOn = newState
-            
-            // Trigger the same logic as the UI toggle
-            let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-            let serialPortManager = DependencyContainer.shared.resolve(SerialPortManagerProtocol.self)
-            
-            if newState {
-                self.logger.log(content: "Shortcut: Setting USB to Target")
-                hidManager.setUSBtoTarget()
-            } else {
-                self.logger.log(content: "Shortcut: Setting USB to Host")
-                hidManager.setUSBtoHost()
-            }
-            
-            // Raise and lower DTR signal only for MS2109 chipset
-            if AppStatus.videoChipsetType != .ms2109 {
-                self.logger.log(content: "Shortcut: Raising DTR signal")
-                serialPortManager.raiseDTR()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    self.logger.log(content: "Shortcut: Lowering DTR signal")
-                    serialPortManager.lowerDTR()
-                }
-            }
+            // Delegate to SwitchableUSBManager to perform the same logic as the UI toggle
+            let switchableUSBManager = DependencyContainer.shared.resolve(SwitchableUSBManagerProtocol.self)
+            switchableUSBManager.toggleUSB(toTarget: newState)
         }
         
         KeyboardShortcuts.onKeyUp(for: .toggleFloatingKeyboard) {

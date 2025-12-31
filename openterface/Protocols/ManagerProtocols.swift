@@ -123,7 +123,12 @@ protocol SerialPortManagerProtocol: AnyObject {
     func resetHidChipToFactory(completion: @escaping (Bool) -> Void)
     func getHidInfo()
     
-    // DTR/RTS control methods
+    // CH32V208 SD card switching helpers
+    func setSdToHost(force: Bool, completion: ((Bool) -> Void)?)
+    func setSdToTarget(force: Bool, completion: ((Bool) -> Void)?)
+    func querySdDirectionSync(timeout: TimeInterval, force: Bool) -> SDCardDirection?
+    
+    // CH9329 DTR/RTS control methods
     func setDTR(_ enabled: Bool)
     func lowerDTR()
     func raiseDTR()
@@ -307,6 +312,10 @@ protocol PermissionManagerProtocol: AnyObject {
     func isAccessibilityPermissionGranted() -> Bool
     func requestAccessibilityPermission()
     func showPermissionStatus()
+}
+
+protocol SwitchableUSBManagerProtocol: AnyObject {
+    func toggleUSB(toTarget: Bool)
 }
 
 // MARK: - Supporting Types

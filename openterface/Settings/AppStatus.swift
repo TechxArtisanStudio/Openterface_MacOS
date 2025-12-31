@@ -41,6 +41,13 @@ enum ControlChipsetType {
     case unknown   // No control chipset detected or unknown type
 }
 
+// SD card direction for CH32V208 control chipset
+enum SDCardDirection {
+    case unknown
+    case host
+    case target
+}
+
 struct AppStatus {
     // Flags to track the currently connected chipset types
     static var videoChipsetType: VideoChipsetType = .unknown
@@ -90,7 +97,7 @@ struct AppStatus {
     // Host machine Caps Lock state
     static var isHostCapLockOn: Bool = false
     static var isScrollOn: Bool = false
-    static var isSwitchToggleOn: Bool = false
+    static var switchToTarget: Bool = false
     static var isLockSwitchOn: Bool = false
     
     static var videoFirmwareVersion: String = ""
@@ -124,6 +131,9 @@ struct AppStatus {
             }
         }
     }
+
+    // Current SD card direction reported by CH32V208 control chipset
+    static var sdCardDirection: SDCardDirection = .unknown
     
     static var isSoftwareSwitchOn: Bool = false {
         didSet {
@@ -139,12 +149,12 @@ struct AppStatus {
         if isHardwareSwitchOn {
             if isSoftwareSwitchOn != isHardwareSwitchOn {
                 isSoftwareSwitchOn = isHardwareSwitchOn
-                AppStatus.isSwitchToggleOn = isHardwareSwitchOn
+                AppStatus.switchToTarget = isHardwareSwitchOn
             }
         } else {
             if isSoftwareSwitchOn != isHardwareSwitchOn {
                 isSoftwareSwitchOn = isHardwareSwitchOn
-                AppStatus.isSwitchToggleOn = isHardwareSwitchOn
+                AppStatus.switchToTarget = isHardwareSwitchOn
             }
         }
     }

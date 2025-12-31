@@ -142,9 +142,27 @@ class CH32V208ControlChipset: BaseControlChipset {
     override func getDeviceStatus() -> ControlDeviceStatus {
         let baseStatus = super.getDeviceStatus()
 
-        var isTargetConnected = baseStatus.isTargetConnected
+        // Query SD switch direction from CH32V208 asynchronously to avoid blocking
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            if let sdDir = self.serialManager.querySdDirectionSync(timeout: 0.5, force: true) {
+                let switchedToTarget = (sdDir == SDCardDirection.target)
+                DispatchQueue.main.async {
+                    AppStatus.sdCardDirection = sdDir
+                    AppStatus.switchToTarget = switchedToTarget
+                    AppStatus.isUSBSwitchConnectToTarget = switchedToTarget
+                    // self.logger.log(content: "CH32V208: SD direction queried - \(switchedToTarget ? \"TARGET\" : \"HOST\")")
+                    self.logger.log(content: "CH32V208: SD direction queried - \(sdDir)")
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.logger.log(content: "CH32V208: Failed to query SD direction")
+                }
+            }
+        }
 
-        isTargetConnected = true
+        // CH32V208 treats target as connected for HID purposes
+        let isTargetConnected = true
 
         return ControlDeviceStatus(
             isTargetConnected: isTargetConnected,
