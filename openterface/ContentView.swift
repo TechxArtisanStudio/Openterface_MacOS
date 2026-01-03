@@ -26,6 +26,8 @@ import AppKit
 struct ContentView: View {
     @StateObject var viewModel = PlayerViewModel() // Ensures the view model is initialized once
     @State private var showInputOverlay = AppStatus.showInputOverlay
+    @State private var showAppInfoOverlay = AppStatus.showAppInfoOverlay
+    @State private var showActiveVideoRect = AppStatus.showActiveVideoRect
     @State private var overlayActive = AppStatus.showParallelOverlay
     @State private var showMiniIndicator: Bool = false
     @State private var miniMousePos: CGPoint = CGPoint(x: 0.5, y: 0.5) // normalized (0..1), origin: top-left
@@ -114,16 +116,40 @@ struct ContentView: View {
                 }
                 .ignoresSafeArea()
             }else{
-                PlayerContainerView(captureSession: viewModel.captureSession)
-                    .onTapGesture {
-                        // click in windows
-                        if AppStatus.isExit {
-                            AppStatus.isExit = false
+                ZStack {
+                    PlayerContainerView(captureSession: viewModel.captureSession)
+                        .onTapGesture {
+                            // click in windows
+                            if AppStatus.isExit {
+                                AppStatus.isExit = false
+                            }
                         }
+                    
+                    // Active video rect bounding box
+                    if showActiveVideoRect {
+                        GeometryReader { geo in
+                            let rect = AppStatus.activeVideoRect
+                            let containerSize = geo.size
+                            
+                            // Only draw if rect has valid dimensions
+                            if rect.width > 0 && rect.height > 0 {
+                                Rectangle()
+                                    .stroke(Color.yellow, lineWidth: 2)
+                                    .frame(width: rect.width, height: rect.height)
+                                    .position(x: rect.origin.x + rect.width / 2, y: rect.origin.y + rect.height / 2)
+                            }
+                        }
+                        .allowsHitTesting(false)
                     }
+                }
                 
                 if showInputOverlay {
                     InputOverlayView()
+                        .padding()
+                }
+                
+                if showAppInfoOverlay {
+                    AppInfoOverlayView()
                         .padding()
                 }
             }
@@ -134,6 +160,12 @@ struct ContentView: View {
         .onReceive(timer) { _ in
             if showInputOverlay != AppStatus.showInputOverlay {
                 showInputOverlay = AppStatus.showInputOverlay
+            }
+            if showAppInfoOverlay != AppStatus.showAppInfoOverlay {
+                showAppInfoOverlay = AppStatus.showAppInfoOverlay
+            }
+            if showActiveVideoRect != AppStatus.showActiveVideoRect {
+                showActiveVideoRect = AppStatus.showActiveVideoRect
             }
             if overlayActive != AppStatus.showParallelOverlay {
                 overlayActive = AppStatus.showParallelOverlay

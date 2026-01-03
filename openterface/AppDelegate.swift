@@ -232,7 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // MARK: - Hardware Abstraction Layer
     private func initializeHAL() {
-        logger.log(content: "🚀 Initializing Hardware Abstraction Layer...")
+        logger.log(content: "Initializing Hardware Abstraction Layer...")
         
         let halIntegration = HALIntegrationManager.shared
         
@@ -244,7 +244,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             
             // Log HAL status
             let halStatus = halIntegration.getHALStatus()
-            logger.log(content: "📊 HAL Status: \(halStatus.description)")
+            if logger.HalPrint {
+                logger.log(content: "HAL Status: \(halStatus.description)")
+            }
             
             logger.log(content: "✅ Hardware Abstraction Layer initialized successfully")
         } else {

@@ -73,7 +73,7 @@ protocol HIDManagerProtocol: AnyObject {
     func getFps() -> Float?
     func getSwitchStatus() -> Bool
     func getHDMIStatus() -> Bool
-    func getSoftwareSwitchStatus() -> Bool
+    func getSoftwareSwitchDirection() -> SDCardDirection
     func getVersion() -> String?
     
     func setUSBtoHost()

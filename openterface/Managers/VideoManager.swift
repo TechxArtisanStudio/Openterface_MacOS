@@ -103,13 +103,6 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             self.observeDeviceNotifications()
             AppStatus.isFristRun = true
         }
-
-        // Restore persisted active video rect from user settings if present
-        let savedRect = UserSettings.shared.activeVideoRect
-        if savedRect.width > 0 && savedRect.height > 0 {
-            AppStatus.activeVideoRect = savedRect
-            logger.log(content: "Restored active video rect from user settings: \(savedRect)")
-        }
     }
     
     deinit {

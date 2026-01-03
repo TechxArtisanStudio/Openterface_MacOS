@@ -125,7 +125,7 @@ class Logger: LoggerProtocol {
             thread = thread.padding(toLength: 10, withPad: " ", startingAt: 0)
         }
 
-        print("[\(dateString)] [\(thread)] " + content)
+        print("\(dateString) [\(thread)] " + content)
         if logToFile {
             writeLogFile(string: "[\(thread)] " + content)
         }

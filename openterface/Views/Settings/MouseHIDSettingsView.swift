@@ -5,7 +5,6 @@ struct MouseHIDSettingsView: View {
     @ObservedObject private var userSettings = UserSettings.shared
     @ObservedObject private var hidManager = HIDManager.shared
     @ObservedObject private var serialPortManager = SerialPortManager.shared
-    @State private var hidConnectionStatus = false
     @State private var switchStatus = false
     @State private var hdmiStatus = false
     @State private var resolution = "Unknown"
@@ -226,16 +225,6 @@ struct MouseHIDSettingsView: View {
             GroupBox("HID Device Status") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Hardware Connection:")
-                        Spacer()
-                        Text(hidConnectionStatus ? "Connected" : "Disconnected")
-                            .foregroundColor(hidConnectionStatus ? .green : .red)
-                        Button("Refresh") {
-                            updateHIDStatus()
-                        }
-                    }
-
-                    HStack {
                         Text("HDMI Status:")
                         Spacer()
                         Text(hdmiStatus ? "Active" : "No Signal")
@@ -270,7 +259,6 @@ struct MouseHIDSettingsView: View {
     }
 
     private func updateHIDStatus() {
-        hidConnectionStatus = hidManager.getSoftwareSwitchStatus()
         switchStatus = hidManager.getSwitchStatus()
         hdmiStatus = hidManager.getHDMIStatus()
 

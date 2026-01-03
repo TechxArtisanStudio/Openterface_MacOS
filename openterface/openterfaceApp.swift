@@ -113,6 +113,7 @@ struct openterfaceApp: App {
 
     @State private var logModeInitialized = false
     @State private var _isAlwaysOnTop = UserSettings.shared.isAlwaysOnTop
+    @State private var _keyboardLayout = UserSettings.shared.keyboardLayout
 
     var log: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -123,7 +124,7 @@ struct openterfaceApp: App {
             ZStack(alignment: .top) {
                 VStack(alignment: .leading){}
                 .padding()
-                .background(Color.gray.opacity(0))
+                .background(Color.black.opacity(0))
                 .cornerRadius(10)
                 .opacity(showButtons ? 1 : 0)
                 .offset(y: showButtons ? 20 : -100)
@@ -369,6 +370,36 @@ struct openterfaceApp: App {
                             Text(appState.maxPerformanceTitle)
                         }
                     }
+                }
+                
+                Divider()
+                
+                Menu("Keyboard Layout") {
+                    Button(action: {
+                        UserSettings.shared.keyboardLayout = .windows
+                        _keyboardLayout = .windows
+                    }) {
+                        Text("Windows\(_keyboardLayout == .windows ? " ✓" : "")")
+                    }
+                    
+                    Button(action: {
+                        UserSettings.shared.keyboardLayout = .mac
+                        _keyboardLayout = .mac
+                    }) {
+                        Text("Mac\(_keyboardLayout == .mac ? " ✓" : "")")
+                    }
+                }
+                
+                Divider()
+                
+                Button(action: {
+                    let pm = DependencyContainer.shared.resolve(ParallelManagerProtocol.self)
+                    pm.toggleParallelMode()
+                    NotificationCenter.default.post(name: Notification.Name("ParallelModeChanged"), object: nil)
+                    // optimistic local update
+                    parallelState.isEnabled.toggle()
+                }) {
+                    Text(parallelState.isEnabled ? "Exit Parallel Mode" : "Enter Parallel Mode")
                 }
             }
             CommandMenu("Settings") {
@@ -646,6 +677,20 @@ struct openterfaceApp: App {
                     Text(AppStatus.showInputOverlay ? "Hide Input Overlay" : "Show Input Overlay")
                 }
                 .keyboardShortcut("i", modifiers: .command)
+                
+                Button(action: {
+                    AppStatus.showAppInfoOverlay.toggle()
+                }) {
+                    Text(AppStatus.showAppInfoOverlay ? "Hide App Info Overlay" : "Show App Info Overlay")
+                }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
+                
+                Button(action: {
+                    AppStatus.showActiveVideoRect.toggle()
+                }) {
+                    Text(AppStatus.showActiveVideoRect ? "Hide Video Rect Box" : "Show Video Rect Box")
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
                 
                 Divider()
                 
