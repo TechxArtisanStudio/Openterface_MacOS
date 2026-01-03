@@ -287,19 +287,7 @@ struct openterfaceApp: App {
         }
         .commands {
             // Customize menu
-            CommandMenu("Settings") {
-                Menu("Cursor Behavior") {
-                    Button(action: {
-                        UserSettings.shared.isAbsoluteModeMouseHide = !UserSettings.shared.isAbsoluteModeMouseHide
-                        if UserSettings.shared.isAbsoluteModeMouseHide {
-                            mouseHideTitle = "Always Show Host Cursor"
-                        } else {
-                            mouseHideTitle = "Auto-hide Host Cursor"
-                        }
-                    }, label: {
-                        Text(mouseHideTitle)
-                    })
-                }
+            CommandMenu("Control") {
                 Menu("Mouse Mode"){
                     Button(action: {
                         // Check permissions for HID mode
@@ -381,7 +369,21 @@ struct openterfaceApp: App {
                             Text(appState.maxPerformanceTitle)
                         }
                     }
-                }                         
+                }
+            }
+            CommandMenu("Settings") {
+                Menu("Cursor Behavior") {
+                    Button(action: {
+                        UserSettings.shared.isAbsoluteModeMouseHide = !UserSettings.shared.isAbsoluteModeMouseHide
+                        if UserSettings.shared.isAbsoluteModeMouseHide {
+                            mouseHideTitle = "Always Show Host Cursor"
+                        } else {
+                            mouseHideTitle = "Auto-hide Host Cursor"
+                        }
+                    }, label: {
+                        Text(mouseHideTitle)
+                    })
+                }
                 Menu("Audio Control") {
                     Button(action: {
                         toggleAudio(isEnabled: true)
@@ -651,6 +653,48 @@ struct openterfaceApp: App {
                     showAspectRatioSelectionWindow()
                 }) {
                     Text("Target Aspect Ratio...")
+                }
+                
+                Divider()
+                
+                // Zoom menu
+                Menu("Zoom") {
+                    Button(action: {
+                        NotificationCenter.default.post(name: Notification.Name("MenuZoomInTriggered"), object: nil)
+                    }) {
+                        Text("Zoom In")
+                    }
+                    .keyboardShortcut("+", modifiers: .command)
+                    
+                    Button(action: {
+                        NotificationCenter.default.post(name: Notification.Name("MenuZoomOutTriggered"), object: nil)
+                    }) {
+                        Text("Zoom Out")
+                    }
+                    .keyboardShortcut("-", modifiers: .command)
+                    
+                    Divider()
+                    
+                    Button(action: {
+                        NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+                    }) {
+                        Text("Zoom to Height")
+                    }
+                    
+                    Button(action: {
+                        NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+                    }) {
+                        Text("Zoom to Width")
+                    }
+                    
+                    Divider()
+                    
+                    Button(action: {
+                        NotificationCenter.default.post(name: Notification.Name("MenuZoomResetTriggered"), object: nil)
+                    }) {
+                        Text("Reset Zoom")
+                    }
+                    .keyboardShortcut("0", modifiers: .command)
                 }
                 
                 Divider()

@@ -38,6 +38,7 @@ class Logger: LoggerProtocol {
     var MouseEventPrint = false
     var ScrollPrint = false
     var SerialDataPrint = false
+    var HalPrint = false
     
     var logToFile = false
     

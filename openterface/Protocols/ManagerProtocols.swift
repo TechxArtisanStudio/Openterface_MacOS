@@ -205,6 +205,7 @@ protocol StatusBarManagerProtocol: AnyObject {
 protocol LoggerProtocol: AnyObject {
     var SerialDataPrint: Bool { get set }
     var MouseEventPrint: Bool { get set }
+    var HalPrint: Bool {get set}
     var logToFile: Bool { get set }
     
     func log(content: String)
