@@ -95,7 +95,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         self.setupBindings()
         setupSession()
         // Listen for first-frame resolution analysis from VideoOutputDelegate
-        NotificationCenter.default.addObserver(self, selector: #selector(handleFirstFrameResolution(_:)), 
+        NotificationCenter.default.addObserver(self, selector: #selector(handleFrameResolution(_:)),
                 name: Notification.Name("checkActiveResolution"), object: nil)
         
         if AppStatus.isFristRun == false {
@@ -714,23 +714,23 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     }
 
     /// Handle first-frame resolution notification and update dimensions
-    @objc private func handleFirstFrameResolution(_ notification: Notification) {
+    @objc private func handleFrameResolution(_ notification: Notification) {
         guard let info = notification.userInfo as? [String: Any],
               let width = info["activeWidth"] as? Int,
               let height = info["activeHeight"] as? Int else { return }
 
-        dimensions = CMVideoDimensions(width: Int32(width), height: Int32(height))
-        AppStatus.videoDimensions.width = CGFloat(width)
-        AppStatus.videoDimensions.height = CGFloat(height)
+        // Use the actual frame dimensions for the capture resolution
+        dimensions = CMVideoDimensions(width: Int32(width), height: Int32(height))     
         logger.log(content: "First frame resolution received: \(width)x\(height) - dimensions updated")
 
         // Auto-match aspect ratio from first frame and update user settings
-        let aspect = CGFloat(width) / max(1.0, CGFloat(height))
+//        let videoAspectRatio = CGFloat(width) / max(1.0, CGFloat(height))
+        let activeAspectRatio = CGFloat(width) / max(1.0, CGFloat(height))
         let tolerance: CGFloat = 0.02 // 2% tolerance
         var matched: AspectRatioOption? = nil
         for option in AspectRatioOption.allCases {
             let r = option.widthToHeightRatio
-            if abs(r - aspect) / aspect <= tolerance {
+            if abs(r - activeAspectRatio) / activeAspectRatio <= tolerance {
                 matched = option
                 break
             }
@@ -749,22 +749,20 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                 didChange = true
             }
 
-            logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", aspect)))")
+            logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", activeAspectRatio)))")
 
             if didChange {
                 NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
                 }
-            } else {
-                logger.log(content: "Auto-matched aspect ratio matches current settings; no UI update posted")
             }
         } else {
             // No match: revert to default aspect handling only if it represents a change
             if previousUseCustom == true || previousGravity != .resizeAspect {
                 UserSettings.shared.useCustomAspectRatio = false
                 UserSettings.shared.gravity = .resizeAspect
-                logger.log(content: "No aspect ratio match (aspect=\(String(format: "%.3f", aspect))). Reverting to default gravity: resizeAspect")
+                logger.log(content: "No aspect ratio match (aspect=\(String(format: "%.3f", activeAspectRatio))). Reverting to default gravity: resizeAspect")
                 NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
@@ -780,14 +778,22 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
            let aw = info["activeWidth"] as? Int,
            let ah = info["activeHeight"] as? Int {
             let rect = CGRect(x: ax, y: ay, width: aw, height: ah)
+
             AppStatus.activeVideoRect = rect
-            logger.log(content: "First frame active video area: \(rect), aspect ratio: \(String(format: "%.2f", rect.width / rect.height))")
+            
+            logger.log(content: "Frame active video area, activeX:\(ax), activeY:\(ay), activeWidth:\(aw), activeHeight:\(ah), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))")
 
             // Persist to user settings so it's remembered
             UserSettings.shared.activeVideoX = ax
             UserSettings.shared.activeVideoY = ay
             UserSettings.shared.activeVideoWidth = aw
             UserSettings.shared.activeVideoHeight = ah
+            
+            // Auto zoom to height if aspect ratio is less than 1 (portrait mode)
+            if activeAspectRatio < 1.0 {
+                logger.log(content: "🎯 Aspect ratio < 1.0 (portrait mode detected), auto-zooming to height")
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+            }
         }
     }
     

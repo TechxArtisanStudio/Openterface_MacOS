@@ -235,8 +235,9 @@ class MouseManager: MouseManagerProtocol {
                 relativeEvents.append(event)
             }
         }
-        
-        logger.log(content: "Queue overflow detected. Absolute: \(absoluteEvents.count), Relative: \(relativeEvents.count). Applying smooth dropping...")
+        if logger.MouseEventPrint {
+            logger.log(content: "Queue overflow detected. Absolute: \(absoluteEvents.count), Relative: \(relativeEvents.count). Applying smooth dropping...")
+        }
         
         // Strategy 1: Smart dropping for absolute events - prioritize dropping small deltas
         if absoluteEvents.count > maxQueueSize / 2 {
@@ -281,14 +282,18 @@ class MouseManager: MouseManagerProtocol {
                 eventsToKeep.append(contentsOf: smallDeltaEvents.suffix(smallToKeep).map { $0.event })
                 eventsToKeep.append(contentsOf: largeDeltaEvents.map { $0.event })
                 actualDropCount = dropCount
-                logger.log(content: "Dropped \(dropCount) small-delta absolute events (Δ<10px), kept \(keepCount) events")
+                if logger.MouseEventPrint {
+                    logger.log(content: "Dropped \(dropCount) small-delta absolute events (Δ<10px), kept \(keepCount) events")
+                }
             } else {
                 // Drop all small delta events, then drop oldest large delta events
                 let remainingDrops = dropCount - smallDeltaEvents.count
                 let largeDeltasToKeep = max(0, largeDeltaEvents.count - remainingDrops)
                 eventsToKeep.append(contentsOf: largeDeltaEvents.suffix(largeDeltasToKeep).map { $0.event })
                 actualDropCount = smallDeltaEvents.count + (largeDeltaEvents.count - largeDeltasToKeep)
-                logger.log(content: "Dropped \(smallDeltaEvents.count) small-delta + \(remainingDrops) oldest absolute events, kept \(keepCount) events")
+                if logger.MouseEventPrint {
+                    logger.log(content: "Dropped \(smallDeltaEvents.count) small-delta + \(remainingDrops) oldest absolute events, kept \(keepCount) events")
+                }
             }
             
             // Sort by timestamp to maintain order
@@ -417,7 +422,9 @@ class MouseManager: MouseManagerProtocol {
         // Reconstruct queue
         pendingMouseEvents = absoluteEvents + relativeEvents
         let finalCount = pendingMouseEvents.count
-        logger.log(content: "Smooth drop completed: \(originalCount) → \(finalCount) events (peak reduction: \(originalCount - finalCount))")
+        if logger.MouseEventPrint {
+            logger.log(content: "Smooth drop completed: \(originalCount) → \(finalCount) events (peak reduction: \(originalCount - finalCount))")
+        }
     }
     
     /// Record a filtered/dropped mouse event (pre-queue drop)

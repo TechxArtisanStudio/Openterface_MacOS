@@ -615,8 +615,10 @@ class HALIntegrationManager {
 
                     // Log control chipset status changes
                     if wasConnected != deviceStatus.isTargetConnected {
-                        logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")
-                        logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
+                        if logger.HalPrint {
+                            logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")
+                            logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
+                        }
                     }
                     
                     // Update control chipset specific status

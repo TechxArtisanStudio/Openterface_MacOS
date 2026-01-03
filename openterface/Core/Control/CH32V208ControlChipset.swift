@@ -115,8 +115,9 @@ class CH32V208ControlChipset: BaseControlChipset {
                     AppStatus.sdCardDirection = sdDir
                     AppStatus.switchToTarget = switchedToTarget
                     AppStatus.isUSBSwitchConnectToTarget = switchedToTarget
-                    // self.logger.log(content: "CH32V208: SD direction queried - \(switchedToTarget ? \"TARGET\" : \"HOST\")")
-                    self.logger.log(content: "CH32V208: SD direction queried - \(sdDir)")
+                    if self.logger.MouseEventPrint {
+                        self.logger.log(content: "CH32V208: SD direction queried - \(sdDir)")
+                    }
                 }
             } else {
                 DispatchQueue.main.async {

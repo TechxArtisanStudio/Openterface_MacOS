@@ -43,6 +43,12 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// Proxy for video manager's isVideoConnected
     @Published var isVideoConnected: Bool = false
     
+    /// Zoom level for the preview layer (1.0 = normal, 2.0 = 2x zoom, etc.)
+    @Published var zoomLevel: CGFloat = 1.0
+    
+    /// The rect of the active video area
+    @Published var activeVideoRect: CGRect = .zero
+    
     // MARK: - Properties
     
     /// Video manager for handling video capture
@@ -54,6 +60,15 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// Flag to prevent adding observers multiple times
     var hasObserverBeenAdded = false
     
+    /// Minimum zoom level allowed
+    private let minZoomLevel: CGFloat = 1.0
+    
+    /// Maximum zoom level allowed
+    private let maxZoomLevel: CGFloat = 4.0
+    
+    /// Zoom step increment/decrement
+    private let zoomStep: CGFloat = 0.1
+    
     // MARK: - Initialization
     
     init(videoManager: any VideoManagerProtocol = DependencyContainer.shared.resolve(VideoManagerProtocol.self)) {
@@ -61,6 +76,9 @@ class PlayerViewModel: NSObject, ObservableObject {
         super.init()
         
         self.setupBindings()
+        
+        // Always setup observers, regardless of AppStatus.isFristRun
+        self.setupZoomObservers()
         
         if AppStatus.isFristRun == false {
             // Add window event observers
@@ -119,11 +137,33 @@ class PlayerViewModel: NSObject, ObservableObject {
         self.hasObserverBeenAdded = true
     }
     
+    /// Sets up zoom menu observers
+    private func setupZoomObservers() {
+        let notificationCenter = NotificationCenter.default
+        
+        // Zoom menu events
+        notificationCenter.addObserver(self, selector: #selector(handleMenuZoomIn(_:)), 
+                                     name: Notification.Name("MenuZoomInTriggered"), object: nil)
+        notificationCenter.addObserver(self, selector: #selector(handleMenuZoomOut(_:)), 
+                                     name: Notification.Name("MenuZoomOutTriggered"), object: nil)
+        notificationCenter.addObserver(self, selector: #selector(handleMenuZoomReset(_:)), 
+                                     name: Notification.Name("MenuZoomResetTriggered"), object: nil)
+        notificationCenter.addObserver(self, selector: #selector(handleMenuZoomToHeight(_:)), 
+                                     name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+        notificationCenter.addObserver(self, selector: #selector(handleMenuZoomToWidth(_:)), 
+                                     name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+    }
+    
     /// Removes all observers and listeners
     private func cleanupObservers() {
         let notificationCenter = NotificationCenter.default
         notificationCenter.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
         notificationCenter.removeObserver(self, name: NSWindow.didResignMainNotification, object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomInTriggered"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomOutTriggered"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomResetTriggered"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
     }
     
     // MARK: - Authorization
@@ -160,6 +200,76 @@ class PlayerViewModel: NSObject, ObservableObject {
         return videoManager.matchesLocalID(uniqueID, locationID)
     }
     
+    // MARK: - Zoom Handling
+    
+    /// Zooms in the video preview
+    func zoomIn() {
+        let newZoomLevel = min(zoomLevel + zoomStep, maxZoomLevel)
+        setZoomLevel(newZoomLevel)
+        logger.log(content: "Zoom In: \(String(format: "%.2f", newZoomLevel))x")
+    }
+    
+    /// Zooms out the video preview
+    func zoomOut() {
+        let newZoomLevel = max(zoomLevel - zoomStep, minZoomLevel)
+        setZoomLevel(newZoomLevel)
+        logger.log(content: "Zoom Out: \(String(format: "%.2f", newZoomLevel))x")
+    }
+    
+    /// Resets zoom to default (1.0x)
+    func resetZoom() {
+        setZoomLevel(1.0)
+        logger.log(content: "Zoom Reset: 1.00x")
+    }
+    
+    /// Zooms to match the active video rect height
+    func zoomToHeight() {
+        let activeRect = AppStatus.activeVideoRect
+        guard activeRect.height > 0 else {
+            return
+        }
+        
+        let videoSize = AppStatus.videoDimensions
+
+        guard videoSize.height > 0 else {
+            return
+        }
+
+        // Calculate zoom based on height
+        let zoomHeight = videoSize.height / activeRect.height
+        let constrainedZoomLevel = min(max(zoomHeight, minZoomLevel), maxZoomLevel)
+        
+        setZoomLevel(constrainedZoomLevel)
+    }
+    
+    /// Zooms to match the active video rect width
+    func zoomToWidth() {
+        let activeRect = AppStatus.activeVideoRect
+
+        guard activeRect.width > 0 else {
+            return
+        }
+        
+        let videoSize = AppStatus.videoDimensions
+
+        guard videoSize.width > 0 else {
+            return
+        }
+
+        // Calculate zoom based on width
+        let zoomWidth = videoSize.width / activeRect.width
+        let constrainedZoomLevel = min(max(zoomWidth, minZoomLevel), maxZoomLevel)
+
+        setZoomLevel(constrainedZoomLevel)
+    }
+    
+    /// Sets the zoom level to a specific value
+    private func setZoomLevel(_ newLevel: CGFloat) {
+        DispatchQueue.main.async {
+            self.zoomLevel = newLevel
+            NotificationCenter.default.post(name: Notification.Name("PlayerZoomLevelChanged"), object: self.zoomLevel)
+        }
+    }
     
     // MARK: - Audio Handling (Legacy, kept for compatibility)
     
@@ -247,5 +357,32 @@ class PlayerViewModel: NSObject, ObservableObject {
                 logger.log(content: "The window just exited full screen mode.")
             }
         }
+    }
+    
+    // MARK: - Menu Zoom Handlers
+    
+    /// Handles zoom in from menu
+    @objc func handleMenuZoomIn(_ notification: Notification) {
+        zoomIn()
+    }
+    
+    /// Handles zoom out from menu
+    @objc func handleMenuZoomOut(_ notification: Notification) {
+        zoomOut()
+    }
+    
+    /// Handles zoom reset from menu
+    @objc func handleMenuZoomReset(_ notification: Notification) {
+        resetZoom()
+    }
+    
+    /// Handles zoom to height from menu
+    @objc func handleMenuZoomToHeight(_ notification: Notification) {
+        zoomToHeight()
+    }
+    
+    /// Handles zoom to width from menu
+    @objc func handleMenuZoomToWidth(_ notification: Notification) {
+        zoomToWidth()
     }
 }

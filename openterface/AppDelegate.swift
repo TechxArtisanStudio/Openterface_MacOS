@@ -439,105 +439,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Get the main menu of the application
         guard let mainMenu = NSApp.mainMenu else { return }
         
-        // Find the "View" menu or create a new one
-        let viewMenuItem = mainMenu.items.first { $0.title == "View" } ?? 
-                          mainMenu.items.first { $0.title == "View" }
-        
+        // Find or create the "View" menu
+        var viewMenuItem = mainMenu.items.first { $0.title == "View" }
         var viewMenu: NSMenu
         
         if let existingViewMenuItem = viewMenuItem {
-            viewMenu = existingViewMenuItem.submenu ?? NSMenu(title: "View")
-            existingViewMenuItem.submenu = viewMenu
+            // Use existing View menu
+            if let existingMenu = existingViewMenuItem.submenu {
+                viewMenu = existingMenu
+            } else {
+                viewMenu = NSMenu(title: "View")
+                existingViewMenuItem.submenu = viewMenu
+            }
         } else {
-            // If the "View" menu is not found, create a new one
+            // Create a new View menu
             viewMenu = NSMenu(title: "View")
             let newViewMenuItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
             newViewMenuItem.submenu = viewMenu
             
             // Find a suitable position to insert the new menu (usually after "File" and "Edit")
-            if let editMenuIndex = mainMenu.items.firstIndex(where: { $0.title == "Edit" || $0.title == "Edit" }) {
+            if let editMenuIndex = mainMenu.items.firstIndex(where: { $0.title == "Edit" }) {
                 mainMenu.insertItem(newViewMenuItem, at: editMenuIndex + 1)
             } else {
                 mainMenu.addItem(newViewMenuItem)
             }
         }
-        
-        // Add a separator
-        viewMenu.addItem(NSMenuItem.separator())
-        
-        // Add "Show Input Overlay" toggle menu item
-        let inputOverlayMenuItem = NSMenuItem(title: "Show Input Overlay", action: #selector(toggleInputOverlay(_:)), keyEquivalent: "i")
-        inputOverlayMenuItem.state = AppStatus.showInputOverlay ? .on : .off
-        viewMenu.addItem(inputOverlayMenuItem)
-        
-        // Add a separator
-        viewMenu.addItem(NSMenuItem.separator())
-        
-        // Add a "Screen Ratio" submenu
-        let aspectRatioMenu = NSMenu(title: "Screen Ratio")
-        let aspectRatioMenuItem = NSMenuItem(title: "Screen Ratio", action: nil, keyEquivalent: "")
-        aspectRatioMenuItem.submenu = aspectRatioMenu
-        viewMenu.addItem(aspectRatioMenuItem)
-        
-        // Add "Auto Detect" option
-        let autoDetectItem = NSMenuItem(title: "Auto Detect", action: #selector(selectAutoDetectAspectRatio(_:)), keyEquivalent: "")
-        autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
-        aspectRatioMenu.addItem(autoDetectItem)
-        
-        aspectRatioMenu.addItem(NSMenuItem.separator())
-        
-        // Add preset aspect ratio options
-        for option in AspectRatioOption.allCases {
-            let menuItem = NSMenuItem(title: option.rawValue, action: #selector(selectAspectRatio(_:)), keyEquivalent: "")
-            menuItem.representedObject = option
-            if UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option {
-                menuItem.state = .on
-            }
-            aspectRatioMenu.addItem(menuItem)
-        }
-        
-        // Add a separator
-        viewMenu.addItem(NSMenuItem.separator())
-
-        // --- Parallel Mode menu item (avoid duplicates) ---
-        if viewMenu.items.first(where: { $0.action == #selector(toggleParallelModeMenu(_:)) || $0.title == "Enter Parallel Mode" || $0.title == "Exit Parallel Mode" }) == nil {
-            let parallelMenuItem = NSMenuItem(title: parallelManager.isParallelModeEnabled ? "Exit Parallel Mode" : "Enter Parallel Mode", action: #selector(toggleParallelModeMenu(_:)), keyEquivalent: "")
-            parallelMenuItem.target = self
-            viewMenu.addItem(parallelMenuItem)
-        }
-
-        // --- Target Screen Placement submenu (avoid duplicates) ---
-        if viewMenu.items.first(where: { $0.title == "Target Screen Placement" }) == nil {
-            let placementMenu = NSMenu(title: "Target Screen Placement")
-            let placementMenuItem = NSMenuItem(title: "Target Screen Placement", action: nil, keyEquivalent: "")
-            placementMenuItem.submenu = placementMenu
-
-            let leftItem = NSMenuItem(title: "Left", action: #selector(setTargetPlacementLeftMenu(_:)), keyEquivalent: "")
-            leftItem.target = self
-            leftItem.state = UserSettings.shared.targetComputerPlacement == .left ? .on : .off
-            placementMenu.addItem(leftItem)
-
-            let rightItem = NSMenuItem(title: "Right", action: #selector(setTargetPlacementRightMenu(_:)), keyEquivalent: "")
-            rightItem.target = self
-            rightItem.state = UserSettings.shared.targetComputerPlacement == .right ? .on : .off
-            placementMenu.addItem(rightItem)
-
-            let topItem = NSMenuItem(title: "Top", action: #selector(setTargetPlacementTopMenu(_:)), keyEquivalent: "")
-            topItem.target = self
-            topItem.state = UserSettings.shared.targetComputerPlacement == .top ? .on : .off
-            placementMenu.addItem(topItem)
-
-            let bottomItem = NSMenuItem(title: "Bottom", action: #selector(setTargetPlacementBottomMenu(_:)), keyEquivalent: "")
-            bottomItem.target = self
-            bottomItem.state = UserSettings.shared.targetComputerPlacement == .bottom ? .on : .off
-            placementMenu.addItem(bottomItem)
-
-            viewMenu.addItem(placementMenuItem)
-        }
-        
-        // Add a "HID Resolution Change Alert Settings" menu item
-        let hidAlertMenuItem = NSMenuItem(title: "HID Resolution Change Alert Settings", action: #selector(showHidResolutionAlertSettings(_:)), keyEquivalent: "")
-        viewMenu.addItem(hidAlertMenuItem)
     }
 
     // MARK: - View menu handlers (Parallel Mode + Target Placement)
@@ -627,7 +553,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         )
         
         // Calculate appropriate size
-        let newSize = WindowUtils.shared.calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
+        let newSize = WindowUtils.shared.calculateConstrainedWindowSize(for: window, targetSize: targetSize, initialContentSize: self.initialContentSize)
         
         // Calculate center position
         let newX = screenFrame.origin.x + (screenFrame.width - newSize.width) / 2
@@ -658,7 +584,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        return WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
+        return WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, initialContentSize: self.initialContentSize)
     }
 
     func windowWillStartLiveResize(_ notification: Notification) {
@@ -690,7 +616,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             )
             
             // Use calculateConstrainedWindowSize function to calculate new size
-            let newSize = WindowUtils.shared.calculateConstrainedWindowSize(for: window, targetSize: targetSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
+            let newSize = WindowUtils.shared.calculateConstrainedWindowSize(for: window, targetSize: targetSize, initialContentSize: self.initialContentSize)
             
             // Ensure the new size is not smaller than minimum allowed
             let finalSize = NSSize(
@@ -764,7 +690,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let targetSize = NSSize(width: maxWidth, height: maxHeight)
             
             // Use calculateConstrainedWindowSize to maintain the aspect ratio
-            let maxSize = WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetSize, constraintToScreen: true, initialContentSize: self.initialContentSize)
+            let maxSize = WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetSize, initialContentSize: self.initialContentSize)
             
             // Calculate center position
             let newX = screenFrame.origin.x + (screenFrame.width - maxSize.width) / 2

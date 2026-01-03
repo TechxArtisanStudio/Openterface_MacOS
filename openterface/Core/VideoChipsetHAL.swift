@@ -171,7 +171,9 @@ class BaseVideoChipset: VideoChipsetProtocol {
         self.isConnected = isConnected
         
         if previousStatus != isConnected {
-            logger.log(content: "📺 Video chipset \(chipsetInfo.name) connection status: \(isConnected ? "Connected" : "Disconnected")")
+            if logger.HalPrint {
+                logger.log(content: "📺 Video chipset \(chipsetInfo.name) connection status: \(isConnected ? "Connected" : "Disconnected")")
+            }
         }
     }
     

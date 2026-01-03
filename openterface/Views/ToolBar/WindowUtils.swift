@@ -239,9 +239,8 @@ final class WindowUtils {
     /// - Parameters:
     ///   - window: The window being resized
     ///   - targetSize: The desired target size
-    ///   - constraintToScreen: Whether to clamp to the visible screen area
     ///   - initialContentSize: The default content size / aspect ratio to use when none is available
-    func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, constraintToScreen: Bool, initialContentSize: CGSize) -> NSSize {
+    func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, initialContentSize: CGSize) -> NSSize {
         // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
         
@@ -266,32 +265,30 @@ final class WindowUtils {
         var newSize = targetSize
 
         // Adjust height calculation to account for the toolbar
-        var contentHeight = newSize.width / aspectRatioToUse
+        let contentHeight = newSize.width / aspectRatioToUse
         newSize.height = contentHeight + toolbarHeight
 
-        // If requested, constrain the window to the visible screen area
-        if constraintToScreen {
-            let screenFrame = screen.visibleFrame
+        // Limt the window into the visible screen area
+        let screenFrame = screen.visibleFrame
 
-            // If the computed height exceeds the screen's visible height, clamp it
-            if newSize.height > screenFrame.height {
-                // Maximum content height available (excluding toolbar)
-                let maxContentHeight = max(screenFrame.height - toolbarHeight, 1)
+        // If the computed height exceeds the screen's visible height, clamp it
+        if newSize.height > screenFrame.height {
+            // Maximum content height available (excluding toolbar)
+            let maxContentHeight = max(screenFrame.height - toolbarHeight, 1)
 
-                // Compute width that preserves aspect ratio for the clamped height
-                var adjustedWidth = maxContentHeight * aspectRatioToUse
-                var adjustedHeight = maxContentHeight + toolbarHeight
+            // Compute width that preserves aspect ratio for the clamped height
+            var adjustedWidth = maxContentHeight * aspectRatioToUse
+            var adjustedHeight = maxContentHeight + toolbarHeight
 
-                // If the adjusted width also exceeds screen width, clamp width and recompute height
-                if adjustedWidth > screenFrame.width {
-                    adjustedWidth = screenFrame.width
-                    let contentHeightFromWidth = adjustedWidth / aspectRatioToUse
-                    adjustedHeight = contentHeightFromWidth + toolbarHeight
-                }
-
-                newSize.width = adjustedWidth
-                newSize.height = adjustedHeight
+            // If the adjusted width also exceeds screen width, clamp width and recompute height
+            if adjustedWidth > screenFrame.width {
+                adjustedWidth = screenFrame.width
+                let contentHeightFromWidth = adjustedWidth / aspectRatioToUse
+                adjustedHeight = contentHeightFromWidth + toolbarHeight
             }
+
+            newSize.width = adjustedWidth
+            newSize.height = adjustedHeight
         }
 
         // Ensure we respect the window's minimum size

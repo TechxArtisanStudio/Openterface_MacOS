@@ -95,6 +95,7 @@ class PlayerView: NSView, NSWindowDelegate {
         playViewNtf.addObserver(self, selector: #selector(promptUserHowToExitRelativeMode(_:)), name: .enableRelativeModeNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(handleHIDMouseEscaped(_:)), name: .hidMouseEscapedNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(handleGravitySettingsChanged(_:)), name: .gravitySettingsChanged, object: nil)
+        playViewNtf.addObserver(self, selector: #selector(handleZoomLevelChanged(_:)), name: Notification.Name("PlayerZoomLevelChanged"), object: nil)
     }
     
         @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
@@ -116,6 +117,38 @@ class PlayerView: NSView, NSWindowDelegate {
             self.setupLayer()
             self.logger.log(content: "Updated gravity settings: \(UserSettings.shared.gravity.rawValue)")
         }
+    }
+    
+    @objc func handleZoomLevelChanged(_ notification: Notification) {
+        guard let zoomLevel = notification.object as? CGFloat else { return }
+        
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.2)
+        
+        // Get the bounds of the preview layer
+        guard let previewLayer = self.previewLayer else {
+            CATransaction.commit()
+            return
+        }
+        
+        let bounds = previewLayer.bounds
+        let centerX = bounds.midX
+        let centerY = bounds.midY
+
+        // Create transform that zooms from center:
+        // 1. Translate to origin
+        // 2. Scale
+        // 3. Translate back to center
+        var transform = CGAffineTransform.identity
+        transform = transform.translatedBy(x: centerX, y: centerY)
+
+        transform = transform.scaledBy(x: zoomLevel, y: zoomLevel)
+
+        transform = transform.translatedBy(x: -centerX, y: -centerY)
+
+        previewLayer.setAffineTransform(transform)
+        
+        CATransaction.commit()
     }
     
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
