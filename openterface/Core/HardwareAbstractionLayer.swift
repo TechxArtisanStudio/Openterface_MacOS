@@ -261,7 +261,9 @@ class HardwareAbstractionLayer {
         }
         
         AppStatus.videoChipsetType = .unknown
-        logger.log(content: "HAL: No supported video chipset detected")
+        if logger.HalPrint {
+            logger.log(content: "No supported video chipset detected")
+        }
         return false
     }
     
@@ -271,7 +273,9 @@ class HardwareAbstractionLayer {
             if ch32v208.detectDevice() && ch32v208.initialize() {
                 controlChipset = ch32v208
                 AppStatus.controlChipsetType = .ch32v208
-                logger.log(content: "✅ HAL: CH32V208 control chipset detected and initialized")
+                if logger.HalPrint {
+                    logger.log(content: "CH32V208 control chipset detected and initialized")
+                }
                 return true
             }
         }
@@ -281,13 +285,17 @@ class HardwareAbstractionLayer {
             if ch9329.detectDevice() && ch9329.initialize() {
                 controlChipset = ch9329
                 AppStatus.controlChipsetType = .ch9329
-                logger.log(content: "✅ HAL: CH9329 control chipset detected and initialized")
+                if logger.HalPrint {
+                    logger.log(content: "✅ HAL: CH9329 control chipset detected and initialized")
+                }
                 return true
             }
         }
 
         AppStatus.controlChipsetType = .unknown
-        logger.log(content: "⚠️ HAL: No supported control chipset detected")
+        if logger.HalPrint {
+            logger.log(content: "⚠️ HAL: No supported control chipset detected")
+        }
         return false
     }
     

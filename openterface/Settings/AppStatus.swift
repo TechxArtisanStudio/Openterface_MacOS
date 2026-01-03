@@ -67,6 +67,8 @@ struct AppStatus {
     static var isLogMode: Bool = false
     static var isAreaOCRing: Bool = false
     static var showInputOverlay: Bool = false
+    static var showAppInfoOverlay: Bool = false
+    static var showActiveVideoRect: Bool = false
     static var showParallelOverlay: Bool = false
     
     //Following two status check the CTS flipping status for Mini-KVM
@@ -98,7 +100,6 @@ struct AppStatus {
     static var isHostCapLockOn: Bool = false
     static var isScrollOn: Bool = false
     static var switchToTarget: Bool = false
-    static var isLockSwitchOn: Bool = false
     
     static var videoFirmwareVersion: String = ""
     static var hasHdmiSignal: Bool?

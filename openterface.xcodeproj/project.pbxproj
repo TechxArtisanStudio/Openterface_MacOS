@@ -72,6 +72,7 @@
 		BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */; };
 		BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */; };
 		BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */; };
+		BF9A24582F093D92004A4038 /* AppInfoOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A24572F093D92004A4038 /* AppInfoOverlayView.swift */; };
 		BFA445742F016E3E005D2937 /* AudioVideoSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445732F016E3E005D2937 /* AudioVideoSettingsView.swift */; };
 		BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */; };
 		BFA445782F016FEA005D2937 /* DeviceConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */; };
@@ -179,6 +180,7 @@
 		BF98F7312E35A1BC002EACD7 /* HardwareAbstractionLayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HardwareAbstractionLayer.swift; path = openterface/Core/HardwareAbstractionLayer.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7322E35A1BC002EACD7 /* VideoChipsetHAL.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = VideoChipsetHAL.swift; path = openterface/Core/VideoChipsetHAL.swift; sourceTree = SOURCE_ROOT; };
 		BF98F7332E35A1BC002EACD7 /* HALIntegration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HALIntegration.swift; path = openterface/Core/HALIntegration.swift; sourceTree = SOURCE_ROOT; };
+		BF9A24572F093D92004A4038 /* AppInfoOverlayView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppInfoOverlayView.swift; sourceTree = "<group>"; };
 		BFA445732F016E3E005D2937 /* AudioVideoSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioVideoSettingsView.swift; sourceTree = "<group>"; };
 		BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardOCRSettingsView.swift; sourceTree = "<group>"; };
 		BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeviceConnectionSettingsView.swift; sourceTree = "<group>"; };
@@ -341,6 +343,7 @@
 		53FBE7DB2B3D6789007785B0 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				BF9A24572F093D92004A4038 /* AppInfoOverlayView.swift */,
 				6BC364642F025DD4001B9A07 /* ToolBar */,
 				BF7752E22F00FDDD00FE5D0E /* Settings */,
 				6B2450A22EFE5FA500BE14D8 /* FullScreenView.swift */,
@@ -627,6 +630,7 @@
 				BFD4EA962E3643CA0029BFC2 /* PasteConfirmationView.swift in Sources */,
 				53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */,
 				BF98F7392E35A1BD002EACD7 /* HALIntegration.swift in Sources */,
+				BF9A24582F093D92004A4038 /* AppInfoOverlayView.swift in Sources */,
 				53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */,
 				BF7752EF2F01328900FE5D0E /* SettingsTypes.swift in Sources */,
 				BFA445742F016E3E005D2937 /* AudioVideoSettingsView.swift in Sources */,

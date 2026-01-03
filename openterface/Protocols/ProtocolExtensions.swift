@@ -59,8 +59,8 @@ extension VideoManagerProtocol {
 
 extension HIDManagerProtocol {
     /// Default implementation for basic HID status
-    func getSoftwareSwitchStatus() -> Bool {
-        return isOpen ?? false
+    func getSoftwareSwitchDirection() -> SDCardDirection {
+        return SDCardDirection.unknown  
     }
     
     /// Default implementation for USB switching
