@@ -73,7 +73,7 @@ protocol HIDManagerProtocol: AnyObject {
     func getFps() -> Float?
     func getSwitchStatus() -> Bool
     func getHDMIStatus() -> Bool
-    func getSoftwareSwitchStatus() -> Bool
+    func getSoftwareSwitchDirection() -> SDCardDirection
     func getVersion() -> String?
     
     func setUSBtoHost()
@@ -205,6 +205,7 @@ protocol StatusBarManagerProtocol: AnyObject {
 protocol LoggerProtocol: AnyObject {
     var SerialDataPrint: Bool { get set }
     var MouseEventPrint: Bool { get set }
+    var HalPrint: Bool {get set}
     var logToFile: Bool { get set }
     
     func log(content: String)

@@ -471,7 +471,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             if let expectedCmd = expectedCmd, expectedCmd == cmd {
                 self.syncResponseData = data
                 let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-                logger.log(content: "SYNC: Captured response for cmd 0x\(String(format: "%02X", cmd)): \(dataString)")
+                if logger.SerialDataPrint {
+                    logger.log(content: "SYNC: Rx(0x\(String(format: "%02X", cmd))）: \(dataString)")
+                }
                 return  // Exit early - don't process command normally for sync responses
             } else {
                 if logger.SerialDataPrint {
@@ -635,10 +637,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             switch dir {
             case 0x00:
                 AppStatus.sdCardDirection = SDCardDirection.host
-                logger.log(content: "CH32V208: SD card pointing to HOST")
             case 0x01:
                 AppStatus.sdCardDirection = SDCardDirection.target
-                logger.log(content: "CH32V208: SD card pointing to TARGET")
             default:
                 AppStatus.sdCardDirection = SDCardDirection.unknown
                 logger.log(content: "CH32V208: SD card direction unknown (0x\(String(format: "%02X", dir)))")
@@ -1221,8 +1221,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             let receivedData = syncResponseQueue.sync { self.syncResponseData }
             if let receivedData = receivedData {
                 response = receivedData
-                logger.log(content: "SYNC: Response received after \(pollCount) polls")
-                logger.log(content: "[Baudrate: \(self.baudrate)] Rx(sync): \(response)")
+                if logger.SerialDataPrint {
+                    logger.log(content: "SYNC: Response received after \(pollCount) polls")
+                    logger.log(content: "[Baudrate: \(self.baudrate)] Rx(sync): \(response)")
+                }
                 break
             }
             

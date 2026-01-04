@@ -6,11 +6,21 @@ import AppKit
 /// Delegate for handling video data output
 class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
+    private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private weak var videoManager: VideoManager?
+    
     // Store the latest video frame for OCR processing
     private var latestPixelBuffer: CVPixelBuffer?
     // Timestamp of the last processed frame (seconds)
     private var lastProcessedTime: TimeInterval? = nil
     private let bufferQueue = DispatchQueue(label: "VideoOutputDelegate.bufferQueue", qos: .userInitiated)
+    
+    /// Initializes the video output delegate with a reference to the video manager
+    /// - Parameter videoManager: The VideoManager instance for accessing active display detection
+    init(videoManager: VideoManager) {
+        self.videoManager = videoManager
+        super.init()
+    }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
@@ -58,9 +68,9 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             return
         }
 
-        // Use a shorter interval for the very first processing (1s),
-        // then a 5s interval for subsequent processing
-        let interval: TimeInterval = (lastProcessedTime == nil) ? 1.0 : 5.0
+        // Use a shorter interval for the very first processing (0.5s),
+        // then a 3s interval for subsequent processing
+        let interval: TimeInterval = (lastProcessedTime == nil) ? 0.5 : 3.0
         if let last = lastProcessedTime, currentTime - last < interval {
             return
         }
@@ -69,88 +79,25 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             let width = cgImage.width
             let height = cgImage.height
 
-            // Detect active (non-black) area within the frame
+            // Detect active (non-black) area within the frame using VideoManager
             var userInfo: [String: Any] = ["width": width, "height": height, "timestamp": currentTime]
-            if let activeRect = detectActiveRect(from: cgImage) {
+            if let activeRect = videoManager?.detectActiveRect(from: cgImage) {
                 userInfo["activeX"] = Int(activeRect.origin.x)
                 userInfo["activeY"] = Int(activeRect.origin.y)
                 userInfo["activeWidth"] = Int(activeRect.size.width)
                 userInfo["activeHeight"] = Int(activeRect.size.height)
             } else {
-                print("ℹ️ No active (non-black) area detected at \(currentTime)s")
+                logger.log(content: "ℹ️ No active (non-black) area detected at \(currentTime)s")
             }
 
             NotificationCenter.default.post(name: Notification.Name("checkActiveResolution"), object: nil, userInfo: userInfo)
 
             lastProcessedTime = currentTime
         } else {
-            print("❌ Failed to create CGImage for frame analysis at \(currentTime)s")
+            logger.log(content: "❌ Failed to create CGImage for frame analysis at \(currentTime)s")
         }
     }
 
-    /// Detects the bounding rect of non-black pixels in the image (image coordinates)
-    private func detectActiveRect(from cgImage: CGImage) -> CGRect? {
-        let width = cgImage.width
-        let height = cgImage.height
-
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * width
-        let bitsPerComponent = 8
-
-        guard let contextData = malloc(height * bytesPerRow) else { return nil }
-        defer { free(contextData) }
-
-        guard let context = CGContext(data: contextData,
-                                      width: width,
-                                      height: height,
-                                      bitsPerComponent: bitsPerComponent,
-                                      bytesPerRow: bytesPerRow,
-                                      space: colorSpace,
-                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-            return nil
-        }
-
-        // Draw into RGBA context
-        let rect = CGRect(x: 0, y: 0, width: width, height: height)
-        context.draw(cgImage, in: rect)
-
-        let threshold: UInt8 = 16 // pixel > threshold considered active (not black)
-
-        var minX = width
-        var minY = height
-        var maxX: Int = 0
-        var maxY: Int = 0
-
-        let data = context.data!.assumingMemoryBound(to: UInt8.self)
-
-        for y in 0..<height {
-            let row = data.advanced(by: y * bytesPerRow)
-            for x in 0..<width {
-                let pixel = row.advanced(by: x * bytesPerPixel)
-                let r = pixel[0]
-                let g = pixel[1]
-                let b = pixel[2]
-
-                if r > threshold || g > threshold || b > threshold {
-                    if x < minX { minX = x }
-                    if x > maxX { maxX = x }
-                    if y < minY { minY = y }
-                    if y > maxY { maxY = y }
-                }
-            }
-        }
-
-        if minX <= maxX && minY <= maxY {
-            // Note: Core Graphics origin is bottom-left for drawing, but here we return image coordinates with origin at (0,0) top-left
-            let w = maxX - minX + 1
-            let h = maxY - minY + 1
-            return CGRect(x: minX, y: minY, width: w, height: h)
-        }
-
-        return nil
-    }
-    
     /// Gets the latest video frame for OCR processing
     func getLatestFrame() -> CVPixelBuffer? {
         return bufferQueue.sync {
@@ -160,16 +107,16 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     
     /// Captures a specific area from the latest video frame
     func captureArea(_ rect: NSRect) -> NSImage? {
-        print("🎬 VideoOutputDelegate.captureArea called with rect: \(rect)")
+        logger.log(content: "🎬 VideoOutputDelegate.captureArea called with rect: \(rect)")
         
         guard let pixelBuffer = getLatestFrame() else {
-            print("❌ No latest frame available for video capture")
+            logger.log(content: "❌ No latest frame available for video capture")
             return nil
         }
         
         // Convert CVPixelBuffer to CGImage
         guard let cgImage = createCGImage(from: pixelBuffer) else {
-            print("❌ Failed to create CGImage from pixel buffer")
+            logger.log(content: "❌ Failed to create CGImage from pixel buffer")
             return nil
         }
         
@@ -177,8 +124,8 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         let imageWidth = CGFloat(cgImage.width)
         let imageHeight = CGFloat(cgImage.height)
         
-        print("🎬 Video frame dimensions: \(imageWidth) x \(imageHeight)")
-        print("🎬 Requested crop rect: \(rect)")
+        logger.log(content: "🎬 Video frame dimensions: \(imageWidth) x \(imageHeight)")
+        logger.log(content: "🎬 Requested crop rect: \(rect)")
         
         // Create crop rect and ensure it's within bounds
         let cropRect = CGRect(
@@ -188,23 +135,23 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             height: min(rect.height, imageHeight - max(0, rect.minY))
         )
         
-        print("🎬 Calculated crop rect: \(cropRect)")
-        print("🎬 Crop rect bounds check: x=\(cropRect.minX), y=\(cropRect.minY), w=\(cropRect.width), h=\(cropRect.height)")
+        logger.log(content: "🎬 Calculated crop rect: \(cropRect)")
+        logger.log(content: "🎬 Crop rect bounds check: x=\(cropRect.minX), y=\(cropRect.minY), w=\(cropRect.width), h=\(cropRect.height)")
         
         // Ensure crop rect is valid
         guard cropRect.width > 0 && cropRect.height > 0 else {
-            print("❌ Invalid crop rect dimensions: \(cropRect)")
+            logger.log(content: "❌ Invalid crop rect dimensions: \(cropRect)")
             return nil
         }
         
         // Crop the image
         guard let croppedCGImage = cgImage.cropping(to: cropRect) else {
-            print("❌ Failed to crop CGImage with rect: \(cropRect)")
+            logger.log(content: "❌ Failed to crop CGImage with rect: \(cropRect)")
             return nil
         }
         
         let resultImage = NSImage(cgImage: croppedCGImage, size: NSSize(width: cropRect.width, height: cropRect.height))
-        print("✅ Successfully captured video area. Result image size: \(resultImage.size)")
+        logger.log(content: "✅ Successfully captured video area. Result image size: \(resultImage.size)")
         
         return resultImage
     }

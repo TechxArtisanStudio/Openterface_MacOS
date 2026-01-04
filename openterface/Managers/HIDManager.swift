@@ -213,25 +213,25 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         self.sendHIDReport(report: [0xB6, 0xDF, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00])
     }
     
-    func getSoftwareSwitchStatus() -> Bool {
+    func getSoftwareSwitchDirection() -> SDCardDirection {
         // Command: 0xB5 0xDF to check hardware connection status
         // Report format: [0xB5, 0xDF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]
         guard let chipset = getActiveVideoChipset(),
               let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
             logger.log(content: "No active video chipset found for HDMI status reading")
             AppStatus.hasHdmiSignal = nil
-            return false
+            return SDCardDirection.unknown
         }
         let report = generateHIDReport(address: hidRegisters.softwareSwitchStatus)
         self.sendHIDReport(report: report)
         if let report = self.readHIDReport() {
             if report[3] == 0 { // to host
-                return false
+                return SDCardDirection.host
             } else {
-                return true
+                return SDCardDirection.target
             }
         }
-        return true
+        return SDCardDirection.unknown
     }
     
     func getSwitchStatus() -> Bool {
@@ -333,11 +333,6 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             // When the resolution changes, send a notification
             if newResolution.0 > 0 && newResolution.1 > 0 {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
-                
-                // Reset user custom aspect ratio settings on main thread to avoid concurrent access
-                DispatchQueue.main.async {
-                    UserSettings.shared.useCustomAspectRatio = false
-                }
             }
         }
         

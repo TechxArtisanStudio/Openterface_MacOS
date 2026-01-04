@@ -615,8 +615,10 @@ class HALIntegrationManager {
 
                     // Log control chipset status changes
                     if wasConnected != deviceStatus.isTargetConnected {
-                        logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")
-                        logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
+                        if logger.HalPrint {
+                            logger.log(content: "🎮 Control target status changed: \(deviceStatus.isTargetConnected ? "Connected" : "Disconnected")")
+                            logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
+                        }
                     }
                     
                     // Update control chipset specific status
@@ -650,8 +652,8 @@ class HALIntegrationManager {
                 // Get version and connection status (these might still need HID manager for some chipsets)
                 if let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
                     _ = hidManager.getSwitchStatus()
-                    let status = hidManager.getSoftwareSwitchStatus()
-                    AppStatus.isUSBSwitchConnectToTarget = status
+                    let direction = hidManager.getSoftwareSwitchDirection()
+                    AppStatus.sdCardDirection = direction
                 //    AppStatus.videoFirmwareVersion = hidManager.getVersion() ?? ""
                 }
             } catch {

@@ -38,6 +38,7 @@ class Logger: LoggerProtocol {
     var MouseEventPrint = false
     var ScrollPrint = false
     var SerialDataPrint = false
+    var HalPrint = false
     
     var logToFile = false
     
@@ -124,7 +125,7 @@ class Logger: LoggerProtocol {
             thread = thread.padding(toLength: 10, withPad: " ", startingAt: 0)
         }
 
-        print("[\(dateString)] [\(thread)] " + content)
+        print("\(dateString) [\(thread)] " + content)
         if logToFile {
             writeLogFile(string: "[\(thread)] " + content)
         }
