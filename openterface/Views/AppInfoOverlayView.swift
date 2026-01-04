@@ -84,7 +84,8 @@ struct AppInfoOverlayView: View {
                         ("X", String(format: "%.0f", AppStatus.activeVideoRect.origin.x)),
                         ("Y", String(format: "%.0f", AppStatus.activeVideoRect.origin.y)),
                         ("W", String(format: "%.0f", AppStatus.activeVideoRect.width)),
-                        ("H", String(format: "%.0f", AppStatus.activeVideoRect.height))
+                        ("H", String(format: "%.0f", AppStatus.activeVideoRect.height)),
+                        ("Ratio", getActiveAspectRatio())
                     ])
                 }
                 .frame(minWidth: 200, alignment: .topLeading)
@@ -232,6 +233,42 @@ struct AppInfoOverlayView: View {
         }
         
         let aspectRatio = view.width / view.height
+        let tolerance: CGFloat = 0.01
+        
+        // Find the closest matching aspect ratio from AspectRatioOption
+        var closestMatch: AspectRatioOption? = nil
+        var closestDifference: CGFloat = CGFloat.infinity
+        
+        for option in AspectRatioOption.allCases {
+            let difference = abs(aspectRatio - option.widthToHeightRatio)
+            if difference < closestDifference {
+                closestDifference = difference
+                closestMatch = option
+                
+                // If within tolerance, use exact match
+                if difference < tolerance {
+                    break
+                }
+            }
+        }
+        
+        let ratioString = String(format: "%.3f", aspectRatio)
+        if let match = closestMatch {
+            return "\(match.rawValue) (\(ratioString))"
+        }
+        
+        return ratioString
+    }
+    
+    private func getActiveAspectRatio() -> String {
+        let rect = AppStatus.activeVideoRect
+        
+        // Guard against zero dimensions
+        guard rect.width > 0 && rect.height > 0 else {
+            return "N/A"
+        }
+        
+        let aspectRatio = rect.width / rect.height
         let tolerance: CGFloat = 0.01
         
         // Find the closest matching aspect ratio from AspectRatioOption

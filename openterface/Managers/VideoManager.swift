@@ -78,6 +78,22 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// Minimum interval for video session start (1 second)
     private let videoSessionStartMinInterval: TimeInterval = 1.0
     
+    /// Previous activeRect result for stability check
+    private var previousActiveRect: CGRect?
+    
+    /// Current candidate activeRect being validated
+    private var candidateActiveRect: CGRect?
+    
+    /// Number of consecutive frames with same candidate rect
+    private var consecutiveFramesSameRect: Int = 0
+    
+    /// Minimum consecutive frames required to confirm a new rect (consensus threshold)
+    private let minConsecutiveFramesForUpdate: Int = 3
+    
+    /// Tolerance threshold for ignoring minor activeRect changes (in pixels)
+    /// Increased to handle capture card jitter in both dimensions and position
+    private let activeRectChangeThreshold: Int = 25
+    
     /// Delegate for handling video output
     private var videoOutputDelegate: VideoOutputDelegate?
     
@@ -119,7 +135,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         ]
         videoDataOutput.alwaysDiscardsLateVideoFrames = true
 
-        self.videoOutputDelegate = VideoOutputDelegate()
+        self.videoOutputDelegate = VideoOutputDelegate(videoManager: self)
         videoDataOutput.setSampleBufferDelegate(videoOutputDelegate, queue: DispatchQueue(label: "VideoOutputQueue"))
 
         if captureSession.canAddOutput(videoDataOutput) {
@@ -647,6 +663,99 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         }
     }
     
+    // MARK: - Active Display Detection
+    
+    /// Detects the bounding rect of non-black pixels in the image (image coordinates)
+    /// Assumes video image symmetry - uses closer-to-edge values for more reliable border detection
+    /// - Parameter cgImage: The image to analyze
+    /// - Returns: CGRect representing the active (non-black) area, or nil if no active area found
+    func detectActiveRect(from cgImage: CGImage) -> CGRect? {
+        let width = cgImage.width
+        let height = cgImage.height
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        let bitsPerComponent = 8
+
+        guard let contextData = malloc(height * bytesPerRow) else { return nil }
+        defer { free(contextData) }
+
+        guard let context = CGContext(data: contextData,
+                                      width: width,
+                                      height: height,
+                                      bitsPerComponent: bitsPerComponent,
+                                      bytesPerRow: bytesPerRow,
+                                      space: colorSpace,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return nil
+        }
+
+        // Draw into RGBA context
+        let rect = CGRect(x: 0, y: 0, width: width, height: height)
+        context.draw(cgImage, in: rect)
+
+        let threshold: UInt8 = 16 // pixel > threshold considered active (not black)
+
+        var minX = width
+        var minY = height
+        var maxX: Int = 0
+        var maxY: Int = 0
+
+        let data = context.data!.assumingMemoryBound(to: UInt8.self)
+
+        for y in 0..<height {
+            let row = data.advanced(by: y * bytesPerRow)
+            for x in 0..<width {
+                let pixel = row.advanced(by: x * bytesPerPixel)
+                let r = pixel[0]
+                let g = pixel[1]
+                let b = pixel[2]
+
+                if r > threshold || g > threshold || b > threshold {
+                    if x < minX { minX = x }
+                    if x > maxX { maxX = x }
+                    if y < minY { minY = y }
+                    if y > maxY { maxY = y }
+                }
+            }
+        }
+
+        if minX <= maxX && minY <= maxY {
+            // Assuming video image symmetry, use the closer-to-edge values for more reliable border detection
+            // For horizontal: compare distance from left (minX) vs distance from right (width - maxX - 1)
+            let leftBorder = minX
+            let rightBorder = width - maxX - 1
+            let useLeftAsReference = leftBorder <= rightBorder
+            let finalMinX = useLeftAsReference ? minX : (width - maxX - 1)
+            let finalMaxX = useLeftAsReference ? (width - 1 - minX) : maxX
+            
+            // For vertical: compare distance from top (minY) vs distance from bottom (height - maxY - 1)
+            let topBorder = minY
+            let bottomBorder = height - maxY - 1
+            let useTopAsReference = topBorder <= bottomBorder
+            let finalMinY = useTopAsReference ? minY : (height - maxY - 1)
+            let finalMaxY = useTopAsReference ? (height - 1 - minY) : maxY
+            
+            // Calculate final active rectangle
+            let w = finalMaxX - finalMinX + 1
+            let h = finalMaxY - finalMinY + 1
+            let activeRect = CGRect(x: finalMinX, y: finalMinY, width: w, height: h)
+            
+            logger.log(content: "[ActiveRectDetect] Raw bounds: minX=\(minX), maxX=\(maxX), minY=\(minY), maxY=\(maxY)")
+            logger.log(content: "[ActiveRectDetect] Symmetry analysis - Left:\(leftBorder)px, Right:\(rightBorder)px, Top:\(topBorder)px, Bottom:\(bottomBorder)px")
+            logger.log(content: "[ActiveRectDetect] Adjusted bounds: minX=\(finalMinX), maxX=\(finalMaxX), minY=\(finalMinY), maxY=\(finalMaxY)")
+            logger.log(content: "[ActiveRectDetect] Active rect size: \(w)x\(h) at origin (\(finalMinX), \(finalMinY)), ratio: \(String(format: "%.4f", CGFloat(w)/CGFloat(h)))")
+            logger.log(content: "[ActiveRectDetect] Top border: \(finalMinY) px, Bottom border: \(height - finalMaxY - 1) px")
+            logger.log(content: "[ActiveRectDetect] Left border: \(finalMinX) px, Right border: \(width - finalMaxX - 1) px")
+            return activeRect
+        }
+        
+        logger.log(content: "[ActiveRectDetect] No non-black pixels found in frame \(width)x\(height)")
+
+        return nil
+    }
+    
     // MARK: - Notification Handlers
     
     /// Handles when a video device is connected
@@ -707,6 +816,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     }
 
     /// Handle first-frame resolution notification and update dimensions
+    // MARK: - Active Display Frame Resolution Handling
+    
+    /// Handles frame resolution notification and updates display dimensions
+    /// - Parameter notification: Contains activeWidth, activeHeight, and optional activeRect info
     @objc private func handleFrameResolution(_ notification: Notification) {
         guard let info = notification.userInfo as? [String: Any],
               let width = info["activeWidth"] as? Int,
@@ -714,79 +827,235 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         // Use the actual frame dimensions for the capture resolution
         dimensions = CMVideoDimensions(width: Int32(width), height: Int32(height))     
-        logger.log(content: "First frame resolution received: \(width)x\(height) - dimensions updated")
+        logger.log(content: "Frame resolution received: \(width)x\(height) - dimensions updated")
 
-        // Auto-match aspect ratio from first frame and update user settings
-//        let videoAspectRatio = CGFloat(width) / max(1.0, CGFloat(height))
-        let activeAspectRatio = CGFloat(width) / max(1.0, CGFloat(height))
-        let tolerance: CGFloat = 0.02 // 2% tolerance
-        var matched: AspectRatioOption? = nil
-        for option in AspectRatioOption.allCases {
-            let r = option.widthToHeightRatio
-            if abs(r - activeAspectRatio) / activeAspectRatio <= tolerance {
-                matched = option
-                break
-            }
-        }
+        // Calculate aspect ratio and apply auto-matching
+        let activeAspectRatio = calculateAspectRatio(width: width, height: height)
+        applyAspectRatioMatching(activeAspectRatio: activeAspectRatio)
 
-        // Determine if applying the matched aspect ratio would change current settings
-        let previousAspect = UserSettings.shared.customAspectRatio
-        let previousUseCustom = UserSettings.shared.useCustomAspectRatio
-        let previousGravity = UserSettings.shared.gravity
-
-        if let matched = matched {
-            var didChange = false
-            if previousUseCustom == false || previousAspect != matched {
-                UserSettings.shared.customAspectRatio = matched
-                UserSettings.shared.useCustomAspectRatio = true
-                didChange = true
-            }
-
-            logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", activeAspectRatio)))")
-
-            if didChange {
-                NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
-                }
-            }
-        } else {
-            // No match: revert to default aspect handling only if it represents a change
-            if previousUseCustom == true || previousGravity != .resizeAspect {
-                UserSettings.shared.useCustomAspectRatio = false
-                UserSettings.shared.gravity = .resizeAspect
-                logger.log(content: "No aspect ratio match (aspect=\(String(format: "%.3f", activeAspectRatio))). Reverting to default gravity: resizeAspect")
-                NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
-                }
-            } else {
-                logger.log(content: "No aspect ratio match and settings unchanged; no UI update posted")
-            }
-        }
-
-        // If active rect provided, update AppStatus and log
+        // Handle active video area if provided
         if let ax = info["activeX"] as? Int,
            let ay = info["activeY"] as? Int,
            let aw = info["activeWidth"] as? Int,
            let ah = info["activeHeight"] as? Int {
-            let rect = CGRect(x: ax, y: ay, width: aw, height: ah)
-
-            AppStatus.activeVideoRect = rect
+            handleActiveVideoArea(x: ax, y: ay, width: aw, height: ah, aspectRatio: activeAspectRatio)
+        }
+    }
+    
+    /// Calculates aspect ratio from video dimensions
+    /// - Parameters:
+    ///   - width: Video width in pixels
+    ///   - height: Video height in pixels
+    /// - Returns: Width-to-height aspect ratio
+    func calculateAspectRatio(width: Int, height: Int) -> CGFloat {
+        return CGFloat(width) / max(1.0, CGFloat(height))
+    }
+    
+    /// Finds the best matching aspect ratio option within tolerance
+    /// - Parameters:
+    ///   - activeAspectRatio: Calculated aspect ratio from video frame
+    ///   - tolerance: Maximum acceptable difference ratio (default: 2%)
+    /// - Returns: Matching AspectRatioOption or nil if no match found
+    func findMatchingAspectRatio(_ activeAspectRatio: CGFloat, tolerance: CGFloat = 0.01) -> AspectRatioOption? {
+        var bestMatch: AspectRatioOption? = nil
+        var bestDistance: CGFloat = CGFloat.greatestFiniteMagnitude
+        
+        for option in AspectRatioOption.allCases {
+            let optionRatio = option.widthToHeightRatio
+            let distance = abs(optionRatio - activeAspectRatio) / activeAspectRatio
             
-            logger.log(content: "Frame active video area, activeX:\(ax), activeY:\(ay), activeWidth:\(aw), activeHeight:\(ah), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))")
+            // Only consider options within tolerance
+            if distance <= tolerance && distance < bestDistance {
+                bestDistance = distance
+                bestMatch = option
+            }
+        }
+        
+        return bestMatch
+    }
+    
+    /// Applies aspect ratio matching and updates user settings if changed
+    /// - Parameter activeAspectRatio: Calculated aspect ratio from video frame
+    private func applyAspectRatioMatching(activeAspectRatio: CGFloat) {
+        let matchedOption = findMatchingAspectRatio(activeAspectRatio)
+        let previousAspect = UserSettings.shared.customAspectRatio
+        let previousGravity = UserSettings.shared.gravity
+        let previousCustomValue = UserSettings.shared.customAspectRatioValue
 
-            // Persist to user settings so it's remembered
-            UserSettings.shared.activeVideoX = ax
-            UserSettings.shared.activeVideoY = ay
-            UserSettings.shared.activeVideoWidth = aw
-            UserSettings.shared.activeVideoHeight = ah
+        if let matched = matchedOption {
+            // Update aspect ratio if changed
+            if previousAspect != matched {
+                UserSettings.shared.customAspectRatio = matched
+                logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", activeAspectRatio)))")
+                
+                notifyAspectRatioChanged()
+            } else {
+                logger.log(content: "Aspect ratio already set to \(matched.rawValue), no change needed")
+            }
+        } else {
+            // No match: check if we should update custom aspect ratio value
+            let customValueChanged = abs(previousCustomValue - activeAspectRatio) > 0.01 || abs(previousAspect.widthToHeightRatio - activeAspectRatio) > 0.01
             
-            // Auto zoom to height if aspect ratio is less than 1 (portrait mode)
-            if activeAspectRatio < 1.0 {
-                logger.log(content: "🎯 Aspect ratio < 1.0 (portrait mode detected), auto-zooming to height")
+            if customValueChanged {
+                // Store the custom aspect ratio value for future use
+                UserSettings.shared.customAspectRatioValue = activeAspectRatio
+                UserSettings.shared.gravity = .resizeAspect
+                logger.log(content: "No preset match found. Storing custom aspect ratio value: \(String(format: "%.3f", activeAspectRatio))")
+                
+                notifyAspectRatioChanged()
+            } else {
+                logger.log(content: "No aspect ratio match and custom value unchanged; no UI update posted")
+            }
+        }
+    }
+    
+    /// Handles active video area detection and auto-zoom
+    /// - Parameters:
+    ///   - x: Active area left position
+    ///   - y: Active area top position
+    ///   - width: Active area width
+    ///   - height: Active area height
+    ///   - aspectRatio: Calculated aspect ratio
+    private func handleActiveVideoArea(x: Int, y: Int, width: Int, height: Int, aspectRatio: CGFloat) {
+        let newRect = CGRect(x: x, y: y, width: width, height: height)
+        
+        // Check if this is a minor change from the previous activeRect (capture card instability)
+        let (isMinorChange, stableRect) = checkAndFilterMinorActiveRectChange(newRect)
+        
+        // Use the stable rect (either the new one or previous one if change is minor)
+        let rect = stableRect
+        let finalX = Int(rect.origin.x)
+        let finalY = Int(rect.origin.y)
+        let finalWidth = Int(rect.size.width)
+        let finalHeight = Int(rect.size.height)
+        
+        // Update app status and persist to user settings
+        AppStatus.activeVideoRect = rect
+        UserSettings.shared.activeVideoX = finalX
+        UserSettings.shared.activeVideoY = finalY
+        UserSettings.shared.activeVideoWidth = finalWidth
+        UserSettings.shared.activeVideoHeight = finalHeight
+        
+        let logMessage = isMinorChange 
+            ? "Frame active video area (filtered minor change), activeX:\(finalX), activeY:\(finalY), activeWidth:\(finalWidth), activeHeight:\(finalHeight), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))"
+            : "Frame active video area, activeX:\(finalX), activeY:\(finalY), activeWidth:\(finalWidth), activeHeight:\(finalHeight), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))"
+        logger.log(content: logMessage)
+        
+        // Trigger auto-zoom based on detected blank areas
+        applyAutoZoom(blankAreaX: finalX, blankAreaY: finalY, activeWidth: finalWidth, activeHeight: finalHeight, aspectRatio: aspectRatio)
+    }
+    
+    /// Checks if the new activeRect represents a minor change from the previous one
+    /// Uses a consensus approach: requires multiple consecutive frames showing the same rect before updating
+    /// - Parameter newRect: The newly detected active rectangle
+    /// - Returns: Tuple of (isMinorChange: Bool, rectToUse: CGRect)
+    private func checkAndFilterMinorActiveRectChange(_ newRect: CGRect) -> (isMinorChange: Bool, rectToUse: CGRect) {
+        guard let prevRect = previousActiveRect else {
+            // No previous rect, this is the first detection
+            previousActiveRect = newRect
+            candidateActiveRect = newRect
+            consecutiveFramesSameRect = 1
+            logger.log(content: "[ActiveRect Stability] First detection: \(Int(newRect.width))x\(Int(newRect.height)) at (\(Int(newRect.origin.x)), \(Int(newRect.origin.y)))")
+            return (isMinorChange: false, rectToUse: newRect)
+        }
+        
+        // Check if new rect is the same as current candidate (within threshold)
+        let isSameAsCandidate = isRectSimilar(newRect, candidateActiveRect ?? newRect)
+        
+        if isSameAsCandidate {
+            // Same as candidate, increment consecutive frame counter
+            consecutiveFramesSameRect += 1
+            
+            if consecutiveFramesSameRect >= minConsecutiveFramesForUpdate {
+                // We have consensus - update to new rect
+                let widthDifference = abs(Int(newRect.width) - Int(prevRect.width))
+                let heightDifference = abs(Int(newRect.height) - Int(prevRect.height))
+                let xDifference = abs(Int(newRect.origin.x) - Int(prevRect.origin.x))
+                let yDifference = abs(Int(newRect.origin.y) - Int(prevRect.origin.y))
+                
+                if widthDifference > activeRectChangeThreshold || 
+                   heightDifference > activeRectChangeThreshold ||
+                   xDifference > activeRectChangeThreshold ||
+                   yDifference > activeRectChangeThreshold {
+                    // Significant change confirmed by consensus
+                    previousActiveRect = newRect
+                    logger.log(content: "[ActiveRect Stability] Consensus reached after \(consecutiveFramesSameRect) frames. Updating: \(Int(newRect.width))x\(Int(newRect.height))@(\(Int(newRect.origin.x)),\(Int(newRect.origin.y))) (diffs: w=\(widthDifference), h=\(heightDifference), x=\(xDifference), y=\(yDifference))")
+                    consecutiveFramesSameRect = 0
+                    return (isMinorChange: false, rectToUse: newRect)
+                } else {
+                    // Minor changes, keep using previous rect
+                    return (isMinorChange: true, rectToUse: prevRect)
+                }
+            } else {
+                // Still accumulating consensus, use previous rect
+                logger.log(content: "[ActiveRect Stability] Candidate \(Int(newRect.width))x\(Int(newRect.height)) seen \(consecutiveFramesSameRect)/\(minConsecutiveFramesForUpdate) times. Keeping previous.")
+                return (isMinorChange: true, rectToUse: prevRect)
+            }
+        } else {
+            // Different from candidate, reset counter and start new candidate
+            logger.log(content: "[ActiveRect Stability] New candidate detected: \(Int(newRect.width))x\(Int(newRect.height))@(\(Int(newRect.origin.x)),\(Int(newRect.origin.y))). Previous candidate: \(Int(candidateActiveRect?.width ?? 0))x\(Int(candidateActiveRect?.height ?? 0))")
+            candidateActiveRect = newRect
+            consecutiveFramesSameRect = 1
+            return (isMinorChange: true, rectToUse: prevRect)
+        }
+    }
+    
+    /// Checks if two rectangles are similar within the threshold
+    /// - Parameters:
+    ///   - rect1: First rectangle to compare
+    ///   - rect2: Second rectangle to compare
+    /// - Returns: True if rectangles are within threshold of each other
+    private func isRectSimilar(_ rect1: CGRect, _ rect2: CGRect) -> Bool {
+        let widthDiff = abs(Int(rect1.width) - Int(rect2.width))
+        let heightDiff = abs(Int(rect1.height) - Int(rect2.height))
+        let xDiff = abs(Int(rect1.origin.x) - Int(rect2.origin.x))
+        let yDiff = abs(Int(rect1.origin.y) - Int(rect2.origin.y))
+        
+        return widthDiff <= activeRectChangeThreshold && 
+               heightDiff <= activeRectChangeThreshold &&
+               xDiff <= activeRectChangeThreshold &&
+               yDiff <= activeRectChangeThreshold
+    }
+    
+    /// Applies auto-zoom based on detected blank area position
+    /// - Parameters:
+    ///   - blankAreaX: X offset of active area (left blank area width)
+    ///   - blankAreaY: Y offset of active area (top blank area height)
+    ///   - activeWidth: Width of active area
+    ///   - activeHeight: Height of active area
+    ///   - aspectRatio: Calculated aspect ratio of active area
+    private func applyAutoZoom(blankAreaX: Int, blankAreaY: Int, activeWidth: Int, activeHeight: Int, aspectRatio: CGFloat) {
+        // Pillarbox: black bars on left/right (blankAreaX > 0, blankAreaY == 0)
+        if blankAreaX > 0 && blankAreaY == 0 && activeWidth > 0 && activeHeight > 0 {
+            if aspectRatio > 1.0 {
+                logger.log(content: "Pillarbox detected (left/right black bar), auto-zooming to width to fill horizontal space")
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+            }
+        }
+        // Letterbox: black bars on top/bottom (blankAreaX == 0, blankAreaY > 0)
+        else if blankAreaX == 0 && blankAreaY > 0 && activeWidth > 0 && activeHeight > 0 {
+            if aspectRatio > 1.0 {
+                logger.log(content: "Letterbox detected (top/bottom black bar), auto-zooming to height to fill vertical space")
                 NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
             }
+        }
+        // Mixed blank areas (blankAreaX > 0 AND blankAreaY > 0)
+        else if blankAreaX > 0 && blankAreaY > 0 && activeWidth > 0 && activeHeight > 0 {
+            if aspectRatio < 1.0 {
+                logger.log(content: "Mixed blank areas with portrait aspect ratio, auto-zooming to height")
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+            } else {
+                logger.log(content: "Mixed blank areas with landscape aspect ratio, auto-zooming to width")
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+            }
+        }
+    }
+    
+    /// Notifies that aspect ratio settings have changed
+    private func notifyAspectRatioChanged() {
+        NotificationCenter.default.post(name: .gravitySettingsChanged, object: nil)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name.updateWindowSize, object: nil)
         }
     }
     

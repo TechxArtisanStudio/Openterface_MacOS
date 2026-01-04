@@ -377,42 +377,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
     
-    // Select auto detect aspect ratio
-    @objc func selectAutoDetectAspectRatio(_ sender: NSMenuItem) {
-        // Close user custom aspect ratio
-        UserSettings.shared.useCustomAspectRatio = false
-        
-        // Update menu items status
-        updateAspectRatioMenuItems()
-        
-        // Update window size
-        if let window = NSApplication.shared.mainWindow {
-            updateWindowSize(window: window)
-        }
-    }
-    
     // Toggle input overlay visibility
     @objc func toggleInputOverlay(_ sender: NSMenuItem) {
         AppStatus.showInputOverlay.toggle()
         sender.state = AppStatus.showInputOverlay ? .on : .off
     }
     
-    // Select custom aspect ratio
-    @objc func selectAspectRatio(_ sender: NSMenuItem) {
-        guard let option = sender.representedObject as? AspectRatioOption else { return }
+    // // Select custom aspect ratio
+    // @objc func selectAspectRatio(_ sender: NSMenuItem) {
+    //     guard let option = sender.representedObject as? AspectRatioOption else { return }
         
-        // Save user selection
-        UserSettings.shared.customAspectRatio = option
-        UserSettings.shared.useCustomAspectRatio = true
+    //     // Save user selection
+    //     UserSettings.shared.customAspectRatio = option
+    //     UserSettings.shared.useCustomAspectRatio = true
         
-        // Update menu items status
-        updateAspectRatioMenuItems()
+    //     // Update menu items status
+    //     updateAspectRatioMenuItems()
         
-        // Update window size
-        if let window = NSApplication.shared.mainWindow {
-            updateWindowSize(window: window)
-        }
-    }
+    //     // Update window size
+    //     if let window = NSApplication.shared.mainWindow {
+    //         updateWindowSize(window: window)
+    //     }
+    // }
     
     // Update aspect ratio menu items status
     func updateAspectRatioMenuItems() {
@@ -424,13 +410,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Update "Auto Detect" option
         if let autoDetectItem = aspectRatioMenu.items.first(where: { $0.title == "Auto Detect" }) {
-            autoDetectItem.state = UserSettings.shared.useCustomAspectRatio ? .off : .on
+            autoDetectItem.state = UserSettings.shared.aspectRatioMode == .custom ? .off : .on
         }
         
         // Update all preset aspect ratio options
         for item in aspectRatioMenu.items {
             if let option = item.representedObject as? AspectRatioOption {
-                item.state = (UserSettings.shared.useCustomAspectRatio && UserSettings.shared.customAspectRatio == option) ? .on : .off
+                item.state = (UserSettings.shared.aspectRatioMode == .custom && UserSettings.shared.customAspectRatio == option) ? .on : .off
             }
         }
     }

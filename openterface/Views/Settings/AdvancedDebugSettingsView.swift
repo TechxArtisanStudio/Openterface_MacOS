@@ -223,7 +223,7 @@ struct AdvancedDebugSettingsView: View {
         userSettings.MouseControl = .absolute
         userSettings.isAudioEnabled = false
         userSettings.pasteBehavior = .askEveryTime
-        userSettings.useCustomAspectRatio = false
+        userSettings.aspectRatioMode = .hidResolution
         userSettings.customAspectRatio = .ratio16_9
         userSettings.isAbsoluteModeMouseHide = false
         userSettings.doNotShowHidResolutionAlert = false
@@ -299,7 +299,7 @@ struct AdvancedDebugSettingsView: View {
                 "mouseControl": userSettings.MouseControl.rawValue,
                 "isAudioEnabled": userSettings.isAudioEnabled,
                 "pasteBehavior": userSettings.pasteBehavior.rawValue,
-                "useCustomAspectRatio": userSettings.useCustomAspectRatio,
+                "aspectRatioMode": userSettings.aspectRatioMode.rawValue,
                 "customAspectRatio": userSettings.customAspectRatio.rawValue,
                 "isAbsoluteModeMouseHide": userSettings.isAbsoluteModeMouseHide,
                 "doNotShowHidResolutionAlert": userSettings.doNotShowHidResolutionAlert,
@@ -340,9 +340,13 @@ struct AdvancedDebugSettingsView: View {
             userSettings.pasteBehavior = pasteBehavior
         }
         
-        // Apply aspect ratio settings
-        if let useCustomAspectRatio = settings["useCustomAspectRatio"] as? Bool {
-            userSettings.useCustomAspectRatio = useCustomAspectRatio
+        // Apply aspect ratio mode (new format) or migrate from old format
+        if let aspectRatioModeRaw = settings["aspectRatioMode"] as? String,
+           let aspectRatioMode = AspectRatioMode(rawValue: aspectRatioModeRaw) {
+            userSettings.aspectRatioMode = aspectRatioMode
+        } else if let useCustomAspectRatio = settings["useCustomAspectRatio"] as? Bool {
+            // Migrate from old useCustomAspectRatio boolean setting
+            userSettings.aspectRatioMode = useCustomAspectRatio ? .custom : .hidResolution
         }
         
         if let customAspectRatioRaw = settings["customAspectRatio"] as? String,
