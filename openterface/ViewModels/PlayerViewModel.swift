@@ -272,6 +272,9 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Sets the zoom level to a specific value
     private func setZoomLevel(_ newLevel: CGFloat, source: ZoomSource = .manual) {
+        if self.zoomLevel == newLevel && source != ZoomSource.autoResize{
+            return
+        }
         self.zoomLevel = newLevel
         DispatchQueue.main.async {
             // Log based on source

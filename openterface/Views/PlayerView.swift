@@ -510,8 +510,6 @@ class PlayerView: NSView, NSWindowDelegate {
             return
         }
         
-        let videoWidth = CGFloat(videoDimensions.width)
-        let videoHeight = CGFloat(videoDimensions.height)
         let activeAspectRatio = activeRect.width / activeRect.height
         
         logger.log(content: "Auto-zoom after resize: activeRect=\(activeRect), activeAspectRatio=\(String(format: "%.3f", activeAspectRatio))")
