@@ -202,28 +202,35 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     // MARK: - Zoom Handling
     
+    /// Zoom source enumeration to track origin of zoom change
+    enum ZoomSource {
+        case manual      // User initiated zoom (in/out/reset)
+        case menu        // Zoom to width/height from menu
+        case autoResize  // Auto-zoom triggered by window resize
+    }
+    
     /// Zooms in the video preview
     func zoomIn() {
         let newZoomLevel = min(zoomLevel + zoomStep, maxZoomLevel)
-        setZoomLevel(newZoomLevel)
+        setZoomLevel(newZoomLevel, source: .manual)
         logger.log(content: "Zoom In: \(String(format: "%.2f", newZoomLevel))x")
     }
     
     /// Zooms out the video preview
     func zoomOut() {
         let newZoomLevel = max(zoomLevel - zoomStep, minZoomLevel)
-        setZoomLevel(newZoomLevel)
+        setZoomLevel(newZoomLevel, source: .manual)
         logger.log(content: "Zoom Out: \(String(format: "%.2f", newZoomLevel))x")
     }
     
     /// Resets zoom to default (1.0x)
     func resetZoom() {
-        setZoomLevel(1.0)
+        setZoomLevel(1.0, source: .manual)
         logger.log(content: "Zoom Reset: 1.00x")
     }
     
-    /// Zooms to match the active video rect height
-    func zoomToHeight() {
+    /// Internal zoom to height with source parameter
+    func zoomToHeight(source: ZoomSource = .menu) {
         let activeRect = AppStatus.activeVideoRect
         guard activeRect.height > 0 else {
             return
@@ -239,11 +246,11 @@ class PlayerViewModel: NSObject, ObservableObject {
         let zoomHeight = videoSize.height / activeRect.height
         let constrainedZoomLevel = min(max(zoomHeight, minZoomLevel), maxZoomLevel)
         
-        setZoomLevel(constrainedZoomLevel)
+        setZoomLevel(constrainedZoomLevel, source: source)
     }
     
-    /// Zooms to match the active video rect width
-    func zoomToWidth() {
+    /// Internal zoom to width with source parameter
+    func zoomToWidth(source: ZoomSource = .menu) {
         let activeRect = AppStatus.activeVideoRect
 
         guard activeRect.width > 0 else {
@@ -260,14 +267,31 @@ class PlayerViewModel: NSObject, ObservableObject {
         let zoomWidth = videoSize.width / activeRect.width
         let constrainedZoomLevel = min(max(zoomWidth, minZoomLevel), maxZoomLevel)
 
-        setZoomLevel(constrainedZoomLevel)
+        setZoomLevel(constrainedZoomLevel, source: source)
     }
     
     /// Sets the zoom level to a specific value
-    private func setZoomLevel(_ newLevel: CGFloat) {
+    private func setZoomLevel(_ newLevel: CGFloat, source: ZoomSource = .manual) {
+        self.zoomLevel = newLevel
         DispatchQueue.main.async {
-            self.zoomLevel = newLevel
-            NotificationCenter.default.post(name: Notification.Name("PlayerZoomLevelChanged"), object: self.zoomLevel)
+            // Log based on source
+            let sourceLabel: String
+            switch source {
+            case .manual:
+                sourceLabel = "Manual"
+            case .menu:
+                sourceLabel = "Menu"
+            case .autoResize:
+                sourceLabel = "Auto-Resize"
+            }
+            self.logger.log(content: "Zoom Level Set To: \(String(format: "%.2f", newLevel))x (\(sourceLabel))") 
+            
+            // Post notification with zoom source information
+            let userInfo: [String: Any] = [
+                "zoomLevel": newLevel,
+                "source": source
+            ]
+            NotificationCenter.default.post(name: Notification.Name("PlayerZoomLevelChanged"), object: self, userInfo: userInfo)
         }
     }
     
@@ -376,13 +400,19 @@ class PlayerViewModel: NSObject, ObservableObject {
         resetZoom()
     }
     
-    /// Handles zoom to height from menu
+    /// Handles zoom to height from menu or auto-resize
     @objc func handleMenuZoomToHeight(_ notification: Notification) {
-        zoomToHeight()
+        // Check if this is from auto-resize
+        let isAutoResize = notification.userInfo?["isAutoResize"] as? Bool ?? false
+        let source: ZoomSource = isAutoResize ? .autoResize : .menu
+        zoomToHeight(source: source)
     }
     
-    /// Handles zoom to width from menu
+    /// Handles zoom to width from menu or auto-resize
     @objc func handleMenuZoomToWidth(_ notification: Notification) {
-        zoomToWidth()
+        // Check if this is from auto-resize
+        let isAutoResize = notification.userInfo?["isAutoResize"] as? Bool ?? false
+        let source: ZoomSource = isAutoResize ? .autoResize : .menu
+        zoomToWidth(source: source)
     }
 }

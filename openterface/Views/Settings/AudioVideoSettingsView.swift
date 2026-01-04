@@ -51,29 +51,46 @@ struct AudioVideoSettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Full screen mode", isOn: $userSettings.isFullScreen)
                     
-                    Toggle("Use custom aspect ratio", isOn: $userSettings.useCustomAspectRatio)
-                    
-                    if userSettings.useCustomAspectRatio {
-                        HStack {
-                            Text("Aspect ratio:")
-                            Picker("", selection: $userSettings.customAspectRatio) {
-                                ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
-                                    Text(ratio.toString).tag(ratio)
-                                }
-                            }
-                            .frame(width: 120)
-                        }
+                    // Aspect Ratio Mode Selection
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Aspect Ratio Mode")
+                            .font(.system(size: 14, weight: .medium))
                         
-                        Text("Current ratio: \(String(format: "%.3f", userSettings.customAspectRatio.widthToHeightRatio))")
+                        Picker("", selection: $userSettings.aspectRatioMode) {
+                            ForEach(AspectRatioMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Text(userSettings.aspectRatioMode.description)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                    }
+                    
+                    // Custom Aspect Ratio Picker - only show when in custom mode
+                    if userSettings.aspectRatioMode == .custom {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Aspect ratio:")
+                                Picker("", selection: $userSettings.customAspectRatio) {
+                                    ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
+                                        Text(ratio.toString).tag(ratio)
+                                    }
+                                }
+                                .frame(width: 120)
+                            }
+                            
+                            Text("Current ratio: \(String(format: "%.3f", userSettings.customAspectRatio.widthToHeightRatio))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     
                     Toggle("Show HID resolution change alerts", isOn: Binding(
                         get: { !userSettings.doNotShowHidResolutionAlert },
                         set: { userSettings.doNotShowHidResolutionAlert = !$0 }
                     ))
-                    Toggle("Enable active resolution checking (auto-detect video area)", isOn: $userSettings.doActiveResolutionCheck)
                 }
                 .padding(.vertical, 8)
             }

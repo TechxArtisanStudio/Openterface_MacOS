@@ -333,11 +333,6 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
             // When the resolution changes, send a notification
             if newResolution.0 > 0 && newResolution.1 > 0 {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
-                
-                // Reset user custom aspect ratio settings on main thread to avoid concurrent access
-                DispatchQueue.main.async {
-                    UserSettings.shared.useCustomAspectRatio = false
-                }
             }
         }
         

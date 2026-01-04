@@ -93,7 +93,29 @@ final class UserSettings: ObservableObject {
         self.activeVideoWidth = UserDefaults.standard.object(forKey: "activeVideoWidth") as? Int ?? 0
         self.activeVideoHeight = UserDefaults.standard.object(forKey: "activeVideoHeight") as? Int ?? 0
 
+        // Load aspect ratio mode from UserDefaults, with migration from old useCustomAspectRatio setting
+        let savedAspectRatioMode = UserDefaults.standard.string(forKey: "aspectRatioMode")
+        let aspectRatioModeValue: AspectRatioMode
+        if let mode = savedAspectRatioMode {
+            aspectRatioModeValue = AspectRatioMode(rawValue: mode) ?? .custom
+        } else {
+            // Migrate from old useCustomAspectRatio boolean setting
+            let useCustomAspectRatio = UserDefaults.standard.object(forKey: "useCustomAspectRatio") as? Bool ?? false
+            aspectRatioModeValue = useCustomAspectRatio ? .custom : .hidResolution
+            
+            // If we found the old setting, save the new one
+            if UserDefaults.standard.object(forKey: "useCustomAspectRatio") != nil {
+                UserDefaults.standard.set(aspectRatioModeValue.rawValue, forKey: "aspectRatioMode")
+                UserDefaults.standard.removeObject(forKey: "useCustomAspectRatio")
+            }
+        }
+        self.aspectRatioMode = aspectRatioModeValue
+
         // (doActiveResolutionCheck is loaded from UserDefaults in its declaration)
+        
+        // Load custom aspect ratio value from UserDefaults
+        let savedCustomAspectRatioValue = UserDefaults.standard.object(forKey: "customAspectRatioValue") as? Double ?? 16.0/9.0
+        self.customAspectRatioValue = CGFloat(savedCustomAspectRatioValue)
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -120,8 +142,14 @@ final class UserSettings: ObservableObject {
     @Published var isAbsoluteModeMouseHide: Bool = false
     @Published var mainWindownName: String = "main_openterface"
     
+    // Aspect ratio mode setting - determines which aspect ratio source to use
+    @Published var aspectRatioMode: AspectRatioMode {
+        didSet {
+            UserDefaults.standard.set(aspectRatioMode.rawValue, forKey: "aspectRatioMode")
+        }
+    }
+    
     // User custom screen ratio settings
-    @Published var useCustomAspectRatio: Bool = false
     @Published var customAspectRatio: AspectRatioOption = .ratio16_9 {
         didSet {
             // If the selected aspect ratio is vertical (height > width),
@@ -129,6 +157,14 @@ final class UserSettings: ObservableObject {
             if customAspectRatio.widthToHeightRatio < 1.0 {
                 gravity = .resizeAspectFill
             }
+            UserDefaults.standard.set(customAspectRatio.rawValue, forKey: "customAspectRatio")
+        }
+    }
+    
+    // Custom aspect ratio value (CGFloat) for arbitrary aspect ratios not in predefined options
+    @Published var customAspectRatioValue: CGFloat {
+        didSet {
+            UserDefaults.standard.set(customAspectRatioValue, forKey: "customAspectRatioValue")
         }
     }
     
@@ -316,20 +352,54 @@ enum KeyboardLayout: String, CaseIterable {
     }
 }
 
+// Aspect ratio mode enumeration - determines which aspect ratio source to use
+enum AspectRatioMode: String, CaseIterable {
+    case custom = "custom"           // User-specified custom aspect ratio
+    case hidResolution = "hid"       // From HID resolution query (capture card info)
+    case activeResolution = "active" // From active video area detection
+    
+    var displayName: String {
+        switch self {
+        case .custom:
+            return "Custom Aspect Ratio"
+        case .hidResolution:
+            return "HID Resolution (Device Info)"
+        case .activeResolution:
+            return "Active Resolution (Auto-Detect)"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .custom:
+            return "Use a custom aspect ratio specified by the user"
+        case .hidResolution:
+            return "Use HID resolution from the capture card (may have blank areas)"
+        case .activeResolution:
+            return "Auto-detect the active video area periodically"
+        }
+    }
+}
+
 // Screen ratio option enumeration
 enum AspectRatioOption: String, CaseIterable {
     case ratio21_9 = "21:9"     //2.33333333
+    case ratio32_15 = "32:15"   //2.13333333 (eg: 1920x900, 1280x600)
     case ratio9_5 = "9:5"       //1.8       (eg: 4096x2160)
     case ratio16_9 = "16:9"     //1.77778   (eg: 1920x1080, 3840x2160)
     case ratio16_10 = "16:10"   //1.6       (eg: 2560x1600, 1920x1200)
     case ratio5_3 = "5:3"       //1.66667   (eg: 2560x1536, 1920x1152)
+    case ratio211_135 = "211:135" //1.56296296 (Special handling for 1280:768, the capture card will return such a aspect ratio)
+    case ratio3_2 = "3:2"       //1.5
     case ratio4_3 = "4:3"       //1.33333   (eg: 1600x1200, 1024x768)
     case ratio5_4 = "5:4"       //1.25      (eg: 1280x1024)
+    case ratio211_180 = "211:180" //1.17222222 (Special handling for 1266:1080, the capture card will return such a aspect ratio)
     case ratio9_16 = "9:16"     //0.5625        
     case ratio9_19_5 = "9:19.5" // 0.46153846 
     case ratio9_20 = "9:20"     // 0.45
     case ratio9_21 = "9:21"     // 0.42857143
-    
+    case ratio228_487 = "228:487" // 0.468
+
     var widthToHeightRatio: CGFloat {
         switch self {
         case .ratio4_3:
@@ -344,6 +414,14 @@ enum AspectRatioOption: String, CaseIterable {
             return 5.0 / 4.0
         case .ratio21_9:
             return 21.0 / 9.0
+        case .ratio211_135:
+            return 211.0 / 135.0
+        case .ratio211_180:
+            return 211.0 / 180.0
+        case .ratio3_2:
+            return 3.0/2.0
+        case .ratio32_15:
+            return 32.0 / 15.0
         case .ratio9_16:
             return 9.0 / 16.0
         case .ratio9_19_5:
@@ -354,6 +432,8 @@ enum AspectRatioOption: String, CaseIterable {
             return 9.0 / 21.0
         case .ratio9_5:
             return 9.0 / 5.0
+        case .ratio228_487:
+            return 228.0 / 487.0
         }
     }
     

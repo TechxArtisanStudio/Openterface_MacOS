@@ -120,7 +120,8 @@ class PlayerView: NSView, NSWindowDelegate {
     }
     
     @objc func handleZoomLevelChanged(_ notification: Notification) {
-        guard let zoomLevel = notification.object as? CGFloat else { return }
+        guard let userInfo = notification.userInfo,
+              let zoomLevel = userInfo["zoomLevel"] as? CGFloat else { return }
         
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.2)
@@ -490,6 +491,61 @@ class PlayerView: NSView, NSWindowDelegate {
         super.viewDidEndLiveResize()
 
         playerBackgroundImage.frame = self.bounds
+        
+        // Auto-zoom if needed after resize completes
+        handleAutoZoomAfterResize()
+    }
+    
+    /// Handles auto-zooming based on active video rect and blank areas after window resize
+    private func handleAutoZoomAfterResize() {
+        let activeRect = AppStatus.activeVideoRect
+        
+        // Only auto-zoom if we have a valid active video rect and active resolution checking is enabled
+        guard activeRect.width > 0 && activeRect.height > 0 && UserSettings.shared.doActiveResolutionCheck else {
+            return
+        }
+        
+        let videoDimensions = AppStatus.videoDimensions
+        guard videoDimensions.width > 0 && videoDimensions.height > 0 else {
+            return
+        }
+        
+        let videoWidth = CGFloat(videoDimensions.width)
+        let videoHeight = CGFloat(videoDimensions.height)
+        let activeAspectRatio = activeRect.width / activeRect.height
+        
+        logger.log(content: "Auto-zoom after resize: activeRect=\(activeRect), activeAspectRatio=\(String(format: "%.3f", activeAspectRatio))")
+        
+        // Detect blank area type and trigger appropriate zoom
+        let marginX = Int(activeRect.origin.x)
+        let marginY = Int(activeRect.origin.y)
+        
+        if marginX > 0 && marginY == 0 && activeRect.width > 0 && activeRect.height > 0 {
+            // Pillarbox detected (left/right black bars)
+            if activeAspectRatio > 1.0 {
+                logger.log(content: "Pillarbox detected after resize, auto-zooming to width")
+                let userInfo: [String: Any] = ["isAutoResize": true]
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil, userInfo: userInfo)
+            }
+        } else if marginX == 0 && marginY > 0 && activeRect.width > 0 && activeRect.height > 0 {
+            // Letterbox detected (top/bottom black bars)
+            if activeAspectRatio > 1.0 {
+                logger.log(content: "Letterbox detected after resize, auto-zooming to height")
+                let userInfo: [String: Any] = ["isAutoResize": true]
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil, userInfo: userInfo)
+            }
+        } else if marginX > 0 && marginY > 0 && activeRect.width > 0 && activeRect.height > 0 {
+            // Mixed blank areas
+            if activeAspectRatio < 1.0 {
+                logger.log(content: "Mixed blank areas with portrait aspect ratio after resize, auto-zooming to height")
+                let userInfo: [String: Any] = ["isAutoResize": true]
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil, userInfo: userInfo)
+            } else {
+                logger.log(content: "Mixed blank areas with landscape aspect ratio after resize, auto-zooming to width")
+                let userInfo: [String: Any] = ["isAutoResize": true]
+                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil, userInfo: userInfo)
+            }
+        }
     }
     
     func windowDidResize(_ notification: Notification) {
