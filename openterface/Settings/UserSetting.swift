@@ -385,6 +385,7 @@ enum AspectRatioMode: String, CaseIterable {
 enum AspectRatioOption: String, CaseIterable {
     case ratio21_9 = "21:9"     //2.33333333
     case ratio32_15 = "32:15"   //2.13333333 (eg: 1920x900, 1280x600)
+    case ratio2_1 = "2:1"       //2          (eg: 960x480)
     case ratio9_5 = "9:5"       //1.8       (eg: 4096x2160)
     case ratio16_9 = "16:9"     //1.77778   (eg: 1920x1080, 3840x2160)
     case ratio16_10 = "16:10"   //1.6       (eg: 2560x1600, 1920x1200)
@@ -420,6 +421,8 @@ enum AspectRatioOption: String, CaseIterable {
             return 211.0 / 180.0
         case .ratio3_2:
             return 3.0/2.0
+        case .ratio2_1:
+            return 2.0 / 1.0
         case .ratio32_15:
             return 32.0 / 15.0
         case .ratio9_16:

@@ -695,7 +695,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         let rect = CGRect(x: 0, y: 0, width: width, height: height)
         context.draw(cgImage, in: rect)
 
-        let threshold: UInt8 = 16 // pixel > threshold considered active (not black)
+        let threshold: UInt8 = 32 // pixel > threshold considered active (not black)
 
         var minX = width
         var minY = height
@@ -920,10 +920,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         let newRect = CGRect(x: x, y: y, width: width, height: height)
         
         // Check if this is a minor change from the previous activeRect (capture card instability)
-        let (isMinorChange, stableRect) = checkAndFilterMinorActiveRectChange(newRect)
+        // let (isMinorChange, stableRect) = checkAndFilterMinorActiveRectChange(newRect)
         
         // Use the stable rect (either the new one or previous one if change is minor)
-        let rect = stableRect
+        let rect = newRect
         let finalX = Int(rect.origin.x)
         let finalY = Int(rect.origin.y)
         let finalWidth = Int(rect.size.width)
@@ -936,10 +936,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         UserSettings.shared.activeVideoWidth = finalWidth
         UserSettings.shared.activeVideoHeight = finalHeight
         
-        let logMessage = isMinorChange 
-            ? "Frame active video area (filtered minor change), activeX:\(finalX), activeY:\(finalY), activeWidth:\(finalWidth), activeHeight:\(finalHeight), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))"
-            : "Frame active video area, activeX:\(finalX), activeY:\(finalY), activeWidth:\(finalWidth), activeHeight:\(finalHeight), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))"
-        logger.log(content: logMessage)
+        // let logMessage = isMinorChange 
+        //     ? "Frame active video area (filtered minor change), activeX:\(finalX), activeY:\(finalY), activeWidth:\(finalWidth), activeHeight:\(finalHeight), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))"
+        //     : "Frame active video area, activeX:\(finalX), activeY:\(finalY), activeWidth:\(finalWidth), activeHeight:\(finalHeight), aspect ratio: \(String(format: "%.3f", rect.width / rect.height))"
+        // logger.log(content: logMessage)
         
         // Trigger auto-zoom based on detected blank areas
         applyAutoZoom(blankAreaX: finalX, blankAreaY: finalY, activeWidth: finalWidth, activeHeight: finalHeight, aspectRatio: aspectRatio)
