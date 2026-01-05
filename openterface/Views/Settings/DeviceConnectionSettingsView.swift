@@ -4,11 +4,13 @@ struct DeviceConnectionSettingsView: View {
     @ObservedObject private var hidManager = HIDManager.shared
     @ObservedObject private var userSettings = UserSettings.shared
     @ObservedObject private var serialPortManager = SerialPortManager.shared
-    @State private var firmwareVersion = "Unknown"
-    @State private var serialNumber = "Unknown"
     @State private var connectionAttempts = 0
     @State private var showingFirmwareUpdate = false
     @State private var isUpdatingBaudrate = false
+
+    var firmwareVersion: String {
+        "v\(AppStatus.chipVersion)"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -52,13 +54,6 @@ struct DeviceConnectionSettingsView: View {
                         Text("Firmware Version:")
                         Spacer()
                         Text(firmwareVersion)
-                            .font(.system(.caption, design: .monospaced))
-                    }
-
-                    HStack {
-                        Text("Serial Number:")
-                        Spacer()
-                        Text(serialNumber)
                             .font(.system(.caption, design: .monospaced))
                     }
 
@@ -258,9 +253,6 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
         }
-        .onAppear {
-            loadDeviceInfo()
-        }
         .onChange(of: serialPortManager.isDeviceReady) { isReady in
             // Reset the updating flag when device reconnects after baudrate change
             if isReady && isUpdatingBaudrate {
@@ -275,11 +267,6 @@ struct DeviceConnectionSettingsView: View {
         }
     }
 
-    private func loadDeviceInfo() {
-        // Load device information
-        firmwareVersion = "v1.0.0" // Placeholder
-        serialNumber = "OT001234567" // Placeholder
-    }
 
     private func getControlChipsetDisplayName() -> String {
         switch AppStatus.controlChipsetType {

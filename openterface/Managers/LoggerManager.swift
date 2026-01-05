@@ -33,10 +33,7 @@ extension DispatchQueue {
 class Logger: LoggerProtocol {
     static let shared = Logger()
     
-    var isPrintEnabled = false
-    var KeyboardPrint = false
     var MouseEventPrint = false
-    var ScrollPrint = false
     var SerialDataPrint = false
     var HalPrint = false
     

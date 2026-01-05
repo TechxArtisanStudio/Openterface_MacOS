@@ -485,8 +485,23 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         switch cmd {
         case 0x81:  // HID info
             let byteValue = data[5]
-            let chipVersion: Int8 = Int8(bitPattern: byteValue)
-            AppStatus.chipVersion = Int8(chipVersion)
+            var chipVersion: Int8 = Int8(bitPattern: byteValue)
+            
+            // Special handling for chip version based on initial value
+            if chipVersion == 0x00 {
+                // If chipVersion is 00, get the version from data[12]
+                if data.count > 12 {
+                    chipVersion = Int8(bitPattern: data[12])
+                }
+            } else if chipVersion == 0x01 || chipVersion == 0x02 {
+                // If chipVersion is 01 or 02, get the version from data[7]
+                if data.count > 8 {
+                    chipVersion = Int8(bitPattern: data[8])
+                }
+            }
+            // For other values, chipVersion remains as is
+            AppStatus.chipVersion = chipVersion
+            
             
             let isTargetConnected = data[6] == 0x01
             AppStatus.isTargetConnected = isTargetConnected

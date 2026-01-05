@@ -754,6 +754,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     @objc func videoWasConnected(notification: NSNotification) {
         usbDevicesManager?.update()
         
+        // Perform HAL hardware check when video is connected
+        logger.log(content: "🔍 Initiating HAL hardware check for video connection...")
+        let _ = hal.detectAndInitializeHardware()
+
         if let defaultDevice = AppStatus.DefaultVideoDevice,
            let device = notification.object as? AVCaptureDevice, 
            matchesLocalID(device.uniqueID, defaultDevice.locationID) {

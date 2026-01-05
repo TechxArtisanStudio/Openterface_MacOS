@@ -48,6 +48,16 @@ struct AdvancedDebugSettingsView: View {
                             Logger.shared.SerialDataPrint = enabled
                         }
                     
+                    Toggle("Enable mouse event logging", isOn: $userSettings.isMouseEventPrintEnabled)
+                        .onChange(of: userSettings.isMouseEventPrintEnabled) { enabled in
+                            Logger.shared.MouseEventPrint = enabled
+                        }
+                    
+                    Toggle("Enable HAL print logging", isOn: $userSettings.isHalPrintEnabled)
+                        .onChange(of: userSettings.isHalPrintEnabled) { enabled in
+                            Logger.shared.HalPrint = enabled
+                        }
+                    
                     HStack(spacing: 12) {
                         Button(action: { showingLogViewer = true }) {
                             HStack {
@@ -180,8 +190,10 @@ struct AdvancedDebugSettingsView: View {
             Text(errorMessage)
         }
         .onAppear {
-            // Load the serial output logging setting from Logger to sync with UI
+            // Load the logging settings from Logger to sync with UI
             Logger.shared.SerialDataPrint = userSettings.isSerialOutput
+            Logger.shared.MouseEventPrint = userSettings.isMouseEventPrintEnabled
+            Logger.shared.HalPrint = userSettings.isHalPrintEnabled
         }
     }
     
@@ -229,6 +241,8 @@ struct AdvancedDebugSettingsView: View {
         userSettings.doNotShowHidResolutionAlert = false
         userSettings.edgeThreshold = 5
         userSettings.isSerialOutput = false
+        userSettings.isMouseEventPrintEnabled = false
+        userSettings.isHalPrintEnabled = false
         userSettings.mainWindownName = "main_openterface"
         userSettings.viewWidth = 1920.0
         userSettings.viewHeight = 1080.0
@@ -305,6 +319,8 @@ struct AdvancedDebugSettingsView: View {
                 "doNotShowHidResolutionAlert": userSettings.doNotShowHidResolutionAlert,
                 "edgeThreshold": userSettings.edgeThreshold,
                 "isSerialOutput": userSettings.isSerialOutput,
+                "isMouseEventPrintEnabled": userSettings.isMouseEventPrintEnabled,
+                "isHalPrintEnabled": userSettings.isHalPrintEnabled,
                 "mainWindowName": userSettings.mainWindownName,
                 "viewWidth": userSettings.viewWidth,
                 "viewHeight": userSettings.viewHeight,
@@ -372,6 +388,16 @@ struct AdvancedDebugSettingsView: View {
         // Apply serial output setting
         if let isSerialOutput = settings["isSerialOutput"] as? Bool {
             userSettings.isSerialOutput = isSerialOutput
+        }
+        
+        // Apply mouse event print setting
+        if let isMouseEventPrintEnabled = settings["isMouseEventPrintEnabled"] as? Bool {
+            userSettings.isMouseEventPrintEnabled = isMouseEventPrintEnabled
+        }
+        
+        // Apply HAL print setting
+        if let isHalPrintEnabled = settings["isHalPrintEnabled"] as? Bool {
+            userSettings.isHalPrintEnabled = isHalPrintEnabled
         }
         
         // Apply main window name
