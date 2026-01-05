@@ -300,9 +300,9 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         
         // Cap resolution at 4K, default to 1920x1080 if exceeded
         if width > 4096 || height > 4096 {
-            logger.log(content: "Input resolution (\(width)x\(height)) exceeds 4K limit, defaulting to 1920x1080")
-            width = 1920
-            height = 1080
+            logger.log(content: "Input resolution (\(width)x\(height)) exceeds 4K limit, defaulting to previous safe resolution 1920x1080")
+            width = AppStatus.hidReadResolusion.width
+            height = AppStatus.hidReadResolusion.height
         }
         
         let pixelClock = AppStatus.hidReadPixelClock / 100

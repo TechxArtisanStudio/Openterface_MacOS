@@ -233,7 +233,7 @@ class HALIntegrationManager {
             return
         }
         
-        let serialManager = DependencyContainer.shared.resolve(SerialPortManagerProtocol.self)
+        _ = DependencyContainer.shared.resolve(SerialPortManagerProtocol.self)
         
         // Configure serial communication based on chipset
         switch controlChipset.communicationInterface {

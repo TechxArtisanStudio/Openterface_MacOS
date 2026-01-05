@@ -94,6 +94,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// Increased to handle capture card jitter in both dimensions and position
     private let activeRectChangeThreshold: Int = 25
     
+    /// Tracks whether aspect ratio has been initialized on first detection
+    private var isAspectRatioInitialized: Bool = false
+    
     /// Delegate for handling video output
     private var videoOutputDelegate: VideoOutputDelegate?
     
@@ -522,13 +525,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             isVideoSessionStarting = false
         }
         
-        print("Supported pixel format--------")
-        for format in device.formats {
-            let description = format.formatDescription
-            let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
-            let formatDescription = pixelFormatDescription(pixelFormat)
-            print("Supported pixel format: \(formatDescription)")
-        }
+//        print("Supported pixel format--------")
+//        for format in device.formats {
+//            let description = format.formatDescription
+//            let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
+//            let formatDescription = pixelFormatDescription(pixelFormat)
+//            print("Supported pixel format: \(formatDescription)")
+//        }
     }
     
     /// Starts video capture session
@@ -870,18 +873,20 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         return bestMatch
     }
     
-    /// Applies aspect ratio matching and updates user settings if changed
+    /// Applies aspect ratio matching and updates user settings if chan ged
     /// - Parameter activeAspectRatio: Calculated aspect ratio from video frame
     private func applyAspectRatioMatching(activeAspectRatio: CGFloat) {
         let matchedOption = findMatchingAspectRatio(activeAspectRatio)
-        let previousAspect = UserSettings.shared.customAspectRatio
+        // On first time, previousAspect should be nil to ensure aspect ratio is always applied
+        let previousAspect: AspectRatioOption? = isAspectRatioInitialized ? UserSettings.shared.customAspectRatio : nil
         let previousGravity = UserSettings.shared.gravity
         let previousCustomValue = UserSettings.shared.customAspectRatioValue
 
         if let matched = matchedOption {
-            // Update aspect ratio if changed
-            if previousAspect != matched {
+            // Update aspect ratio if changed or if this is the first time (previousAspect is nil)
+            if previousAspect == nil || previousAspect != matched {
                 UserSettings.shared.customAspectRatio = matched
+                isAspectRatioInitialized = true
                 logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", activeAspectRatio)))")
                 
                 notifyAspectRatioChanged()
@@ -890,12 +895,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             }
         } else {
             // No match: check if we should update custom aspect ratio value
-            let customValueChanged = abs(previousCustomValue - activeAspectRatio) > 0.01 || abs(previousAspect.widthToHeightRatio - activeAspectRatio) > 0.01
+            let customValueChanged = abs(previousCustomValue - activeAspectRatio) > 0.01 || (previousAspect != nil && abs(previousAspect!.widthToHeightRatio - activeAspectRatio) > 0.01)
             
             if customValueChanged {
                 // Store the custom aspect ratio value for future use
                 UserSettings.shared.customAspectRatioValue = activeAspectRatio
                 UserSettings.shared.gravity = .resizeAspect
+                isAspectRatioInitialized = true
                 logger.log(content: "No preset match found. Storing custom aspect ratio value: \(String(format: "%.3f", activeAspectRatio))")
                 
                 notifyAspectRatioChanged()

@@ -1014,6 +1014,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     
     func closeSerialPort() {
+        logger.log(content: "Close serial port..")
         self.isDeviceReady = false
         self.serialPort?.close()
 //        self.serialPort = nil
@@ -1188,9 +1189,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         if !serialPort.isOpen {
             if logger.SerialDataPrint {
-                logger.log(content: "[Sync] Serial port is not open or not selected")
+                logger.log(content: "[Sync] Serial port is not open, open it again")
             }
-            return Data()
+            serialPort.open()
         }
         
         // Prepare to receive response - set expected command BEFORE sending
@@ -1252,10 +1253,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "SYNC: Timeout after \(pollCount) polls (expected cmd 0x\(String(format: "%02X", expectedResponseCmd)))")
         }
         
-        // Clean up
+        // Clean up - clear the expected command first, then data
+        // This prevents new incoming data from being mismatched to a stale expected command
         syncResponseQueue.sync {
-            self.syncResponseData = nil
             self.syncResponseExpectedCmd = nil
+            self.syncResponseData = nil
         }
         
         return response
