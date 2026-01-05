@@ -70,7 +70,6 @@ class CH32V208ControlChipset: BaseControlChipset {
             logger.log(content: "✅ CH32V208 communication established at \(currentBaudRate) baud")
             // Trigger HAL integration with managers after successful communication
             HALIntegrationManager.shared.reintegrateControlChipset()
-            isConnected = true
             //Get the hid info in order to know the current firmware version
             serialManager.getHidInfo()
             isConnected = true
