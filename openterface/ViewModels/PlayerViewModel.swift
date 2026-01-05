@@ -275,8 +275,10 @@ class PlayerViewModel: NSObject, ObservableObject {
         if self.zoomLevel == newLevel && source != ZoomSource.autoResize{
             return
         }
-        self.zoomLevel = newLevel
+        
         DispatchQueue.main.async {
+            self.zoomLevel = newLevel
+            
             // Log based on source
             let sourceLabel: String
             switch source {

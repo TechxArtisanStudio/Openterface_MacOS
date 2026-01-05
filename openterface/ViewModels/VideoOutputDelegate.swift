@@ -54,19 +54,16 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             self?.latestPixelBuffer = pixelBuffer
         }
 
-        // Process the pixel buffer using the sample buffer's presentation timestamp
-        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        processPixelBuffer(pixelBuffer, timestamp: timestamp)
+        // Only process pixel buffer when active resolution checking is enabled
+        if UserSettings.shared.aspectRatioMode == .activeResolution {
+            let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            processPixelBuffer(pixelBuffer, timestamp: timestamp)
+        }
     }
     
     private func processPixelBuffer(_ pixelBuffer: CVPixelBuffer, timestamp: CMTime) {
         let currentTime = CMTimeGetSeconds(timestamp)
         guard !currentTime.isNaN else { return }
-
-        // Respect user setting: only run active resolution checking when enabled
-        if !UserSettings.shared.doActiveResolutionCheck {
-            return
-        }
 
         // Use a shorter interval for the very first processing (0.5s),
         // then a 3s interval for subsequent processing
@@ -75,26 +72,29 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             return
         }
 
-        if let cgImage = createCGImage(from: pixelBuffer) {
+        lastProcessedTime = currentTime
+
+        // Move heavy detection to background queue to avoid blocking video capture thread
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self, let cgImage = self.createCGImage(from: pixelBuffer) else {
+                return
+            }
+
             let width = cgImage.width
             let height = cgImage.height
 
             // Detect active (non-black) area within the frame using VideoManager
             var userInfo: [String: Any] = ["width": width, "height": height, "timestamp": currentTime]
-            if let activeRect = videoManager?.detectActiveRect(from: cgImage) {
+            if let activeRect = self.videoManager?.detectActiveRect(from: cgImage) {
                 userInfo["activeX"] = Int(activeRect.origin.x)
                 userInfo["activeY"] = Int(activeRect.origin.y)
                 userInfo["activeWidth"] = Int(activeRect.size.width)
                 userInfo["activeHeight"] = Int(activeRect.size.height)
             } else {
-                logger.log(content: "ℹ️ No active (non-black) area detected at \(currentTime)s")
+                self.logger.log(content: "ℹ️ No active (non-black) area detected at \(currentTime)s")
             }
 
             NotificationCenter.default.post(name: Notification.Name("checkActiveResolution"), object: nil, userInfo: userInfo)
-
-            lastProcessedTime = currentTime
-        } else {
-            logger.log(content: "❌ Failed to create CGImage for frame analysis at \(currentTime)s")
         }
     }
 
