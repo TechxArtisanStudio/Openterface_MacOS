@@ -742,16 +742,8 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             let h = finalMaxY - finalMinY + 1
             let activeRect = CGRect(x: finalMinX, y: finalMinY, width: w, height: h)
             
-            logger.log(content: "[ActiveRectDetect] Raw bounds: minX=\(minX), maxX=\(maxX), minY=\(minY), maxY=\(maxY)")
-            logger.log(content: "[ActiveRectDetect] Symmetry analysis - Left:\(leftBorder)px, Right:\(rightBorder)px, Top:\(topBorder)px, Bottom:\(bottomBorder)px")
-            logger.log(content: "[ActiveRectDetect] Adjusted bounds: minX=\(finalMinX), maxX=\(finalMaxX), minY=\(finalMinY), maxY=\(finalMaxY)")
-            logger.log(content: "[ActiveRectDetect] Active rect size: \(w)x\(h) at origin (\(finalMinX), \(finalMinY)), ratio: \(String(format: "%.4f", CGFloat(w)/CGFloat(h)))")
-            logger.log(content: "[ActiveRectDetect] Top border: \(finalMinY) px, Bottom border: \(height - finalMaxY - 1) px")
-            logger.log(content: "[ActiveRectDetect] Left border: \(finalMinX) px, Right border: \(width - finalMaxX - 1) px")
             return activeRect
         }
-        
-        logger.log(content: "[ActiveRectDetect] No non-black pixels found in frame \(width)x\(height)")
 
         return nil
     }

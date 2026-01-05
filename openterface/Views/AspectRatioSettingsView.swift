@@ -201,6 +201,8 @@ struct AspectRatioSettingsView: View {
             return "1920×1200, 2560×1600, 1440×900"
         case .ratio21_9:
             return "2560×1080, 3440×1440"
+        case .ratio23_11:
+            return "2304×1100"
         case .ratio32_15:
             return "1920×900, 1280×600"
         case .ratio211_135:

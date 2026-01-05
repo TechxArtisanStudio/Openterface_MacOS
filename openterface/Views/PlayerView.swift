@@ -501,7 +501,7 @@ class PlayerView: NSView, NSWindowDelegate {
         let activeRect = AppStatus.activeVideoRect
         
         // Only auto-zoom if we have a valid active video rect and active resolution checking is enabled
-        guard activeRect.width > 0 && activeRect.height > 0 && UserSettings.shared.doActiveResolutionCheck else {
+        guard activeRect.width > 0 && activeRect.height > 0 && UserSettings.shared.aspectRatioMode == .activeResolution else {
             return
         }
         
