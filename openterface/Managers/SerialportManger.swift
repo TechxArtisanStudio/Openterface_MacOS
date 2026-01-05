@@ -802,7 +802,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
-        logger.log(content: "Trying to connect with baudrate: \(baudrate)")
         self.serialPort = getSerialPortPathFromUSBManager()
         AppStatus.serialPortBaudRate = baudrate
 

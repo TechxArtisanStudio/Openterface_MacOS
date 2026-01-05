@@ -73,15 +73,15 @@ class CH9329ControlChipset: BaseControlChipset {
         // CH9329 requires baudrate detection and validation
         serialManager.tryOpenSerialPort()
 
-        // Check if communication was established
-        currentBaudRate = serialManager.baudrate
-        
-        if currentBaudRate > 0 {
-           // Check if the keyboard and mouse are connected
-           if let status = serialManager.getTargetConnectionStatusSync() {
-               self.isConnected = status.isKeyboardConnected || status.isMouseConnected
-           }
-        }
+//        // Check if communication was established
+//        currentBaudRate = serialManager.baudrate
+//        
+//        if currentBaudRate > 0 {
+//           // Check if the keyboard and mouse are connected
+//           if let status = serialManager.getTargetConnectionStatusSync() {
+//               self.isConnected = status.isKeyboardConnected || status.isMouseConnected
+//           }
+//        }
         startCTSMonitoring()
         return true
     }
