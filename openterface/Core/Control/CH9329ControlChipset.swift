@@ -56,46 +56,9 @@ class CH9329ControlChipset: BaseControlChipset {
         super.init(chipsetInfo: info, capabilities: capabilities)
     }
 
-    override var communicationInterface: CommunicationInterface {
-        return .serial(baudRate: currentBaudRate)
-    }
-
-    override var supportedBaudRates: [Int] {
-        return [BaseControlChipset.LOWSPEED_BAUDRATE, BaseControlChipset.HIGHSPEED_BAUDRATE]
-    }
-
-    override func initialize() -> Bool {
-        guard detectDevice() else {
-            logger.log(content: "❌ CH9329 device not detected")
-            return false
-        }
-
-        if establishCommunication() {
-            startCTSMonitoring()
-            logger.log(content: "✅ CH9329 chipset initialized successfully")
-            return true
-        }
-
-        logger.log(content: "❌ CH9329 chipset initialization failed")
-        return false
-    }
-
     override func deinitialize() {
         stopCTSMonitoring()
         super.deinitialize()
-    }
-
-    override func detectDevice() -> Bool {
-        // Check if CH9329 device is connected via USB manager
-        for device in AppStatus.USBDevices {
-            if device.vendorID == CH9329ControlChipset.VENDOR_ID &&
-               device.productID == CH9329ControlChipset.PRODUCT_ID {
-                logger.log(content: "🔍 CH9329 device detected: \(device.productName)")
-                return true
-            }
-        }
-
-        return false
     }
 
     override func validateConnection() -> Bool {
@@ -119,6 +82,7 @@ class CH9329ControlChipset: BaseControlChipset {
                self.isConnected = status.isKeyboardConnected || status.isMouseConnected
            }
         }
+        startCTSMonitoring()
         return true
     }
 

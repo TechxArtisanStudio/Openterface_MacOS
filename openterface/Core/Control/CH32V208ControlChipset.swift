@@ -52,43 +52,6 @@ class CH32V208ControlChipset: BaseControlChipset {
         super.init(chipsetInfo: info, capabilities: capabilities)
     }
 
-    override var communicationInterface: CommunicationInterface {
-        return .serial(baudRate: currentBaudRate)
-    }
-
-    override var supportedBaudRates: [Int] {
-        return [BaseControlChipset.LOWSPEED_BAUDRATE]
-    }
-
-    override func initialize() -> Bool {
-        guard detectDevice() else {
-            logger.log(content: "❌ CH32V208 device not detected")
-            return false
-        }
-
-        if establishCommunication() {
-            isConnected = true
-            logger.log(content: "✅ CH32V208 chipset initialized successfully")
-            return true
-        }
-
-        logger.log(content: "❌ CH32V208 chipset initialization failed")
-        return false
-    }
-
-    override func detectDevice() -> Bool {
-        // Check if CH32V208 device is connected via USB manager
-        for device in AppStatus.USBDevices {
-            if device.vendorID == CH32V208ControlChipset.VENDOR_ID &&
-               device.productID == CH32V208ControlChipset.PRODUCT_ID {
-                logger.log(content: "🔍 CH32V208 device detected: \(device.productName)")
-                return true
-            }
-        }
-
-        return false
-    }
-
     override func validateConnection() -> Bool {
         // CH32V208 doesn't require command validation like CH9329
         // Connection is valid if serial port opens successfully
@@ -107,6 +70,7 @@ class CH32V208ControlChipset: BaseControlChipset {
             logger.log(content: "✅ CH32V208 communication established at \(currentBaudRate) baud")
             // Trigger HAL integration with managers after successful communication
             HALIntegrationManager.shared.reintegrateControlChipset()
+            isConnected = true
         } else {
             logger.log(content: "❌ CH32V208 communication establishment failed. Expected baudrate: \(CH32V208ControlChipset.HIGHSPEED_BAUDRATE), got: \(currentBaudRate)")
             serialManager.isDeviceReady = false

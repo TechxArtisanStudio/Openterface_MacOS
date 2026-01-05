@@ -46,19 +46,19 @@ class BaseControlChipset: ControlChipsetProtocol {
     // MARK: - Abstract Methods (to be overridden)
     
     var communicationInterface: CommunicationInterface {
-        fatalError("Must be implemented by subclass")
+        return .serial(baudRate: currentBaudRate)
     }
     
     var supportedBaudRates: [Int] {
+        return [BaseControlChipset.LOWSPEED_BAUDRATE, BaseControlChipset.HIGHSPEED_BAUDRATE]
+    }
+    
+    func establishCommunication() -> Bool {
         fatalError("Must be implemented by subclass")
     }
     
     var isDeviceReady: Bool {
         return serialManager.isDeviceReady
-    }
-    
-    func initialize() -> Bool {
-        fatalError("Must be implemented by subclass")
     }
     
     func deinitialize() {
@@ -67,15 +67,34 @@ class BaseControlChipset: ControlChipsetProtocol {
     }
     
     func detectDevice() -> Bool {
-        fatalError("Must be implemented by subclass")
+        // Check if device is connected via USB manager using chipset IDs
+        for device in AppStatus.USBDevices {
+            if device.vendorID == chipsetInfo.vendorID &&
+               device.productID == chipsetInfo.productID {
+                logger.log(content: "🔍 \(chipsetInfo.name) device detected: \(device.productName)")
+                return true
+            }
+        }
+        return false
     }
     
     func validateConnection() -> Bool {
         fatalError("Must be implemented by subclass")
     }
     
-    func establishCommunication() -> Bool {
-        fatalError("Must be implemented by subclass")
+    func initialize() -> Bool {
+        guard detectDevice() else {
+            logger.log(content: "❌ \(chipsetInfo.name) device not detected")
+            return false
+        }
+
+        if establishCommunication() && validateConnection() {
+            logger.log(content: "✅ \(chipsetInfo.name) chipset initialized successfully")
+            return true
+        }
+
+        logger.log(content: "❌ \(chipsetInfo.name) chipset initialization failed")
+        return false
     }
     
     // MARK: - Common Control Operations
