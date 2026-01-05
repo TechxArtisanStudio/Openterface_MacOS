@@ -55,6 +55,7 @@ class BaseVideoChipset: VideoChipsetProtocol {
     
     func initialize() -> Bool {
         fatalError("Must be implemented by subclass")
+        
     }
     
     func deinitialize() {
