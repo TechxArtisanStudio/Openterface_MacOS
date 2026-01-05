@@ -270,25 +270,29 @@ class HardwareAbstractionLayer {
     private func detectControlChipset() -> Bool {        
         // Check for CH32V208 chipset
         if let ch32v208 = CH32V208ControlChipset() {
-            if ch32v208.detectDevice() && ch32v208.initialize() {
+            if ch32v208.detectDevice() {
                 controlChipset = ch32v208
                 AppStatus.controlChipsetType = .ch32v208
-                if logger.HalPrint {
-                    logger.log(content: "CH32V208 control chipset detected and initialized")
+                if ch32v208.initialize() {
+                    if logger.HalPrint {
+                        logger.log(content: "CH32V208 control chipset detected and initialized")
+                    }
+                    return true
                 }
-                return true
             }
         }
         
         // Check for CH9329 chipset
         if let ch9329 = CH9329ControlChipset() {
-            if ch9329.detectDevice() && ch9329.initialize() {
+            if ch9329.detectDevice() {
                 controlChipset = ch9329
                 AppStatus.controlChipsetType = .ch9329
-                if logger.HalPrint {
-                    logger.log(content: "✅ HAL: CH9329 control chipset detected and initialized")
+                if ch9329.initialize() {
+                    if logger.HalPrint {
+                        logger.log(content: "✅ HAL: CH9329 control chipset detected and initialized")
+                    }
+                    return true
                 }
-                return true
             }
         }
 
