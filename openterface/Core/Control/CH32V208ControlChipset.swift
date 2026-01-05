@@ -73,6 +73,7 @@ class CH32V208ControlChipset: BaseControlChipset {
             isConnected = true
             //Get the hid info in order to know the current firmware version
             serialManager.getHidInfo()
+            isConnected = true
         } else {
             logger.log(content: "❌ CH32V208 communication establishment failed. Expected baudrate: \(CH32V208ControlChipset.HIGHSPEED_BAUDRATE), got: \(currentBaudRate)")
             serialManager.isDeviceReady = false
