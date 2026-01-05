@@ -71,6 +71,8 @@ class CH32V208ControlChipset: BaseControlChipset {
             // Trigger HAL integration with managers after successful communication
             HALIntegrationManager.shared.reintegrateControlChipset()
             isConnected = true
+            //Get the hid info in order to know the current firmware version
+            serialManager.getHidInfo()
         } else {
             logger.log(content: "❌ CH32V208 communication establishment failed. Expected baudrate: \(CH32V208ControlChipset.HIGHSPEED_BAUDRATE), got: \(currentBaudRate)")
             serialManager.isDeviceReady = false

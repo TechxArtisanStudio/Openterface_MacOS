@@ -72,6 +72,12 @@ final class UserSettings: ObservableObject {
         // Load log mode preference from UserDefaults
         self.isLogMode = UserDefaults.standard.object(forKey: "isLogMode") as? Bool ?? false
         
+        // Load mouse event print logging preference from UserDefaults
+        self.isMouseEventPrintEnabled = UserDefaults.standard.object(forKey: "isMouseEventPrintEnabled") as? Bool ?? false
+        
+        // Load HAL print logging preference from UserDefaults
+        self.isHalPrintEnabled = UserDefaults.standard.object(forKey: "isHalPrintEnabled") as? Bool ?? false
+        
         // Load mouse event throttling Hz limit from UserDefaults
         let savedMouseEventThrottleHz = UserDefaults.standard.object(forKey: "mouseEventThrottleHz") as? Int ?? 60
         self.mouseEventThrottleHz = savedMouseEventThrottleHz
@@ -97,11 +103,11 @@ final class UserSettings: ObservableObject {
         let savedAspectRatioMode = UserDefaults.standard.string(forKey: "aspectRatioMode")
         let aspectRatioModeValue: AspectRatioMode
         if let mode = savedAspectRatioMode {
-            aspectRatioModeValue = AspectRatioMode(rawValue: mode) ?? .custom
+            aspectRatioModeValue = AspectRatioMode(rawValue: mode) ?? .activeResolution
         } else {
             // Migrate from old useCustomAspectRatio boolean setting
             let useCustomAspectRatio = UserDefaults.standard.object(forKey: "useCustomAspectRatio") as? Bool ?? false
-            aspectRatioModeValue = useCustomAspectRatio ? .custom : .hidResolution
+            aspectRatioModeValue = useCustomAspectRatio ? .custom : .activeResolution
             
             // If we found the old setting, save the new one
             if UserDefaults.standard.object(forKey: "useCustomAspectRatio") != nil {
@@ -110,8 +116,6 @@ final class UserSettings: ObservableObject {
             }
         }
         self.aspectRatioMode = aspectRatioModeValue
-
-        // (doActiveResolutionCheck is loaded from UserDefaults in its declaration)
         
         // Load custom aspect ratio value from UserDefaults
         let savedCustomAspectRatioValue = UserDefaults.standard.object(forKey: "customAspectRatioValue") as? Double ?? 16.0/9.0
@@ -127,6 +131,20 @@ final class UserSettings: ObservableObject {
     @Published var isLogMode: Bool {
         didSet {
             UserDefaults.standard.set(isLogMode, forKey: "isLogMode")
+        }
+    }
+    
+    // Mouse event print logging preference persistence
+    @Published var isMouseEventPrintEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isMouseEventPrintEnabled, forKey: "isMouseEventPrintEnabled")
+        }
+    }
+    
+    // HAL print logging preference persistence
+    @Published var isHalPrintEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isHalPrintEnabled, forKey: "isHalPrintEnabled")
         }
     }
     
@@ -175,14 +193,6 @@ final class UserSettings: ObservableObject {
     @Published var isAudioEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isAudioEnabled, forKey: "isAudioEnabled")
-        }
-    }
-    
-    // Whether to perform active resolution checking (detect active video area and auto-match aspect)
-    // Default is false to avoid unexpected UI changes
-    @Published var doActiveResolutionCheck: Bool = UserDefaults.standard.object(forKey: "doActiveResolutionCheck") as? Bool ?? false {
-        didSet {
-            UserDefaults.standard.set(doActiveResolutionCheck, forKey: "doActiveResolutionCheck")
         }
     }
     
@@ -385,6 +395,7 @@ enum AspectRatioMode: String, CaseIterable {
 enum AspectRatioOption: String, CaseIterable {
     case ratio21_9 = "21:9"     //2.33333333
     case ratio32_15 = "32:15"   //2.13333333 (eg: 1920x900, 1280x600)
+    case ratio23_11 = "23:11"   //2.09090909 (eg: 2304x1100)
     case ratio2_1 = "2:1"       //2          (eg: 960x480)
     case ratio9_5 = "9:5"       //1.8       (eg: 4096x2160)
     case ratio16_9 = "16:9"     //1.77778   (eg: 1920x1080, 3840x2160)
@@ -419,6 +430,8 @@ enum AspectRatioOption: String, CaseIterable {
             return 211.0 / 135.0
         case .ratio211_180:
             return 211.0 / 180.0
+        case .ratio23_11:
+            return 23.0 / 11.0
         case .ratio3_2:
             return 3.0/2.0
         case .ratio2_1:
