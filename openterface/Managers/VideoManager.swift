@@ -117,11 +117,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         NotificationCenter.default.addObserver(self, selector: #selector(handleFrameResolution(_:)),
                 name: Notification.Name("checkActiveResolution"), object: nil)
         
-        if AppStatus.isFristRun == false {
-            // Add device notification observers
-            self.observeDeviceNotifications()
-            AppStatus.isFristRun = true
-        }
+
+        // Add device notification observers
+        self.observeDeviceNotifications()
     }
     
     deinit {
@@ -1031,24 +1029,24 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         if blankAreaX > 0 && blankAreaY == 0 && activeWidth > 0 && activeHeight > 0 {
             if aspectRatio > 1.0 {
                 logger.log(content: "Pillarbox detected (left/right black bar), auto-zooming to width to fill horizontal space")
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToWidthTriggered"), object: nil, userInfo: ["isAutoResize": true])
             }
         }
         // Letterbox: black bars on top/bottom (blankAreaX == 0, blankAreaY > 0)
         else if blankAreaX == 0 && blankAreaY > 0 && activeWidth > 0 && activeHeight > 0 {
             if aspectRatio > 1.0 {
                 logger.log(content: "Letterbox detected (top/bottom black bar), auto-zooming to height to fill vertical space")
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToHeightTriggered"), object: nil, userInfo: ["isAutoResize": true])
             }
         }
         // Mixed blank areas (blankAreaX > 0 AND blankAreaY > 0)
         else if blankAreaX > 0 && blankAreaY > 0 && activeWidth > 0 && activeHeight > 0 {
             if aspectRatio < 1.0 {
                 logger.log(content: "Mixed blank areas with portrait aspect ratio, auto-zooming to height")
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToHeightTriggered"), object: nil, userInfo: ["isAutoResize": true])
             } else {
                 logger.log(content: "Mixed blank areas with landscape aspect ratio, auto-zooming to width")
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToWidthTriggered"), object: nil, userInfo: ["isAutoResize": true])
             }
         }
     }

@@ -1095,7 +1095,37 @@ class MouseManager: MouseManagerProtocol {
         }
         
         recordOutputMouseEvent()
-        mouserMapper.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: mouseEvent, wheelMovement: self.scrollWheelEventDeltaMapping(delta: wheelMovement))
+        
+        // Apply zoom level mapping if user is in custom zoom mode
+        var finalX = x
+        var finalY = y
+        
+        // Try to resolve PlayerViewModel from DependencyContainer
+        if DependencyContainer.shared.isRegistered(PlayerViewModel.self) {
+            let playerViewModel = DependencyContainer.shared.resolve(PlayerViewModel.self)
+            if playerViewModel.customZoom {
+                let zoomLevel = playerViewModel.zoomLevel
+                if zoomLevel != 1.0 {
+                    // Apply inverse zoom transform around the zoom center point
+                    // Formula: new_coord = center + (coord - center) / zoomLevel
+                    let centerX = playerViewModel.zoomCenter.x
+                    let centerY = playerViewModel.zoomCenter.y
+                    
+                    let fx = CGFloat(x)
+                    let fy = CGFloat(y)
+                    
+                    let mappedX = centerX + (fx - centerX) / zoomLevel
+                    let mappedY = centerY + (fy - centerY) / zoomLevel
+                    
+                    finalX = Int(mappedX)
+                    finalY = Int(mappedY)
+                    
+                    logger.log(content: "Applied zoom mapping with center (\(String(format: "%.0f", centerX)), \(String(format: "%.0f", centerY))): zoom=\(String(format: "%.2f", zoomLevel))x, original=(\(x),\(y)), mapped=(\(finalX),\(finalY))")
+                }
+            }
+        }
+        
+        mouserMapper.handleAbsoluteMouseAction(x: finalX, y: finalY, mouseEvent: mouseEvent, wheelMovement: self.scrollWheelEventDeltaMapping(delta: wheelMovement))
     }
     
     func handleRelativeMouseAction(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged:Bool = false) {

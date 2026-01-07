@@ -72,6 +72,7 @@ class PlayerView: NSView, NSWindowDelegate {
         if let image = NSImage(named: "content_dark_eng"), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             playerBackgroundImage.contents = cgImage
             playerBackgroundImage.contentsGravity = UserSettings.shared.gravity.contentsGravity
+            playerBackgroundImage.masksToBounds = true
             self.playerBackgroundImage.zPosition = -2
             // Ensure background color is red when using an image (fallback overlay)
             self.playerBackgroundImage.backgroundColor = NSColor(white: 0.15, alpha: 1.0).cgColor
@@ -79,12 +80,10 @@ class PlayerView: NSView, NSWindowDelegate {
         self.previewLayer?.addSublayer(self.playerBackgroundImage)
 
         // Set preview layer background to red (replace default black)
-        self.previewLayer?.backgroundColor = NSColor.gray.cgColor
-
+        self.previewLayer?.backgroundColor = NSColor.black.cgColor
+        self.previewLayer?.masksToBounds = true
         layer = self.previewLayer
-
         logger.log(content: "Setup layer completed")
-        
     }
     
     func observe() {
@@ -122,7 +121,7 @@ class PlayerView: NSView, NSWindowDelegate {
     @objc func handleZoomLevelChanged(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let zoomLevel = userInfo["zoomLevel"] as? CGFloat else { return }
-        
+
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.2)
         
@@ -148,6 +147,21 @@ class PlayerView: NSView, NSWindowDelegate {
         transform = transform.translatedBy(x: -centerX, y: -centerY)
 
         previewLayer.setAffineTransform(transform)
+        
+        // Fade playerBackgroundImage opacity when zooming to prevent sublayer visibility at edges
+        // This is done in the same transaction as the zoom transform for smooth animation
+        if zoomLevel > 1.0 {
+            playerBackgroundImage.opacity = 0.0
+        } else {
+            playerBackgroundImage.opacity = 1.0
+        }
+        
+        // Update PlayerViewModel's zoom center for mouse coordinate mapping
+        if DependencyContainer.shared.isRegistered(PlayerViewModel.self) {
+            let playerViewModel = DependencyContainer.shared.resolve(PlayerViewModel.self)
+            playerViewModel.zoomCenter = CGPoint(x: centerX, y: centerY)
+            logger.log(content: "Updated zoom center: (\(centerX), \(centerY))")
+        }
         
         CATransaction.commit()
     }
@@ -490,14 +504,23 @@ class PlayerView: NSView, NSWindowDelegate {
     override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
 
+        playerBackgroundImage.isHidden = false
         playerBackgroundImage.frame = self.bounds
         
+        // Post notification that window resize has ended
+        NotificationCenter.default.post(name: Notification.Name("PlayerViewDidEndResize"), object: nil)
+        
         // Auto-zoom if needed after resize completes
-        handleAutoZoomAfterResize()
+        handleAutoZoom()
+    }
+    
+    override func viewWillStartLiveResize() {
+        super.viewWillStartLiveResize()
+        playerBackgroundImage.isHidden = true
     }
     
     /// Handles auto-zooming based on active video rect and blank areas after window resize
-    private func handleAutoZoomAfterResize() {
+    private func handleAutoZoom() {
         let activeRect = AppStatus.activeVideoRect
         
         // Only auto-zoom if we have a valid active video rect and active resolution checking is enabled
@@ -523,25 +546,25 @@ class PlayerView: NSView, NSWindowDelegate {
             if activeAspectRatio > 1.0 {
                 logger.log(content: "Pillarbox detected after resize, auto-zooming to width")
                 let userInfo: [String: Any] = ["isAutoResize": true]
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil, userInfo: userInfo)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToWidthTriggered"), object: nil, userInfo: userInfo)
             }
         } else if marginX == 0 && marginY > 0 && activeRect.width > 0 && activeRect.height > 0 {
             // Letterbox detected (top/bottom black bars)
             if activeAspectRatio > 1.0 {
                 logger.log(content: "Letterbox detected after resize, auto-zooming to height")
                 let userInfo: [String: Any] = ["isAutoResize": true]
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil, userInfo: userInfo)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToHeightTriggered"), object: nil, userInfo: userInfo)
             }
         } else if marginX > 0 && marginY > 0 && activeRect.width > 0 && activeRect.height > 0 {
             // Mixed blank areas
             if activeAspectRatio < 1.0 {
                 logger.log(content: "Mixed blank areas with portrait aspect ratio after resize, auto-zooming to height")
                 let userInfo: [String: Any] = ["isAutoResize": true]
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToHeightTriggered"), object: nil, userInfo: userInfo)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToHeightTriggered"), object: nil, userInfo: userInfo)
             } else {
                 logger.log(content: "Mixed blank areas with landscape aspect ratio after resize, auto-zooming to width")
                 let userInfo: [String: Any] = ["isAutoResize": true]
-                NotificationCenter.default.post(name: Notification.Name("MenuZoomToWidthTriggered"), object: nil, userInfo: userInfo)
+                NotificationCenter.default.post(name: Notification.Name("AutoZoomToWidthTriggered"), object: nil, userInfo: userInfo)
             }
         }
     }

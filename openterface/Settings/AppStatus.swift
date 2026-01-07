@@ -55,9 +55,7 @@ struct AppStatus {
     
     // Available control chipsets for selection
     static var availableControlChipsets: [ControlChipsetType] = []
-    
-    static var isFristRun: Bool = false
-    
+
     static var isMouseInView: Bool = true
     static var isFouceWindow: Bool = true
     static var isHDMIConnected: Bool = false

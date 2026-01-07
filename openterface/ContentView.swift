@@ -39,9 +39,14 @@ struct ContentView: View {
     
     init() {
     }
-
+    
     var body: some View {
         ZStack {
+            // Register PlayerViewModel in DependencyContainer when the view loads
+            Color.clear.onAppear {
+                DependencyContainer.shared.register(PlayerViewModel.self, instance: self.viewModel)
+            }
+            
             // Parallel overlay indicator: show orange dot at top-center when active
             if overlayActive {
                 GeometryReader { geo in
@@ -123,7 +128,7 @@ struct ContentView: View {
                             if AppStatus.isExit {
                                 AppStatus.isExit = false
                             }
-                        }
+                    }
                     
                     // Active video rect bounding box
                     if showActiveVideoRect {

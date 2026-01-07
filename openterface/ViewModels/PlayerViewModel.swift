@@ -49,6 +49,12 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// The rect of the active video area
     @Published var activeVideoRect: CGRect = .zero
     
+    /// Tracks if user is currently using custom zoom
+    @Published var customZoom: Bool = false
+    
+    /// Center point of the zoom transform (for mouse coordinate mapping)
+    @Published var zoomCenter: CGPoint = CGPoint(x: 2048, y: 2048)
+    
     // MARK: - Properties
     
     /// Video manager for handling video capture
@@ -77,14 +83,11 @@ class PlayerViewModel: NSObject, ObservableObject {
         
         self.setupBindings()
         
-        // Always setup observers, regardless of AppStatus.isFristRun
+        // Always setup observers
         self.setupZoomObservers()
         
-        if AppStatus.isFristRun == false {
-            // Add window event observers
-            self.observeWindowNotifications()
-            AppStatus.isFristRun = true
-        }
+        // Add window event observers
+        self.observeWindowNotifications()
     }
     
     deinit {
@@ -134,6 +137,10 @@ class PlayerViewModel: NSObject, ObservableObject {
         notificationCenter.addObserver(self, selector: #selector(windowdidResignMain(_:)), 
                                      name: NSWindow.didResignMainNotification, object: nil)
         
+        // Window resize events
+        notificationCenter.addObserver(self, selector: #selector(windowDidEndResize(_:)), 
+                                     name: Notification.Name("PlayerViewDidEndResize"), object: nil)
+        
         self.hasObserverBeenAdded = true
     }
     
@@ -141,7 +148,7 @@ class PlayerViewModel: NSObject, ObservableObject {
     private func setupZoomObservers() {
         let notificationCenter = NotificationCenter.default
         
-        // Zoom menu events
+        // Menu zoom events (user-triggered)
         notificationCenter.addObserver(self, selector: #selector(handleMenuZoomIn(_:)), 
                                      name: Notification.Name("MenuZoomInTriggered"), object: nil)
         notificationCenter.addObserver(self, selector: #selector(handleMenuZoomOut(_:)), 
@@ -152,6 +159,12 @@ class PlayerViewModel: NSObject, ObservableObject {
                                      name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
         notificationCenter.addObserver(self, selector: #selector(handleMenuZoomToWidth(_:)), 
                                      name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+        
+        // Auto-zoom events (auto-detect triggered)
+        notificationCenter.addObserver(self, selector: #selector(handleAutoZoomToHeight(_:)), 
+                                     name: Notification.Name("AutoZoomToHeightTriggered"), object: nil)
+        notificationCenter.addObserver(self, selector: #selector(handleAutoZoomToWidth(_:)), 
+                                     name: Notification.Name("AutoZoomToWidthTriggered"), object: nil)
     }
     
     /// Removes all observers and listeners
@@ -159,11 +172,14 @@ class PlayerViewModel: NSObject, ObservableObject {
         let notificationCenter = NotificationCenter.default
         notificationCenter.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
         notificationCenter.removeObserver(self, name: NSWindow.didResignMainNotification, object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("PlayerViewDidEndResize"), object: nil)
         notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomInTriggered"), object: nil)
         notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomOutTriggered"), object: nil)
         notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomResetTriggered"), object: nil)
         notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomToHeightTriggered"), object: nil)
         notificationCenter.removeObserver(self, name: Notification.Name("MenuZoomToWidthTriggered"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("AutoZoomToHeightTriggered"), object: nil)
+        notificationCenter.removeObserver(self, name: Notification.Name("AutoZoomToWidthTriggered"), object: nil)
     }
     
     // MARK: - Authorization
@@ -226,6 +242,7 @@ class PlayerViewModel: NSObject, ObservableObject {
     /// Resets zoom to default (1.0x)
     func resetZoom() {
         setZoomLevel(1.0, source: .manual)
+        customZoom = false
         logger.log(content: "Zoom Reset: 1.00x")
     }
     
@@ -278,6 +295,11 @@ class PlayerViewModel: NSObject, ObservableObject {
         
         DispatchQueue.main.async {
             self.zoomLevel = newLevel
+            
+            // Update customZoom flag based on source and zoom level
+            if source == .manual || source == .menu {
+                self.customZoom = (newLevel != 1.0)
+            }
             
             // Log based on source
             let sourceLabel: String
@@ -377,6 +399,13 @@ class PlayerViewModel: NSObject, ObservableObject {
         }
     }
     
+    /// Handles when window finishes resizing
+    @objc func windowDidEndResize(_ notification: Notification) {
+        // Reset custom zoom flag when user finishes resizing to allow auto-zoom
+        customZoom = false
+        logger.log(content: "Window resize ended, reset customZoom to allow auto-zoom")
+    }
+    
     /// Handles fullscreen mode changes
     @objc func handleDidEnterFullScreenNotification(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
@@ -405,19 +434,33 @@ class PlayerViewModel: NSObject, ObservableObject {
         resetZoom()
     }
     
-    /// Handles zoom to height from menu or auto-resize
+    /// Handles zoom to height from menu
     @objc func handleMenuZoomToHeight(_ notification: Notification) {
-        // Check if this is from auto-resize
-        let isAutoResize = notification.userInfo?["isAutoResize"] as? Bool ?? false
-        let source: ZoomSource = isAutoResize ? .autoResize : .menu
-        zoomToHeight(source: source)
+        zoomToHeight(source: .menu)
     }
     
-    /// Handles zoom to width from menu or auto-resize
+    /// Handles zoom to width from menu
     @objc func handleMenuZoomToWidth(_ notification: Notification) {
-        // Check if this is from auto-resize
-        let isAutoResize = notification.userInfo?["isAutoResize"] as? Bool ?? false
-        let source: ZoomSource = isAutoResize ? .autoResize : .menu
-        zoomToWidth(source: source)
+        zoomToWidth(source: .menu)
+    }
+    
+    /// Handles auto-zoom to height (from active resolution detection)
+    @objc func handleAutoZoomToHeight(_ notification: Notification) {
+        // Ignore auto-zoom if user is using custom zoom
+        guard !customZoom else {
+            logger.log(content: "Auto-zoom to height ignored: user is using custom zoom")
+            return
+        }
+        zoomToHeight(source: .autoResize)
+    }
+    
+    /// Handles auto-zoom to width (from active resolution detection)
+    @objc func handleAutoZoomToWidth(_ notification: Notification) {
+        // Ignore auto-zoom if user is using custom zoom
+        guard !customZoom else {
+            logger.log(content: "Auto-zoom to width ignored: user is using custom zoom")
+            return
+        }
+        zoomToWidth(source: .autoResize)
     }
 }
