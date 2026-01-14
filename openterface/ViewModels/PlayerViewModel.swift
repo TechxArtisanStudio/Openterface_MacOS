@@ -401,9 +401,14 @@ class PlayerViewModel: NSObject, ObservableObject {
     
     /// Handles when window finishes resizing
     @objc func windowDidEndResize(_ notification: Notification) {
-        // Reset custom zoom flag when user finishes resizing to allow auto-zoom
-        customZoom = false
-        logger.log(content: "Window resize ended, reset customZoom to allow auto-zoom")
+        // Reset custom zoom flag when user finishes resizing to allow auto-zoom.
+        // Defer the change to the next runloop iteration to avoid re-entrant
+        // notification handling that can cause hangs when resize triggers
+        // auto-zoom notifications immediately.
+        DispatchQueue.main.async {
+            self.customZoom = false
+            self.logger.log(content: "Window resize ended, reset customZoom to allow auto-zoom")
+        }
     }
     
     /// Handles fullscreen mode changes
