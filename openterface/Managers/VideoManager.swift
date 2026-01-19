@@ -882,7 +882,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         if let matched = matchedOption {
             // Update aspect ratio if changed or if this is the first time (previousAspect is nil)
-            if previousAspect == nil || previousAspect != matched {
+            if previousAspect == nil || previousAspect != matched || abs(previousCustomValue - activeAspectRatio) > 0.1 {
                 UserSettings.shared.customAspectRatio = matched
                 isAspectRatioInitialized = true
                 logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", activeAspectRatio)))")

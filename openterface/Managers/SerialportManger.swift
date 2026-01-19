@@ -383,8 +383,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         var bufferBytes = [UInt8](receiveBuffer)
         var processedBytes = 0
         
-        if logger.SerialDataPrint { logger.log(content: "PROCESS: Buffer size=\(bufferBytes.count)") }
-        
         while bufferBytes.count >= 6 { // Minimum message size: 5 bytes header + 1 byte checksum
             // Look for the next valid message start
             guard let prefixIndex = findNextMessageStart(in: bufferBytes, from: processedBytes) else {
@@ -475,10 +473,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     logger.log(content: "SYNC: Rx(0x\(String(format: "%02X", cmd))）: \(dataString)")
                 }
                 return  // Exit early - don't process command normally for sync responses
-            } else {
-                if logger.SerialDataPrint {
-                    logger.log(content: "SYNC: expectedCmd=\(expectedCmd?.description ?? "nil"), received cmd=0x\(String(format: "%02X", cmd))")
-                }
             }
         }
 
