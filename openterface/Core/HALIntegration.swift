@@ -634,6 +634,9 @@ class HALIntegrationManager {
             guard let videoChipset = videoChipset else { return }
             
             do {
+                // Get other chipset-specific data
+                AppStatus.hidReadResolusion = videoChipset.getResolution() ?? (width: 0, height: 0)
+                AppStatus.hidReadFps = videoChipset.getFrameRate() ?? 0
                 // Get timing information from the video chipset (handles chipset-specific registers)
                 if let timingInfo = videoChipset.getTimingInfo() {
                     AppStatus.hidInputHTotal = timingInfo.horizontalTotal
@@ -644,11 +647,6 @@ class HALIntegrationManager {
                     AppStatus.hidInputVsyncWidth = timingInfo.verticalSyncWidth
                     AppStatus.hidReadPixelClock = timingInfo.pixelClock
                 }
-                
-                // Get other chipset-specific data
-                AppStatus.hidReadResolusion = videoChipset.getResolution() ?? (width: 0, height: 0)
-                AppStatus.hidReadFps = videoChipset.getFrameRate() ?? 0
-                
                 // Get version and connection status (these might still need HID manager for some chipsets)
                 if let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
                     _ = hidManager.getSwitchStatus()

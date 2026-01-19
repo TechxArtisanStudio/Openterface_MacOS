@@ -119,6 +119,23 @@ class BaseVideoChipset: VideoChipsetProtocol {
         return nil
     }
     
+    /// Generic resolution correction method
+    /// Chipsets can override this to apply chipset-specific corrections
+    /// Default implementation returns resolution unchanged
+    func correctResolution(width: Int, height: Int) -> (width: Int, height: Int) {
+        var correctedWidth = width
+        var correctedHeight = height
+        
+        // Cap resolution at 4K, default to 1920x1080 if exceeded
+        if correctedWidth > 4096 || correctedHeight > 4096 {
+            logger.log(content: "Input resolution (\(correctedWidth)x\(correctedHeight)) exceeds 4K limit, defaulting to previous safe resolution 1920x1080")
+            correctedWidth = AppStatus.hidReadResolusion.width
+            correctedHeight = AppStatus.hidReadResolusion.height
+        }
+        
+        return (correctedWidth, correctedHeight)
+    }
+    
     func getSignalStatus() -> VideoSignalStatus {
         let hasSignal = hidManager.getHDMIStatus()
         

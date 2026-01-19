@@ -215,4 +215,29 @@ extension MS2109SVideoChipset: VideoChipsetHIDRegisters {
     // MARK: - Chipset Capabilities
     var supportsHIDCommands: Bool { true }
     var supportsEEPROM: Bool { true }
+    
+    // MARK: - MS2109S HID Report Format
+    /// MS2109S uses standard format without 0x01 prefix (same as MS2109)
+    /// Format: [0xB5, highByte, lowByte, 0, 0, 0, 0]
+    func generateHIDReportFormat(commandPrefix: UInt8, highByte: UInt8, lowByte: UInt8) -> [UInt8] {
+        return [commandPrefix, highByte, lowByte, 0, 0, 0, 0]
+    }
+    
+    // MARK: - MS2109S UInt16 Response Parsing
+    /// MS2109S uses same format as MS2109 - returns only one byte per read
+    /// So we need to read the next address for the low byte
+    /// Value index is at position 3 in the response
+    func parseUInt16Response(response: [UInt8], address: UInt16, readLowByte: (UInt16) -> [UInt8]?) -> UInt16? {
+        let valueIndex = 3
+        guard response.count > valueIndex else { return nil }
+        
+        // highByte first as it's big-endian
+        let highByte = response[valueIndex]
+        let lowAddress = address + 1
+        
+        guard let lowResponse = readLowByte(lowAddress), lowResponse.count > valueIndex else { return nil }
+        let lowByte = lowResponse[valueIndex]
+        
+        return (UInt16(highByte) << 8) | UInt16(lowByte)
+    }
 }

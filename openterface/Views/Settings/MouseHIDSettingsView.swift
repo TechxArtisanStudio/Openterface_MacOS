@@ -262,9 +262,7 @@ struct MouseHIDSettingsView: View {
         switchStatus = hidManager.getSwitchStatus()
         hdmiStatus = hidManager.getHDMIStatus()
 
-        if let res = hidManager.getResolution() {
-            resolution = "\(res.width)x\(res.height)"
-        }
+        resolution = "\(AppStatus.hidReadResolusion.width)x\(AppStatus.hidReadResolusion.height)"
 
         if let fps = hidManager.getFps() {
             frameRate = String(format: "%.1f fps", fps)

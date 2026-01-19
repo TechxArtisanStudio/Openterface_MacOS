@@ -120,6 +120,20 @@ class MS2130SVideoChipset: BaseVideoChipset {
             lastUpdate: Date()
         )
     }
+    
+    /// MS2130S-specific resolution correction helper
+    /// Converts 3840x1080 to 3840x2160 due to different HID report format
+    override func correctResolution(width: Int, height: Int) -> (width: Int, height: Int) {
+        let correctedWidth = width
+        var correctedHeight = height
+        
+        // MS2130S-specific: Handle 3840x1080 which should be 3840x2160
+        if correctedWidth == 3840 && correctedHeight == 1080 {
+            correctedHeight = 2160
+        }
+        
+        return (correctedWidth, correctedHeight)
+    }
 }
 
 // MARK: - MS2130S HID Register Configuration
@@ -180,4 +194,26 @@ extension MS2130SVideoChipset: VideoChipsetHIDRegisters {
     // MARK: - Chipset Capabilities
     var supportsHIDCommands: Bool { true }
     var supportsEEPROM: Bool { false } // MS2130S doesn't support EEPROM
+    
+    // MARK: - MS2130S HID Report Format
+    /// MS2130S requires 0x01 prefix before command prefix
+    /// Format: [0x01, 0xB5, highByte, lowByte]
+    func generateHIDReportFormat(commandPrefix: UInt8, highByte: UInt8, lowByte: UInt8) -> [UInt8] {
+        return [0x01, commandPrefix, highByte, lowByte]
+    }
+    
+    // MARK: - MS2130S UInt16 Response Parsing
+    /// MS2130S returns both high and low bytes in a single read with 0x01 report ID prefix
+    /// Value index is at position 4 (after 0x01 report ID prefix at position 0)
+    /// Data format: [reportID=0x01, command, addrHigh, addrLow, highByte, lowByte, ...]
+    func parseUInt16Response(response: [UInt8], address: UInt16, readLowByte: (UInt16) -> [UInt8]?) -> UInt16? {
+        let valueIndex = 4
+        guard response.count >= valueIndex + 1 else { return nil }
+        
+        // MS2130S returns both bytes in single response
+        let highByte = response[valueIndex]
+        let lowByte = response[valueIndex + 1]
+        
+        return (UInt16(highByte) << 8) | UInt16(lowByte)
+    }
 }

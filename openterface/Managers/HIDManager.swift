@@ -162,7 +162,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         guard let device = self.device else { return }
         var report = report
         _ = report.map { String(format: "%02X", $0) }.joined(separator: " ")
-
+        
         let result = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, self.getReportID(), &report, report.count)
         if result != kIOReturnSuccess {
             logger.log(content: "Failed to send HID report - error code: \(result). \(self.interpretIOReturn(result))")
@@ -171,6 +171,7 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     
     func sendAndReadHIDReport(_ report: [UInt8]) -> [UInt8]? {
         self.sendHIDReport(report: report)
+        Thread.sleep(forTimeInterval: 0.001) // 1ms delay
         return readHIDReport()
     }
     
@@ -185,18 +186,18 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     func sendAndReadHIDReportAsUInt16(_ report: [UInt8]) -> UInt16? {
         guard let response = sendAndReadHIDReport(report) else { return nil }
         guard response.count > 4 else { return nil }
-        let isMs2130s = (getActiveVideoChipset()?.chipsetInfo.chipsetType == .video(.ms2130s))
-        let valueIndex = isMs2130s ? 4 : 3
-        // For ms2109, only one byte is returned, so we need to read next address to get the full UInt16
-        if isMs2130s {
-            return (UInt16(response[valueIndex]) << 8) | UInt16(response[valueIndex + 1])
+        
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            return nil
         }
-        // highByte first as it's big-endian
-        let highByte = response[valueIndex]
-        let lowReport = generateHIDReport(address: (UInt16(response[1]) << 8) | UInt16(response[2]) + 1)
-        guard let lowResponse = sendAndReadHIDReport(lowReport), lowResponse.count > valueIndex else { return nil }
-        let lowByte = lowResponse[valueIndex]
-        return (UInt16(highByte) << 8) | UInt16(lowByte)
+        
+        // Delegate UInt16 parsing to chipset implementation
+        return hidRegisters.parseUInt16Response(response: response, address: (UInt16(response[1]) << 8) | UInt16(response[2])) { lowAddress in
+            let lowReport = self.generateHIDReport(address: lowAddress)
+            Thread.sleep(forTimeInterval: 0.001) // 1ms delay between two address reads
+            return self.sendAndReadHIDReport(lowReport)
+        }
     }
     
     func setUSBtoHost() {
@@ -298,25 +299,14 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         var width = Int(widthU16)
         var height = Int(heightU16)
         
-        // Cap resolution at 4K, default to 1920x1080 if exceeded
-        if width > 4096 || height > 4096 {
-            logger.log(content: "Input resolution (\(width)x\(height)) exceeds 4K limit, defaulting to previous safe resolution 1920x1080")
-            width = AppStatus.hidReadResolusion.width
-            height = AppStatus.hidReadResolusion.height
-        }
-        
-        let pixelClock = AppStatus.hidReadPixelClock / 100
-        if AppStatus.videoChipsetType == .ms2109 || AppStatus.videoChipsetType == .ms2109s {
-            if pixelClock > 189 { // The magic value for MS2109 4K resovideoChipsetTypelution correction
-                width = width == 4096 ? width : width*2
-                height = height == 2160 ? height : height*2
-            }
-        }else{
-            if width == 3840 && height == 1080 {
-                height = 2160
-            }
-        }
-        
+        logger.log(content: "HID reported resolution: \(String(width, radix: 2))x\(String(height, radix: 2)), from addresses \(String(format: "0x%04X", hidRegisters.inputResolutionWidthHigh)) and \(String(format: "0x%04X", hidRegisters.inputResolutionHeightHigh))")
+
+        // Apply chipset-specific resolution correction (generic approach)
+        // Each chipset can override correctResolution() for custom behavior
+        let corrected = chipset.correctResolution(width: width, height: height)
+        width = corrected.width
+        height = corrected.height
+
         // Check if a resolution change notification needs to be sent
         let newResolution = (width, height)
         let oldResolution = AppStatus.hidReadResolusion
@@ -335,12 +325,11 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
                 NotificationCenter.default.post(name: .hidResolutionChanged, object: nil, userInfo: ["width": width, "height": height])
             }
         }
-        
         return (width, height)
     }
     
     func getAspectRatio() -> Float? {
-        guard let resolution = getResolution(),
+        guard let resolution = AppStatus.hidReadResolusion as (width: Int, height: Int)?,
               resolution.height > 0 else {
             return nil
         }
@@ -608,6 +597,22 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     
     // MARK: - EEPROM Operations for Firmware Update
     
+    /// Checks if the current chipset supports EEPROM operations via HAL
+    /// - Returns: True if EEPROM is supported, false otherwise
+    private func supportsEEPROMOperations() -> Bool {
+        guard let chipset = getActiveVideoChipset(),
+              let hidRegisters = chipset as? VideoChipsetHIDRegisters else {
+            logger.log(content: "⚠️ Cannot determine EEPROM support: no active chipset")
+            return false
+        }
+        
+        let supportsEEPROM = hidRegisters.supportsEEPROM
+        if !supportsEEPROM {
+            logger.log(content: "⚠️ Current chipset (\(chipset.chipsetInfo.name)) does not support EEPROM operations")
+        }
+        return supportsEEPROM
+    }
+    
     /// Writes data to EEPROM using HID commands (based on Qt implementation)
     /// - Parameters:
     ///   - address: The starting address in EEPROM
@@ -615,6 +620,12 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     ///   - progressCallback: Optional callback to report progress (0.0 to 1.0)
     /// - Returns: True if write was successful
     func writeEeprom(address: UInt16, data: Data, progressCallback: ((Double) -> Void)? = nil) -> Bool {
+        // Check if current chipset supports EEPROM via HAL
+        guard supportsEEPROMOperations() else {
+            logger.log(content: "❌ EEPROM write failed: chipset does not support EEPROM operations")
+            return false
+        }
+        
         logger.log(content: "Writing \(data.count) bytes to EEPROM at address 0x\(String(format: "%04X", address))")
         
         // Write in chunks (based on C++ implementation)
@@ -717,11 +728,18 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     /// Reads data from EEPROM (for verification)
+    /// Checks chipset capability before attempting read
     /// - Parameters:
     ///   - address: The starting address to read from
     ///   - length: Number of bytes to read
     /// - Returns: The read data, or nil if failed
     func readEeprom(address: UInt16, length: UInt8) -> Data? {
+        // Check if current chipset supports EEPROM via HAL
+        guard supportsEEPROMOperations() else {
+            logger.log(content: "❌ EEPROM read failed: chipset does not support EEPROM operations")
+            return nil
+        }
+        
         logger.log(content: "Reading \(length) bytes from EEPROM at address 0x\(String(format: "%04X", address))")
         
         guard length > 0 else {
@@ -977,7 +995,7 @@ extension HIDManager {
         return hal.getCurrentVideoChipset()
     }
     
-    /// Generate HID report using HAL register address instead of enum
+    /// Generate HID report using chipset-specific format via protocol
     func generateHIDReport(address: UInt16) -> [UInt8] {
         let commandPrefix: UInt8 = 0xB5
         let highByte = UInt8((address >> 8) & 0xFF)
@@ -989,14 +1007,8 @@ extension HIDManager {
             return [commandPrefix, highByte, lowByte, 0, 0, 0, 0]
         }
         
-
-        // MS2130S requires a prefix before commandPrefix
-        if chipset.chipsetInfo.chipsetType == ChipsetType.video(VideoChipsetType.ms2130s) {
-            return [0x01, commandPrefix, highByte, lowByte]
-        } else {
-            // MS2109 and other chipsets use the standard format
-            return [commandPrefix, highByte, lowByte, 0, 0, 0, 0]
-        }
+        // Delegate report format to chipset implementation
+        return hidRegisters.generateHIDReportFormat(commandPrefix: commandPrefix, highByte: highByte, lowByte: lowByte)
     }
     
     /// Get the report ID based on the chipset type

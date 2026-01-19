@@ -57,20 +57,16 @@ struct DeviceConnectionSettingsView: View {
                             .font(.system(.caption, design: .monospaced))
                     }
 
-                    if let resolution = hidManager.getResolution() {
-                        HStack {
-                            Text("Current Resolution:")
-                            Spacer()
-                            Text("\(resolution.width) × \(resolution.height)")
-                        }
+                    HStack {
+                        Text("Current Resolution:")
+                        Spacer()
+                        Text("\(AppStatus.hidReadResolusion.width) × \(AppStatus.hidReadResolusion.height)")
                     }
 
-                    if let fps = hidManager.getFps() {
-                        HStack {
-                            Text("Refresh Rate:")
-                            Spacer()
-                            Text(String(format: "%.1f Hz", fps))
-                        }
+                    HStack {
+                        Text("Refresh Rate:")
+                        Spacer()
+                        Text(String(format: "%.1f Hz", AppStatus.hidReadFps))
                     }
                 }
                 .padding(.vertical, 8)

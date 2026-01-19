@@ -55,6 +55,7 @@ protocol VideoChipsetProtocol: HardwareChipsetProtocol {
     func getSignalStatus() -> VideoSignalStatus
     func getTimingInfo() -> VideoTimingInfo?
     func updateConnectionStatus(_ isConnected: Bool)
+    func correctResolution(width: Int, height: Int) -> (width: Int, height: Int)
 }
 
 /// Protocol for control chipsets (HID/Serial communication)
@@ -120,6 +121,20 @@ protocol VideoChipsetHIDRegisters {
     // MARK: - Chipset Capabilities
     var supportsHIDCommands: Bool { get }
     var supportsEEPROM: Bool { get }
+    
+    // MARK: - HID Report Format
+    /// Generate HID report in chipset-specific format
+    /// Default: [0xB5, highByte, lowByte, 0, 0, 0, 0]
+    /// Override in MS2130S: [0x01, 0xB5, highByte, lowByte]
+    func generateHIDReportFormat(commandPrefix: UInt8, highByte: UInt8, lowByte: UInt8) -> [UInt8]
+    
+    // MARK: - UInt16 Response Parsing
+    /// Parse UInt16 from HID response with optional low byte reading
+    /// - Parameters:
+    ///   - response: The HID response data
+    ///   - address: The current address being read
+    ///   - readLowByte: Closure to read low byte from next address if needed
+    func parseUInt16Response(response: [UInt8], address: UInt16, readLowByte: (UInt16) -> [UInt8]?) -> UInt16?
 }
 
 // MARK: - Data Structures
@@ -134,7 +149,7 @@ struct ChipsetInfo {
     let chipsetType: ChipsetType
 }
 
-/// Chipset capabilities
+// MARK: - Chipset Capabilities
 struct ChipsetCapabilities {
     let supportsHDMI: Bool
     let supportsAudio: Bool
