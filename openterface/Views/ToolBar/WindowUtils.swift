@@ -126,6 +126,30 @@ final class WindowUtils {
     ///   - targetSize: The desired target size
     ///   - initialContentSize: The default content size / aspect ratio to use when none is available
     func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, initialContentSize: CGSize) -> NSSize {
+        // Log the lock setting and resize action
+        logger.log(content: "windowWillResize called - isAspectRatioLocked: \(UserSettings.shared.isAspectRatioLocked), targetSize: \(targetSize)")
+        
+        // If aspect ratio lock is disabled, return target size as-is (but still respect screen bounds)
+        if !UserSettings.shared.isAspectRatioLocked {
+            logger.log(content: "Aspect ratio lock is DISABLED - allowing free resize")
+            guard let screen = (window.screen ?? NSScreen.main) else { return targetSize }
+            let screenFrame = screen.visibleFrame
+            
+            // Still clamp to screen bounds, but don't enforce aspect ratio
+            var newSize = targetSize
+            newSize.width = min(newSize.width, screenFrame.width)
+            newSize.height = min(newSize.height, screenFrame.height)
+            
+            // Ensure we respect the window's minimum size
+            newSize.width = max(newSize.width, window.minSize.width)
+            newSize.height = max(newSize.height, window.minSize.height)
+            
+            logger.log(content: "Free resize result: \(newSize)")
+            return newSize
+        }
+        
+        logger.log(content: "Aspect ratio lock is ENABLED - enforcing aspect ratio")
+        
         // Get the height of the toolbar (if visible)
         let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
 
@@ -198,6 +222,7 @@ final class WindowUtils {
         newSize.width = max(newSize.width, window.minSize.width)
         newSize.height = max(newSize.height, window.minSize.height)
 
+        logger.log(content: "Aspect ratio locked resize result: \(newSize)")
         return newSize
     }
     

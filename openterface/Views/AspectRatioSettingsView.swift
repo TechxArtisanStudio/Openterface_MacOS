@@ -26,6 +26,7 @@ struct AspectRatioSettingsView: View {
     @State private var selectedGravity: GravityOption
     @State private var selectedAspectRatioMode: AspectRatioMode
     @State private var selectedCustomAspectRatio: AspectRatioOption
+    @State private var isAspectRatioLocked: Bool
     
     let onConfirm: (GravityOption, AspectRatioMode, AspectRatioOption) -> Void
     let onCancel: () -> Void
@@ -35,6 +36,7 @@ struct AspectRatioSettingsView: View {
         self._selectedGravity = State(initialValue: UserSettings.shared.gravity)
         self._selectedAspectRatioMode = State(initialValue: UserSettings.shared.aspectRatioMode)
         self._selectedCustomAspectRatio = State(initialValue: UserSettings.shared.customAspectRatio)
+        self._isAspectRatioLocked = State(initialValue: UserSettings.shared.isAspectRatioLocked)
         self.onConfirm = onConfirm
         self.onCancel = onCancel
     }
@@ -170,6 +172,30 @@ struct AspectRatioSettingsView: View {
             
             Divider()
             
+            // Aspect Ratio Lock Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Lock Aspect Ratio During Resize")
+                            .font(.body)
+                            .fontWeight(.medium)
+                        Text("When enabled, maintains aspect ratio when resizing the window. When disabled, allows free resizing.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $isAspectRatioLocked)
+                        .labelsHidden()
+                }
+                .padding(10)
+                .background(Color.blue.opacity(0.03))
+                .cornerRadius(8)
+            }
+            .padding(.bottom, 8)
+            
+            Divider()
+            
             // Buttons
             HStack(spacing: 12) {
                 Button(action: onCancel) {
@@ -179,6 +205,8 @@ struct AspectRatioSettingsView: View {
                 .buttonStyle(.bordered)
                 
                 Button(action: {
+                    // Save the lock setting
+                    UserSettings.shared.isAspectRatioLocked = isAspectRatioLocked
                     onConfirm(selectedGravity, selectedAspectRatioMode, selectedCustomAspectRatio)
                 }) {
                     Text("OK")

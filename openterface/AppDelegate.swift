@@ -568,7 +568,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 AppStatus.currentWindow = window.frame
             }
         }
-//        handleToolbarAutoHide()
+       handleToolbarAutoHide()
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
@@ -580,7 +580,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
-//        handleToolbarAutoHide()
+       handleToolbarAutoHide()
     }
 
     // Handle window moving between screens

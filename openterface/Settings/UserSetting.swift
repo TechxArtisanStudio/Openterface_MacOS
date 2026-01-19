@@ -120,6 +120,9 @@ final class UserSettings: ObservableObject {
         // Load custom aspect ratio value from UserDefaults
         let savedCustomAspectRatioValue = UserDefaults.standard.object(forKey: "customAspectRatioValue") as? Double ?? 16.0/9.0
         self.customAspectRatioValue = CGFloat(savedCustomAspectRatioValue)
+        
+        // Load aspect ratio lock setting from UserDefaults
+        self.isAspectRatioLocked = UserDefaults.standard.object(forKey: "isAspectRatioLocked") as? Bool ?? true
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -183,6 +186,13 @@ final class UserSettings: ObservableObject {
     @Published var customAspectRatioValue: CGFloat {
         didSet {
             UserDefaults.standard.set(customAspectRatioValue, forKey: "customAspectRatioValue")
+        }
+    }
+    
+    // Aspect ratio lock setting - whether to maintain aspect ratio during window resize
+    @Published var isAspectRatioLocked: Bool {
+        didSet {
+            UserDefaults.standard.set(isAspectRatioLocked, forKey: "isAspectRatioLocked")
         }
     }
     
