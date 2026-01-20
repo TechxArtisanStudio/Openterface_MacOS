@@ -116,7 +116,7 @@ class MS2109SVideoChipset: BaseVideoChipset {
                 // Only update USBDeviceInfo if video name is valid (not just spaces)
                 let trimmedName = videoName.trimmingCharacters(in: .whitespaces)
                 if !trimmedName.isEmpty {
-                    if var defaultDevice = AppStatus.DefaultVideoDevice {
+                    if var defaultDevice = AppStatus.videoChipDevice {
                         // Update the matching device in AppStatus.USBDevices array so the tree view reflects the change
                         if let index = AppStatus.USBDevices.firstIndex(where: { device in
                             device.vendorID == defaultDevice.vendorID &&
@@ -136,7 +136,7 @@ class MS2109SVideoChipset: BaseVideoChipset {
                             logger.log(content: "✅ Updated USBDevices array with new product name for tree view")
                         }
                         
-                        // Also update DefaultVideoDevice
+                        // Also update videoChipDevice
                         defaultDevice = USBDeviceInfo(
                             productName: videoName,
                             manufacturer: defaultDevice.manufacturer,
@@ -145,8 +145,8 @@ class MS2109SVideoChipset: BaseVideoChipset {
                             locationID: defaultDevice.locationID,
                             speed: defaultDevice.speed
                         )
-                        AppStatus.DefaultVideoDevice = defaultDevice
-                        logger.log(content: "✅ Updated DefaultVideoDevice productName with EEPROM video name")
+                        AppStatus.videoChipDevice = defaultDevice
+                        logger.log(content: "✅ Updated videoChipDevice productName with EEPROM video name")
                     }
                 } else {
                     logger.log(content: "⚠️ Video name is empty or contains only spaces, skipping update")

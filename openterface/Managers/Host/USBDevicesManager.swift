@@ -255,6 +255,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 videoChipDevice = deviceGroup.first { device in
                     getVideoChipsetType(vendorId: device.vendorID, productId: device.productID) != .unknown
                 }
+                // Update AppStatus with the video chip device
+                AppStatus.videoChipDevice = videoChipDevice
                 logger.log(content: "Detected video chipset type: \(videoType)")
             }
             
@@ -275,6 +277,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 }
                 
                 AppStatus.controlChipsetType = controlType
+                // Update AppStatus with the control chip device
+                AppStatus.controlChipDevice = controlChipDevice
                 logger.log(content: "Detected control chipset type: \(controlType) (detected types in group: \(Array(controlTypesSet)))")
             }
         }
@@ -287,12 +291,14 @@ class USBDevicesManager: USBDevicesManagerProtocol {
             if videoType != .unknown && videoChipDevice == nil {
                 AppStatus.videoChipsetType = videoType
                 videoChipDevice = device
+                AppStatus.videoChipDevice = videoChipDevice
                 logger.log(content: "Detected video chipset type: \(videoType)")
             }
             
             if controlType != .unknown && controlChipDevice == nil {
                 AppStatus.controlChipsetType = controlType
                 controlChipDevice = device
+                AppStatus.controlChipDevice = controlChipDevice
                 logger.log(content: "Detected control chipset type: \(controlType)")
             }
         }
@@ -467,7 +473,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         }
         
         // Fallback to default USB serial device
-        if let defaultSerial = AppStatus.DefaultUSBSerial {
+        if let defaultSerial = AppStatus.controlChipDevice {
             logger.log(content: "Using default USB serial device: \(defaultSerial.productName)")
             return defaultSerial.locationID
         }
@@ -539,8 +545,8 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                     }
                 }
                 
-                AppStatus.DefaultVideoDevice = defaultVideoDevice
-                AppStatus.DefaultUSBSerial = defaultSerialDevice
+                AppStatus.videoChipDevice = defaultVideoDevice
+                AppStatus.controlChipDevice = defaultSerialDevice
                 
                 logger.log(content: "Found \(groupedDevices.count) device groups, default video: \(defaultVideoDevice?.productName ?? "none"), default serial: \(defaultSerialDevice?.productName ?? "none")")
             }

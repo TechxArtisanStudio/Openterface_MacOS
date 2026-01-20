@@ -88,6 +88,10 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
     @Published var stressTestKeyboardRate: Double = 0.0
     @Published var stressTestMouseRate: Double = 0.0
     @Published var isDefectiveUnitDetected: Bool = false
+    @Published var showDepthWarningAlert: Bool = false
+    @Published var depthWarningMessage: String = ""
+    @Published var hasCheckedDeviceDepth: Bool = false
+    @Published var deviceDepthWarningActive: Bool = false
     
     // Connection state tracking for diagnostic images
     @Published var hostOrangeConnected: Bool = false  // H: Host orange cable connection state
@@ -153,7 +157,69 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
         addStatusMessage("🔌 Serial logging disabled")
     }
     
+    // MARK: - Device Depth Check
+    
+    func checkDeviceDepthOnViewAppear() {
+        // Mark that we've performed the initial check
+        hasCheckedDeviceDepth = true
+        
+        var maxDepth = 0
+        var deepDevices: [String] = []
+        
+        // Check video chip
+        if let videoChip = AppStatus.videoChipDevice {
+            let depth = countHubsToRoot(locationID: videoChip.locationID)
+            if depth > maxDepth {
+                maxDepth = depth
+            }
+            if depth > 2 {
+                deepDevices.append("Video Chip (depth: \(depth))")
+            }
+        }
+        
+        // Check control chip
+        if let controlChip = AppStatus.controlChipDevice {
+            let depth = countHubsToRoot(locationID: controlChip.locationID)
+            if depth > maxDepth {
+                maxDepth = depth
+            }
+            if depth > 2 {
+                deepDevices.append("Control Chip (depth: \(depth))")
+            }
+        }
+        
+        // Show warning if any device has depth > 2
+        if !deepDevices.isEmpty {
+            deviceDepthWarningActive = true
+            depthWarningMessage = """
+            ⚠️ USB Hub Warning
+            
+            Detected device(s) with depth > 2:
+            \(deepDevices.joined(separator: "\n"))
+            
+            An external USB hub is likely present between the device and computer.
+            
+            ⚠️ IMPORTANT: Please ensure the USB hub has external power, or diagnostic tests may fail due to insufficient power.
+            
+            It's recommended to connect the device directly to your computer for accurate diagnostic results.
+            """
+            showDepthWarningAlert = true
+            
+            addStatusMessage("⚠️ USB Hub detected with depth > 2")
+            addStatusMessage("⚠️ This may cause diagnostic test failures")
+            addStatusMessage("⚠️ Please ensure hub has external power or connect device directly")
+        } else {
+            deviceDepthWarningActive = false
+            addStatusMessage("✅ Device connected directly or through powered hub (depth ≤ 2)")
+        }
+    }
+    
     // MARK: - Helper Methods
+    
+    /// Check if device depth has been verified before allowing tests
+    func canProceedWithTests() -> Bool {
+        return hasCheckedDeviceDepth
+    }
     
     private func addStatusMessage(_ message: String) {
         let dateFormatter = DateFormatter()
@@ -1552,12 +1618,16 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
         // The dialog has already handled the actions internally
     }
     
-    private func getStatusAndResultsLog() -> String {
+    func getStatusAndResultsLog() -> String {
         var log = "OPENTERFACE DIAGNOSTICS - STATUS AND RESULTS LOG\n"
         log += "=".repeated(50) + "\n"
         log += "Generated: \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium))\n"
-        log += "App Version: \(getAppVersion())\n"
-        log += "macOS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+        log += "\n"
+        
+        // Add System Information section
+        log += "SYSTEM INFORMATION:\n"
+        log += "-".repeated(50) + "\n"
+        log += getSystemInformationLog()
         log += "\n"
         
         log += "TEST RESULTS:\n"
@@ -1581,6 +1651,341 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
         log += isDefectiveUnitDetected ? "⚠️ DEFECTIVE UNIT DETECTED\n" : "✅ No defects detected\n"
         
         return log
+    }
+    
+    private func getSystemInformationLog() -> String {
+        var info = ""
+        
+        // App Version
+        info += "App Version: \(getAppVersion())\n"
+        
+        // macOS Version
+        info += "macOS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+        
+        // Control Chip
+        info += "Control Chip: \(getControlChipsetDisplayName())\n"
+        
+        // Video Chip
+        info += "Video Chip: \(getVideoChipsetDisplayName())\n"
+        
+        // USB Hub Structure
+        info += "\nUSB Hub Structure:\n"
+        info += getUSBHubStructureLog()
+        
+        return info
+    }
+    
+    private func getControlChipsetDisplayName() -> String {
+        switch AppStatus.controlChipsetType {
+        case .ch9329:
+            return "CH9329 ✅"
+        case .ch32v208:
+            return "CH32V208 ✅"
+        case .unknown:
+            return "Unknown ⚠️"
+        }
+    }
+    
+    private func getVideoChipsetDisplayName() -> String {
+        switch AppStatus.videoChipsetType {
+        case .ms2109:
+            return "MS2109 ✅"
+        case .ms2109s:
+            return "MS2109S ✅"
+        case .ms2130s:
+            return "MS2130S ✅"
+        case .unknown:
+            return "Unknown ⚠️"
+        }
+    }
+    
+    private func getUSBHubStructureLog() -> String {
+        var usbLog = ""
+        
+        // Only show video and control chip devices
+        var deviceList: [(device: USBDeviceInfo, type: String)] = []
+        
+        if let videoChip = AppStatus.videoChipDevice {
+            deviceList.append((device: videoChip, type: "Video Chip"))
+        }
+        
+        if let controlChip = AppStatus.controlChipDevice {
+            deviceList.append((device: controlChip, type: "Control Chip"))
+        }
+        
+        if deviceList.isEmpty {
+            usbLog += "  No video or control chips detected\n"
+            return usbLog
+        }
+        
+        // Display each chip with location and hub count
+        for (index, item) in deviceList.enumerated() {
+            let device = item.device
+            let chipType = item.type
+            let isLast = (index == deviceList.count - 1)
+            
+            // Calculate device depth (number of hubs from device to root)
+            let deviceDepth = countHubsToRoot(locationID: device.locationID)
+            
+            usbLog += "  \(isLast ? "└── " : "├── ")[\(chipType)] Device Info:\n"
+            usbLog += "       Manufacturer: \(device.manufacturer)\n"
+            usbLog += "       VID: \(String(format: "%04X", device.vendorID)), PID: \(String(format: "%04X", device.productID))\n"
+            usbLog += "       Location ID: \(device.locationID)\n"
+            usbLog += "       Device Depth: \(deviceDepth)\n"
+            
+            // Warning if device depth is greater than 2
+            if deviceDepth > 2 {
+                usbLog += "       ⚠️ WARNING: Device depth > 2 detected!\n"
+                usbLog += "       An external USB hub is likely present between the device and computer.\n"
+                usbLog += "       Please ensure the USB hub has external power, or tests may fail.\n"
+            }
+            
+            usbLog += "       Speed: \(device.speed)\n"
+            usbLog += "\n"
+        }
+        
+        return usbLog
+    }
+    
+    private func countHubsToRoot(locationID: String) -> Int {
+        // Extract port numbers from location ID
+        guard let ports = extractPortsFromLocationID(locationID) else {
+            return 0
+        }
+        
+        // The number of hubs is the number of port levels minus 1 (the last level is the device itself)
+        // ports.count - 1 gives us the number of intermediate hubs
+        return max(0, ports.count - 1)
+    }
+    
+    private func buildUSBHierarchy(from locationID: String, allDevices: [USBDeviceInfo], chipType: String) -> [String] {
+        var hierarchy: [String] = []
+        
+        // Parse the location ID to extract the port path
+        // Location ID format: 0xAABBCCDD where each byte represents a port in the hierarchy
+        guard locationID.hasPrefix("0x"), locationID.count >= 10 else {
+            hierarchy.append("Root")
+            return hierarchy
+        }
+        
+        let hexString = String(locationID.dropFirst(2)) // Remove "0x"
+        var bytes: [UInt8] = []
+        
+        // First, extract all bytes
+        for i in stride(from: 0, to: hexString.count, by: 2) {
+            let startIndex = hexString.index(hexString.startIndex, offsetBy: i)
+            let endIndex = hexString.index(startIndex, offsetBy: 2)
+            let byteString = String(hexString[startIndex..<endIndex])
+            if let byte = UInt8(byteString, radix: 16) {
+                if byte != 0 {
+                    bytes.append(byte)
+                }
+            }
+        }
+        
+        // Now extract port numbers: upper nibble from all bytes, lower nibble only from last byte
+        var ports: [UInt8] = []
+        for (index, byte) in bytes.enumerated() {
+            let upperNibble = byte >> 4
+            let lowerNibble = byte & 0x0F
+            
+            // Always add upper nibble
+            ports.append(upperNibble)
+            
+            // Only add lower nibble from the LAST non-zero byte, and only if non-zero
+            if index == bytes.count - 1 && lowerNibble != 0 {
+                ports.append(lowerNibble)
+            }
+        }
+        
+        logger.log(content: "[USB Hierarchy] Building for \(chipType) at location \(locationID)")
+        logger.log(content: "[USB Hierarchy] Extracted port numbers from \(hexString): \(ports)")
+        
+        // Build hierarchy showing Root -> Hub at Port X -> Hub at Port Y -> Device
+        hierarchy.append("Root Hub")
+        
+        // For each port in the hierarchy, find matching hub or device
+        for (portIndex, portNumber) in ports.enumerated() {
+            let portString = "Port \(portNumber)"
+            
+            if portIndex < ports.count - 1 {
+                // Build the hub port path - all ports up to and including this one
+                let hubPortNumbers = Array(ports[0...portIndex])
+                logger.log(content: "   🔎 Looking for hub at port numbers: \(hubPortNumbers)")
+                
+                var hubInfo = "Intermediate Hub"
+                var hubFound = false
+                var isOpenterfaceHub = false
+                
+                // Debug: list all devices and their extracted ports
+                logger.log(content: "   Checking \(allDevices.count) devices:")
+                for device in allDevices {
+                    if let devicePortNumbers = extractPortsFromLocationID(device.locationID) {
+                        let vid = String(format: "%04X", device.vendorID)
+                        let pid = String(format: "%04X", device.productID)
+                        logger.log(content: "      Device: \(device.manufacturer) (VID: \(vid), PID: \(pid)) at \(device.locationID) -> ports: \(devicePortNumbers)")
+                        
+                        // Check if device's port number path matches what we're looking for
+                        let devicePrefix = Array(devicePortNumbers.prefix(hubPortNumbers.count))
+                        if devicePrefix == hubPortNumbers {
+                            hubFound = true
+                            let vidStr = String(format: "%04X", device.vendorID)
+                            let pidStr = String(format: "%04X", device.productID)
+                            hubInfo = "\(device.manufacturer) (VID: \(vidStr), PID: \(pidStr))"
+                            logger.log(content: "      [MATCH FOUND] port numbers: \(devicePrefix) == \(hubPortNumbers)")
+                            
+                            // Check if this hub is actually the Openterface hub
+                            if device.vendorID == 0x1A40 && device.productID == 0x0101 {
+                                isOpenterfaceHub = true
+                                logger.log(content: "      [OPENTERFACE DETECTED] This is Openterface Hub: \(hubInfo)")
+                            } else {
+                                logger.log(content: "      [MATCH] Found hub: \(hubInfo)")
+                            }
+                            break
+                        } else {
+                            let devicePrefix = Array(devicePortNumbers.prefix(hubPortNumbers.count))
+                            logger.log(content: "      [NO MATCH] port numbers: \(devicePrefix) != \(hubPortNumbers)")
+                        }
+                    }
+                }
+                
+                if isOpenterfaceHub {
+                    hierarchy.append("└─ \(portString) ([OPENTERFACE] \(hubInfo))")
+                    logger.log(content: "   └─ \(portString): [OPENTERFACE] \(hubInfo)")
+                } else if hubFound {
+                    hierarchy.append("└─ \(portString) (\(hubInfo))")
+                    logger.log(content: "   └─ \(portString): \(hubInfo)")
+                } else {
+                    hierarchy.append("└─ \(portString) (\(hubInfo) [NOT DETECTED])")
+                    logger.log(content: "   └─ \(portString): [NOT DETECTED] - \(hubInfo)")
+                }
+                
+                // Only show child devices for the LAST hub in the chain (immediate parent of target device)
+                let isLastHub = (portIndex == ports.count - 2)
+                if hubFound && isLastHub {
+                    logger.log(content: "   Looking for devices connected to this hub...")
+                    var childDevicesFound: [(device: USBDeviceInfo, portNumber: UInt8)] = []
+                    
+                    for device in allDevices {
+                        if let devicePortNumbers = extractPortsFromLocationID(device.locationID) {
+                            // A device is a child of this hub if:
+                            // 1. It has exactly one more port level than the hub
+                            // 2. Its port prefix matches the hub's port path
+                            if devicePortNumbers.count == hubPortNumbers.count + 1 {
+                                let devicePrefix = Array(devicePortNumbers.prefix(hubPortNumbers.count))
+                                if devicePrefix == hubPortNumbers {
+                                    let childPortNumber = devicePortNumbers[hubPortNumbers.count]
+                                    childDevicesFound.append((device: device, portNumber: childPortNumber))
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Display each child device
+                    for child in childDevicesFound {
+                        let childPortString = "  └─ Port \(child.portNumber)"
+                        
+                        let vid = String(format: "%04X", child.device.vendorID)
+                        let pid = String(format: "%04X", child.device.productID)
+                        let childInfo = "\(child.device.manufacturer) (VID: \(vid), PID: \(pid))"
+                        
+                        hierarchy.append("\(childPortString) (\(childInfo))")
+                        logger.log(content: "      \(childPortString): \(childInfo)")
+                    }
+                }
+            }
+        }
+        
+        // If no ports found, just show root
+        if ports.isEmpty {
+            hierarchy.append("(Direct connection to Root)")
+        }
+        
+        return hierarchy
+    }
+    
+    private func isHubAtPathOpenterface(ports: [UInt8], allDevices: [USBDeviceInfo]) -> Bool {
+        // Look for any device with the Openterface Hub VID/PID
+        for device in allDevices {
+            if device.vendorID == 0x1A40 && device.productID == 0x0101 {
+                // Extract the port path from this hub's location ID
+                if let hubPorts = extractPortsFromLocationID(device.locationID) {
+                    // Debug: log what we're comparing
+                    logger.log(content: "Openterface hub found at location: \(device.locationID), extracted ports: \(hubPorts), comparing with: \(ports)")
+                    
+                    // Check if this is the hub at the exact path (ignore trailing hub indicator byte)
+                    // Hub ports might be [2, 18, 32] where 32 (0x20) is a hub indicator
+                    // We match if hubPorts minus the last byte equals ports
+                    var hubPathPorts = hubPorts
+                    if hubPathPorts.count > ports.count && hubPathPorts.last == 32 {
+                        // Remove the hub indicator byte
+                        hubPathPorts.removeLast()
+                    }
+                    
+                    if hubPathPorts == ports {
+                        logger.log(content: "✅ Openterface Hub Match found!")
+                        return true
+                    }
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    private func extractPortsFromLocationID(_ locationID: String) -> [UInt8]? {
+        guard locationID.hasPrefix("0x"), locationID.count >= 10 else {
+            return nil
+        }
+        
+        let hexString = String(locationID.dropFirst(2)) // Remove "0x"
+        var bytes: [UInt8] = []
+        
+        // First, extract all non-zero bytes
+        for i in stride(from: 0, to: min(hexString.count, 8), by: 2) {
+            let startIndex = hexString.index(hexString.startIndex, offsetBy: i)
+            let endIndex = hexString.index(startIndex, offsetBy: 2)
+            let byteString = String(hexString[startIndex..<endIndex])
+            if let byte = UInt8(byteString, radix: 16) {
+                if byte != 0 {
+                    bytes.append(byte)
+                }
+            }
+        }
+        
+        // Now extract port numbers: upper nibble from all bytes, lower nibble only from last byte
+        var ports: [UInt8] = []
+        for (index, byte) in bytes.enumerated() {
+            let upperNibble = byte >> 4
+            let lowerNibble = byte & 0x0F
+            
+            // Always add upper nibble
+            ports.append(upperNibble)
+            
+            // Only add lower nibble from the LAST non-zero byte, and only if non-zero
+            if index == bytes.count - 1 && lowerNibble != 0 {
+                ports.append(lowerNibble)
+            }
+        }
+        
+        return ports.isEmpty ? nil : ports
+    }
+    
+    private func buildLocationIDForPath(ports: [UInt8]) -> String {
+        // USB location IDs are 4 bytes: 0xAABBCCDD
+        // Each port in the hierarchy gets its own byte position
+        // The byte after the last port should be 0x10 to indicate the hub itself
+        var locationID = [UInt8](repeating: 0, count: 4)
+        for (index, port) in ports.enumerated() {
+            if index < 4 {
+                locationID[index] = port
+            }
+        }
+        // Set the next position to 0x10 to indicate this is the hub (not a device under it)
+        if ports.count < 4 {
+            locationID[ports.count] = 0x10
+        }
+        return String(format: "0x%02X%02X%02X%02X", locationID[0], locationID[1], locationID[2], locationID[3])
     }
     
     private func getApplicationLogContent() -> String {

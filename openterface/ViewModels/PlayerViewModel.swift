@@ -340,7 +340,7 @@ class PlayerViewModel: NSObject, ObservableObject {
         var matchingAudioDevices = [AVCaptureDevice]()
         
         for device in audioDiscoverySession.devices {
-            if device.uniqueID.contains(AppStatus.DefaultVideoDevice?.locationID ?? "nil"), 
+            if device.uniqueID.contains(AppStatus.videoChipDevice?.locationID ?? "nil"), 
                !matchingAudioDevices.contains(where: { $0.localizedName == device.localizedName }) {
                 matchingAudioDevices.append(device)
             }

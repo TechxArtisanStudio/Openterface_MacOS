@@ -1830,7 +1830,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
         
         // Fallback to default USB serial device if available
-        if let defaultSerial = AppStatus.DefaultUSBSerial {
+        if let defaultSerial = AppStatus.controlChipDevice {
             logger.log(content: "Using default USB serial device: \(defaultSerial.productName) at \(defaultSerial.locationID)")
             
             if let groupIndex = USBDevicesManager.shared.findGroupContaining(device: defaultSerial) {

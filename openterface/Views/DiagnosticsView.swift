@@ -27,6 +27,7 @@ struct DiagnosticsView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @State private var showLoggingAlert = true
+    @State private var showStatusAndResults = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -117,6 +118,38 @@ struct DiagnosticsView: View {
                         .cornerRadius(8)
                     }
                     .padding(16)
+                    
+                    // USB Hub Depth Warning Banner (if applicable)
+                    if viewModel.deviceDepthWarningActive {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.system(size: 16))
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("USB Hub Detected")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.orange)
+                                    Text("Device is connected through a USB hub. Ensure the hub has external power to avoid test failures.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(10)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, -8)
+                    }
                     
                     // Logging section
                     VStack(alignment: .leading, spacing: 8) {
@@ -230,6 +263,60 @@ struct DiagnosticsView: View {
                             }
                         }
                     }
+                    
+                    // Status and Results Summary Section
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button(action: {
+                            showStatusAndResults.toggle()
+                        }) {
+                            HStack {
+                                Image(systemName: showStatusAndResults ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Status & Results Summary")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    let statusAndResults = viewModel.getStatusAndResultsLog()
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(statusAndResults, forType: .string)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "doc.on.doc")
+                                            .font(.system(size: 11))
+                                        Text("Copy")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundColor(.blue)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Copy status and results to clipboard")
+                            }
+                            .padding(12)
+                            .borderBottom()
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        if showStatusAndResults {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    let statusAndResults = viewModel.getStatusAndResultsLog()
+                                    Text(statusAndResults)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(colorScheme == .dark ? .white : .black)
+                                        .lineLimit(nil)
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .padding(12)
+                            }
+                            .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
+                            .frame(height: 200)
+                        }
+                    }
+                    .background(Color(nsColor: .controlBackgroundColor))
                     
                     Spacer()
                     
@@ -358,6 +445,10 @@ struct DiagnosticsView: View {
         }
         .frame(minWidth: 900, minHeight: 600)
         .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white)
+        .onAppear {
+            // Perform device depth check immediately when view appears
+            viewModel.checkDeviceDepthOnViewAppear()
+        }
         .alert("Enable Diagnostic Logging", isPresented: $showLoggingAlert) {
             Button("Enable Both") {
                 viewModel.enableLogging()
@@ -369,6 +460,13 @@ struct DiagnosticsView: View {
             Button("Later", role: .cancel) { }
         } message: {
             Text("Enable logging to save detailed diagnostics for troubleshooting.\n\nLog file: \(viewModel.logFilePath)\n\nWould you like to enable serial data logging as well?")
+        }
+        .alert("USB Hub Warning", isPresented: $viewModel.showDepthWarningAlert) {
+            Button("I Understand", role: .cancel) {
+                // Allow tests to proceed after user acknowledges
+            }
+        } message: {
+            Text(viewModel.depthWarningMessage)
         }
     }
     

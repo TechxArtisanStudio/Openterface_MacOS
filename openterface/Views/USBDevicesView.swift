@@ -489,7 +489,7 @@ struct USBDevicesView: View {
         }
         
         // Default Video Device section
-        if let defaultDevice = AppStatus.DefaultVideoDevice {
+        if let defaultDevice = AppStatus.videoChipDevice {
             let defaultVideoChildren = [
                 TreeNode(title: "Product Name", value: defaultDevice.productName),
                 TreeNode(title: "Manufacturer", value: defaultDevice.manufacturer),
@@ -515,7 +515,7 @@ struct USBDevicesView: View {
         }
         
         // Keyboard Mouse Device section (Serial Device)
-        if let serialDevice = AppStatus.DefaultUSBSerial {
+        if let serialDevice = AppStatus.controlChipDevice {
             let serialDeviceChildren = [
                 TreeNode(title: "Product Name", value: serialDevice.productName),
                 TreeNode(title: "Manufacturer", value: serialDevice.manufacturer),

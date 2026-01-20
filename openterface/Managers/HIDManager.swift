@@ -48,8 +48,8 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
     }
     
     func startHID() {
-        if (AppStatus.DefaultVideoDevice != nil){
-            if let _v = AppStatus.DefaultVideoDevice?.vendorID, let _p = AppStatus.DefaultVideoDevice?.productID, let _l = AppStatus.DefaultVideoDevice?.locationID {
+        if (AppStatus.videoChipDevice != nil){
+            if let _v = AppStatus.videoChipDevice?.vendorID, let _p = AppStatus.videoChipDevice?.productID, let _l = AppStatus.videoChipDevice?.locationID {
                 openHID(vid: _v, pid: _p, lid: _l)
             }
         }else{
@@ -299,8 +299,6 @@ class HIDManager: ObservableObject, HIDManagerProtocol {
         var width = Int(widthU16)
         var height = Int(heightU16)
         
-        logger.log(content: "HID reported resolution: \(String(width, radix: 2))x\(String(height, radix: 2)), from addresses \(String(format: "0x%04X", hidRegisters.inputResolutionWidthHigh)) and \(String(format: "0x%04X", hidRegisters.inputResolutionHeightHigh))")
-
         // Apply chipset-specific resolution correction (generic approach)
         // Each chipset can override correctResolution() for custom behavior
         let corrected = chipset.correctResolution(width: width, height: height)
@@ -1026,7 +1024,7 @@ extension HIDManager {
         }
         
         // Fallback: create chipset info based on connected USB device
-        if let device = AppStatus.DefaultVideoDevice {
+        if let device = AppStatus.videoChipDevice {
             return ChipsetInfo(
                 name: "MS2109", // Default assumption
                 vendorID: device.vendorID,

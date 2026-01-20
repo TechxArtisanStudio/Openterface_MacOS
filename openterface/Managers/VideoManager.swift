@@ -374,7 +374,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         var matchingDevices = [AVCaptureDevice]()
         
         for device in devices {
-            if let defaultDevice = AppStatus.DefaultVideoDevice {
+            if let defaultDevice = AppStatus.videoChipDevice {
                 if matchesLocalID(device.uniqueID, defaultDevice.locationID) {
                     matchingDevices.append(device)
                     AppStatus.isMatchVideoDevice = true
@@ -759,7 +759,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         logger.log(content: "🔍 Initiating HAL hardware check for video connection...")
         let _ = hal.detectAndInitializeHardware()
 
-        if let defaultDevice = AppStatus.DefaultVideoDevice,
+        if let defaultDevice = AppStatus.videoChipDevice,
            let device = notification.object as? AVCaptureDevice, 
            matchesLocalID(device.uniqueID, defaultDevice.locationID) {
             
@@ -776,7 +776,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Handles when a video device is disconnected
     @objc func videoWasDisconnected(notification: NSNotification) {
-        if let defaultDevice = AppStatus.DefaultVideoDevice, 
+        if let defaultDevice = AppStatus.videoChipDevice, 
            let device = notification.object as? AVCaptureDevice, 
            matchesLocalID(device.uniqueID, defaultDevice.locationID) {
             
