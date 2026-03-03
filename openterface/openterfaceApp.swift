@@ -148,7 +148,7 @@ struct openterfaceApp: App {
                             fps: _fps,
                             pixelClock: _pixelClock,
                             serialPortName: _serialPortName,
-                            serialPortBaudRate: _serialPortBaudRate,
+                            serialPortBaudRate: $_serialPortBaudRate,
                             handleSwitchToggle: handleSwitchToggle,
                             toggleAudio: toggleAudio,
                             showAspectRatioSelection: showAspectRatioSelectionWindow,

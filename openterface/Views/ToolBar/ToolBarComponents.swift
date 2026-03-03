@@ -67,27 +67,19 @@ struct SerialInfoView: View {
     let portName: String
     let baudRate: Int
     let processingHz: Int
-    let isConfiguring: Bool
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "cable.connector")
                 .font(.system(size: 16))
-                .foregroundColor(isConfiguring ? .orange : .primary)
-            VStack(alignment: .leading, spacing: -2) {
-                if isConfiguring {
-                    Text("Configuring...")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.orange)
-                } else {
-                    Text("\(portName)")
-                        .font(.system(size: 9, weight: .medium))
-                    Text("\(baudRate)(\(processingHz)Hz)")
-                        .font(.system(size: 9, weight: .medium))
-                }
-            }
+                .foregroundColor(.primary)
+            // always display port name and baud/Hz; ignore configuration state
+            Text("\(portName)\n\(baudRate) bps, \(processingHz)Hz")
+                .font(.system(size: 9, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
         }
-        .frame(width: 140, alignment: .leading)
+        .frame(minWidth: 140, minHeight: 30, alignment: .leading)
     }
 }
 
