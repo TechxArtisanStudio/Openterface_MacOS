@@ -560,15 +560,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     func windowDidResize(_ notification: Notification) {
         if let window = NSApplication.shared.mainWindow {
-            if let toolbar = window.toolbar, toolbar.isVisible {
-                let windowHeight = window.frame.height
-                let contentLayoutRect = window.contentLayoutRect
-                _ = windowHeight - contentLayoutRect.height
-                AppStatus.currentView = contentLayoutRect
-                AppStatus.currentWindow = window.frame
-            }
+            updateWindowAppStatus(for: window)
         }
        handleToolbarAutoHide()
+    }
+
+    /// Updates AppStatus.currentView / currentWindow to reflect the current
+    /// content layout rect of the window.  Must be called on the main thread.
+    private func updateWindowAppStatus(for window: NSWindow) {
+        let contentLayoutRect = window.contentLayoutRect
+        AppStatus.currentView = contentLayoutRect
+        AppStatus.currentWindow = window.frame
     }
 
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
@@ -842,12 +844,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             guard let self = self else { return event }
             let mouseLocation = window.convertPoint(fromScreen: NSEvent.mouseLocation)
             if mouseLocation.y >= window.frame.height - toolbarRevealArea {
-                window.toolbar?.isVisible = true
+                if window.toolbar?.isVisible == false {
+                    window.toolbar?.isVisible = true
+                    // Defer AppStatus refresh so the layout settles before the
+                    // next mouse event is mapped, preventing a cursor offset.
+                    DispatchQueue.main.async { [weak self, weak window] in
+                        guard let window = window else { return }
+                        self?.updateWindowAppStatus(for: window)
+                        NotificationCenter.default.post(name: .toolbarVisibilityChanged, object: nil)
+                    }
+                }
                 self.resetToolbarAutoHideTimer(for: window)
             } else if isToolbarHiddenForMaximize {
                 // Only hide if timer is not running (i.e., not in the 10s grace period)
                 if self.toolbarAutoHideTimer == nil {
-                    window.toolbar?.isVisible = false
+                    if window.toolbar?.isVisible == true {
+                        window.toolbar?.isVisible = false
+                        DispatchQueue.main.async { [weak self, weak window] in
+                            guard let window = window else { return }
+                            self?.updateWindowAppStatus(for: window)
+                            NotificationCenter.default.post(name: .toolbarVisibilityChanged, object: nil)
+                        }
+                    }
                 }
             }
             return event
@@ -860,6 +878,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             guard let self = self, let window = window else { return }
             if self.isToolbarHiddenForMaximize {
                 window.toolbar?.isVisible = false
+                // Refresh AppStatus after layout settles so mouse mapping
+                // stays accurate when toolbar auto-hides.
+                DispatchQueue.main.async { [weak self, weak window] in
+                    guard let window = window else { return }
+                    self?.updateWindowAppStatus(for: window)
+                    NotificationCenter.default.post(name: .toolbarVisibilityChanged, object: nil)
+                }
             }
             self.toolbarAutoHideTimer = nil
         }
