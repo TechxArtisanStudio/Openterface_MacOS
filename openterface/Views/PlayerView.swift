@@ -95,6 +95,9 @@ class PlayerView: NSView, NSWindowDelegate {
         playViewNtf.addObserver(self, selector: #selector(handleHIDMouseEscaped(_:)), name: .hidMouseEscapedNotification, object: nil)
         playViewNtf.addObserver(self, selector: #selector(handleGravitySettingsChanged(_:)), name: .gravitySettingsChanged, object: nil)
         playViewNtf.addObserver(self, selector: #selector(handleZoomLevelChanged(_:)), name: Notification.Name("PlayerZoomLevelChanged"), object: nil)
+        // Refresh cached geometry after toolbar auto-hide/show so that the
+        // mouse mapping uses the correct view dimensions and there is no offset.
+        playViewNtf.addObserver(self, selector: #selector(handleToolbarVisibilityChanged(_:)), name: .toolbarVisibilityChanged, object: nil)
     }
     
         @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
@@ -117,7 +120,21 @@ class PlayerView: NSView, NSWindowDelegate {
             self.logger.log(content: "Updated gravity settings: \(UserSettings.shared.gravity.rawValue)")
         }
     }
-    
+
+    /// Refreshes cached window/view geometry after the toolbar is shown or hidden.
+    /// Without this, the mouse-to-target coordinate mapping can have a vertical
+    /// offset equal to the toolbar height while the toolbar is transitioning.
+    @objc func handleToolbarVisibilityChanged(_ notification: Notification) {
+        DispatchQueue.main.async {
+            guard let window = NSApplication.shared.mainWindow else { return }
+            AppStatus.currentView = window.contentLayoutRect
+            AppStatus.currentWindow = window.frame
+            // Force tracking areas to use the updated bounds so mouse enter/exit
+            // events fire against the correct geometry.
+            self.updateTrackingAreas()
+        }
+    }
+
     @objc func handleZoomLevelChanged(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let zoomLevel = userInfo["zoomLevel"] as? CGFloat else { return }

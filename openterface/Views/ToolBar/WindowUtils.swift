@@ -279,4 +279,8 @@ final class WindowUtils {
 extension Notification.Name {
     static let updateWindowSize = Notification.Name("UpdateWindowSizeNotification")
     static let gravitySettingsChanged = Notification.Name("GravitySettingsChangedNotification")
+    /// Posted on the main thread after the toolbar is shown or hidden so that
+    /// mouse-position consumers can refresh their cached geometry before the
+    /// next mouse event is mapped.
+    static let toolbarVisibilityChanged = Notification.Name("ToolbarVisibilityChangedNotification")
 }
