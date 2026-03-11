@@ -115,7 +115,6 @@ protocol SerialPortManagerProtocol: AnyObject {
     func openSerialPort( baudrate: Int)
     func pauseConnectionAttempts()
     func resumeConnectionAttempts()
-    func stopConnectionAttempts()
     func sendAsyncCommand(command: [UInt8], force: Bool)
     
     func getChipParameterCfg()
@@ -123,9 +122,10 @@ protocol SerialPortManagerProtocol: AnyObject {
     func resetHidChipToFactory(completion: @escaping (Bool) -> Void)
     func getHidInfo()
     
-    // CH32V208 SD card switching helpers
-    func setSdToHost(force: Bool, completion: ((Bool) -> Void)?)
-    func setSdToTarget(force: Bool, completion: ((Bool) -> Void)?)
+    // CH32V208 SD card switching helpers (Async)
+    func setSdToHost(force: Bool, completion: @escaping (Bool) -> Void)
+    func setSdToTarget(force: Bool, completion: @escaping (Bool) -> Void)
+    func querySdDirection(force: Bool, completion: @escaping (SDCardDirection?) -> Void)
     func querySdDirectionSync(timeout: TimeInterval, force: Bool) -> SDCardDirection?
     
     // CH9329 DTR/RTS control methods
@@ -135,7 +135,6 @@ protocol SerialPortManagerProtocol: AnyObject {
     func setRTS(_ enabled: Bool) -> Bool
     func lowerRTS() -> Bool
     func raiseRTS() -> Bool
-    func getTargetConnectionStatusSync() -> (isKeyboardConnected: Bool, isMouseConnected: Bool)?
 }
 
 /// Protocol for audio streaming and management

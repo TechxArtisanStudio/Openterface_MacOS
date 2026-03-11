@@ -4,12 +4,13 @@ struct DeviceConnectionSettingsView: View {
     @ObservedObject private var hidManager = HIDManager.shared
     @ObservedObject private var userSettings = UserSettings.shared
     @ObservedObject private var serialPortManager = SerialPortManager.shared
+    @ObservedObject private var serialStatus = SerialPortStatus.shared
     @State private var connectionAttempts = 0
     @State private var showingFirmwareUpdate = false
     @State private var isUpdatingBaudrate = false
 
     var firmwareVersion: String {
-        "v\(AppStatus.chipVersion)"
+        "v\(serialStatus.chipVersion)"
     }
 
     var body: some View {
@@ -23,8 +24,8 @@ struct DeviceConnectionSettingsView: View {
                     HStack {
                         Text("Control Chipset Ready:")
                         Spacer()
-                        Text(AppStatus.isControlChipsetReady ? "Ready" : "Not Ready")
-                            .foregroundColor(AppStatus.isControlChipsetReady ? .green : .orange)
+                        Text(serialStatus.isControlChipsetReady ? "Ready" : "Not Ready")
+                            .foregroundColor(serialStatus.isControlChipsetReady ? .green : .orange)
                     }
 
                     HStack {
@@ -46,8 +47,8 @@ struct DeviceConnectionSettingsView: View {
                     HStack {
                         Text("Target Connected:")
                         Spacer()
-                        Text(AppStatus.isTargetConnected ? "Connected" : "Disconnected")
-                            .foregroundColor(AppStatus.isTargetConnected ? .green : .red)
+                        Text(serialStatus.isTargetConnected ? "Connected" : "Disconnected")
+                            .foregroundColor(serialStatus.isTargetConnected ? .green : .red)
                     }
 
                     HStack {

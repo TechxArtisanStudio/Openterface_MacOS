@@ -91,6 +91,7 @@
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
 		F1747E9A2F61150A0058F163 /* SerialProtocolCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */; };
+		F1747E9C2F6142860058F163 /* SerialPortStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1747E9B2F6142860058F163 /* SerialPortStatus.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -200,6 +201,7 @@
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 		F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialProtocolCommands.swift; sourceTree = "<group>"; };
+		F1747E9B2F6142860058F163 /* SerialPortStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortStatus.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -336,6 +338,7 @@
 				BFD4EA972E369C870029BFC2 /* CameraManager.swift */,
 				BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */,
 				BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */,
+				F1747E9B2F6142860058F163 /* SerialPortStatus.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				BF98F7222E34FC8D002EACD7 /* OCRManager.swift */,
 				6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */,
@@ -621,6 +624,7 @@
 				BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */,
 				BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
+				F1747E9C2F6142860058F163 /* SerialPortStatus.swift in Sources */,
 				6BC364662F025DD4001B9A07 /* WindowUtils.swift in Sources */,
 				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
 				6B8B06412F04C7500040BEBF /* SwitchableUSBManager.swift in Sources */,

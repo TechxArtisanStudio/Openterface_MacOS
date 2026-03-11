@@ -108,22 +108,18 @@ class CH32V208ControlChipset: BaseControlChipset {
     override func getDeviceStatus() -> ControlDeviceStatus {
         let baseStatus = super.getDeviceStatus()
 
-        // Query SD switch direction from CH32V208 asynchronously to avoid blocking
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let self = self else { return }
-            if let sdDir = self.serialManager.querySdDirectionSync(timeout: 0.5, force: true) {
-                let switchedToTarget = (sdDir == SDCardDirection.target)
-                DispatchQueue.main.async {
-                    AppStatus.sdCardDirection = sdDir
-                    AppStatus.switchToTarget = switchedToTarget
-                    AppStatus.isUSBSwitchConnectToTarget = switchedToTarget
-                    if self.logger.MouseEventPrint {
-                        self.logger.log(content: "CH32V208: SD direction queried - \(sdDir)")
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.logger.log(content: "CH32V208: Failed to query SD direction")
+        // Query SD switch direction from CH32V208 — fully non-blocking.
+        // The callback fires on the main thread once the device responds,
+        // updating AppStatus and SerialPortStatus reactively.
+        serialManager.querySdDirection(force: true) { [weak self] sdDir in
+            guard let self = self, let sdDir = sdDir else { return }
+            let switchedToTarget = (sdDir == .target)
+            DispatchQueue.main.async {
+                AppStatus.sdCardDirection = sdDir
+                AppStatus.switchToTarget = switchedToTarget
+                AppStatus.isUSBSwitchConnectToTarget = switchedToTarget
+                if self.logger.MouseEventPrint {
+                    self.logger.log(content: "CH32V208: SD direction queried - \(sdDir)")
                 }
             }
         }

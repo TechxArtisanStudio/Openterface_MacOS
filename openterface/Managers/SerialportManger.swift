@@ -29,7 +29,6 @@ import Combine
 class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProtocol, ObservableObject {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     static let shared = SerialPortManager()
-    var tryOpenTimer: Timer?
     var receiveBuffer = Data()
 
     // All protocol commands and constants moved to SerialProtocolCommands.swift
@@ -45,8 +44,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
     }
     
-    
-    @Published var serialFile: Int32 = 0
     
     @Published var serialPorts : [ORSSerialPort] = []
     
@@ -116,6 +113,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     private let ackTrackingInterval: TimeInterval = 5.0  // Calculate over 5 seconds
     private let ackRateSmoothingFactor: Double = 0.3  // EMA smoothing factor (0-1, lower = smoother)
     var disablePeriodicAckReset: Bool = false  // Set to true during stress tests to prevent periodic resets
+    
+    // SD Card operation async tracking
+    private var pendingSdOperations: [UInt8: (Bool) -> Void] = [:]
+    private var pendingSdQueryOperations: [UInt8: (SDCardDirection?) -> Void] = [:]
+    private let sdOperationQueue = DispatchQueue(label: "com.openterface.SerialPortManager.sdOperations", attributes: .concurrent)
+    private var sdOperationIdCounter: UInt8 = 0
     
     /// Tracks the number of complete retry cycles through all baudrates.
     /// Incremented after each full cycle through both 9600 and 115200 baudrates.
@@ -245,14 +248,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 //        USBDevicesManager.shared.update()
         if USBDevicesManager.shared.isOpenterfaceConnected(){
             // Check the control chipset type and use appropriate connection method
-            if AppStatus.controlChipsetType == .ch32v208 {
+            if USBDevicesManager.shared.isCH32V208Connected() {
                 logger.log(content: "CH32V208 detected - using direct serial port connection")
                 self.tryOpenSerialPortForCH32V208()
-            } else if AppStatus.controlChipsetType == .ch9329 {
+            } else if USBDevicesManager.shared.isCH9329Connected() {
                 logger.log(content: "CH9329 detected - using standard serial port connection with validation")
                 self.tryOpenSerialPort()
             } else {
-                logger.log(content: "Unknown control chipset type: \(AppStatus.controlChipsetType) - using standard connection method")
+                logger.log(content: "Unknown control chipset type - using standard connection method")
                 self.tryOpenSerialPort()
             }
         }
@@ -292,8 +295,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 lastHIDEventTime = Date()
             }
             if lastCts != cts {
-                AppStatus.isKeyboardConnected = true
-                AppStatus.isMouseConnected = true
+                SerialPortStatus.shared.isKeyboardConnected = true
+                SerialPortStatus.shared.isMouseConnected = true
                 lastHIDEventTime = Date()
                 lastCts = cts
             }
@@ -474,26 +477,23 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 }
             }
             // For other values, chipVersion remains as is
-            AppStatus.chipVersion = chipVersion
-            
-            
-            let isTargetConnected = data[6] == 0x01
-            AppStatus.isTargetConnected = isTargetConnected
-            
-            AppStatus.isKeyboardConnected = isTargetConnected
-            AppStatus.isMouseConnected = isTargetConnected
+            SerialPortStatus.shared.chipVersion = chipVersion
 
-            
+            let isTargetConnected = data[6] == 0x01
+            SerialPortStatus.shared.isTargetConnected = isTargetConnected
+            SerialPortStatus.shared.isKeyboardConnected = isTargetConnected
+            SerialPortStatus.shared.isMouseConnected = isTargetConnected
+
             logger.log(content: isTargetConnected ? "The Target Screen keyboard and mouse are connected" : "The Target Screen keyboard and mouse are disconnected")
-            
+
             let isNumLockOn = (data[7] & 0x01) == 0x01
-            AppStatus.isNumLockOn = isNumLockOn
-            
+            SerialPortStatus.shared.isNumLockOn = isNumLockOn
+
             let isCapLockOn = (data[7] & 0x02) == 0x02
-            AppStatus.isCapLockOn = isCapLockOn
-            
+            SerialPortStatus.shared.isCapLockOn = isCapLockOn
+
             let isScrollOn = (data[7] & 0x04) == 0x04
-            AppStatus.isScrollOn = isScrollOn
+            SerialPortStatus.shared.isScrollOn = isScrollOn
             
             // logger.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
             
@@ -572,8 +572,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 // Device matches the user's preferred baudrate and mode
                 self.isDeviceReady = true
                 self.errorAlertShown = false  // Reset error alert flag on successful connection
-                AppStatus.serialPortBaudRate = self.baudrate
-                AppStatus.isControlChipsetReady = true
+                SerialPortStatus.shared.serialPortBaudRate = self.baudrate
+                SerialPortStatus.shared.isControlChipsetReady = true
             } else {
                 // Device configuration differs from user preference - update user settings to match device configuration
                 logger.log(content: "Device configuration detected. Expected: baudrate=\(preferredBaud) mode=0x\(String(format: "%02X", preferredMode)), Got: baudrate=\(self.baudrate) mode=0x\(String(format: "%02X", mode)). Updating user settings...")
@@ -602,8 +602,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 // Mark device as ready with the current configuration
                 self.isDeviceReady = true
                 self.errorAlertShown = false
-                AppStatus.serialPortBaudRate = self.baudrate
-                AppStatus.isControlChipsetReady = true
+                SerialPortStatus.shared.serialPortBaudRate = self.baudrate
+                SerialPortStatus.shared.isControlChipsetReady = true
                 logger.log(content: "Device ready with detected configuration")
             }
 
@@ -623,15 +623,35 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 break
             }
             let dir = data[5]
+            
+            // Resolve direction value
+            let resolvedDirection: SDCardDirection
             switch dir {
-            case 0x00:
-                AppStatus.sdCardDirection = SDCardDirection.host
-            case 0x01:
-                AppStatus.sdCardDirection = SDCardDirection.target
+            case 0x00: resolvedDirection = .host
+            case 0x01: resolvedDirection = .target
             default:
-                AppStatus.sdCardDirection = SDCardDirection.unknown
+                resolvedDirection = .unknown
                 logger.log(content: "CH32V208: SD card direction unknown (0x\(String(format: "%02X", dir)))")
             }
+            
+            // Update global status (already on main via ORSSerial dispatch)
+            SerialPortStatus.shared.sdCardDirection = resolvedDirection
+            
+            // Drain and invoke all pending callbacks without blocking the main thread.
+            // Use async barrier to safely mutate the concurrent dictionary, then dispatch
+            // the actual completion calls back to main so callers can update UI freely.
+            let captured = resolvedDirection
+            sdOperationQueue.async(flags: .barrier) {
+                let setCompletions = Array(self.pendingSdOperations.values)
+                self.pendingSdOperations.removeAll()
+                let queryCompletions = Array(self.pendingSdQueryOperations.values)
+                self.pendingSdQueryOperations.removeAll()
+                DispatchQueue.main.async {
+                    setCompletions.forEach { $0(true) }
+                    queryCompletions.forEach { $0(captured) }
+                }
+            }
+            
         //Handle error command responses
         case SerialProtocolCommands.ResponseCodes.CHECKSUM_ERROR:  // checksum error
             if logger.SerialDataPrint {
@@ -644,7 +664,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "Unknown command: \(hexCmd), full data: \(dataString)")
         }
     }
-
+    
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {
         self.serialPort = nil
     }
@@ -777,14 +797,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
         self.serialPort = getSerialPortPathFromUSBManager()
-        AppStatus.serialPortBaudRate = baudrate
+        DispatchQueue.main.async { SerialPortStatus.shared.serialPortBaudRate = baudrate }
 
         if self.serialPort != nil {
             logger.log(content: "Trying to connect with baudrate: \(baudrate), path: \(self.serialPort?.path ?? "Unknown")")
             self.openSerialPort(baudrate: baudrate)
             
             // For CH32V208, device is ready once port is opened (no command-response validation needed)
-            if AppStatus.controlChipsetType == .ch32v208 {
+            if USBDevicesManager.shared.isCH32V208Connected() {
                 if self.serialPort?.isOpen == true {
                     self.isDeviceReady = true
                     self.errorAlertShown = false
@@ -879,7 +899,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         logger.log(content: "HID info - NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
         
         // Store baudrate if we have it (from the current connection)
-        AppStatus.serialPortBaudRate = self.baudrate
+        let validatedBaudrate = self.baudrate
+        DispatchQueue.main.async { SerialPortStatus.shared.serialPortBaudRate = validatedBaudrate }
         
         return true
     }
@@ -967,13 +988,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
                     // Successfully opened the serial port
                     print("Serial port opened successfully at \(port.baudRate)")
-                    // update AppStatus info
                     let actualBaudRate = port.baudRate.intValue > 0 ? port.baudRate.intValue : effectiveBaudrate
-                    AppStatus.serialPortBaudRate = actualBaudRate
-                    if let portPath = port.path as String? {
-                        AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
+                    let openedPortName = (port.path as String).components(separatedBy: "/").last ?? "Unknown"
+                    DispatchQueue.main.async {
+                        SerialPortStatus.shared.serialPortBaudRate = actualBaudRate
+                        SerialPortStatus.shared.serialPortName = openedPortName
                     }
-                    
+
                     self.baudrate = actualBaudRate
                 } else {
                     print("the serial port fail to open")
@@ -996,9 +1017,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.timer?.invalidate()
         self.timer = nil
 
-        AppStatus.isTargetConnected = false
-        AppStatus.isKeyboardConnected = false
-        AppStatus.isMouseConnected = false
+        DispatchQueue.main.async {
+            SerialPortStatus.shared.isTargetConnected = false
+            SerialPortStatus.shared.isKeyboardConnected = false
+            SerialPortStatus.shared.isMouseConnected = false
+            SerialPortStatus.shared.isControlChipsetReady = false
+        }
     }
     
     func closeSerialPortAndResetRetry() {
@@ -1051,12 +1075,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         if serialPort.isOpen {
             logger.log(content: "Serial port opened successfully for factory reset at \(SerialProtocolCommands.LOWSPEED_BAUDRATE) baud")
             
-            // Update app status
-            AppStatus.serialPortBaudRate = SerialProtocolCommands.LOWSPEED_BAUDRATE
-            if let portPath = serialPort.path as String? {
-                AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
+            // Update status
+            let factoryPortName = (serialPort.path as String).components(separatedBy: "/").last ?? "Unknown"
+            DispatchQueue.main.async {
+                SerialPortStatus.shared.serialPortBaudRate = SerialProtocolCommands.LOWSPEED_BAUDRATE
+                SerialPortStatus.shared.serialPortName = factoryPortName
             }
-            
+
             self.baudrate = SerialProtocolCommands.LOWSPEED_BAUDRATE
             
             // Set device ready to false initially - it will be set to true when proper communication is established
@@ -1070,15 +1095,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "Failed to open serial port for factory reset")
             return false
         }
-    }
-    
-    /// Stop all connection attempts
-    /// This method is useful during factory reset or firmware update to prevent
-    /// connection attempts from interfering with the process
-    /// @deprecated Use pauseConnectionAttempts() instead for better control
-    func stopConnectionAttempts() {
-        logger.log(content: "Stopping all connection attempts")
-        self.isTrying = false
     }
     
     func sendAsyncCommand(command: [UInt8], force: Bool = false) {
@@ -1176,7 +1192,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         let data = Data(completeCommand)
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        let threadName = Thread.current.isMainThread ? "main" : "background"
         
         // Track send time for latency measurement based on command type
         let cmdType = command.count > 3 ? command[3] : 0
@@ -1262,46 +1277,112 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.sendAsyncCommand(command: SerialProtocolCommands.DeviceInfo.GET_PARA_CFG, force: true)
     }
 
-    // MARK: - CH32V208 SD switch helpers
-    /// Set SD card to host (CH32V208)
-    public func setSdToHost(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
+    // MARK: - CH32V208 SD switch helpers (Async)
+    
+    /// Generates a unique operation ID for tracking SD operations
+    private func generateSdOperationId() -> UInt8 {
+        sdOperationQueue.sync(flags: .barrier) {
+            sdOperationIdCounter = (sdOperationIdCounter &+ 1) % 255
+            if sdOperationIdCounter == 0 { sdOperationIdCounter = 1 } // Avoid 0 as operation ID
+            return sdOperationIdCounter
+        }
+    }
+    
+    /// Set SD card to host (CH32V208) - Async version
+    public func setSdToHost(force: Bool = false, completion: @escaping (Bool) -> Void) {
+        let operationId = generateSdOperationId()
+        
+        sdOperationQueue.async(flags: .barrier) {
+            self.pendingSdOperations[operationId] = completion
+        }
+        
+        // Set timeout for this operation
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.timeoutSdOperation(operationId: operationId)
+        }
+        
         var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
         cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.HOST)
-        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE, timeout: 2.0, force: force)
-        if !response.isEmpty && response.count >= 6 {
-            let dir = response[5]
-            completion?(dir == 0x00)
-        } else {
-            completion?(false)
-        }
+        cmd.append(operationId) // Add operation ID for tracking
+        
+        self.sendAsyncCommand(command: cmd, force: force)
     }
-
-    /// Set SD card to target (CH32V208)
-    public func setSdToTarget(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
+    
+    /// Set SD card to target (CH32V208) - Async version
+    public func setSdToTarget(force: Bool = false, completion: @escaping (Bool) -> Void) {
+        let operationId = generateSdOperationId()
+        
+        sdOperationQueue.async(flags: .barrier) {
+            self.pendingSdOperations[operationId] = completion
+        }
+        
+        // Set timeout for this operation
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.timeoutSdOperation(operationId: operationId)
+        }
+        
         var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
         cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.TARGET)
-        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE, timeout: 2.0, force: force)
-        if !response.isEmpty && response.count >= 6 {
-            let dir = response[5]
-            completion?(dir == 0x01)
-        } else {
-            completion?(false)
-        }
+        cmd.append(operationId) // Add operation ID for tracking
+        
+        self.sendAsyncCommand(command: cmd, force: force)
     }
-
-    /// Query SD card direction synchronously. Returns SDCardDirection or nil on failure.
-    public func querySdDirectionSync(timeout: TimeInterval = 2.0, force: Bool = false) -> SDCardDirection? {
+    
+    /// Query SD card direction - Async version
+    public func querySdDirection(force: Bool = false, completion: @escaping (SDCardDirection?) -> Void) {
+        let operationId = generateSdOperationId()
+        
+        sdOperationQueue.async(flags: .barrier) {
+            self.pendingSdQueryOperations[operationId] = completion
+        }
+        
+        // Set timeout for this operation
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.timeoutSdQueryOperation(operationId: operationId)
+        }
+        
         var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
         cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.QUERY)
-        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE, timeout: timeout, force: force)
-        guard !response.isEmpty && response.count >= 6 else {
-            return nil
+        cmd.append(operationId) // Add operation ID for tracking
+        
+        self.sendAsyncCommand(command: cmd, force: force)
+    }
+    
+    /// Legacy synchronous version - now wraps async version
+    public func querySdDirectionSync(timeout: TimeInterval = 2.0, force: Bool = false) -> SDCardDirection? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: SDCardDirection?
+        
+        querySdDirection(force: force) { direction in
+            result = direction
+            semaphore.signal()
         }
-        let dir = response[5]
-        switch dir {
-        case 0x00: return SDCardDirection.host
-        case 0x01: return SDCardDirection.target
-        default: return SDCardDirection.unknown
+        
+        let waitResult = semaphore.wait(timeout: .now() + timeout)
+        return waitResult == .success ? result : nil
+    }
+    
+    /// Handle timeout for SD set operations
+    private func timeoutSdOperation(operationId: UInt8) {
+        sdOperationQueue.async(flags: .barrier) {
+            if let completion = self.pendingSdOperations.removeValue(forKey: operationId) {
+                DispatchQueue.main.async {
+                    self.logger.log(content: "SD operation \(operationId) timed out")
+                    completion(false)
+                }
+            }
+        }
+    }
+    
+    /// Handle timeout for SD query operations
+    private func timeoutSdQueryOperation(operationId: UInt8) {
+        sdOperationQueue.async(flags: .barrier) {
+            if let completion = self.pendingSdQueryOperations.removeValue(forKey: operationId) {
+                DispatchQueue.main.async {
+                    self.logger.log(content: "SD query operation \(operationId) timed out")
+                    completion(nil)
+                }
+            }
         }
     }
     
@@ -1332,7 +1413,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         let preferredMode = UserSettings.shared.controlMode
         
         // Check if this is CH32V208
-        let isCH32V208 = (AppStatus.controlChipsetType == .ch32v208)
+        let isCH32V208 = USBDevicesManager.shared.isCH32V208Connected()
         
         if isCH32V208 {
             // For CH32V208, just close and reopen with new baudrate
@@ -1539,9 +1620,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         let elapsed = currentTime - ackTrackingStartTime
         
         // For CH32V208, always mark keyboard and mouse as connected
-        if AppStatus.controlChipsetType == .ch32v208 {
-            AppStatus.isKeyboardConnected = true
-            AppStatus.isMouseConnected = true
+        if USBDevicesManager.shared.isCH32V208Connected() {
+            SerialPortStatus.shared.isKeyboardConnected = true
+            SerialPortStatus.shared.isMouseConnected = true
         }
         
         // Calculate ACK rates
@@ -1579,35 +1660,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func getHidInfo(){
         self.sendAsyncCommand(command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO)
     }
-
-    // Use sync call to get keybaord and mouse is connected to target by HID info
-    func getTargetConnectionStatusSync() -> (isKeyboardConnected: Bool, isMouseConnected: Bool)? {
-        let response = self.sendSyncCommand(command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.HID_INFO_RESPONSE, timeout: 2.0, force: true)
-        
-        guard !response.isEmpty && response.count >= 8 else {
-            logger.log(content: "Failed to get target connection status: empty or too short response")
-            return nil
-        }
-        
-        let responseBytes = [UInt8](response)
-        
-        // Extract target connection status
-        let isTargetConnected = responseBytes[6] == 0x01
-        logger.log(content: "HID info - Target connected: \(isTargetConnected)")
-        
-        // Extract lock states
-        let isNumLockOn = (responseBytes[7] & 0x01) == 0x01
-        let isCapLockOn = (responseBytes[7] & 0x02) == 0x02
-        let isScrollOn = (responseBytes[7] & 0x04) == 0x04
-        logger.log(content: "HID info - NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
-        
-        // For CH32V208, always mark keyboard and mouse as connected
-        if AppStatus.controlChipsetType == .ch32v208 {
-            return (isKeyboardConnected: true, isMouseConnected: true)
-        } else {
-            return (isKeyboardConnected: isTargetConnected, isMouseConnected: isTargetConnected)
-        }
-    }
     
     /// Sets the control mode for the HID chip via the SET_PARA_CFG command
     /// When changing FROM non-compatibility mode TO compatibility mode, automatically uses 0x02 instead of 0x82
@@ -1622,7 +1674,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         // Special handling: if changing TO compatibility mode from a non-compatibility mode, use 0x02
         if mode == .compatibility && self.baudrate != 0 {
             // Check if current mode is not already compatibility mode
-            let currentModeIsCompatibility = (AppStatus.controlChipsetType == .ch9329)
+            let currentModeIsCompatibility = USBDevicesManager.shared.isCH9329Connected()
             if currentModeIsCompatibility {
                 // User is switching FROM non-compatibility TO compatibility, use 0x02
                 logger.log(content: "Switching to compatibility mode from non-compatibility - using mode byte 0x02 instead of 0x82")
@@ -1751,8 +1803,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
         
         self.isTrying = false
-        AppStatus.isKeyboardConnected = true
-        AppStatus.isMouseConnected = true
+        DispatchQueue.main.async {
+            SerialPortStatus.shared.isKeyboardConnected = true
+            SerialPortStatus.shared.isMouseConnected = true
+        }
     }
     
     /// Start CTS monitoring for HID event detection
@@ -1804,7 +1858,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
         
         // Fallback to default USB serial device if available
-        if let defaultSerial = AppStatus.controlChipDevice {
+        if let defaultSerial = USBDevicesManager.shared.getControlChipDevice() {
             logger.log(content: "Using default USB serial device: \(defaultSerial.productName) at \(defaultSerial.locationID)")
             
             if let groupIndex = USBDevicesManager.shared.findGroupContaining(device: defaultSerial) {
@@ -1855,93 +1909,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         logger.log(content: "No USB serial ports found for device: \(usbDevice.productName)")
         return nil
     }
-    
-    /// Prompts the user about a stale CH9329 chip state and offers automatic recovery
-    /// 
-    /// When the CH9329 chip is detected in a stale state (receiving data but not processing HID events),
-    /// this method displays an alert to the user with options to:
-    /// - Auto recover (perform factory reset)
-    /// - Dismiss the alert
-    /// 
-    /// This ensures the user is aware of the issue while providing an automatic recovery path.
-    private func promptUserForChipRecovery() {
-        let alert = NSAlert()
-        alert.messageText = "CH9329 Chip Stale State Detected"
-        alert.informativeText = "The CH9329 control chip appears to be in a stale state and is not responding properly to HID events. Would you like to automatically recover by performing a factory reset?"
-        alert.addButton(withTitle: "Auto Recover")
-        alert.addButton(withTitle: "Dismiss")
-        
-        let response = alert.runModal()
-        
-        if response == .alertFirstButtonReturn {
-            // User chose to auto recover
-            self.logger.log(content: "User initiated automatic CH9329 chip recovery")
-            self.resetHidChipToFactory { [weak self] success in
-                DispatchQueue.main.async {
-                    if success {
-                        self?.logger.log(content: "CH9329 chip factory reset completed successfully")
-                        
-                        // Show success message
-                        let successAlert = NSAlert()
-                        successAlert.messageText = "Recovery Successful"
-                        successAlert.informativeText = "The CH9329 chip has been successfully recovered and reset to factory settings."
-                        successAlert.addButton(withTitle: "OK")
-                        successAlert.runModal()
-                    } else {
-                        self?.logger.log(content: "CH9329 chip factory reset failed")
-                        
-                        // Show failure message
-                        let failureAlert = NSAlert()
-                        failureAlert.messageText = "Recovery Failed"
-                        failureAlert.informativeText = "Failed to recover the CH9329 chip. Please try manually resetting the device."
-                        failureAlert.addButton(withTitle: "OK")
-                        failureAlert.runModal()
-                    }
-                }
-            }
-        } else {
-            self.logger.log(content: "User dismissed CH9329 chip stale state alert")
-        }
-    }
-    
-    /// Displays a user-friendly alert when a serial port communication error occurs.
-    /// 
-    /// This method detects various types of serial port errors and prompts the user to
-    /// reconnect their USB serial device. Common errors include:
-    /// - Invalid argument (Code 22, EINVAL): Often caused by USB disconnection/reconnection
-    /// - Device not found (Code 2, ENOENT): Serial device path is no longer available
-    /// - I/O error (Code 5, EIO): General communication failure
-    /// 
-    /// The alert provides clear guidance to the user about the USB connection issue.
-    private func promptUserForSerialConnectionError(error: Error) {
-        // Only show error alert once until a successful connection is made
-        if self.errorAlertShown {
-            return
-        }
-        
-        self.errorAlertShown = true
-        
-        let alert = NSAlert()
-        var messageText = "Serial Communication Error Detected"
-        var informativeText = "We detected an error in serial communication, likely a USB serial connection issue.\n\nPlease try to reconnect the device and ensure the USB cable is properly connected."
-        
-        // Check for "Resource busy" error (POSIX error code 16)
-        if let nsError = error as? NSError {
-            self.logger.log(content: "Serial port error - Domain: \(nsError.domain), Code: \(nsError.code), Description: \(nsError.localizedDescription)")
-            
-            // Handle EBUSY (Resource busy) error - indicates port is occupied by another application
-            if nsError.domain == NSPOSIXErrorDomain && nsError.code == 16 {
-                messageText = "Serial Port Occupied"
-                informativeText = "The serial port is currently occupied by another application.\n\nPlease check and close any other applications that might be using this serial port (e.g., other KVM software, serial monitors, or terminal applications), then try reconnecting the device."
-            }
-        }
-        
-        alert.messageText = messageText
-        alert.informativeText = informativeText
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        
-        alert.runModal()
-    }
+
 }
 
