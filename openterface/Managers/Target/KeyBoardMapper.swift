@@ -338,7 +338,7 @@ class KeyboardMapper {
     
 
     func sendKeyData(keyCode: [UInt16], isRelease: Bool, modifiers: NSEvent.ModifierFlags) {
-        var keyDat: [UInt8] = SerialPortManager.KEYBOARD_DATA_PREFIX
+        var keyDat: [UInt8] = SerialProtocolCommands.Keyboard.DATA_PREFIX
         for (index, kc) in keyCode.prefix(6).enumerated() {
             if let mappedValue = keyCodeMapping[kc] {
                 keyDat[7 + index] = mappedValue
@@ -368,7 +368,7 @@ class KeyboardMapper {
     /// Byte3: Bit0=E-Mail, Bit1=Search, Bit2=Favorites, Bit3=Home, Bit4=Back, Bit5=Forward, Bit6=Stop, Bit7=Refresh
     /// Byte4: Bit0=Media, Bit1=Explorer, Bit2=Calculator, Bit3=Screen Saver, Bit4=My Computer, Bit5=Minimize, Bit6=Record, Bit7=Rewind
     func sendMultimediaKeyData(byte2: UInt8, byte3: UInt8 = 0, byte4: UInt8 = 0, isPress: Bool) {
-        var multimediaData: [UInt8] = Array(SerialPortManager.MULTIMEDIA_KEY_CMD_PREFIX)
+        var multimediaData: [UInt8] = Array(SerialProtocolCommands.Keyboard.MULTIMEDIA_CMD_PREFIX)
         
         // Add Report ID for multimedia keys (0x02)
         multimediaData.append(0x02)
@@ -394,7 +394,7 @@ class KeyboardMapper {
     /// [HEAD, ADDR, CMD, LEN, REPORT_ID, DATA, checksum]
     /// Data: Bit0=Power, Bit1=Sleep, Bit2=Wake-up
     func sendACPIKeyData(powerBit: Bool = false, sleepBit: Bool = false, wakeupBit: Bool = false) {
-        var acpiData: [UInt8] = Array(SerialPortManager.MULTIMEDIA_KEY_CMD_PREFIX)
+        var acpiData: [UInt8] = Array(SerialProtocolCommands.Keyboard.MULTIMEDIA_CMD_PREFIX)
         
         // Add Report ID for ACPI keys (0x01)
         acpiData.append(0x01)

@@ -32,28 +32,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     var tryOpenTimer: Timer?
     var receiveBuffer = Data()
 
-    public static var MOUSE_ABS_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x04, 0x07, 0x02]
-    public static var MOUSE_REL_ACTION_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x05, 0x05, 0x01]
-    public static let CMD_GET_HID_INFO: [UInt8] = [0x57, 0xAB, 0x00, 0x01, 0x00]
-    public static let CMD_GET_PARA_CFG: [UInt8] = [0x57, 0xAB, 0x00, 0x08, 0x00]
-    public static let KEYBOARD_DATA_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x02, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    
-    // Multimedia/ACPI key data prefix: [HEAD, ADDR, CMD, LEN, ...]
-    // CMD: 0x03 for multimedia keys
-    // ACPI keys:       [0x57, 0xAB, 0x00, 0x03, 0x04, 0x01, DATA, 0, 0, checksum] - Report ID 0x01, 1 data byte
-    // Multimedia keys: [0x57, 0xAB, 0x00, 0x03, 0x04, 0x02, BYTE2, 0, 0, checksum] - Report ID 0x02, 3 data bytes
-    public static let MULTIMEDIA_KEY_CMD_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x03, 0x04]
-    public static let CMD_SET_PARA_CFG_PREFIX_115200: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x01, 0xC2, 0x00]
-    public static let CMD_SET_PARA_CFG_PREFIX_9600: [UInt8] = [0x57, 0xAB, 0x00, 0x09, 0x32, 0x82, 0x80, 0x00, 0x00, 0x25, 0x80, 0x00]
-    public static let CMD_SET_PARA_CFG_POSTFIX: [UInt8] = [0x08, 0x00, 0x00, 0x03, 0x86, 0x1A, 0x29, 0xE1, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-    public static let CMD_RESET: [UInt8] = [0x57, 0xAB, 0x00, 0x0F, 0x00]
-    // CH32V208 SD card switch commands
-    // Base: header + cmd 0x17 + len 0x05 + 4 zero bytes (payload prefix)
-    public static let CMD_SD_SWITCH_PREFIX: [UInt8] = [0x57, 0xAB, 0x00, 0x17, 0x05, 0x00, 0x00, 0x00, 0x00]
-    
-    // Baudrate constants
-    public static let LOWSPEED_BAUDRATE = BaseControlChipset.LOWSPEED_BAUDRATE
-    public static let HIGHSPEED_BAUDRATE = BaseControlChipset.HIGHSPEED_BAUDRATE
+    // All protocol commands and constants moved to SerialProtocolCommands.swift
+    // Use SerialProtocolCommands.* for all command references
     
     @objc let serialPortManager = ORSSerialPortManager.shared()
     
@@ -477,7 +457,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
 
         switch cmd {
-        case 0x81:  // HID info
+        case SerialProtocolCommands.ResponseCodes.HID_INFO_RESPONSE:  // HID info
             let byteValue = data[5]
             var chipVersion: Int8 = Int8(bitPattern: byteValue)
             
@@ -517,7 +497,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             
             // logger.log(content: "Receive HID info, chip version: \(chipVersion), target connected: \(isTargetConnected), NumLock: \(isNumLockOn), CapLock: \(isCapLockOn), Scroll: \(isScrollOn)")
             
-        case 0x82:  //Keyboard hid execution status 0 - success
+        case SerialProtocolCommands.ResponseCodes.KEYBOARD_ACK:  //Keyboard hid execution status 0 - success
             let kbStatus = data[5]
             // Calculate keyboard acknowledgement latency
             if let sendTime = lastKeyboardSendTime {
@@ -536,13 +516,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 logger.log(content: "Receive keyboard status: \(String(format: "0x%02X", kbStatus))")
             }
             
-        case 0x83:  //multimedia data hid execution status 0 - success
+        case SerialProtocolCommands.ResponseCodes.MULTIMEDIA_ACK:  //multimedia data hid execution status 0 - success
             if logger.SerialDataPrint  {
                 let kbStatus = data[5]
                 logger.log(content: "Receive multi-meida status: \(String(format: "0x%02X", kbStatus))")
             }
             
-        case 0x84, 0x85:  //Mouse hid execution status 0 - success
+        case SerialProtocolCommands.ResponseCodes.MOUSE_ABSOLUTE_ACK, SerialProtocolCommands.ResponseCodes.MOUSE_RELATIVE_ACK:  //Mouse hid execution status 0 - success
             let kbStatus = data[5]
             // Calculate mouse acknowledgement latency
             if let sendTime = lastMouseSendTime {
@@ -557,16 +537,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             mouseAckCount += 1
             updateAckRates()
             if logger.SerialDataPrint {
-                logger.log(content: "\(cmd == 0x84 ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
+                logger.log(content: "\(cmd == SerialProtocolCommands.ResponseCodes.MOUSE_ABSOLUTE_ACK ? "Absolute" : "Relative") mouse event sent, status: \(String(format: "0x%02X", kbStatus))")
             }
             
-        case 0x86, 0x87:  //custom hid execution status 0 - success
+        case SerialProtocolCommands.ResponseCodes.CUSTOM_HID_SEND_ACK, SerialProtocolCommands.ResponseCodes.CUSTOM_HID_READ_ACK:  //custom hid execution status 0 - success
             if logger.SerialDataPrint  {
                 let kbStatus = data[5]
-                logger.log(content: "Receive \(cmd == 0x86 ? "SEND" : "READ") custom hid status: \(String(format: "0x%02X", kbStatus))")
+                logger.log(content: "Receive \(cmd == SerialProtocolCommands.ResponseCodes.CUSTOM_HID_SEND_ACK ? "SEND" : "READ") custom hid status: \(String(format: "0x%02X", kbStatus))")
             }
             
-        case 0x88:  // get para cfg
+        case SerialProtocolCommands.ResponseCodes.PARA_CFG_RESPONSE:  // get para cfg
             guard data.count >= 12 else {
                 logger.log(content: "Invalid data length for get para cfg command. Expected >= 12 bytes, got \(data.count)")
                 return
@@ -627,17 +607,17 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 logger.log(content: "Device ready with detected configuration")
             }
 
-        case 0x8F:
+        case SerialProtocolCommands.ResponseCodes.RESET_ACK:
             if logger.SerialDataPrint {
                 let status = data[5]
                 logger.log(content: "Device reset command response status: \(String(format: "0x%02X", status))")
             }
-        case 0x89:  // set para cfg
+        case SerialProtocolCommands.ResponseCodes.SET_PARA_CFG_ACK:  // set para cfg
             if logger.SerialDataPrint {
                 let status = data[5]
                 logger.log(content: "Set para cfg status: \(String(format: "0x%02X", status))")
             }
-        case 0x97: // CH32V208 SD card direction response
+        case SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE: // CH32V208 SD card direction response
             guard data.count >= 6 else {
                 logger.log(content: "Invalid SD direction response length: \(data.count)")
                 break
@@ -653,7 +633,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 logger.log(content: "CH32V208: SD card direction unknown (0x\(String(format: "%02X", dir)))")
             }
         //Handle error command responses
-        case 0xC4:  // checksum error
+        case SerialProtocolCommands.ResponseCodes.CHECKSUM_ERROR:  // checksum error
             if logger.SerialDataPrint {
                 let errorCode = data[5]
                 logger.log(content: "Checksum error response: \(String(format: "0x%02X", errorCode))")
@@ -731,8 +711,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 
                 // Try user's preferred baudrate first, then fall back to the other
                 let preferredBaudrate = UserSettings.shared.preferredBaudrate.rawValue
-                let otherBaudrate = preferredBaudrate == SerialPortManager.LOWSPEED_BAUDRATE ? 
-                    SerialPortManager.HIGHSPEED_BAUDRATE : SerialPortManager.LOWSPEED_BAUDRATE
+                let otherBaudrate = preferredBaudrate == SerialProtocolCommands.LOWSPEED_BAUDRATE ? 
+                    SerialProtocolCommands.HIGHSPEED_BAUDRATE : SerialProtocolCommands.LOWSPEED_BAUDRATE
                 let baudrates = [preferredBaudrate, otherBaudrate]
                     
                 
@@ -818,8 +798,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 
                 // Send sync command to get HID info with longer timeout to account for device latency
                 let hidInfoResponse = self.sendSyncCommand(
-                    command: SerialPortManager.CMD_GET_HID_INFO,
-                    expectedResponseCmd: 0x81,
+                    command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO,
+                    expectedResponseCmd: SerialProtocolCommands.ResponseCodes.HID_INFO_RESPONSE,
                     timeout: 5.0,  // Increased timeout to 5 seconds
                     force: true
                 )
@@ -861,14 +841,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         let responseBytes = [UInt8](response)
         
-        // Check header prefix [0x57, 0xAB, 0x00]
-        guard responseBytes[0] == 0x57 && responseBytes[1] == 0xAB && responseBytes[2] == 0x00 else {
+        // Check header prefix using SerialProtocolCommands helper
+        guard SerialProtocolCommands.hasValidHeader(response) else {
             logger.log(content: "Invalid HID info response: incorrect header prefix")
             return false
         }
         
-        // Check command byte (should be 0x81 for HID info response)
-        guard responseBytes[3] == 0x81 else {
+        // Check command byte (should be HID_INFO_RESPONSE)
+        guard responseBytes[3] == SerialProtocolCommands.ResponseCodes.HID_INFO_RESPONSE else {
             logger.log(content: "Invalid HID info response: command byte is 0x\(String(format: "%02X", responseBytes[3])), expected 0x81")
             return false
         }
@@ -1047,7 +1027,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// This method ensures the serial port opens with the correct low baudrate setting
     /// that is typically required after a factory reset procedure
     func openSerialPortForFactoryReset() -> Bool {
-        logger.log(content: "Opening serial port for factory reset with low baudrate: \(CH9329ControlChipset.LOWSPEED_BAUDRATE)")
+        logger.log(content: "Opening serial port for factory reset with low baudrate: \(SerialProtocolCommands.LOWSPEED_BAUDRATE)")
         
         // Get the serial port from USB device manager
         self.serialPort = getSerialPortPathFromUSBManager()
@@ -1063,21 +1043,21 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
         
         // Configure and open with low baudrate
-        serialPort.baudRate = NSNumber(value: CH9329ControlChipset.LOWSPEED_BAUDRATE)
+        serialPort.baudRate = NSNumber(value: SerialProtocolCommands.LOWSPEED_BAUDRATE)
         serialPort.delegate = self
         
         serialPort.open()
         
         if serialPort.isOpen {
-            logger.log(content: "Serial port opened successfully for factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
+            logger.log(content: "Serial port opened successfully for factory reset at \(SerialProtocolCommands.LOWSPEED_BAUDRATE) baud")
             
             // Update app status
-            AppStatus.serialPortBaudRate = CH9329ControlChipset.LOWSPEED_BAUDRATE
+            AppStatus.serialPortBaudRate = SerialProtocolCommands.LOWSPEED_BAUDRATE
             if let portPath = serialPort.path as String? {
                 AppStatus.serialPortName = portPath.components(separatedBy: "/").last ?? "Unknown"
             }
             
-            self.baudrate = CH9329ControlChipset.LOWSPEED_BAUDRATE
+            self.baudrate = SerialProtocolCommands.LOWSPEED_BAUDRATE
             
             // Set device ready to false initially - it will be set to true when proper communication is established
             self.isDeviceReady = false
@@ -1116,21 +1096,19 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
 
     
-        // Create a mutable command and append the checksum
-        var mutableCommand = command
-        let checksum = self.calculateChecksum(data: command)
-        mutableCommand.append(checksum)
+        // Create command with checksum using SerialProtocolCommands helper
+        let completeCommand = SerialProtocolCommands.createCommand(from: command)
         
         // Convert [UInt8] to Data
-        let data = Data(mutableCommand)
+        let data = Data(completeCommand)
         
         // Record the sent data
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        // Track send time for latency measurement
+        // Track send time for latency measurement based on command type
         let cmdType = command.count > 3 ? command[3] : 0
-        if cmdType == 0x02 {  // Keyboard command
+        if cmdType == 0x02 {  // SerialProtocolCommands.Keyboard.DATA_PREFIX command
             lastKeyboardSendTime = Date()
-        } else if cmdType == 0x04 || cmdType == 0x05 {  // Mouse commands (absolute or relative)
+        } else if cmdType == 0x04 || cmdType == 0x05 {  // SerialProtocolCommands.Mouse commands (absolute or relative)
             lastMouseSendTime = Date()
         }
 
@@ -1164,8 +1142,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// **Example:**
     /// ```swift
     /// let response = sendSyncCommand(
-    ///     command: SerialPortManager.CMD_GET_PARA_CFG,
-    ///     expectedResponseCmd: 0x88
+    ///     command: SerialProtocolCommands.DeviceInfo.GET_PARA_CFG,
+    ///     expectedResponseCmd: SerialProtocolCommands.ResponseCodes.PARA_CFG_RESPONSE
     /// )
     /// if !response.isEmpty {
     ///     // Process response
@@ -1193,20 +1171,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             self.syncResponseExpectedCmd = expectedResponseCmd
         }
         
-        // Send command
-        var mutableCommand = command
-        let checksum = self.calculateChecksum(data: command)
-        mutableCommand.append(checksum)
+        // Send command with checksum using SerialProtocolCommands helper
+        let completeCommand = SerialProtocolCommands.createCommand(from: command)
         
-        let data = Data(mutableCommand)
+        let data = Data(completeCommand)
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
         let threadName = Thread.current.isMainThread ? "main" : "background"
         
-        // Track send time for latency measurement
+        // Track send time for latency measurement based on command type
         let cmdType = command.count > 3 ? command[3] : 0
-        if cmdType == 0x02 {  // Keyboard command
+        if cmdType == 0x02 {  // SerialProtocolCommands.Keyboard.DATA_PREFIX command
             lastKeyboardSendTime = Date()
-        } else if cmdType == 0x04 || cmdType == 0x05 {  // Mouse commands (absolute or relative)
+        } else if cmdType == 0x04 || cmdType == 0x05 {  // SerialProtocolCommands.Mouse commands (absolute or relative)
             lastMouseSendTime = Date()
         }
         
@@ -1257,7 +1233,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func calculateChecksum(data: [UInt8]) -> UInt8 {
-        return UInt8(data.reduce(0, { (sum, element) in sum + Int(element) }) & 0xFF)
+        return SerialProtocolCommands.calculateChecksum(for: data)
     }
 
     /// Retrieves the current parameter configuration from the CH9329 HID chip.
@@ -1266,7 +1242,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// including baudrate, communication mode, and other operational parameters.
     /// 
     /// **What it does:**
-    /// - Sends `CMD_GET_PARA_CFG` command to the CH9329 chip
+    /// - Sends `SerialProtocolCommands.DeviceInfo.GET_PARA_CFG` command to the CH9329 chip
     /// - The chip responds with current configuration data (command 0x88)
     /// - Response includes baudrate (bytes 8-11) and mode (byte 5)
     /// 
@@ -1277,21 +1253,21 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// 
     /// **Expected Response:**
     /// - Command: 0x88 (get parameter configuration)
-    /// - Baudrate: Should be 115200 (HIGHSPEED_BAUDRATE)
+    /// - Baudrate: Should be 115200 (SerialProtocolCommands.HIGHSPEED_BAUDRATE)
     /// - Mode: Should be 0x82 for proper HID operation
     /// 
     /// **Note:** This method uses `force: true` to ensure the command is sent even if 
     /// `isDeviceReady` is false, as it's part of the device initialization process.
     func getChipParameterCfg(){
-        self.sendAsyncCommand(command: SerialPortManager.CMD_GET_PARA_CFG, force: true)
+        self.sendAsyncCommand(command: SerialProtocolCommands.DeviceInfo.GET_PARA_CFG, force: true)
     }
 
     // MARK: - CH32V208 SD switch helpers
     /// Set SD card to host (CH32V208)
     public func setSdToHost(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
-        var cmd = SerialPortManager.CMD_SD_SWITCH_PREFIX
-        cmd.append(0x00) // data byte 0x00 => HOST
-        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: 0x97, timeout: 2.0, force: force)
+        var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
+        cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.HOST)
+        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE, timeout: 2.0, force: force)
         if !response.isEmpty && response.count >= 6 {
             let dir = response[5]
             completion?(dir == 0x00)
@@ -1302,9 +1278,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     /// Set SD card to target (CH32V208)
     public func setSdToTarget(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
-        var cmd = SerialPortManager.CMD_SD_SWITCH_PREFIX
-        cmd.append(0x01) // data byte 0x01 => TARGET
-        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: 0x97, timeout: 2.0, force: force)
+        var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
+        cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.TARGET)
+        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE, timeout: 2.0, force: force)
         if !response.isEmpty && response.count >= 6 {
             let dir = response[5]
             completion?(dir == 0x01)
@@ -1315,9 +1291,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     /// Query SD card direction synchronously. Returns SDCardDirection or nil on failure.
     public func querySdDirectionSync(timeout: TimeInterval = 2.0, force: Bool = false) -> SDCardDirection? {
-        var cmd = SerialPortManager.CMD_SD_SWITCH_PREFIX
-        cmd.append(0x03) // data byte 0x03 => query
-        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: 0x97, timeout: timeout, force: force)
+        var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
+        cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.QUERY)
+        let response = self.sendSyncCommand(command: cmd, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.SD_DIRECTION_RESPONSE, timeout: timeout, force: force)
         guard !response.isEmpty && response.count >= 6 else {
             return nil
         }
@@ -1372,8 +1348,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             // For CH9329, check if high-to-low change requires factory reset
             let currentBaudrate = self.baudrate
             let targetBaudrate = preferredBaud
-            let isHighToLow = (currentBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE && 
-                              targetBaudrate == SerialPortManager.LOWSPEED_BAUDRATE)
+            let isHighToLow = (currentBaudrate == SerialProtocolCommands.HIGHSPEED_BAUDRATE && 
+                              targetBaudrate == SerialProtocolCommands.LOWSPEED_BAUDRATE)
             
             if isHighToLow {
                 // High speed to low speed requires factory reset for CH9329
@@ -1400,16 +1376,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 var modeByteToUse = preferredMode.modeByteValue
                 
                 // Build set-parameter command with preferred mode
-                let prefix: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? 
-                    SerialPortManager.CMD_SET_PARA_CFG_PREFIX_9600 : 
-                    SerialPortManager.CMD_SET_PARA_CFG_PREFIX_115200
+                let prefix: [UInt8] = preferredBaud == SerialProtocolCommands.LOWSPEED_BAUDRATE ? 
+                    SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_9600 : 
+                    SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_115200
                 
                 var command: [UInt8] = prefix
                 // The mode byte is at index 5 in the prefix, so we replace it
                 if command.count > 5 {
                     command[5] = modeByteToUse
                 }
-                command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
+                command.append(contentsOf: SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_POSTFIX)
                 
                 self.sendAsyncCommand(command: command, force: true)
                 logger.log(content: "Set param command: \(command.map { String(format: "%02X", $0) }.joined(separator: " "))")
@@ -1435,7 +1411,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     // Software reset the CH9329 HID chip
     func resetHidChip(){
-        self.sendAsyncCommand(command: SerialPortManager.CMD_RESET, force: true)
+        self.sendAsyncCommand(command: SerialProtocolCommands.DeviceConfig.RESET, force: true)
     }
     
     /// Resets ACK (acknowledgement) counters and tracking timestamp
@@ -1547,7 +1523,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     self.resumeConnectionAttempts()
                     
                     // Try to reopen with low baudrate (factory default)
-                    self.tryOpenSerialPort(priorityBaudrate: CH9329ControlChipset.LOWSPEED_BAUDRATE)
+                    self.tryOpenSerialPort(priorityBaudrate: SerialProtocolCommands.LOWSPEED_BAUDRATE)
                     
                     // Report success
                     completion(true)
@@ -1601,12 +1577,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func getHidInfo(){
-        self.sendAsyncCommand(command: SerialPortManager.CMD_GET_HID_INFO)
+        self.sendAsyncCommand(command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO)
     }
 
     // Use sync call to get keybaord and mouse is connected to target by HID info
     func getTargetConnectionStatusSync() -> (isKeyboardConnected: Bool, isMouseConnected: Bool)? {
-        let response = self.sendSyncCommand(command: SerialPortManager.CMD_GET_HID_INFO, expectedResponseCmd: 0x81, timeout: 2.0, force: true)
+        let response = self.sendSyncCommand(command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO, expectedResponseCmd: SerialProtocolCommands.ResponseCodes.HID_INFO_RESPONSE, timeout: 2.0, force: true)
         
         guard !response.isEmpty && response.count >= 8 else {
             logger.log(content: "Failed to get target connection status: empty or too short response")
@@ -1656,17 +1632,15 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         // Build the SET_PARA_CFG command with the appropriate prefix for user's preferred baudrate
         let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
-        let prefix: [UInt8] = preferredBaud == SerialPortManager.LOWSPEED_BAUDRATE ? 
-            SerialPortManager.CMD_SET_PARA_CFG_PREFIX_9600 : 
-            SerialPortManager.CMD_SET_PARA_CFG_PREFIX_115200
-        
-        // Create command by combining prefix, mode byte, and postfix
+        let prefix: [UInt8] = preferredBaud == SerialProtocolCommands.LOWSPEED_BAUDRATE ? 
+            SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_9600 : 
+            SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_115200
         var command: [UInt8] = prefix
         // The mode byte is at index 5 in the prefix, so we replace it
         if command.count > 5 {
             command[5] = modeByteToUse
         }
-        command.append(contentsOf: SerialPortManager.CMD_SET_PARA_CFG_POSTFIX)
+        command.append(contentsOf: SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_POSTFIX)
         
         // Send the command
         self.sendAsyncCommand(command: command, force: true)
@@ -1758,10 +1732,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.serialPort = getSerialPortPathFromUSBManager()
         
         if let serialPort = self.serialPort {
-            logger.log(content: "Opening CH32V208 serial port directly at default baudrate: \(CH9329ControlChipset.HIGHSPEED_BAUDRATE), path: \(serialPort.path)")
+            logger.log(content: "Opening CH32V208 serial port directly at default baudrate: \(SerialProtocolCommands.LOWSPEED_BAUDRATE), path: \(serialPort.path)")
             
             // Open the serial port with default baudrate
-            self.openSerialPort(baudrate: SerialPortManager.LOWSPEED_BAUDRATE)
+            self.openSerialPort(baudrate: SerialProtocolCommands.LOWSPEED_BAUDRATE)
             
             // For CH32V208, we don't need command validation - set device ready immediately
             if serialPort.isOpen {

@@ -845,10 +845,10 @@ struct openterfaceApp: App {
                 let isCH32V208 = (AppStatus.controlChipsetType == .ch32v208)
                 
                 // Determine if this is a low-to-high or high-to-low change
-                let isLowToHigh = (currentBaudrate == SerialPortManager.LOWSPEED_BAUDRATE && 
-                                  targetBaudrateValue == SerialPortManager.HIGHSPEED_BAUDRATE)
-                let isHighToLow = (currentBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE && 
-                                  targetBaudrateValue == SerialPortManager.LOWSPEED_BAUDRATE)
+                let isLowToHigh = (currentBaudrate == SerialProtocolCommands.LOWSPEED_BAUDRATE && 
+                                  targetBaudrateValue == SerialProtocolCommands.HIGHSPEED_BAUDRATE)
+                let isHighToLow = (currentBaudrate == SerialProtocolCommands.HIGHSPEED_BAUDRATE && 
+                                  targetBaudrateValue == SerialProtocolCommands.LOWSPEED_BAUDRATE)
                 
                 // Give a brief moment for the port to close properly
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
