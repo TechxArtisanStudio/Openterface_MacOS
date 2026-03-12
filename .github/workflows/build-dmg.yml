@@ -176,4 +176,4 @@ jobs:
       run: |
         security find-identity -v -p codesigning
         security list-keychains
-        security show-keychain-info build.keychain
+        security show-keychain-info "$RUNNER_TEMP/build.keychain-db"
