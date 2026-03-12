@@ -27,7 +27,7 @@ class MouseMapper {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     
     func handleAbsoluteMouseAction(x: Int, y: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00) {
-        var command: [UInt8] = SerialPortManager.MOUSE_ABS_ACTION_PREFIX
+        var command: [UInt8] = SerialProtocolCommands.Mouse.ABSOLUTE_PREFIX
         command.append(mouseEvent)
         command.append(UInt8(x & 0xFF))
         command.append(UInt8((x >> 8) & 0xFF))
@@ -38,7 +38,7 @@ class MouseMapper {
     }
     
     func handleRelativeMouseAction(dx: Int, dy: Int, mouseEvent: UInt8 = 0x00, wheelMovement: UInt8 = 0x00, dragged: Bool = false) {
-        var command: [UInt8] = SerialPortManager.MOUSE_REL_ACTION_PREFIX
+        var command: [UInt8] = SerialProtocolCommands.Mouse.RELATIVE_PREFIX
         let dxByte = translateRelativeMovement(value: dx)
         let dyByte = translateRelativeMovement(value: dy)
         

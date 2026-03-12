@@ -384,7 +384,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
                     if serialPortMgr.isDeviceReady {
                         // Send info command with sync (expecting 0x81 response)
                         let response = serialPortMgr.sendSyncCommand(
-                            command: SerialPortManager.CMD_GET_HID_INFO,
+                            command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO,
                             expectedResponseCmd: 0x81,
                             timeout: 2.0,
                             force: true
@@ -708,7 +708,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
                             
                             if let serialPortMgr = self.serialPortManager as? SerialPortManager {
                                 let response = serialPortMgr.sendSyncCommand(
-                                    command: SerialPortManager.CMD_GET_HID_INFO,
+                                    command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO,
                                     expectedResponseCmd: 0x81,
                                     timeout: 2.0,
                                     force: true
@@ -901,7 +901,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
                 
                 if let serialPortMgr = self.serialPortManager as? SerialPortManager {
                     let response = serialPortMgr.sendSyncCommand(
-                        command: SerialPortManager.CMD_GET_HID_INFO,
+                        command: SerialProtocolCommands.DeviceInfo.GET_HID_INFO,
                         expectedResponseCmd: 0x81,
                         timeout: 2.0,
                         force: true

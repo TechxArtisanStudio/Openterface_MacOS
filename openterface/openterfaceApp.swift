@@ -187,12 +187,8 @@ struct openterfaceApp: App {
                         }
                         
                         // Only update UI variables when status actually changes
-                        let newKeyboardConnected = AppStatus.isKeyboardConnected
-                        let newMouseConnected = AppStatus.isMouseConnected
                         let newSwitchToggleOn = AppStatus.switchToTarget
                         let newHdmiSignal = AppStatus.hasHdmiSignal
-                        let newSerialPortName = AppStatus.serialPortName
-                        let newSerialPortBaudRate = AppStatus.serialPortBaudRate
                         let newAudioEnabled = AppStatus.isAudioEnabled
                         
                         // Update camera status
@@ -203,16 +199,6 @@ struct openterfaceApp: App {
                         
                         var stateChanged = false
                         
-                        if _isKeyboardConnected != newKeyboardConnected {
-                            _isKeyboardConnected = newKeyboardConnected
-                            stateChanged = true
-                        }
-                        
-                        if _isMouseConnected != newMouseConnected {
-                            _isMouseConnected = newMouseConnected
-                            stateChanged = true
-                        }
-                        
                         if _switchToTarget != newSwitchToggleOn {
                             _switchToTarget = newSwitchToggleOn
                             stateChanged = true
@@ -220,16 +206,6 @@ struct openterfaceApp: App {
                         
                         if _hasHdmiSignal != newHdmiSignal {
                             _hasHdmiSignal = newHdmiSignal
-                            stateChanged = true
-                        }
-                        
-                        if _serialPortName != newSerialPortName {
-                            _serialPortName = newSerialPortName
-                            stateChanged = true
-                        }
-                        
-                        if _serialPortBaudRate != newSerialPortBaudRate {
-                            _serialPortBaudRate = newSerialPortBaudRate
                             stateChanged = true
                         }
                         
@@ -280,6 +256,10 @@ struct openterfaceApp: App {
                             lastUpdateTime = now
                         }
                     }
+                    .onReceive(SerialPortStatus.shared.$isKeyboardConnected) { _isKeyboardConnected = $0 }
+                    .onReceive(SerialPortStatus.shared.$isMouseConnected) { _isMouseConnected = $0 }
+                    .onReceive(SerialPortStatus.shared.$serialPortName) { _serialPortName = $0 }
+                    .onReceive(SerialPortStatus.shared.$serialPortBaudRate) { _serialPortBaudRate = $0 }
             }
         }
 
@@ -845,10 +825,10 @@ struct openterfaceApp: App {
                 let isCH32V208 = (AppStatus.controlChipsetType == .ch32v208)
                 
                 // Determine if this is a low-to-high or high-to-low change
-                let isLowToHigh = (currentBaudrate == SerialPortManager.LOWSPEED_BAUDRATE && 
-                                  targetBaudrateValue == SerialPortManager.HIGHSPEED_BAUDRATE)
-                let isHighToLow = (currentBaudrate == SerialPortManager.HIGHSPEED_BAUDRATE && 
-                                  targetBaudrateValue == SerialPortManager.LOWSPEED_BAUDRATE)
+                let isLowToHigh = (currentBaudrate == SerialProtocolCommands.LOWSPEED_BAUDRATE && 
+                                  targetBaudrateValue == SerialProtocolCommands.HIGHSPEED_BAUDRATE)
+                let isHighToLow = (currentBaudrate == SerialProtocolCommands.HIGHSPEED_BAUDRATE && 
+                                  targetBaudrateValue == SerialProtocolCommands.LOWSPEED_BAUDRATE)
                 
                 // Give a brief moment for the port to close properly
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

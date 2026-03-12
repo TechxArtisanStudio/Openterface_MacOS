@@ -294,6 +294,11 @@ class HardwareAbstractionLayer {
                     }
                     return true
                 }
+                // Device detected by VID/PID but initialization failed (serial port not open yet).
+                // Keep the type as .ch32v208 so SerialPortManager uses the right connection path.
+                // Do NOT fall through to CH9329 detection.
+                logger.log(content: "CH32V208 detected but initialization deferred (serial port not yet open)")
+                return false
             }
         }
         
@@ -308,6 +313,8 @@ class HardwareAbstractionLayer {
                     }
                     return true
                 }
+                // Device detected but initialization failed — keep type, don't reset.
+                return false
             }
         }
 

@@ -108,25 +108,11 @@ class CH32V208ControlChipset: BaseControlChipset {
     override func getDeviceStatus() -> ControlDeviceStatus {
         let baseStatus = super.getDeviceStatus()
 
-        // Query SD switch direction from CH32V208 asynchronously to avoid blocking
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let self = self else { return }
-            if let sdDir = self.serialManager.querySdDirectionSync(timeout: 0.5, force: true) {
-                let switchedToTarget = (sdDir == SDCardDirection.target)
-                DispatchQueue.main.async {
-                    AppStatus.sdCardDirection = sdDir
-                    AppStatus.switchToTarget = switchedToTarget
-                    AppStatus.isUSBSwitchConnectToTarget = switchedToTarget
-                    if self.logger.MouseEventPrint {
-                        self.logger.log(content: "CH32V208: SD direction queried - \(sdDir)")
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.logger.log(content: "CH32V208: Failed to query SD direction")
-                }
-            }
-        }
+        // SD card direction polling is handled by SerialPortManager's dedicated timer,
+        // which sends a fire-and-forget query command every 3 seconds.
+        // SerialResponseHandler publishes the result via @Published sdCardDirection
+        // and SerialPortManager's Combine subscription updates AppStatus.
+        // Nothing needs to be done here for SD card state.
 
         // CH32V208 treats target as connected for HID purposes
         let isTargetConnected = true
@@ -151,5 +137,37 @@ class CH32V208ControlChipset: BaseControlChipset {
 
     func getFirmwareUpdateCapabilities() -> [String] {
         return capabilities.supportsFirmwareUpdate ? ["Firmware Update", "Device Reset"] : []
+    }
+    
+    /// Determines if the current chip version supports SD card operations
+    /// - Parameter chipVersion: The chip version to check
+    /// - Returns: true if SD card operations are supported, false otherwise
+    private func supportsSDCardOperations(chipVersion: Int8) -> Bool {
+        // Based on observed chip versions and SD card support
+        // CH32V208 chips with certain versions support SD card functionality
+        switch chipVersion {
+        case -126, -125, -124: // Known CH32V208 versions that support SD card
+            if logger.HalPrint {
+                logger.log(content: "CH32V208: Chip version \(chipVersion) supports SD card operations")
+            }
+            return true
+        case 1, 2, 3, 4: // CH9329 versions - no SD card support
+            if logger.HalPrint {
+                logger.log(content: "CH32V208: Chip version \(chipVersion) appears to be CH9329 - no SD card support")
+            }
+            return false
+        case 0, -1: // Uninitialized or unknown versions
+            if logger.HalPrint {
+                logger.log(content: "CH32V208: Unknown chip version \(chipVersion) - disabling SD operations for safety")
+            }
+            return false
+        default:
+            // For unknown versions, conservatively disable SD operations
+            // This prevents timeout issues on unsupported devices
+            if logger.HalPrint {
+                logger.log(content: "CH32V208: Unsupported chip version \(chipVersion) - disabling SD operations")
+            }
+            return false
+        }
     }
 }

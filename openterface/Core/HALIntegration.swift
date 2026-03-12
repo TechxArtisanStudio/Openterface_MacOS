@@ -595,18 +595,18 @@ class HALIntegrationManager {
                 do {
                     let signalStatus = videoChipset.getSignalStatus()
                     let previousStatus = AppStatus.hasHdmiSignal
-                    AppStatus.hasHdmiSignal = signalStatus.hasSignal
                     videoChipset.updateConnectionStatus(signalStatus.hasSignal)
-                    
-                    // Log video status changes if needed
+
                     if previousStatus != signalStatus.hasSignal {
                         logger.log(content: "📺 Video signal status changed: \(signalStatus.hasSignal ? "Connected" : "Disconnected")")
                     }
+                    let hasSignal = signalStatus.hasSignal
+                    DispatchQueue.main.async { AppStatus.hasHdmiSignal = hasSignal }
                 } catch {
                     // Silently handle errors to prevent crashes
                 }
             }
-            
+
             // Update control chipset status with safety checks
             if let controlChipset = controlChipset {
                 do {
@@ -620,7 +620,7 @@ class HALIntegrationManager {
                             logger.log(content: "🔧 Control chipset: \(controlChipset.chipsetInfo.name)")
                         }
                     }
-                    
+
                     // Update control chipset specific status
                     updateControlChipsetStatus(controlChipset)
                 } catch {
@@ -632,27 +632,37 @@ class HALIntegrationManager {
         // Additional chipset-specific periodic checks with safety
         autoreleasepool {
             guard let videoChipset = videoChipset else { return }
-            
+
             do {
-                // Get other chipset-specific data
-                AppStatus.hidReadResolusion = videoChipset.getResolution() ?? (width: 0, height: 0)
-                AppStatus.hidReadFps = videoChipset.getFrameRate() ?? 0
-                // Get timing information from the video chipset (handles chipset-specific registers)
-                if let timingInfo = videoChipset.getTimingInfo() {
-                    AppStatus.hidInputHTotal = timingInfo.horizontalTotal
-                    AppStatus.hidInputVTotal = timingInfo.verticalTotal
-                    AppStatus.hidInputHst = timingInfo.horizontalSyncStart
-                    AppStatus.hidInputVst = timingInfo.verticalSyncStart
-                    AppStatus.hidInputHsyncWidth = timingInfo.horizontalSyncWidth
-                    AppStatus.hidInputVsyncWidth = timingInfo.verticalSyncWidth
-                    AppStatus.hidReadPixelClock = timingInfo.pixelClock
-                }
-                // Get version and connection status (these might still need HID manager for some chipsets)
-                if let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
+                // Compute all values on the background timer queue first
+                let resolution = videoChipset.getResolution() ?? (width: 0, height: 0)
+                let fps = videoChipset.getFrameRate() ?? 0
+                let timingInfo = videoChipset.getTimingInfo()
+
+                // For CH9329 only: read switch/SD direction from HID manager
+                var sdDirection: SDCardDirection? = nil
+                if AppStatus.controlChipsetType != .ch32v208,
+                   let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self) as? HIDManager {
                     _ = hidManager.getSwitchStatus()
-                    let direction = hidManager.getSoftwareSwitchDirection()
-                    AppStatus.sdCardDirection = direction
-                //    AppStatus.videoFirmwareVersion = hidManager.getVersion() ?? ""
+                    sdDirection = hidManager.getSoftwareSwitchDirection()
+                }
+
+                // Dispatch all AppStatus writes to main thread
+                DispatchQueue.main.async {
+                    AppStatus.hidReadResolusion = resolution
+                    AppStatus.hidReadFps = fps
+                    if let timingInfo = timingInfo {
+                        AppStatus.hidInputHTotal = timingInfo.horizontalTotal
+                        AppStatus.hidInputVTotal = timingInfo.verticalTotal
+                        AppStatus.hidInputHst = timingInfo.horizontalSyncStart
+                        AppStatus.hidInputVst = timingInfo.verticalSyncStart
+                        AppStatus.hidInputHsyncWidth = timingInfo.horizontalSyncWidth
+                        AppStatus.hidInputVsyncWidth = timingInfo.verticalSyncWidth
+                        AppStatus.hidReadPixelClock = timingInfo.pixelClock
+                    }
+                    if let direction = sdDirection {
+                        AppStatus.sdCardDirection = direction
+                    }
                 }
             } catch {
                 // Silently handle errors to prevent crashes
@@ -662,11 +672,11 @@ class HALIntegrationManager {
     
     /// Update control chipset specific status information
     private func updateControlChipsetStatus(_ controlChipset: ControlChipsetProtocol) {
-        // Update chipset readiness status
+        // Update chipset readiness status — dispatched to main to satisfy @Published requirements
         let isReady = controlChipset.isDeviceReady
         if AppStatus.isControlChipsetReady != isReady {
-            AppStatus.isControlChipsetReady = isReady
             logger.log(content: "🔧 Control chipset ready status: \(isReady ? "Ready" : "Not Ready")")
+            DispatchQueue.main.async { AppStatus.isControlChipsetReady = isReady }
         }
         
         // Check communication interface status
