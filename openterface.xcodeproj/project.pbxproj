@@ -92,6 +92,7 @@
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
 		F1747E9A2F61150A0058F163 /* SerialProtocolCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */; };
 		F1747E9C2F6142860058F163 /* SerialPortStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1747E9B2F6142860058F163 /* SerialPortStatus.swift */; };
+		F1E5DEA92F6263F8005BBE83 /* SerialResponseHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E5DEA82F6263F8005BBE83 /* SerialResponseHandler.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -202,6 +203,7 @@
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
 		F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialProtocolCommands.swift; sourceTree = "<group>"; };
 		F1747E9B2F6142860058F163 /* SerialPortStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortStatus.swift; sourceTree = "<group>"; };
+		F1E5DEA82F6263F8005BBE83 /* SerialResponseHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialResponseHandler.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -323,6 +325,7 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				F1E5DEA82F6263F8005BBE83 /* SerialResponseHandler.swift */,
 				6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */,
 				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
@@ -616,6 +619,7 @@
 				6BC3646A2F02646D001B9A07 /* ToolBarComponents.swift in Sources */,
 				BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */,
 				BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */,
+				F1E5DEA92F6263F8005BBE83 /* SerialResponseHandler.swift in Sources */,
 				BF7752DF2EFFECE400FE5D0E /* ParallelManager.swift in Sources */,
 				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,
 				BFD4EA942E35EE970029BFC2 /* ProtocolExtensions.swift in Sources */,

@@ -33,21 +33,33 @@ final class SwitchableUSBManager: NSObject, SwitchableUSBManagerProtocol {
             if toTarget {
                 logger.log(content: "SwitchableUSBManager: CH32V208 - setting SD to TARGET via serial")
                 ser.setSdToTarget(force: true) { success in
-                    if success {
-                        AppStatus.sdCardDirection = .target
-                        self.logger.log(content: "SwitchableUSBManager: CH32V208 SD set to TARGET")
-                    } else {
-                        self.logger.log(content: "SwitchableUSBManager: Failed to set CH32V208 SD to TARGET")
+                    DispatchQueue.main.async {
+                        if success {
+                            AppStatus.sdCardDirection = .target
+                            AppStatus.isUSBSwitchConnectToTarget = true
+                            self.logger.log(content: "SwitchableUSBManager: CH32V208 SD set to TARGET confirmed")
+                        } else {
+                            // Revert button to actual hardware state on failure
+                            AppStatus.switchToTarget = false
+                            AppStatus.isUSBSwitchConnectToTarget = false
+                            self.logger.log(content: "SwitchableUSBManager: Failed to set CH32V208 SD to TARGET - reverting button")
+                        }
                     }
                 }
             } else {
                 logger.log(content: "SwitchableUSBManager: CH32V208 - setting SD to HOST via serial")
                 ser.setSdToHost(force: true) { success in
-                    if success {
-                        AppStatus.sdCardDirection = .host
-                        self.logger.log(content: "SwitchableUSBManager: CH32V208 SD set to HOST")
-                    } else {
-                        self.logger.log(content: "SwitchableUSBManager: Failed to set CH32V208 SD to HOST")
+                    DispatchQueue.main.async {
+                        if success {
+                            AppStatus.sdCardDirection = .host
+                            AppStatus.isUSBSwitchConnectToTarget = false
+                            self.logger.log(content: "SwitchableUSBManager: CH32V208 SD set to HOST confirmed")
+                        } else {
+                            // Revert button to actual hardware state on failure
+                            AppStatus.switchToTarget = true
+                            AppStatus.isUSBSwitchConnectToTarget = true
+                            self.logger.log(content: "SwitchableUSBManager: Failed to set CH32V208 SD to HOST - reverting button")
+                        }
                     }
                 }
             }
