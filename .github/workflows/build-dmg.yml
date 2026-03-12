@@ -39,10 +39,8 @@ jobs:
         security default-keychain -d user -s "$KEYCHAIN_PATH"
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-        # Support both GNU and BSD base64 flags on macOS runners.
-        if ! printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > certificate.p12 2>/dev/null; then
-          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 -D > certificate.p12
-        fi
+        # openssl handles multi-line / whitespace-padded base64 reliably on macOS runners.
+        printf '%s' "$MACOS_CERTIFICATE_P12" | tr -d '[:space:]' | openssl base64 -d -A > certificate.p12
 
         if [[ ! -s certificate.p12 ]]; then
           echo "Decoded certificate.p12 is empty. Recheck MACOS_CERTIFICATE_P12 secret value."
