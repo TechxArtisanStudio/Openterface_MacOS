@@ -43,7 +43,27 @@ jobs:
         printf '%s' "$MACOS_CERTIFICATE_P12" | tr -d '[:space:]' | openssl base64 -d -A > certificate.p12
 
         if [[ ! -s certificate.p12 ]]; then
-          echo "Decoded certificate.p12 is empty. Recheck MACOS_CERTIFICATE_P12 secret value."
+          echo "ERROR: Decoded certificate.p12 is empty. Recheck MACOS_CERTIFICATE_P12 secret value."
+          exit 1
+        fi
+
+        echo "certificate.p12 size: $(wc -c < certificate.p12) bytes"
+
+        # Validate the p12 and confirm it contains a private key before importing.
+        echo "--- Validating p12 contents ---"
+        if ! openssl pkcs12 -info -in certificate.p12 -passin "pass:${MACOS_CERTIFICATE_PASSWORD}" -noout 2>&1; then
+          echo "ERROR: openssl could not parse certificate.p12."
+          echo "  - Check MACOS_CERTIFICATE_PASSWORD is correct."
+          echo "  - Re-export the .p12 from Keychain Access including the private key."
+          exit 1
+        fi
+
+        # Count private keys in the p12 (must be >= 1).
+        KEY_COUNT=$(openssl pkcs12 -in certificate.p12 -passin "pass:${MACOS_CERTIFICATE_PASSWORD}" -nodes -nocerts 2>/dev/null | grep -c "BEGIN PRIVATE KEY\|BEGIN RSA PRIVATE KEY\|BEGIN EC PRIVATE KEY" || true)
+        echo "Private keys found in p12: $KEY_COUNT"
+        if [[ "$KEY_COUNT" -eq 0 ]]; then
+          echo "ERROR: p12 contains no private key."
+          echo "  In Keychain Access, expand the certificate and right-click the CERTIFICATE+KEY pair, then export both."
           exit 1
         fi
 
@@ -51,6 +71,7 @@ jobs:
         security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        echo "--- Identities in keychain ---"
         security find-identity -v -p codesigning "$KEYCHAIN_PATH"
     
     # Build the macOS app using xcodebuild
