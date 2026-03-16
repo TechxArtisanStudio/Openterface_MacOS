@@ -383,7 +383,22 @@ class PlayerView: NSView, NSWindowDelegate {
 
     override func scrollWheel(with event: NSEvent) {
         let wheelMovement = Int(event.scrollingDeltaY)
-        handleMouseMovement(with: event, wheelMovement: wheelMovement)
+
+        // Keep mouse button state in the event so that scrolling while holding a button
+        // does not appear as a button release to the target device.
+        var mouseEvent: UInt8 = 0x00
+        let pressedButtons = NSEvent.pressedMouseButtons
+        if (pressedButtons & (1 << 0)) != 0 {
+            mouseEvent |= 0x01 // left button
+        }
+        if (pressedButtons & (1 << 1)) != 0 {
+            mouseEvent |= 0x02 // right button
+        }
+        if (pressedButtons & (1 << 2)) != 0 {
+            mouseEvent |= 0x04 // middle/other button
+        }
+
+        handleMouseMovement(with: event, mouseEvent: mouseEvent, wheelMovement: wheelMovement)
     }
 
 
@@ -431,7 +446,8 @@ class PlayerView: NSView, NSWindowDelegate {
             
             let isDragging = event.type == .leftMouseDragged || 
                             event.type == .rightMouseDragged || 
-                            event.type == .otherMouseDragged
+                            event.type == .otherMouseDragged || 
+                            (event.type == .scrollWheel && NSEvent.pressedMouseButtons != 0)
             
             hostManager.handleRelativeMouseAction(dx: deltaX, dy: deltaY, 
                                                        mouseEvent: mouseEvent, 
