@@ -266,6 +266,21 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             SerialPortManager.shared.getHidInfo()
         }
     }
+
+    func toggleNumLock() {
+        sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.numLock)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            SerialPortManager.shared.getHidInfo()
+        }
+    }
+
+    func toggleScrollLock() {
+        // Scroll Lock has no macOS keycode; send HID scancode 0x47 directly
+        kbm.sendRawHIDKey(hidScancode: 0x47)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            SerialPortManager.shared.getHidInfo()
+        }
+    }
     
     func modifierFlagsDescription(_ flags: NSEvent.ModifierFlags) -> String {
         var descriptions: [String] = []

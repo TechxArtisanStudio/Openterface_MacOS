@@ -169,6 +169,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.isInitialLaunch = false
         }
+
+        // Sync CapsLock / NumLock / ScrollLock status from target once the serial
+        // port has had time to connect and become ready (typically within 2 seconds).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            SerialPortManager.shared.getHidInfo()
+        }
     }
 
     // Remove extra system-provided items from the Edit menu we don't want exposed
