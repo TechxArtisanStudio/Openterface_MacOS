@@ -335,6 +335,19 @@ class KeyboardMapper {
     func releaseKey(keys: [UInt16]) {
         sendKeyData(keyCode: keys, isRelease: true, modifiers: [])
     }
+
+    /// Sends a single HID scancode directly as a press-then-release.
+    /// Used for keys that have no macOS keycode equivalent (e.g. Scroll Lock = 0x47).
+    func sendRawHIDKey(hidScancode: UInt8) {
+        var pressData: [UInt8] = SerialProtocolCommands.Keyboard.DATA_PREFIX
+        pressData[7] = hidScancode
+        pressData[13] = calculateChecksum(data: pressData)
+        let _ = serialPortManager.sendAsyncCommand(command: pressData)
+        Thread.sleep(forTimeInterval: 0.005)
+        var releaseData: [UInt8] = SerialProtocolCommands.Keyboard.DATA_PREFIX
+        releaseData[13] = calculateChecksum(data: releaseData)
+        let _ = serialPortManager.sendAsyncCommand(command: releaseData)
+    }
     
 
     func sendKeyData(keyCode: [UInt16], isRelease: Bool, modifiers: NSEvent.ModifierFlags) {

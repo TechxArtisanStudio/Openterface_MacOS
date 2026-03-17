@@ -349,9 +349,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         if !videoDevices.isEmpty {
             let device = videoDevices[0]
             
-            // Set to 1920x1080 resolution with highest FPS
+            // Set to 1920x1080 resolution capped at 60fps (hardware chipset max)
             setVideoResolution(width: 1920, height: 1080)
-            logger.log(content: "Setting video to 1920x1080 resolution with highest FPS")
+            logger.log(content: "Setting video to 1920x1080 resolution at 60fps (hardware limit)")
             
             setupVideoCapture(with: device)
         } else {
@@ -452,31 +452,47 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                         logger.log(content: "Format \(index): \(formatDimensions.width)x\(formatDimensions.height) @ \(frameRateInfo) - \(formatDescription)")
                     }
                     
-                    // Find the best matching format for the desired resolution
-                    if let matchingFormat = device.formats.first(where: { format in
+                    // Find the best matching format for the desired resolution.
+                    // Prefer a format whose frame rate range includes 60fps, since the
+                    // MS2109/MS2130S chipset has a hardware maximum of 60fps at 1920x1080.
+                    // Capturing at higher rates (e.g. 120Hz input) causes garbled output.
+                    let candidateFormats = device.formats.filter { format in
                         let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
                         return formatDimensions.width == desiredRes.width && formatDimensions.height == desiredRes.height
-                    }) {
+                    }
+                    let matchingFormat = candidateFormats.first(where: { format in
+                        guard let ranges = format.videoSupportedFrameRateRanges as? [AVFrameRateRange] else { return false }
+                        return ranges.contains(where: { $0.minFrameRate <= 60.0 && $0.maxFrameRate >= 60.0 })
+                    }) ?? candidateFormats.first
+                    if let matchingFormat = matchingFormat {
                         device.activeFormat = matchingFormat
                         let pixelFormat = CMFormatDescriptionGetMediaSubType(matchingFormat.formatDescription)
                         let formatDescription = pixelFormatDescription(pixelFormat)
                         logger.log(content: "Set video resolution to \(desiredRes.width)x\(desiredRes.height) using format: \(formatDescription)")
                         
-                        // Set to 144fps for 1920x1080 if available
+                        // Cap at 60fps for 1920x1080: the MS2109/MS2130S hardware chipset
+                        // supports a maximum of 60fps at this resolution. Requesting higher
+                        // frame rates when the target sends a 120Hz (or higher) HDMI signal
+                        // causes the chip to lose sync and produce unreadable/garbled frames.
                         if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
                             logger.log(content: "Available frame rate ranges for 1920x1080: \(frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", "))")
                             
-                            // First try to find 144fps specifically
-                            if let fps144Range = frameRateRanges.first(where: { abs($0.maxFrameRate - 144.0) < 1.0 }) {
-                                device.activeVideoMinFrameDuration = fps144Range.minFrameDuration
-                                device.activeVideoMaxFrameDuration = fps144Range.maxFrameDuration
-                                logger.log(content: "Successfully set frame rate to 144fps for 1920x1080")
+                            let targetFps = 60.0
+                            if let fps60Range = frameRateRanges.first(where: { $0.minFrameRate <= targetFps && $0.maxFrameRate >= targetFps }) {
+                                // Lock exactly to 60fps
+                                let frameDuration = CMTimeMake(value: 1, timescale: Int32(targetFps))
+                                device.activeVideoMinFrameDuration = frameDuration
+                                device.activeVideoMaxFrameDuration = frameDuration
+                                logger.log(content: "Set frame rate to 60fps for 1920x1080 (hardware limit)")
                             } else {
-                                // Fall back to highest available frame rate
-                                let bestFrameRateRange = frameRateRanges.max(by: { $0.maxFrameRate < $1.maxFrameRate })!
-                                device.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration
-                                device.activeVideoMaxFrameDuration = bestFrameRateRange.maxFrameDuration
-                                logger.log(content: "144fps not found, using highest available frame rate \(bestFrameRateRange.maxFrameRate)fps for 1920x1080")
+                                // 60fps range not found — use the highest rate that does not exceed 60fps
+                                let bestRange = frameRateRanges
+                                    .filter { $0.maxFrameRate <= 60.0 }
+                                    .max(by: { $0.maxFrameRate < $1.maxFrameRate })
+                                    ?? frameRateRanges.min(by: { $0.maxFrameRate < $1.maxFrameRate })!
+                                device.activeVideoMinFrameDuration = bestRange.minFrameDuration
+                                device.activeVideoMaxFrameDuration = bestRange.maxFrameDuration
+                                logger.log(content: "60fps range not found, using \(bestRange.maxFrameRate)fps for 1920x1080")
                             }
                         }
                         

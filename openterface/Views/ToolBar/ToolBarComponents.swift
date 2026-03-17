@@ -87,16 +87,65 @@ struct SerialInfoView: View {
 struct CapsLockIndicatorView: View {
     @ObservedObject var serialPortStatus = SerialPortStatus.shared
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: serialPortStatus.isCapLockOn ? "lock.fill" : "lock.open")
-                .foregroundColor(serialPortStatus.isCapLockOn ? .blue : .secondary)
-                .font(.system(size: 12))
-            Text("CAPS")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(serialPortStatus.isCapLockOn ? .blue : .secondary)
+        Button(action: {
+            KeyboardManager.shared.toggleCapsLock()
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: serialPortStatus.isCapLockOn ? "lock.fill" : "lock.open")
+                    .foregroundColor(serialPortStatus.isCapLockOn ? .blue : .secondary)
+                    .font(.system(size: 12))
+                Text("CAPS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(serialPortStatus.isCapLockOn ? .blue : .secondary)
+            }
+            .frame(width: 54, alignment: .center)
         }
-        .frame(width: 54, alignment: .center)
-        .help(serialPortStatus.isCapLockOn ? "Target Caps Lock is ON" : "Target Caps Lock is OFF")
+        .buttonStyle(.plain)
+        .help(serialPortStatus.isCapLockOn ? "Target Caps Lock is ON – click to toggle" : "Target Caps Lock is OFF – click to toggle")
+    }
+}
+
+// Num Lock indicator view - shows label with color indicating Num Lock state
+struct NumLockIndicatorView: View {
+    @ObservedObject var serialPortStatus = SerialPortStatus.shared
+    var body: some View {
+        Button(action: {
+            KeyboardManager.shared.toggleNumLock()
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: serialPortStatus.isNumLockOn ? "lock.fill" : "lock.open")
+                    .foregroundColor(serialPortStatus.isNumLockOn ? .blue : .secondary)
+                    .font(.system(size: 12))
+                Text("NUM")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(serialPortStatus.isNumLockOn ? .blue : .secondary)
+            }
+            .frame(width: 54, alignment: .center)
+        }
+        .buttonStyle(.plain)
+        .help(serialPortStatus.isNumLockOn ? "Target Num Lock is ON – click to toggle" : "Target Num Lock is OFF – click to toggle")
+    }
+}
+
+// Scroll Lock indicator view - shows label with color indicating Scroll Lock state
+struct ScrollLockIndicatorView: View {
+    @ObservedObject var serialPortStatus = SerialPortStatus.shared
+    var body: some View {
+        Button(action: {
+            KeyboardManager.shared.toggleScrollLock()
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: serialPortStatus.isScrollOn ? "lock.fill" : "lock.open")
+                    .foregroundColor(serialPortStatus.isScrollOn ? .blue : .secondary)
+                    .font(.system(size: 12))
+                Text("SCR")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(serialPortStatus.isScrollOn ? .blue : .secondary)
+            }
+            .frame(width: 54, alignment: .center)
+        }
+        .buttonStyle(.plain)
+        .help(serialPortStatus.isScrollOn ? "Target Scroll Lock is ON – click to toggle" : "Target Scroll Lock is OFF – click to toggle")
     }
 }
 

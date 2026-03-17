@@ -432,6 +432,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func setDeviceReady(_ ready: Bool) {
         self.isDeviceReady = ready
         self.errorAlertShown = !ready  // Reset error alert flag on successful connection
+
+        // On successful connection, query target LED states (CapsLock / NumLock / ScrollLock)
+        // so the toolbar indicators reflect the real target state immediately.
+        if ready {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.getHidInfo()
+            }
+        }
     }
     
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {

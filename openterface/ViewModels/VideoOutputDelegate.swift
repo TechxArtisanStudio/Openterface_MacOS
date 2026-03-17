@@ -65,6 +65,17 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         let currentTime = CMTimeGetSeconds(timestamp)
         guard !currentTime.isNaN else { return }
 
+        // Skip active-rect detection when the HDMI input fps exceeds the chipset hardware maximum.
+        // The MS2109/MS2130S chip supports at most 60fps at 1920×1080. When the source outputs
+        // 120Hz (or higher), the chip's pixel-clock is out of spec and the frames it delivers
+        // over USB contain corrupted / garbled pixel data. Running detectActiveRect on such a
+        // frame produces a wrong bounding-box, which then drives an incorrect zoom level and
+        // makes the preview appear blurry even on the frames that are less corrupted.
+        let chipMaxFps: Float = 60.0
+        if AppStatus.hidReadFps > chipMaxFps {
+            return
+        }
+
         // Use a shorter interval for the very first processing (0.5s),
         // then a 3s interval for subsequent processing
         let interval: TimeInterval = (lastProcessedTime == nil) ? 0.5 : 3.0

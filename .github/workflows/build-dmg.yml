@@ -15,9 +15,22 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
+
+    # Detect whether this is a fork PR (secrets are unavailable for fork PRs)
+    - name: Set build context
+      id: context
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" && \
+              "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+          echo "can_sign=false" >> $GITHUB_OUTPUT
+          echo "This is a fork PR — code signing will be skipped (secrets unavailable)."
+        else
+          echo "can_sign=true" >> $GITHUB_OUTPUT
+        fi
     
     # Install the Apple certificate and provisioning profile
     - name: Install Apple Certificate
+      if: steps.context.outputs.can_sign == 'true'
       env:
         MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
         MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -74,8 +87,9 @@ jobs:
         echo "--- Identities in keychain ---"
         security find-identity -v -p codesigning "$KEYCHAIN_PATH"
     
-    # Build the macOS app using xcodebuild
+    # Build the macOS app using xcodebuild (signed — non-fork only)
     - name: Build macOS App
+      if: steps.context.outputs.can_sign == 'true'
       env:
         DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
         CODE_SIGN_IDENTITY: ${{ vars.CODE_SIGN_IDENTITY || 'Developer ID Application' }}
@@ -114,10 +128,23 @@ jobs:
           -archivePath "build/Openterface.xcarchive" \
           -exportPath "build/export" \
           -exportOptionsPlist "$CI_EXPORT_OPTIONS_PLIST"
+    # Unsigned compilation check for fork PRs
+    - name: Build macOS App (unsigned — fork PR)
+      if: steps.context.outputs.can_sign == 'false'
+      env:
+        DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      run: |
+        xcodebuild -scheme "openterface" \
+          -configuration Release \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          build
+
     # Notarize the app
     - name: Notarize App
-      # main branch only
-      if: github.ref == 'refs/heads/main'
+      # main branch only, and only when signing secrets are available
+      if: github.ref == 'refs/heads/main' && steps.context.outputs.can_sign == 'true'
       env:
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -141,9 +168,11 @@ jobs:
         xcrun stapler staple "build/export/Openterface.app"
     # Create DMG using create-dmg
     - name: Install create-dmg
+      if: steps.context.outputs.can_sign == 'true'
       run: brew install create-dmg
 
     - name: Create DMG
+      if: steps.context.outputs.can_sign == 'true'
       run: |
         create-dmg \
           --volname "Openterface" \
@@ -159,6 +188,7 @@ jobs:
         xcrun stapler staple "build/Openterface.dmg"
     # Upload DMG as artifact
     - name: Upload DMG artifact
+      if: steps.context.outputs.can_sign == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: Openterface-KVM
@@ -173,6 +203,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node- 
     - name: Debug Certificates
+      if: steps.context.outputs.can_sign == 'true'
       run: |
         security find-identity -v -p codesigning
         security list-keychains

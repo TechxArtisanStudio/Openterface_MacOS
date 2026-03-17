@@ -98,9 +98,21 @@ class PlayerView: NSView, NSWindowDelegate {
         // Refresh cached geometry after toolbar auto-hide/show so that the
         // mouse mapping uses the correct view dimensions and there is no offset.
         playViewNtf.addObserver(self, selector: #selector(handleToolbarVisibilityChanged(_:)), name: .toolbarVisibilityChanged, object: nil)
+        // Show a warning tip when the detected HDMI input fps exceeds the chipset hardware max.
+        playViewNtf.addObserver(self, selector: #selector(handleUnsupportedFrameRate(_:)), name: Notification.Name("UnsupportedInputFrameRate"), object: nil)
     }
     
-        @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
+        @objc func handleUnsupportedFrameRate(_ notification: Notification) {
+        guard let fps = notification.userInfo?["fps"] as? Float,
+              let maxFps = notification.userInfo?["maxFps"] as? Float else { return }
+        let message = "⚠️ Input \(Int(fps))Hz exceeds hardware max (\(Int(maxFps))Hz). Set target display to ≤\(Int(maxFps))Hz for a clear image."
+        logger.log(content: message)
+        DispatchQueue.main.async {
+            self.tipLayerManager.showTip(text: message, yOffset: 3.0, fontSize: 18.0, window: NSApp.mainWindow)
+        }
+    }
+
+    @objc func promptUserHowToExitRelativeMode(_ notification: Notification) {
         let tips = "Long press or multiple clikc「ESC」to exit relative mode"
         DispatchQueue.main.async {
             self.tipLayerManager.showTip(text: tips, yOffset: 1.5, window: NSApp.mainWindow)

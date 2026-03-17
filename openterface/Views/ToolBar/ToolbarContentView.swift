@@ -58,6 +58,12 @@ struct ToolbarContentView: ToolbarContent {
             CapsLockIndicatorView()
                 .help("Target Caps Lock state - ON/OFF")
 
+            NumLockIndicatorView()
+                .help("Target Num Lock state - ON/OFF")
+
+            ScrollLockIndicatorView()
+                .help("Target Scroll Lock state - ON/OFF")
+
             Button(action: {}) {
                 Image(systemName: "poweron") // spacer
             }

@@ -22,6 +22,10 @@ public class TipLayerManager: TipLayerManagerProtocol {
     }
     
     public func showTip(text: String, yOffset: CGFloat = 1.5, window: NSWindow?) {
+        showTip(text: text, yOffset: yOffset, fontSize: nil, window: window)
+    }
+
+    public func showTip(text: String, yOffset: CGFloat = 1.5, fontSize: CGFloat? = nil, window: NSWindow?) {
         guard let window = window, let screen = window.screen else { return }
         
         // Create a new window for the tip
@@ -47,7 +51,8 @@ public class TipLayerManager: TipLayerManagerProtocol {
         
         let textLayer = CATextLayer()
         textLayer.string = text
-        textLayer.fontSize = map(value: screen.frame.width, inMin: 100, inMax: 2000, outMin: 10, outMax: 30)
+        let autoFontSize = map(value: screen.frame.width, inMin: 100, inMax: 2000, outMin: 10, outMax: 30)
+        textLayer.fontSize = fontSize ?? autoFontSize
         
         let width = CGFloat(CGFloat(text.count) * textLayer.fontSize * 0.5)
         let height = textLayer.fontSize * 1.5
