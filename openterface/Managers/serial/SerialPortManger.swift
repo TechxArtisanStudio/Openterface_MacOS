@@ -29,7 +29,19 @@ import Combine
 class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProtocol, ObservableObject, SerialResponseHandlerDelegate {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     static let shared = SerialPortManager()
-    var receiveBuffer = Data()
+
+    private lazy var messageParser: SerialMessageParser = {
+        let parser = SerialMessageParser(logger: logger)
+        parser.onMessage = { [weak self] messageData in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.isDeviceReady = true
+                self.errorAlertShown = false
+            }
+            self.responseHandler.handleSerialData(data: messageData)
+        }
+        return parser
+    }()
 
     // All protocol commands and constants moved to SerialProtocolCommands.swift
     // Use SerialProtocolCommands.* for all command references
@@ -319,96 +331,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "[Baudrate:\(self.baudrate)] Rx: \(dataString)")
         }
         
-        // Append new data to buffer
-        receiveBuffer.append(data)
-        
-        // Process all complete messages in the buffer
-        processBufferedMessages()
+        // Parse and dispatch complete messages
+        messageParser.append(data)
     }
     
-    private func processBufferedMessages() {
-        var bufferBytes = [UInt8](receiveBuffer)
-        var processedBytes = 0
-        
-        while bufferBytes.count >= 6 { // Minimum message size: 5 bytes header + 1 byte checksum
-            // Look for the next valid message start
-            guard let prefixIndex = findNextMessageStart(in: bufferBytes, from: processedBytes) else {
-                logger.log(content: "No valid message start found in buffer, discarding \(bufferBytes.count) bytes")
-                // No valid message start found, keep remaining data in buffer
-                if processedBytes > 0 {
-                    receiveBuffer = Data(bufferBytes[processedBytes...])
-                }
-                return
-            }
-            
-            // Adjust buffer if we skipped invalid data
-            if prefixIndex > processedBytes {
-                if logger.SerialDataPrint {
-                    let skippedData = bufferBytes[processedBytes..<prefixIndex]
-                    let skippedString = skippedData.map { String(format: "%02X", $0) }.joined(separator: " ")
-                    logger.log(content: "Skipping invalid data: \(skippedString)")
-                }
-                bufferBytes = Array(bufferBytes[prefixIndex...])
-                processedBytes = 0
-            }
-            
-            // Check if we have enough bytes for a complete message
-            if bufferBytes.count < 6 {
-                logger.log(content: "Not enough data for complete message, waiting for more data")
-                break
-            }
-            
-            let len = bufferBytes[4]
-            let expectedMessageLength = Int(len) + 6 // 5 bytes header + length + 1 byte checksum
-            
-            if bufferBytes.count < expectedMessageLength {
-                logger.log(content: "Incomplete message in buffer, waiting for more data, expected length: \(expectedMessageLength), current length: \(bufferBytes.count)")
-                break
-            }
-            
-            // Extract the complete message
-            let messageBytes = Array(bufferBytes[0..<expectedMessageLength])
-            let messageData = Data(messageBytes)
-            
-            // Verify checksum
-            let chksum = messageBytes[messageBytes.count - 1]
-            let checksum = self.calculateChecksum(data: Array(messageBytes[0..<messageBytes.count - 1]))
-            
-            if chksum == checksum {
-                DispatchQueue.main.async { [weak self] in
-                    self?.isDeviceReady = true
-                    self?.errorAlertShown = false
-                }
-                
-                _ = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
-                responseHandler.handleSerialData(data: messageData)
-            } else {
-                let errorDataString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
-                let checksumHex = String(format: "%02X", checksum)
-                let chksumHex = String(format: "%02X", chksum)
-                logger.log(content: "Checksum error, discard the message: \(errorDataString), calculated checksum: \(checksumHex), received checksum: \(chksumHex)")
-            }
-            
-            // Move to the next message
-            bufferBytes = Array(bufferBytes[expectedMessageLength...])
-            processedBytes = 0
-        }
-        
-        // Update the buffer with remaining data
-        receiveBuffer = Data(bufferBytes)
-    }
-    
-    private func findNextMessageStart(in bytes: [UInt8], from startIndex: Int) -> Int? {
-        let prefix: [UInt8] = [0x57, 0xAB, 0x00]
-        
-        for i in startIndex..<(bytes.count - 2) {
-            if bytes[i] == prefix[0] && bytes[i + 1] == prefix[1] && bytes[i + 2] == prefix[2] {
-                return i
-            }
-        }
-        return nil
-    }
-
     // MARK: - SerialResponseHandlerDelegate Implementation
     
     func updateKeyboardLatency(_ latency: Double, maxLatency: Double) {
