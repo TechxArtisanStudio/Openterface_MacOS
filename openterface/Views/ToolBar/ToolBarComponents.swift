@@ -100,3 +100,37 @@ struct CapsLockIndicatorView: View {
     }
 }
 
+// Num Lock indicator view - shows label with color indicating Num Lock state
+struct NumLockIndicatorView: View {
+    @ObservedObject var serialPortStatus = SerialPortStatus.shared
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: serialPortStatus.isNumLockOn ? "lock.fill" : "lock.open")
+                .foregroundColor(serialPortStatus.isNumLockOn ? .blue : .secondary)
+                .font(.system(size: 12))
+            Text("NUM")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(serialPortStatus.isNumLockOn ? .blue : .secondary)
+        }
+        .frame(width: 54, alignment: .center)
+        .help(serialPortStatus.isNumLockOn ? "Target Num Lock is ON" : "Target Num Lock is OFF")
+    }
+}
+
+// Scroll Lock indicator view - shows label with color indicating Scroll Lock state
+struct ScrollLockIndicatorView: View {
+    @ObservedObject var serialPortStatus = SerialPortStatus.shared
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: serialPortStatus.isScrollOn ? "lock.fill" : "lock.open")
+                .foregroundColor(serialPortStatus.isScrollOn ? .blue : .secondary)
+                .font(.system(size: 12))
+            Text("SCR")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(serialPortStatus.isScrollOn ? .blue : .secondary)
+        }
+        .frame(width: 54, alignment: .center)
+        .help(serialPortStatus.isScrollOn ? "Target Scroll Lock is ON" : "Target Scroll Lock is OFF")
+    }
+}
+
