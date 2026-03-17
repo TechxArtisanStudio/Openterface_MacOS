@@ -260,7 +260,11 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         isCapsLockOn.toggle()
         // For Caps Lock, we typically want to send the key press regardless of the state
         sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.capsLock)
-    AppStatus.isHostCapLockOn = isCapsLockOn
+        AppStatus.isHostCapLockOn = isCapsLockOn
+        // Query target LED state after a short delay so the target has time to update
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            SerialPortManager.shared.getHidInfo()
+        }
     }
     
     func modifierFlagsDescription(_ flags: NSEvent.ModifierFlags) -> String {
@@ -443,6 +447,10 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                     kbm.pressKey(keys: pressedKeys, modifiers: [])
                     pressedKeys[index] = 255
                     kbm.releaseKey(keys: pressedKeys)
+                }
+                // Query target LED state after a short delay so the target has time to update
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    SerialPortManager.shared.getHidInfo()
                 }
             }
             isCapsLockOn = true

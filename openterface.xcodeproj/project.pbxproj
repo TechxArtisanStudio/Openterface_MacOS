@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -24,7 +24,6 @@
 		53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */; };
 		53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC66092B8EDB390081F927 /* LoggerManager.swift */; };
 		53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC660E2B8EE70C0081F927 /* LogTests.swift */; };
-		53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F7C7122B440C8E00ED872F /* SerialPortManger.swift */; };
 		53F7C7162B44113100ED872F /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = 53F7C7152B44113100ED872F /* ORSSerial */; };
 		53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */; };
 		53FBE7AE2B3D66D2007785B0 /* openterfaceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */; };
@@ -90,9 +89,6 @@
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
-		F1747E9A2F61150A0058F163 /* SerialProtocolCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */; };
-		F1747E9C2F6142860058F163 /* SerialPortStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1747E9B2F6142860058F163 /* SerialPortStatus.swift */; };
-		F1E5DEA92F6263F8005BBE83 /* SerialResponseHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E5DEA82F6263F8005BBE83 /* SerialResponseHandler.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -129,7 +125,6 @@
 		53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		53CC66092B8EDB390081F927 /* LoggerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerManager.swift; sourceTree = "<group>"; };
 		53CC660E2B8EE70C0081F927 /* LogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTests.swift; sourceTree = "<group>"; };
-		53F7C7122B440C8E00ED872F /* SerialPortManger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortManger.swift; sourceTree = "<group>"; };
 		53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManager.swift; sourceTree = "<group>"; };
 		53FBE7AA2B3D66D2007785B0 /* openterface.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = openterface.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = openterfaceApp.swift; sourceTree = "<group>"; };
@@ -201,10 +196,11 @@
 		BFD4EA972E369C870029BFC2 /* CameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
-		F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialProtocolCommands.swift; sourceTree = "<group>"; };
-		F1747E9B2F6142860058F163 /* SerialPortStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortStatus.swift; sourceTree = "<group>"; };
-		F1E5DEA82F6263F8005BBE83 /* SerialResponseHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialResponseHandler.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		F12FAECD2F6813C000F91607 /* serial */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = serial; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		53FBE7A72B3D66D2007785B0 /* Frameworks */ = {
@@ -325,7 +321,7 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
-				F1E5DEA82F6263F8005BBE83 /* SerialResponseHandler.swift */,
+				F12FAECD2F6813C000F91607 /* serial */,
 				6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */,
 				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
@@ -334,14 +330,11 @@
 				5394F9662B57DC4000DB44ED /* Target */,
 				5394F9612B57DB7D00DB44ED /* Host */,
 				53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */,
-				53F7C7122B440C8E00ED872F /* SerialPortManger.swift */,
-				F1747E992F61150A0058F163 /* SerialProtocolCommands.swift */,
 				53CC66092B8EDB390081F927 /* LoggerManager.swift */,
 				BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */,
 				BFD4EA972E369C870029BFC2 /* CameraManager.swift */,
 				BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */,
 				BF98F71E2E34F139002EACD7 /* FloatingKeyboardManager.swift */,
-				F1747E9B2F6142860058F163 /* SerialPortStatus.swift */,
 				53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */,
 				BF98F7222E34FC8D002EACD7 /* OCRManager.swift */,
 				6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */,
@@ -482,6 +475,9 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				F12FAECD2F6813C000F91607 /* serial */,
+			);
 			name = openterface;
 			packageProductDependencies = (
 				53F7C7152B44113100ED872F /* ORSSerial */,
@@ -609,7 +605,6 @@
 				296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				BFD4EA932E35EE970029BFC2 /* ManagerProtocols.swift in Sources */,
-				53F7C7132B440C8E00ED872F /* SerialPortManger.swift in Sources */,
 				BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */,
 				BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
@@ -619,7 +614,6 @@
 				6BC3646A2F02646D001B9A07 /* ToolBarComponents.swift in Sources */,
 				BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */,
 				BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */,
-				F1E5DEA92F6263F8005BBE83 /* SerialResponseHandler.swift in Sources */,
 				BF7752DF2EFFECE400FE5D0E /* ParallelManager.swift in Sources */,
 				BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */,
 				BFD4EA942E35EE970029BFC2 /* ProtocolExtensions.swift in Sources */,
@@ -628,7 +622,6 @@
 				BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */,
 				BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
-				F1747E9C2F6142860058F163 /* SerialPortStatus.swift in Sources */,
 				6BC364662F025DD4001B9A07 /* WindowUtils.swift in Sources */,
 				BF98F7372E35A1BD002EACD7 /* HardwareAbstractionLayer.swift in Sources */,
 				6B8B06412F04C7500040BEBF /* SwitchableUSBManager.swift in Sources */,
@@ -640,7 +633,6 @@
 				BF98F71F2E34F139002EACD7 /* FloatingKeyboardManager.swift in Sources */,
 				BF98F7352E35A1BD002EACD7 /* DependencyContainer.swift in Sources */,
 				531BAC362B5E40BA00950525 /* KeyBoardManager.swift in Sources */,
-				F1747E9A2F61150A0058F163 /* SerialProtocolCommands.swift in Sources */,
 				53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */,
 				BFD4EA962E3643CA0029BFC2 /* PasteConfirmationView.swift in Sources */,
 				6BFCEC852F0A1CBD00CDE096 /* AspectRatioSettingsView.swift in Sources */,

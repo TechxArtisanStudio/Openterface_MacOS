@@ -85,18 +85,18 @@ struct SerialInfoView: View {
 
 // Caps Lock indicator view - shows a small icon and label with color indicating Caps state
 struct CapsLockIndicatorView: View {
-    @ObservedObject var keyboardManager = KeyboardManager.shared
+    @ObservedObject var serialPortStatus = SerialPortStatus.shared
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: keyboardManager.isCapsLockOn ? "lock.fill" : "lock.open")
-                .foregroundColor(keyboardManager.isCapsLockOn ? .blue : .secondary)
+            Image(systemName: serialPortStatus.isCapLockOn ? "lock.fill" : "lock.open")
+                .foregroundColor(serialPortStatus.isCapLockOn ? .blue : .secondary)
                 .font(.system(size: 12))
             Text("CAPS")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(keyboardManager.isCapsLockOn ? .blue : .secondary)
+                .foregroundColor(serialPortStatus.isCapLockOn ? .blue : .secondary)
         }
         .frame(width: 54, alignment: .center)
-        .help(keyboardManager.isCapsLockOn ? "Caps Lock is ON" : "Caps Lock is OFF")
+        .help(serialPortStatus.isCapLockOn ? "Target Caps Lock is ON" : "Target Caps Lock is OFF")
     }
 }
 
