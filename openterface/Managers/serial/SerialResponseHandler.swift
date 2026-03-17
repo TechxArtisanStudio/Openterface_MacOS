@@ -220,26 +220,27 @@ extension SerialResponseHandler {
             }
         }
         // For other values, chipVersion remains as is
-        SerialPortStatus.shared.chipVersion = chipVersion
-        
-        // Update device capabilities based on chip version
+
+        // Update device capabilities based on chip version (non-UI, safe off main thread)
         deviceCapabilities = DeviceCapabilities.forChipVersion(chipVersion)
-        
+
         let isTargetConnected = data[6] == 0x01
-        SerialPortStatus.shared.isTargetConnected = isTargetConnected
-        SerialPortStatus.shared.isKeyboardConnected = isTargetConnected
-        SerialPortStatus.shared.isMouseConnected = isTargetConnected
+        let isNumLockOn = (data[7] & 0x01) == 0x01
+        let isCapLockOn = (data[7] & 0x02) == 0x02
+        let isScrollOn = (data[7] & 0x04) == 0x04
 
         logger.log(content: isTargetConnected ? "The Target Screen keyboard and mouse are connected" : "The Target Screen keyboard and mouse are disconnected")
 
-        let isNumLockOn = (data[7] & 0x01) == 0x01
-        SerialPortStatus.shared.isNumLockOn = isNumLockOn
-
-        let isCapLockOn = (data[7] & 0x02) == 0x02
-        SerialPortStatus.shared.isCapLockOn = isCapLockOn
-
-        let isScrollOn = (data[7] & 0x04) == 0x04
-        SerialPortStatus.shared.isScrollOn = isScrollOn
+        // All @Published property mutations must happen on the main thread for SwiftUI to react
+        DispatchQueue.main.async {
+            SerialPortStatus.shared.chipVersion = chipVersion
+            SerialPortStatus.shared.isTargetConnected = isTargetConnected
+            SerialPortStatus.shared.isKeyboardConnected = isTargetConnected
+            SerialPortStatus.shared.isMouseConnected = isTargetConnected
+            SerialPortStatus.shared.isNumLockOn = isNumLockOn
+            SerialPortStatus.shared.isCapLockOn = isCapLockOn
+            SerialPortStatus.shared.isScrollOn = isScrollOn
+        }
     }
     
     private func handleKeyboardAck(_ data: Data) {
