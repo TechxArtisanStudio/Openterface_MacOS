@@ -99,6 +99,8 @@ class HALIntegrationManager {
     private var isInitialized: Bool = false
     private var periodicUpdateTimer: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "hardware-monitor", qos: .utility)
+    /// Prevents flooding the user with repeated "unsupported input fps" tips for the same session.
+    private var hasWarnedAboutUnsupportedFps: Bool = false
     
     private init() {}
     
@@ -647,8 +649,12 @@ class HALIntegrationManager {
                     sdDirection = hidManager.getSoftwareSwitchDirection()
                 }
 
+                // Compute once on the background queue (before the dispatch)
+                let chipMaxFps = videoChipset.maxFrameRate
+
                 // Dispatch all AppStatus writes to main thread
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
                     AppStatus.hidReadResolusion = resolution
                     AppStatus.hidReadFps = fps
                     if let timingInfo = timingInfo {
@@ -662,6 +668,24 @@ class HALIntegrationManager {
                     }
                     if let direction = sdDirection {
                         AppStatus.sdCardDirection = direction
+                    }
+
+                    // Warn once when detected input fps exceeds the chipset hardware maximum.
+                    // The capture chip cannot cleanly handle the higher pixel-clock, so the
+                    // USB frames it delivers will be corrupted/garbled → blurry display.
+                    if fps > chipMaxFps {
+                        if !self.hasWarnedAboutUnsupportedFps {
+                            self.hasWarnedAboutUnsupportedFps = true
+                            self.logger.log(content: "⚠️ Input fps \(fps) exceeds chipset max \(chipMaxFps)fps — display will be blurry. Set target to ≤\(Int(chipMaxFps))Hz.")
+                            NotificationCenter.default.post(
+                                name: Notification.Name("UnsupportedInputFrameRate"),
+                                object: nil,
+                                userInfo: ["fps": fps, "maxFps": chipMaxFps]
+                            )
+                        }
+                    } else {
+                        // Reset so the warning fires again if the user connects a different source
+                        self.hasWarnedAboutUnsupportedFps = false
                     }
                 }
             } catch {

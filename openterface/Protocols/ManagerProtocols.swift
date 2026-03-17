@@ -258,6 +258,7 @@ protocol HostManagerProtocol: AnyObject {
 /// Protocol for tip layer management and on-screen notifications
 protocol TipLayerManagerProtocol: AnyObject {
     func showTip(text: String, yOffset: CGFloat, window: NSWindow?)
+    func showTip(text: String, yOffset: CGFloat, fontSize: CGFloat?, window: NSWindow?)
 }
 
 /// Protocol for floating keyboard window management
