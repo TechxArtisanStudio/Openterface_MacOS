@@ -147,6 +147,7 @@ class FirmwareManager: ObservableObject {
         
         // Parse the firmware info based on chipset type
         // Format: "25022713,Openterface_Firmware_250306.bin" for MS2109
+        //         "25022713,Openterface_Firmware_2109s_250306.bin,2109s" for MS2109S
         //         "25052210,Openterface_Firmware_2130s_250522.bin,2130s" for MS2130S
         let lines = infoString.components(separatedBy: .newlines)
         var selectedLine: String?
@@ -158,10 +159,15 @@ class FirmwareManager: ObservableObject {
             selectedLine = lines.first { line in
                 line.contains("2130s")
             }
-        default:
-            // For MS2109 and MS2109S, use the first line without chipset suffix
+        case .ms2109s:
+            // Look for line containing "2109s"
             selectedLine = lines.first { line in
-                !line.contains("2130s")
+                line.contains("2109s")
+            }
+        default:
+            // For MS2109, use the line without a chipset suffix
+            selectedLine = lines.first { line in
+                !line.contains("2130s") && !line.contains("2109s")
             }
         }
         
@@ -226,6 +232,7 @@ class FirmwareManager: ObservableObject {
             
             // Parse the firmware info based on chipset type
             // Format: "25022713,Openterface_Firmware_250306.bin" for MS2109
+            //         "25022713,Openterface_Firmware_2109s_250306.bin,2109s" for MS2109S
             //         "25052210,Openterface_Firmware_2130s_250522.bin,2130s" for MS2130S
             let lines = responseString.components(separatedBy: .newlines)
             var selectedLine: String?
@@ -237,10 +244,15 @@ class FirmwareManager: ObservableObject {
                 selectedLine = lines.first { line in
                     line.contains("2130s")
                 }
-            default:
-                // For MS2109 and MS2109S, use the first line without chipset suffix
+            case .ms2109s:
+                // Look for line containing "2109s"
                 selectedLine = lines.first { line in
-                    !line.contains("2130s")
+                    line.contains("2109s")
+                }
+            default:
+                // For MS2109, use the line without a chipset suffix
+                selectedLine = lines.first { line in
+                    !line.contains("2130s") && !line.contains("2109s")
                 }
             }
             
