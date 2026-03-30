@@ -51,6 +51,7 @@ enum FirmwareError: LocalizedError {
 }
 
 struct FirmwareUpdateView: View {
+    private let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     @StateObject private var firmwareManager: FirmwareManager
     @State private var currentVersion: String = "Checking..."
     @State private var latestVersion: String = "Checking.."
@@ -61,7 +62,9 @@ struct FirmwareUpdateView: View {
     @State private var updateSuccess: Bool = false
     @State private var showingRestoreConfirmation: Bool = false
     @State private var showingRestoreWarning: Bool = false
+    @State private var showingFlashConfirmation: Bool = false
     @State private var selectedRestoreFile: URL?
+    @State private var selectedFlashFile: URL?
     @Environment(\.dismiss) private var dismiss
     
     init() {
@@ -228,11 +231,17 @@ struct FirmwareUpdateView: View {
                         .disabled(firmwareManager.isUpdateInProgress || firmwareManager.isBackupInProgress)
                         .help("Restore firmware from a backup file")
                         
+                        Button("Flash Local Firmware") {
+                            showFlashFileSelector()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(firmwareManager.isUpdateInProgress || firmwareManager.isBackupInProgress)
+                        .help("Select a local .bin file and write it to the device directly")
+
                         Spacer()
                         
                         if (currentVersion == latestVersion && currentVersion != "Unknown" && latestVersion != "Unknown") || isCurrentVersionNewer() {
                             Button("Close") {
-                                // For standalone windows, we need to close the actual window
                                 if let window = NSApp.keyWindow {
                                     window.close()
                                 } else {
@@ -332,6 +341,14 @@ struct FirmwareUpdateView: View {
             }
         } message: {
             Text("WARNING: Restoring firmware from a file is a potentially dangerous operation that could permanently damage your device.\n\n• Only use firmware files specifically designed for your device\n• Ensure the file is from a trusted source\n• Do not interrupt the process once started\n• The device may become unusable if incorrect firmware is installed\n\nProceed only if you understand these risks.")
+        }
+        .alert("Confirm Flash Local Firmware", isPresented: $showingFlashConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Flash Now", role: .destructive) {
+                startFirmwareFlash()
+            }
+        } message: {
+            Text("You have selected firmware file: \(selectedFlashFile?.lastPathComponent ?? "<unknown>")\n\nThis will write directly to the device flash memory. Make sure your device is connected and you have the correct firmware file.")
         }
         .alert("Confirm Firmware Restore", isPresented: $showingRestoreConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -473,12 +490,11 @@ struct FirmwareUpdateView: View {
         openPanel.allowsMultipleSelection = false
         openPanel.canChooseDirectories = false
         openPanel.canChooseFiles = true
-        
-        // Set default directory to Desktop
+
         if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             openPanel.directoryURL = desktopURL
         }
-        
+
         openPanel.begin { response in
             if response == .OK, let url = openPanel.url {
                 selectedRestoreFile = url
@@ -486,12 +502,103 @@ struct FirmwareUpdateView: View {
             }
         }
     }
-    
+
+    private func showFlashFileSelector() {
+        let openPanel = NSOpenPanel()
+        openPanel.title = "Select Local Firmware File to Flash"
+        openPanel.message = "Choose the local firmware file (.bin) to flash to device"
+        openPanel.allowedContentTypes = [.data]
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+
+        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
+            openPanel.directoryURL = desktopURL
+        }
+
+        openPanel.begin { response in
+            if response == .OK, let url = openPanel.url {
+                selectedFlashFile = url
+                showingFlashConfirmation = true
+            }
+        }
+    }
+
     private func startFirmwareRestore() {
         guard let restoreFile = selectedRestoreFile else { return }
-        
+
         Task {
             await performFirmwareRestore(from: restoreFile)
+        }
+    }
+
+    private func startFirmwareFlash() {
+        guard let flashFile = selectedFlashFile else { return }
+
+        Task {
+            await performFirmwareFlash(from: flashFile)
+        }
+    }
+
+    private func performFirmwareFlash(from fileURL: URL) async {
+        // Block video/HID startup during flash and keep flag state accessible globally
+        AppStatus.isFirmwareFlashing = true
+        defer {
+            AppStatus.isFirmwareFlashing = false
+        }
+
+        await MainActor.run {
+            firmwareManager.updateStatus = "Stopping operations before flash..."
+            firmwareManager.updateProgress = 0.0
+            firmwareManager.isUpdateInProgress = true
+        }
+
+        await stopAllOperations()
+
+        await MainActor.run {
+            firmwareManager.updateStatus = "Loading firmware file..."
+            firmwareManager.updateProgress = 0.0
+        }
+
+        do {
+            let firmwareData = try Data(contentsOf: fileURL)
+            logger.log(content: "FirmwareUpdateView: selected firmware file=\(fileURL.lastPathComponent), size=\(firmwareData.count) bytes")
+            if firmwareData.count <= 100 || firmwareData.count > 10_000_000 {
+                await MainActor.run {
+                    firmwareManager.updateStatus = "Invalid firmware file size: \(firmwareData.count) bytes"
+                    firmwareManager.isUpdateInProgress = false
+                }
+                logger.log(content: "FirmwareUpdateView: invalid firmware file size, aborting flash")
+                return
+            }
+
+            await MainActor.run {
+                firmwareManager.updateProgress = 0.1
+                firmwareManager.updateStatus = "Starting flash process..."
+            }
+
+            let success: Bool
+            if AppStatus.videoChipsetType == .ms2130s {
+                logger.log(content: "FirmwareUpdateView: invoking flashExternalFirmware for MS2130S")
+                success = try await firmwareManager.flashExternalFirmware(firmwareData)
+                logger.log(content: "FirmwareUpdateView: flashExternalFirmware returned \(success)")
+            } else {
+                logger.log(content: "FirmwareUpdateView: invoking writeFirmwareToEeprom")
+                success = await firmwareManager.writeFirmwareToEeprom(firmwareData)
+                logger.log(content: "FirmwareUpdateView: writeFirmwareToEeprom returned \(success)")
+            }
+
+            await MainActor.run {
+                firmwareManager.isUpdateInProgress = false
+                firmwareManager.updateProgress = success ? 1.0 : firmwareManager.updateProgress
+                firmwareManager.updateStatus = success ? "Firmware flash completed successfully!" : "Firmware flash failed"
+            }
+
+        } catch {
+            await MainActor.run {
+                firmwareManager.updateStatus = "Firmware flash error: \(error.localizedDescription)"
+                firmwareManager.isUpdateInProgress = false
+            }
         }
     }
     

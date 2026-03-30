@@ -550,6 +550,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Starts video capture session
     func startVideoSession() {
+        // Avoid HID/video bus conflicts during firmware flashing
+        if AppStatus.isFirmwareFlashing {
+            logger.log(content: "Firmware flash in progress: skipping video session start")
+            isVideoSessionStarting = false
+            return
+        }
+
         // Status check: if session is already running, return directly
         if captureSession.isRunning {
             logger.log(content: "Video session already running, skipping start...")

@@ -1176,6 +1176,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Stop repeating HID operations but keep HID connection open for firmware update
         hidManager.stopAllHIDOperations()
 
+        // Pause HAL periodic updates to avoid concurrent HID access during flash
+        HALIntegrationManager.shared.pausePeriodicHALUpdates()
+
         // Stop video session by posting notification for PlayerViewModel to handle
         logger.log(content: "Posting StopVideoSession notification for firmware update")
         NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
@@ -1217,6 +1220,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         
         // Restart HID operations first
         hidManager.restartHIDOperations()
+
+        // Resume HAL periodic updates after firmware flash
+        HALIntegrationManager.shared.resumePeriodicHALUpdates()
         
         // Restart video session by posting notification for PlayerViewModel to handle
         logger.log(content: "Posting StartVideoSession notification after firmware update")
