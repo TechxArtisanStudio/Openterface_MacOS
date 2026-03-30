@@ -189,6 +189,9 @@ protocol FirmwareManagerProtocol: AnyObject {
     func updateFirmware(from url: URL) async throws
     func validateFirmware(_ data: Data) throws -> Bool
     func writeFirmwareToDevice(_ data: Data) async throws -> Bool
+    func flashExternalFirmware(_ data: Data) async throws -> Bool
+    func backupExternalFirmware(to url: URL, withTotalSize size: Int) async throws -> Bool
+    func restoreExternalFirmware(from url: URL) async throws -> Bool
     func stopAllOperations()
     func restartOperations()
 }

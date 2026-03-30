@@ -53,6 +53,9 @@ struct AppStatus {
     static var videoChipsetType: VideoChipsetType = .unknown
     static var controlChipsetType: ControlChipsetType = .unknown
     
+    // Firmware operations state
+    static var isFirmwareFlashing: Bool = false
+
     // Available control chipsets for selection
     static var availableControlChipsets: [ControlChipsetType] = []
 

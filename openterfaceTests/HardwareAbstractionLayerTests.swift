@@ -163,6 +163,20 @@ class HardwareAbstractionLayerTests: XCTestCase {
         }
     }
     
+    func testMS2130SVideoChipset() {
+        let ms2130s = MS2130SVideoChipset()
+        if let chipset = ms2130s {
+            XCTAssertEqual(chipset.chipsetInfo.name, "MS2130S", "MS2130S chipset name should be correct")
+            XCTAssertEqual(chipset.chipsetInfo.vendorID, 0x345F, "MS2130S vendor ID should be correct")
+            XCTAssertEqual(chipset.chipsetInfo.productID, 0x2132, "MS2130S product ID should be correct")
+            XCTAssertEqual(chipset.maxFrameRate, 60.0, "MS2130S max frame rate should be 60 fps")
+            XCTAssertTrue(chipset.capabilities.supportsHDMI, "MS2130S should support HDMI")
+            XCTAssertTrue(chipset.capabilities.supportsAudio, "MS2130S should support audio")
+            XCTAssertTrue(chipset.capabilities.supportsFirmwareUpdate, "MS2130S should support firmware update")
+            XCTAssertFalse(chipset.capabilities.supportsEEPROM, "MS2130S should not support EEPROM")
+        }
+    }
+    
     func testCH9329ControlChipset() {
         // Test CH9329 chipset creation and properties
         let ch9329 = CH9329ControlChipset()
