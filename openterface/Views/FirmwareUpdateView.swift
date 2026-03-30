@@ -592,6 +592,9 @@ struct FirmwareUpdateView: View {
                 firmwareManager.isUpdateInProgress = false
                 firmwareManager.updateProgress = success ? 1.0 : firmwareManager.updateProgress
                 firmwareManager.updateStatus = success ? "Firmware flash completed successfully!" : "Firmware flash failed"
+                // Show the same completion alert as the MS2109 update path
+                updateSuccess = success
+                showingUpdateCompletionAlert = true
             }
 
         } catch {
