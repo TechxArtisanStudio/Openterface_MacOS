@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var showInputOverlay = AppStatus.showInputOverlay
     @State private var showAppInfoOverlay = AppStatus.showAppInfoOverlay
     @State private var showActiveVideoRect = AppStatus.showActiveVideoRect
+    @State private var showGuideOverlay = AppStatus.showGuideOverlay
     @State private var overlayActive = AppStatus.showParallelOverlay
     @State private var showMiniIndicator: Bool = false
     @State private var miniMousePos: CGPoint = CGPoint(x: 0.5, y: 0.5) // normalized (0..1), origin: top-left
@@ -146,6 +147,31 @@ struct ContentView: View {
                         }
                         .allowsHitTesting(false)
                     }
+
+                    if showGuideOverlay {
+                        GeometryReader { geo in
+                            let rect = AppStatus.guideHighlightRectNormalized
+                            let clampedX = max(0.0, min(1.0, rect.origin.x))
+                            let clampedY = max(0.0, min(1.0, rect.origin.y))
+                            let clampedW = max(0.0, min(1.0, rect.width))
+                            let clampedH = max(0.0, min(1.0, rect.height))
+
+                            if clampedW > 0.001 && clampedH > 0.001 {
+                                let overlayRect = CGRect(
+                                    x: clampedX * geo.size.width,
+                                    y: clampedY * geo.size.height,
+                                    width: clampedW * geo.size.width,
+                                    height: clampedH * geo.size.height
+                                )
+
+                                Rectangle()
+                                    .stroke(Color.red, lineWidth: 3)
+                                    .frame(width: overlayRect.width, height: overlayRect.height)
+                                    .position(x: overlayRect.midX, y: overlayRect.midY)
+                            }
+                        }
+                        .allowsHitTesting(false)
+                    }
                 }
                 
                 if showInputOverlay {
@@ -171,6 +197,9 @@ struct ContentView: View {
             }
             if showActiveVideoRect != AppStatus.showActiveVideoRect {
                 showActiveVideoRect = AppStatus.showActiveVideoRect
+            }
+            if showGuideOverlay != AppStatus.showGuideOverlay {
+                showGuideOverlay = AppStatus.showGuideOverlay
             }
             if overlayActive != AppStatus.showParallelOverlay {
                 overlayActive = AppStatus.showParallelOverlay

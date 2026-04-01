@@ -101,6 +101,15 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         if saveImage(currentFrame, to: fileURL) {
             logger.log(content: "Picture saved to: \(fileURL.path)")
             statusMessage = "Picture saved successfully"
+
+            NotificationCenter.default.post(
+                name: .cameraPictureCaptured,
+                object: nil,
+                userInfo: [
+                    "image": currentFrame,
+                    "fileURL": fileURL
+                ]
+            )
             
             // Show notification
             showNotification(title: "Picture Captured", 
@@ -691,6 +700,10 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         
         self.logger.log(content: "Showed alternative notification feedback: \(title)")
     }
+}
+
+extension Notification.Name {
+    static let cameraPictureCaptured = Notification.Name("cameraPictureCaptured")
 }
 
 // MARK: - Capture Delegates

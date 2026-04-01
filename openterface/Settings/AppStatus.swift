@@ -68,6 +68,8 @@ struct AppStatus {
     static var showAppInfoOverlay: Bool = false
     static var showActiveVideoRect: Bool = false
     static var showParallelOverlay: Bool = false
+    static var showGuideOverlay: Bool = false
+    static var guideHighlightRectNormalized: CGRect = .zero
     
     //Following two status check the CTS flipping status for Mini-KVM
     static var isKeyboardConnected: Bool? = false
@@ -119,6 +121,7 @@ struct AppStatus {
     static var videoChipDevice: USBDeviceInfo?
     static var controlChipDevice: USBDeviceInfo?
     static let logFileName: String = "openterface.log"
+    static let aiTraceLogFileName: String = "openterface-ai-trace.log"
     
     static var serialPortName: String = "N/A"
     static var serialPortBaudRate: Int = 0

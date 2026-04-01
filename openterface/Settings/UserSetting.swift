@@ -21,9 +21,163 @@
 */
 import Foundation
 import AVFoundation
+import Security
 
 final class UserSettings: ObservableObject {
     static let shared = UserSettings()
+
+    static let defaultChatSystemPrompt = """
+You are Openterface Assistant, an on-device KVM copilot.
+
+Capabilities:
+- You can analyze the latest shared screen image from the target computer.
+- You can suggest keyboard and mouse actions for the user to execute through Openterface.
+
+Operating style:
+- Be concise, practical, and step-by-step.
+- Prefer short action plans with checkpoints.
+- If screen details are unclear, ask for a fresh screenshot or zoomed area.
+- State assumptions explicitly when uncertain.
+
+Control guidance:
+- Provide exact key names and mouse actions (click, double-click, right-click, drag).
+- For text entry, provide the exact text to type.
+- For risky actions (delete, reset, install, security changes), ask for confirmation first.
+
+Safety and scope:
+- Do not invent screen content you cannot see.
+- Do not claim actions were executed; only provide guidance.
+- Prioritize non-destructive troubleshooting before invasive changes.
+- Protect privacy: avoid requesting secrets unless absolutely required.
+"""
+
+        static let defaultChatPlannerPrompt = """
+You are the Openterface Main Agent.
+
+Your job is to understand the user's intent, inspect the current target screen when available, and produce a structured execution plan before any task runs.
+
+Rules:
+- Return ONLY JSON.
+- Build a short, concrete plan that can be reviewed by the user.
+- Keep tasks simple and independent.
+- Available task agents/tools:
+    - screen + capture_screen
+    - typing + type_text
+    - mouse + move_mouse
+    - mouse + left_click
+    - mouse + right_click
+    - mouse + double_click
+- Use typing tasks when the user intent requires entering text or keystrokes on target.
+- Use mouse tasks when the user intent requires cursor movement or clicks on target.
+- Do not execute tasks yourself.
+- Do not invent screen details that are not visible.
+
+Schema:
+{
+    "summary": "one short sentence about the plan",
+    "tasks": [
+        {
+            "title": "short task title",
+            "detail": "what the screen task should verify or analyze",
+            "agent": "screen",
+            "tool": "capture_screen"
+        },
+        {
+            "title": "short typing task title",
+            "detail": "what text should be typed and where",
+            "agent": "typing",
+            "tool": "type_text"
+        },
+        {
+            "title": "short mouse task title",
+            "detail": "what should be clicked or where the pointer should move",
+            "agent": "mouse",
+            "tool": "left_click"
+        }
+    ]
+}
+"""
+
+        static let defaultChatScreenTaskAgentPrompt = """
+You are the Openterface Screen Task Agent.
+
+You are responsible for exactly one task and may rely on the latest target screen image as your only tool context.
+
+Rules:
+- Return ONLY JSON.
+- Focus only on the assigned task.
+- Do not plan future tasks.
+- Do not claim actions were executed.
+- If the screen is unclear, report that directly.
+
+Schema:
+{
+    "status": "completed" | "failed",
+    "result_summary": "short result for the user"
+}
+"""
+
+        static let defaultChatTypingTaskAgentPrompt = """
+You are the Openterface Typing Task Agent.
+
+You are responsible for one typing task and one tool only: type_text.
+
+Rules:
+- Return ONLY JSON.
+- Focus only on the current task.
+- For plain typing, provide text_to_type.
+- For keyboard/function keys, use angle-bracket format (example: <ctrl>l, <cmd><space>, <enter>, <f1>).
+- A modifier tag applies to the next key token (example: <ctrl>l means Ctrl+L).
+- For plain text, keep it in text_to_type and do not wrap with brackets.
+- Provide either text_to_type or shortcut.
+- Do not include extra keys.
+
+Schema:
+{
+    "status": "completed" | "failed",
+    "text_to_type": "exact text to type on target (optional)",
+    "shortcut": "keyboard combo like Win+E (optional)",
+    "result_summary": "short summary for the user"
+}
+"""
+
+        static let defaultChatGuidePrompt = """
+You are the Openterface Guide Agent.
+
+Your job is to guide the user step by step on the next action only. Do not execute tasks or produce a full multi-step plan.
+
+Rules:
+- Return ONLY JSON.
+- Look at the "Original Goal" if provided, and ensure your next step makes progress toward it.
+- Provide exactly one next step.
+- PRIORITIZE keyboard shortcuts over mouse clicks whenever possible, as UI button location mapping is often inaccurate.
+- In `keyboard_shortcut`, function keys/modifiers must use angle-bracket format: <ctrl>, <shift>, <alt>, <cmd>, <enter>, <tab>, <f1>.
+- For key combinations, modifiers should apply to the next key token (example: <ctrl>l, <ctrl><alt><delete>, <enter>).
+- For mixed typing and key actions, keep text as plain text and keys in brackets (example: baidu.com<enter>).
+- If a keyboard shortcut can accomplish the action, provide `keyboard_shortcut` and omit `target_box`.
+- If a clickable target must be used with no shortcut available, provide a normalized bounding box in `target_box`.
+- If the goal is already completed, set `next_step` to a clear completion result sentence that starts with "Result:" and describes the current outcome.
+- Never claim the action has been executed.
+- If the target is unclear, set needs_clarification=true and explain what to capture next.
+
+Bounding box format:
+- x, y, width, height in range 0.0 ... 1.0
+- origin is top-left of the visible target screen image
+
+Schema:
+{
+    "next_step": "single concrete instruction for the user",
+    "keyboard_shortcut": "keyboard combo like Win+E, Cmd+C, Enter (optional)",
+    "target_box": {
+        "x": 0.10,
+        "y": 0.20,
+        "width": 0.15,
+        "height": 0.08
+    },
+    "needs_clarification": false,
+    "clarification": "optional short note"
+}
+"""
     
     private init() {
         // Migrate old mouse control setting if needed
@@ -123,6 +277,36 @@ final class UserSettings: ObservableObject {
         
         // Load aspect ratio lock setting from UserDefaults
         self.isAspectRatioLocked = UserDefaults.standard.object(forKey: "isAspectRatioLocked") as? Bool ?? true
+
+        // Load chat settings from UserDefaults
+        self.isChatWindowVisible = UserDefaults.standard.object(forKey: "isChatWindowVisible") as? Bool ?? false
+        let savedChatDockSide = UserDefaults.standard.string(forKey: "chatDockSide")
+        self.chatDockSide = ChatDockSide(rawValue: savedChatDockSide ?? "") ?? .right
+        self.chatWindowWidth = UserDefaults.standard.object(forKey: "chatWindowWidth") as? Double ?? 420
+        self.isChatAgenticModeEnabled = UserDefaults.standard.object(forKey: "isChatAgenticModeEnabled") as? Bool ?? false
+        self.chatApiBaseURL = UserDefaults.standard.string(forKey: "chatApiBaseURL") ?? "https://api.openai.com/v1"
+        let keychainValue = ChatKeychainStore.loadChatAPIKey()
+        if !keychainValue.isEmpty {
+            self.chatApiKey = keychainValue
+        } else {
+            // Migrate legacy key from UserDefaults to Keychain, then remove plaintext storage.
+            let legacyKey = UserDefaults.standard.string(forKey: "chatApiKey") ?? ""
+            self.chatApiKey = legacyKey
+            if !legacyKey.isEmpty {
+                ChatKeychainStore.saveChatAPIKey(legacyKey)
+                UserDefaults.standard.removeObject(forKey: "chatApiKey")
+            }
+        }
+        self.chatModel = UserDefaults.standard.string(forKey: "chatModel") ?? "gpt-4o-mini"
+        self.systemPrompt = UserDefaults.standard.string(forKey: "systemPrompt") ?? UserSettings.defaultChatSystemPrompt
+        self.isChatGuideModeEnabled = UserDefaults.standard.object(forKey: "isChatGuideModeEnabled") as? Bool ?? false
+        self.isChatPlannerModeEnabled = UserDefaults.standard.object(forKey: "isChatPlannerModeEnabled") as? Bool ?? false
+        self.plannerPrompt = UserDefaults.standard.string(forKey: "plannerPrompt") ?? UserSettings.defaultChatPlannerPrompt
+        self.screenAgentPrompt = UserDefaults.standard.string(forKey: "screenAgentPrompt") ?? UserSettings.defaultChatScreenTaskAgentPrompt
+        self.typingAgentPrompt = UserDefaults.standard.string(forKey: "typingAgentPrompt") ?? UserSettings.defaultChatTypingTaskAgentPrompt
+        self.guidePrompt = UserDefaults.standard.string(forKey: "guidePrompt") ?? UserSettings.defaultChatGuidePrompt
+        let savedChatImageUploadLimit = UserDefaults.standard.string(forKey: "chatImageUploadLimit")
+        self.chatImageUploadLimit = ChatImageUploadLimit(rawValue: savedChatImageUploadLimit ?? "") ?? .original
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -268,6 +452,115 @@ final class UserSettings: ObservableObject {
     @Published var targetComputerPlacement: TargetComputerPlacement {
         didSet {
             UserDefaults.standard.set(targetComputerPlacement.rawValue, forKey: "targetComputerPlacement")
+        }
+    }
+
+    // Chat companion window visibility
+    @Published var isChatWindowVisible: Bool {
+        didSet {
+            UserDefaults.standard.set(isChatWindowVisible, forKey: "isChatWindowVisible")
+        }
+    }
+
+    // Chat companion dock side
+    @Published var chatDockSide: ChatDockSide {
+        didSet {
+            UserDefaults.standard.set(chatDockSide.rawValue, forKey: "chatDockSide")
+        }
+    }
+
+    // Chat companion preferred width
+    @Published var chatWindowWidth: Double {
+        didSet {
+            UserDefaults.standard.set(chatWindowWidth, forKey: "chatWindowWidth")
+        }
+    }
+
+    // Enables/disables tool-calling agentic workflow in chat.
+    @Published var isChatAgenticModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isChatAgenticModeEnabled, forKey: "isChatAgenticModeEnabled")
+        }
+    }
+
+    // OpenAI-compatible base URL (e.g. https://api.openai.com/v1)
+    @Published var chatApiBaseURL: String {
+        didSet {
+            UserDefaults.standard.set(chatApiBaseURL, forKey: "chatApiBaseURL")
+        }
+    }
+
+    // API key used for OpenAI-compatible chat requests
+    @Published var chatApiKey: String {
+        didSet {
+            if chatApiKey.isEmpty {
+                ChatKeychainStore.deleteChatAPIKey()
+            } else {
+                ChatKeychainStore.saveChatAPIKey(chatApiKey)
+            }
+        }
+    }
+
+    // Chat model name for /chat/completions
+    @Published var chatModel: String {
+        didSet {
+            UserDefaults.standard.set(chatModel, forKey: "chatModel")
+        }
+    }
+
+    // Optional system prompt prepended to chat context
+    @Published var systemPrompt: String {
+        didSet {
+            UserDefaults.standard.set(systemPrompt, forKey: "systemPrompt")
+        }
+    }
+
+    // Enables planner + task-agent workflow in chat.
+    @Published var isChatPlannerModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isChatPlannerModeEnabled, forKey: "isChatPlannerModeEnabled")
+        }
+    }
+
+    // Enables non-executing guide mode in chat.
+    @Published var isChatGuideModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isChatGuideModeEnabled, forKey: "isChatGuideModeEnabled")
+        }
+    }
+
+    // Prompt used by the main planning agent.
+    @Published var plannerPrompt: String {
+        didSet {
+            UserDefaults.standard.set(plannerPrompt, forKey: "plannerPrompt")
+        }
+    }
+
+    // Prompt used by the screen-only task agent.
+    @Published var screenAgentPrompt: String {
+        didSet {
+            UserDefaults.standard.set(screenAgentPrompt, forKey: "screenAgentPrompt")
+        }
+    }
+
+    // Prompt used by the type_text task agent.
+    @Published var typingAgentPrompt: String {
+        didSet {
+            UserDefaults.standard.set(typingAgentPrompt, forKey: "typingAgentPrompt")
+        }
+    }
+
+    // Prompt used by guide mode for single-step user guidance.
+    @Published var guidePrompt: String {
+        didSet {
+            UserDefaults.standard.set(guidePrompt, forKey: "guidePrompt")
+        }
+    }
+
+    // Max screenshot size sent to the AI provider.
+    @Published var chatImageUploadLimit: ChatImageUploadLimit {
+        didSet {
+            UserDefaults.standard.set(chatImageUploadLimit.rawValue, forKey: "chatImageUploadLimit")
         }
     }
 
@@ -611,5 +904,124 @@ enum TargetComputerPlacement: String, CaseIterable {
         case .bottom:
             return "Target Screen positioned at the bottom"
         }
+    }
+}
+
+enum ChatDockSide: String, CaseIterable {
+    case left = "left"
+    case right = "right"
+
+    var displayName: String {
+        switch self {
+        case .left:
+            return "Left"
+        case .right:
+            return "Right"
+        }
+    }
+}
+
+enum ChatImageUploadLimit: String, CaseIterable, Identifiable {
+    case original = "original"
+    case p720 = "720p"
+    case p1080 = "1080p"
+    case p1440 = "1440p"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .original:
+            return "Original"
+        case .p720:
+            return "720p"
+        case .p1080:
+            return "1080p"
+        case .p1440:
+            return "1440p"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .original:
+            return "Send screenshots at their original resolution."
+        case .p720:
+            return "Scale larger screenshots down to fit within 1280x720."
+        case .p1080:
+            return "Scale larger screenshots down to fit within 1920x1080."
+        case .p1440:
+            return "Scale larger screenshots down to fit within 2560x1440."
+        }
+    }
+
+    var maxLongEdge: CGFloat? {
+        switch self {
+        case .original:
+            return nil
+        case .p720:
+            return 1280
+        case .p1080:
+            return 1920
+        case .p1440:
+            return 2560
+        }
+    }
+}
+
+private enum ChatKeychainStore {
+    private static let service = "com.openterface.chat"
+    private static let account = "ai_api_key"
+
+    static func loadChatAPIKey() -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let value = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return value
+    }
+
+    static func saveChatAPIKey(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        let attributesToUpdate: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributesToUpdate as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        SecItemAdd(addQuery as CFDictionary, nil)
+    }
+
+    static func deleteChatAPIKey() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        SecItemDelete(query as CFDictionary)
     }
 }

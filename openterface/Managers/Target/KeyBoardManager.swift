@@ -920,9 +920,9 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             let modifiers = getCurrentModifiersForCharacter(char)
             
             kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
-            Thread.sleep(forTimeInterval: 0.005) // Wait for 5 milliseconds
+            Thread.sleep(forTimeInterval: 0.03) // Wait for 30 milliseconds
             kbm.releaseKey(keys: self.pressedKeys) // Release all pressed keys
-            Thread.sleep(forTimeInterval: 0.01) // Wait for 10 milliseconds
+            Thread.sleep(forTimeInterval: 0.03) // Wait for 30 milliseconds
         }
         
         // Clear pressed character state

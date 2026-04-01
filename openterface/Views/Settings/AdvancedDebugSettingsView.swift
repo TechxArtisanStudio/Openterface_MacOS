@@ -85,7 +85,7 @@ struct AdvancedDebugSettingsView: View {
                 }
                 .padding(.vertical, 8)
             }
-            
+
             GroupBox("Settings Management") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Export or import your configuration settings")
@@ -247,6 +247,16 @@ struct AdvancedDebugSettingsView: View {
         userSettings.viewWidth = 1920.0
         userSettings.viewHeight = 1080.0
         userSettings.isFullScreen = false
+        userSettings.chatApiBaseURL = "https://api.openai.com/v1"
+        userSettings.chatApiKey = ""
+        userSettings.chatModel = "gpt-4o-mini"
+        userSettings.systemPrompt = UserSettings.defaultChatSystemPrompt
+        userSettings.isChatAgenticModeEnabled = false
+        userSettings.isChatPlannerModeEnabled = false
+        userSettings.plannerPrompt = UserSettings.defaultChatPlannerPrompt
+        userSettings.screenAgentPrompt = UserSettings.defaultChatScreenTaskAgentPrompt
+        userSettings.typingAgentPrompt = UserSettings.defaultChatTypingTaskAgentPrompt
+        userSettings.chatImageUploadLimit = .original
     }
     
     private func exportSettings() {
@@ -324,7 +334,16 @@ struct AdvancedDebugSettingsView: View {
                 "mainWindowName": userSettings.mainWindownName,
                 "viewWidth": userSettings.viewWidth,
                 "viewHeight": userSettings.viewHeight,
-                "isFullScreen": userSettings.isFullScreen
+                "isFullScreen": userSettings.isFullScreen,
+                "chatApiBaseURL": userSettings.chatApiBaseURL,
+                "chatModel": userSettings.chatModel,
+                "systemPrompt": userSettings.systemPrompt,
+                "isChatAgenticModeEnabled": userSettings.isChatAgenticModeEnabled,
+                "isChatPlannerModeEnabled": userSettings.isChatPlannerModeEnabled,
+                "plannerPrompt": userSettings.plannerPrompt,
+                "screenAgentPrompt": userSettings.screenAgentPrompt,
+                "typingAgentPrompt": userSettings.typingAgentPrompt,
+                "chatImageUploadLimit": userSettings.chatImageUploadLimit.rawValue
             ]
         ]
     }
@@ -417,6 +436,43 @@ struct AdvancedDebugSettingsView: View {
         // Apply full screen setting
         if let isFullScreen = settings["isFullScreen"] as? Bool {
             userSettings.isFullScreen = isFullScreen
+        }
+
+        if let chatApiBaseURL = settings["chatApiBaseURL"] as? String {
+            userSettings.chatApiBaseURL = chatApiBaseURL
+        }
+
+        if let chatModel = settings["chatModel"] as? String {
+            userSettings.chatModel = chatModel
+        }
+
+        if let systemPrompt = settings["systemPrompt"] as? String {
+            userSettings.systemPrompt = systemPrompt
+        }
+
+        if let isChatAgenticModeEnabled = settings["isChatAgenticModeEnabled"] as? Bool {
+            userSettings.isChatAgenticModeEnabled = isChatAgenticModeEnabled
+        }
+
+        if let isChatPlannerModeEnabled = settings["isChatPlannerModeEnabled"] as? Bool {
+            userSettings.isChatPlannerModeEnabled = isChatPlannerModeEnabled
+        }
+
+        if let plannerPrompt = settings["plannerPrompt"] as? String {
+            userSettings.plannerPrompt = plannerPrompt
+        }
+
+        if let screenAgentPrompt = settings["screenAgentPrompt"] as? String {
+            userSettings.screenAgentPrompt = screenAgentPrompt
+        }
+
+        if let typingAgentPrompt = settings["typingAgentPrompt"] as? String {
+            userSettings.typingAgentPrompt = typingAgentPrompt
+        }
+
+        if let chatImageUploadLimitRaw = settings["chatImageUploadLimit"] as? String,
+           let chatImageUploadLimit = ChatImageUploadLimit(rawValue: chatImageUploadLimitRaw) {
+            userSettings.chatImageUploadLimit = chatImageUploadLimit
         }
     }
 }
