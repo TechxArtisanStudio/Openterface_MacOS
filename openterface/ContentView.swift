@@ -135,6 +135,31 @@ struct ContentView: View {
                             showGuideOverlay: showGuideOverlay
                         )
                     }
+
+                    if showGuideOverlay {
+                        GeometryReader { geo in
+                            let rect = AppStatus.guideHighlightRectNormalized
+                            let clampedX = max(0.0, min(1.0, rect.origin.x))
+                            let clampedY = max(0.0, min(1.0, rect.origin.y))
+                            let clampedW = max(0.0, min(1.0, rect.width))
+                            let clampedH = max(0.0, min(1.0, rect.height))
+
+                            if clampedW > 0.001 && clampedH > 0.001 {
+                                let overlayRect = CGRect(
+                                    x: clampedX * geo.size.width,
+                                    y: clampedY * geo.size.height,
+                                    width: clampedW * geo.size.width,
+                                    height: clampedH * geo.size.height
+                                )
+
+                                Rectangle()
+                                    .stroke(Color.red, lineWidth: 3)
+                                    .frame(width: overlayRect.width, height: overlayRect.height)
+                                    .position(x: overlayRect.midX, y: overlayRect.midY)
+                            }
+                        }
+                        .allowsHitTesting(false)
+                    }
                 }
                 
                 if showInputOverlay {

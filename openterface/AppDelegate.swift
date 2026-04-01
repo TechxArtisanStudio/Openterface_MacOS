@@ -213,7 +213,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(PermissionManagerProtocol.self, instance: PermissionManager.shared as any PermissionManagerProtocol)
         container.register(ChatManagerProtocol.self, instance: ChatManager.shared as any ChatManagerProtocol)
         container.register(ChatWindowManagerProtocol.self, instance: ChatWindowManager.shared as any ChatWindowManagerProtocol)
-
         // OCR Manager (macOS 12.3+ only)
         if #available(macOS 12.3, *) {
             container.register(OCRManagerProtocol.self, instance: OCRManager.shared as any OCRManagerProtocol)
@@ -818,6 +817,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if let window = notification.object as? NSWindow {
             logResizeEvent("windowDidResize", window: window)
             updateWindowAppStatus(for: window)
+            chatWindowManager.updateDockPosition(animated: false)
         }
         if let window = notification.object as? NSWindow, !window.inLiveResize {
             handleToolbarAutoHide()
@@ -831,6 +831,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if !window.inLiveResize {
                 chatWindowManager.updateDockPosition(animated: false)
             }
+        }
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            updateWindowAppStatus(for: window)
+            chatWindowManager.updateDockPosition(animated: false)
         }
     }
 
