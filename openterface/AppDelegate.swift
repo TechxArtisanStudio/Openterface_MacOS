@@ -817,6 +817,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if let window = notification.object as? NSWindow {
             logResizeEvent("windowDidResize", window: window)
             updateWindowAppStatus(for: window)
+            chatWindowManager.updateDockPosition(animated: false)
         }
         if let window = notification.object as? NSWindow, !window.inLiveResize {
             handleToolbarAutoHide()
