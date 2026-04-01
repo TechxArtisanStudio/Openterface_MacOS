@@ -229,7 +229,7 @@ extension SerialResponseHandler {
         let isCapLockOn = (data[7] & 0x02) == 0x02
         let isScrollOn = (data[7] & 0x04) == 0x04
 
-        logger.log(content: isTargetConnected ? "The Target Screen keyboard and mouse are connected" : "The Target Screen keyboard and mouse are disconnected")
+//        logger.log(content: isTargetConnected ? "The Target Screen keyboard and mouse are connected" : "The Target Screen keyboard and mouse are disconnected")
 
         // All @Published property mutations must happen on the main thread for SwiftUI to react
         DispatchQueue.main.async {

@@ -44,6 +44,7 @@ struct ToolbarContentView: ToolbarContent {
     private var cameraManager: CameraManagerProtocol { DependencyContainer.shared.resolve(CameraManagerProtocol.self) }
     private var serialPortManager: SerialPortManagerProtocol { DependencyContainer.shared.resolve(SerialPortManagerProtocol.self) }
     private var mouseManager: MouseManagerProtocol { DependencyContainer.shared.resolve(MouseManagerProtocol.self) }
+    private var chatWindowManager: ChatWindowManagerProtocol { DependencyContainer.shared.resolve(ChatWindowManagerProtocol.self) }
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
 
     var body: some ToolbarContent {
@@ -54,6 +55,13 @@ struct ToolbarContentView: ToolbarContent {
             } label: {
                 Image(systemName: showButtons ? "keyboard" : "keyboard.chevron.compact.down.fill")
             }
+
+            Button {
+                chatWindowManager.toggleChatWindow()
+            } label: {
+                Image(systemName: UserSettings.shared.isChatWindowVisible ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
+            }
+            .help(UserSettings.shared.isChatWindowVisible ? "Hide companion chat" : "Show companion chat")
 
             CapsLockIndicatorView()
                 .help("Target Caps Lock state - ON/OFF")

@@ -379,3 +379,138 @@ protocol ParallelManagerProtocol: AnyObject {
     func toggleParallelMode()
     func shouldPreventTermination() -> Bool
 }
+
+// MARK: - Chat Manager Protocols
+
+enum ChatRole: String, Codable {
+    case system
+    case user
+    case assistant
+}
+
+struct ChatMessage: Identifiable, Codable, Equatable {
+    let id: UUID
+    let role: ChatRole
+    let content: String
+    let createdAt: Date
+    let attachmentFilePath: String?
+    let guideActionRect: CGRect?
+    let guideShortcut: String?
+
+    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date(), attachmentFilePath: String? = nil, guideActionRect: CGRect? = nil, guideShortcut: String? = nil) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.createdAt = createdAt
+        self.attachmentFilePath = attachmentFilePath
+        self.guideActionRect = guideActionRect
+        self.guideShortcut = guideShortcut
+    }
+}
+
+enum ChatTaskStatus: String, Codable {
+    case pending
+    case approved
+    case running
+    case completed
+    case failed
+    case skipped
+}
+
+enum ChatPlanStatus: String, Codable {
+    case draft
+    case awaitingApproval
+    case approved
+    case running
+    case completed
+    case failed
+    case cancelled
+}
+
+struct ChatTask: Identifiable, Codable, Equatable {
+    let id: UUID
+    let title: String
+    let detail: String
+    let agentName: String
+    let toolName: String
+    var status: ChatTaskStatus
+    var resultSummary: String?
+    var inputTokenCount: Int?
+    var outputTokenCount: Int?
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        detail: String,
+        agentName: String,
+        toolName: String,
+        status: ChatTaskStatus = .pending,
+        resultSummary: String? = nil,
+        inputTokenCount: Int? = nil,
+        outputTokenCount: Int? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.agentName = agentName
+        self.toolName = toolName
+        self.status = status
+        self.resultSummary = resultSummary
+        self.inputTokenCount = inputTokenCount
+        self.outputTokenCount = outputTokenCount
+    }
+}
+
+struct ChatExecutionPlan: Identifiable, Codable, Equatable {
+    let id: UUID
+    let goal: String
+    let summary: String
+    var status: ChatPlanStatus
+    let createdAt: Date
+    var tasks: [ChatTask]
+
+    init(
+        id: UUID = UUID(),
+        goal: String,
+        summary: String,
+        status: ChatPlanStatus = .draft,
+        createdAt: Date = Date(),
+        tasks: [ChatTask]
+    ) {
+        self.id = id
+        self.goal = goal
+        self.summary = summary
+        self.status = status
+        self.createdAt = createdAt
+        self.tasks = tasks
+    }
+}
+
+@MainActor
+protocol ChatManagerProtocol: AnyObject {
+    var messages: [ChatMessage] { get }
+    var isSending: Bool { get }
+    var lastError: String? { get }
+    var currentPlan: ChatExecutionPlan? { get }
+
+    func sendMessage(_ text: String, attachmentFileURL: URL?)
+    func cancelSending()
+    func clearHistory()
+    func approveCurrentPlan()
+    func clearCurrentPlan()
+}
+
+extension ChatManagerProtocol {
+    func sendMessage(_ text: String) {
+        sendMessage(text, attachmentFileURL: nil)
+    }
+}
+
+@MainActor
+protocol ChatWindowManagerProtocol: AnyObject {
+    func showChatWindow()
+    func hideChatWindow()
+    func toggleChatWindow()
+    func updateDockPosition(animated: Bool)
+    func closeChatWindow()
+}

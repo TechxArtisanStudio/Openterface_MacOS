@@ -75,6 +75,8 @@ struct openterfaceApp: App {
     private var cameraManager: CameraManagerProtocol { DependencyContainer.shared.resolve(CameraManagerProtocol.self) }
     private var permissionManager: PermissionManagerProtocol { DependencyContainer.shared.resolve(PermissionManagerProtocol.self) }
     private var switchableUSBManager: SwitchableUSBManagerProtocol { DependencyContainer.shared.resolve(SwitchableUSBManagerProtocol.self) }
+    private var chatManager: ChatManagerProtocol { DependencyContainer.shared.resolve(ChatManagerProtocol.self) }
+    private var chatWindowManager: ChatWindowManagerProtocol { DependencyContainer.shared.resolve(ChatWindowManagerProtocol.self) }
     
     init() {
         // Setup dependencies before UI construction to ensure they're available
@@ -678,6 +680,35 @@ struct openterfaceApp: App {
                     showAspectRatioSelectionWindow()
                 }) {
                     Text("Target Aspect Ratio...")
+                }
+
+                Button(action: {
+                    chatWindowManager.toggleChatWindow()
+                }) {
+                    Text(UserSettings.shared.isChatWindowVisible ? "Hide Chat" : "Show Chat")
+                }
+                .keyboardShortcut("j", modifiers: [.command, .option])
+
+                Menu("Chat Dock Side") {
+                    Button(action: {
+                        UserSettings.shared.chatDockSide = .left
+                        NotificationCenter.default.post(name: Notification.Name("ChatDockSideChanged"), object: nil)
+                    }) {
+                        Text("Left\(UserSettings.shared.chatDockSide == .left ? " ✓" : "")")
+                    }
+
+                    Button(action: {
+                        UserSettings.shared.chatDockSide = .right
+                        NotificationCenter.default.post(name: Notification.Name("ChatDockSideChanged"), object: nil)
+                    }) {
+                        Text("Right\(UserSettings.shared.chatDockSide == .right ? " ✓" : "")")
+                    }
+                }
+
+                Button(action: {
+                    chatManager.clearHistory()
+                }) {
+                    Text("Clear Chat History")
                 }
                 
                 Divider()

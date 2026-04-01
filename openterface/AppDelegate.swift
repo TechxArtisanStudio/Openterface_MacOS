@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var clipboardManager: any ClipboardManagerProtocol
     private var usbDevicesManager: (any USBDevicesManagerProtocol)?
     private var parallelManager: any ParallelManagerProtocol
+    private var chatWindowManager: any ChatWindowManagerProtocol
     private var logger: any LoggerProtocol
     
     //Use half of the screen width as initial window width
@@ -72,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         self.hidManager = container.resolve(HIDManagerProtocol.self)
         self.clipboardManager = container.resolve(ClipboardManagerProtocol.self)
         self.parallelManager = container.resolve(ParallelManagerProtocol.self)
+        self.chatWindowManager = container.resolve(ChatWindowManagerProtocol.self)
         self.logger = container.resolve(LoggerProtocol.self)
         
         // USB Devices Manager is only available on macOS 12.0+
@@ -83,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Observe menu-related notifications so AppDelegate can keep the main View menu in sync
         NotificationCenter.default.addObserver(self, selector: #selector(handleParallelModeChanged(_:)), name: Notification.Name("ParallelModeChanged"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handlePlacementChanged(_:)), name: Notification.Name("TargetPlacementChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleChatDockSideChanged(_:)), name: Notification.Name("ChatDockSideChanged"), object: nil)
     }
 
     deinit {
@@ -90,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     // MARK: - Dependency Setup
+    @MainActor
     static func setupDependencies(container: DependencyContainer) {
         // Register concrete implementations with their protocols
         container.register(LoggerProtocol.self, instance: Logger.shared as any LoggerProtocol)
@@ -110,6 +114,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
         container.register(CameraManagerProtocol.self, instance: CameraManager.shared as any CameraManagerProtocol)
         container.register(PermissionManagerProtocol.self, instance: PermissionManager.shared as any PermissionManagerProtocol)
+        container.register(ChatManagerProtocol.self, instance: ChatManager.shared as any ChatManagerProtocol)
+        container.register(ChatWindowManagerProtocol.self, instance: ChatWindowManager.shared as any ChatWindowManagerProtocol)
         
         // OCR Manager (macOS 12.3+ only)
         if #available(macOS 12.3, *) {
@@ -152,6 +158,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         audioManager.initializeAudio()
         
         setupMainWindow()
+        if UserSettings.shared.isChatWindowVisible {
+            DispatchQueue.main.async {
+                self.chatWindowManager.showChatWindow()
+            }
+        }
         setupNotificationObservers()
         // Defer menu setup so SwiftUI has a chance to build its menus first,
         // then merge our custom items into the existing View menu.
@@ -295,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     
                     // Apply always on top setting if enabled
                     WindowUtils.shared.setAlwaysOnTop(UserSettings.shared.isAlwaysOnTop)
+                    updateWindowAppStatus(for: window)
                 }
             }
         }
@@ -533,6 +545,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc private func handlePlacementChanged(_ notification: Notification) {
         updatePlacementMenuItems()
     }
+
+    @MainActor @objc private func handleChatDockSideChanged(_ notification: Notification) {
+        chatWindowManager.updateDockPosition(animated: true)
+    }
     
     // Update window size
     func updateWindowSize(window: NSWindow) {
@@ -567,8 +583,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func windowDidResize(_ notification: Notification) {
         if let window = NSApplication.shared.mainWindow {
             updateWindowAppStatus(for: window)
+            chatWindowManager.updateDockPosition(animated: false)
         }
        handleToolbarAutoHide()
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            updateWindowAppStatus(for: window)
+            chatWindowManager.updateDockPosition(animated: false)
+        }
     }
 
     /// Updates AppStatus.currentView / currentWindow to reflect the current
@@ -633,6 +657,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             
             window.setFrame(newFrame, display: true, animate: true)
         }
+        updateWindowAppStatus(for: window)
+        chatWindowManager.updateDockPosition(animated: false)
     }
 
     // click on window close button to exit the programme
@@ -647,6 +673,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Stop audio operations
         audioManager.stopAudioSession()
+        chatWindowManager.closeChatWindow()
         
         // Deinitialize Hardware Abstraction Layer
         deinitializeHAL()

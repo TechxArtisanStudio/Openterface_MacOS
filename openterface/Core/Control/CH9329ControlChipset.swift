@@ -157,7 +157,7 @@ class CH9329ControlChipset: BaseControlChipset {
             lastCTSState = currentCTS
             lastCTSUpdateTime = Date()
 
-            logger.log(content: "📡 CH9329 HID activity detected via CTS change")
+           // logger.log(content: "📡 CH9329 HID activity detected via CTS change")
         }
     }
 
