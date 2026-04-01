@@ -26,6 +26,20 @@ import ORSSerial
 import os.log
 import Combine
 
+@propertyWrapper
+final class ThreadSafe<T> {
+    private let queue: DispatchQueue
+    private var _value: T
+    init(wrappedValue: T, label: String) {
+        self._value = wrappedValue
+        self.queue = DispatchQueue(label: label)
+    }
+    var wrappedValue: T {
+        get { queue.sync { _value } }
+        set { queue.sync { _value = newValue } }
+    }
+}
+
 class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProtocol, ObservableObject, SerialResponseHandlerDelegate {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     static let shared = SerialPortManager()
@@ -112,16 +126,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// Indicates whether serial port configuration (baudrate or mode change) is in progress
     /// This flag is set to true when starting a configuration change and false when complete
     @Published var isConfiguring: Bool = false
-    private let isTryingQueue = DispatchQueue(label: "com.openterface.SerialPortManager.isTryingQueue")
-    private var _isTrying: Bool = false
-    var isTrying: Bool {
-        get {
-            return isTryingQueue.sync { _isTrying }
-        }
-        set {
-            isTryingQueue.sync { _isTrying = newValue }
-        }
-    }
+    @ThreadSafe(label: "com.openterface.SerialPortManager.isTryingQueue")
+    var isTrying: Bool = false
     
     /// Indicates whether the serial port manager is paused and should not attempt any connections.
     /// 
@@ -135,29 +141,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// 
     /// This provides a more robust control mechanism than just stopping current attempts,
     /// as it prevents new attempts from being started automatically.
-    private let pauseQueue = DispatchQueue(label: "com.openterface.SerialPortManager.pauseQueue")
-    private var _isPaused: Bool = false
-    var isPaused: Bool {
-        get {
-            return pauseQueue.sync { _isPaused }
-        }
-        set {
-            pauseQueue.sync { _isPaused = newValue }
-        }
-    }
+    @ThreadSafe(label: "com.openterface.SerialPortManager.pauseQueue")
+    var isPaused: Bool = false
     
     /// Tracks whether an error alert has been shown to the user.
     /// This ensures error alerts are displayed only once to avoid redundant notifications.
-    private let errorAlertQueue = DispatchQueue(label: "com.openterface.SerialPortManager.errorAlertQueue")
-    private var _errorAlertShown: Bool = false
-    private var errorAlertShown: Bool {
-        get {
-            return errorAlertQueue.sync { _errorAlertShown }
-        }
-        set {
-            errorAlertQueue.sync { _errorAlertShown = newValue }
-        }
-    }
+    @ThreadSafe(label: "com.openterface.SerialPortManager.errorAlertQueue")
+    private var errorAlertShown: Bool = false
 
     override init(){
         super.init()
@@ -187,13 +177,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// - Parameter mode: The raw mode byte value
     /// - Returns: The normalized mode byte (uses lower value of equivalent pairs)
     private func normalizeMode(_ mode: UInt8) -> UInt8 {
-        switch mode {
-        case 0x80: return 0x00  // Normalize 0x80 to 0x00
-        case 0x81: return 0x01  // Normalize 0x81 to 0x01
-        case 0x82: return 0x02  // Normalize 0x82 to 0x02
-        case 0x83: return 0x03  // Normalize 0x83 to 0x03
-        default: return mode
-        }
+        return mode >= 0x80 ? mode - 0x80 : mode
     }
     
     /// Checks if two mode bytes are equivalent after normalization
@@ -221,18 +205,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             if USBDevicesManager.shared.isCH32V208Connected() {
                 logger.log(content: "CH32V208 detected - using direct serial port connection")
                 self.tryOpenSerialPortForCH32V208()
-            } else if USBDevicesManager.shared.isCH9329Connected() {
-                logger.log(content: "CH9329 detected - using standard serial port connection with validation")
-                self.tryOpenSerialPort()
             } else {
-                logger.log(content: "Unknown control chipset type - using standard connection method")
                 self.tryOpenSerialPort()
             }
         }
     }
 
     private func observerSerialPortNotifications() {
-        print("observerSerialPortNotifications")
         let serialPortNtf = NotificationCenter.default
        
         serialPortNtf.addObserver(self, selector: #selector(serialPortsWereConnected(_:)), name: NSNotification.Name.ORSSerialPortsWereConnected, object: nil)
@@ -284,7 +263,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             return
         }
 
-        if _isPaused {
+        if isPaused {
             return
         }
         
@@ -338,30 +317,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     // MARK: - SerialResponseHandlerDelegate Implementation
     
     func updateKeyboardLatency(_ latency: Double, maxLatency: Double) {
-        self.keyboardAckLatency = latency
-        // Update max latency if current latency is higher
-        if latency > self.keyboardMaxLatency {
-            self.keyboardMaxLatency = latency
-        }
-        // Track keyboard ACK count
+        keyboardAckLatency = latency
+        if latency > keyboardMaxLatency { keyboardMaxLatency = latency }
         keyboardAckCount += 1
     }
     
     func updateMouseLatency(_ latency: Double, maxLatency: Double) {
-        self.mouseAckLatency = latency
-        // Update max latency if current latency is higher
-        if latency > self.mouseMaxLatency {
-            self.mouseMaxLatency = latency
-        }
-        // Track mouse ACK count
+        mouseAckLatency = latency
+        if latency > mouseMaxLatency { mouseMaxLatency = latency }
         mouseAckCount += 1
     }
     
     func updateAckRates() {
-        self.updateAckRatesInternal()
-    }
-    
-    private func updateAckRatesInternal() {
         guard !disablePeriodicAckReset else { return }
         let now = Date().timeIntervalSince1970
         let elapsed = now - ackTrackingStartTime
@@ -384,30 +351,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
         let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
         let preferredMode = UserSettings.shared.controlMode.modeByteValue
-        
-        // Check if mode matches user's preference using normalization
-        // Mode equivalences: 0x80=0x00, 0x81=0x01, 0x82=0x02, 0x83=0x03
-        let modeMatches = modesAreEquivalent(mode, preferredMode)
-        
-        if baudrate == preferredBaud && modeMatches {
-            // Device matches the user's preferred baudrate and mode
-            self.setDeviceReady(true)
-            self.baudrate = baudrate
-            SerialPortStatus.shared.serialPortBaudRate = baudrate
-            SerialPortStatus.shared.isControlChipsetReady = true
-        } else {
-            // Device configuration differs from user preference - update user settings to match device configuration
+
+        if baudrate != preferredBaud || !modesAreEquivalent(mode, preferredMode) {
+            // Device configuration differs - update user settings to match device
             logger.log(content: "Device configuration detected. Expected: baudrate=\(preferredBaud) mode=0x\(String(format: "%02X", preferredMode)), Got: baudrate=\(baudrate) mode=0x\(String(format: "%02X", mode)). Updating user settings...")
-            
-            // Update preferred baudrate in user settings
+
             if let baudrateOption = BaudrateOption(rawValue: baudrate) {
                 UserSettings.shared.preferredBaudrate = baudrateOption
                 logger.log(content: "Updated user preferred baudrate to \(baudrate)")
             } else {
                 logger.log(content: "Warning: Detected baudrate \(baudrate) is not a valid BaudrateOption")
             }
-            
-            // Update control mode in user settings
+
             if let controlMode = ControlMode(rawValue: Int(mode)) {
                 UserSettings.shared.controlMode = controlMode
                 logger.log(content: "Updated user control mode to \(controlMode.displayName)")
@@ -419,14 +374,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     logger.log(content: "Updated user control mode to \(controlMode.displayName) (normalized from 0x\(String(format: "%02X", mode)))")
                 }
             }
-            
-            // Mark device as ready with the current configuration
-            self.setDeviceReady(true)
-            self.baudrate = baudrate
-            SerialPortStatus.shared.serialPortBaudRate = baudrate
-            SerialPortStatus.shared.isControlChipsetReady = true
-            logger.log(content: "Device ready with detected configuration")
         }
+
+        self.setDeviceReady(true)
+        self.baudrate = baudrate
+        SerialPortStatus.shared.serialPortBaudRate = baudrate
+        SerialPortStatus.shared.isControlChipsetReady = true
     }
     
     func setDeviceReady(_ ready: Bool) {
@@ -473,7 +426,17 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.serialPorts = serialPortManager.availablePorts
         return self.serialPorts
     }
-    
+
+    private func setCH32V208DeviceReady() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isDeviceReady = true
+            self.errorAlertShown = false
+            SerialPortStatus.shared.isKeyboardConnected = true
+            SerialPortStatus.shared.isMouseConnected = true
+        }
+    }
+
     func tryOpenSerialPort( priorityBaudrate: Int? = nil) {
 
         // Check if connection attempts are paused
@@ -504,6 +467,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 return 
             }
 
+            // After a factory reset the device returns to 9600 baud, so we want to try
+            // that baudrate first on the next loop iteration.  This local variable lets
+            // the factory-reset branch inject a one-shot priority without touching the
+            // caller-supplied `priorityBaudrate`.
+            var postResetPriority: Int? = nil
+
             while !self.isDeviceReady {
                 // Check if connection attempts are paused
                 if self.isPaused {
@@ -516,11 +485,15 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     break
                 }
                 
+                // Use post-reset priority first, then caller priority, then user preference.
+                let effectivePriority = postResetPriority ?? priorityBaudrate
+                postResetPriority = nil  // consume the one-shot override
+
                 // Use priority baudrate if provided, otherwise use preferred baudrate from user settings
-                let preferredBaudrate = priorityBaudrate ?? UserSettings.shared.preferredBaudrate.rawValue
+                let preferredBaudrate = effectivePriority ?? UserSettings.shared.preferredBaudrate.rawValue
                 let otherBaudrate = preferredBaudrate == SerialProtocolCommands.LOWSPEED_BAUDRATE ? 
                     SerialProtocolCommands.HIGHSPEED_BAUDRATE : SerialProtocolCommands.LOWSPEED_BAUDRATE
-                let baudrates = priorityBaudrate != nil ? [preferredBaudrate] : [preferredBaudrate, otherBaudrate]
+                let baudrates = effectivePriority != nil ? [preferredBaudrate] : [preferredBaudrate, otherBaudrate]
                     
                 
                 for baudrate in baudrates {
@@ -563,6 +536,8 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     // Perform the factory reset
                     if self.performFactoryResetInline() {
                         logger.log(content: "Factory reset done, retrying connection attempts...")
+                        // Device returns to 9600 baud after factory reset – try it first.
+                        postResetPriority = SerialProtocolCommands.LOWSPEED_BAUDRATE
                         continue
                     } else {
                         logger.log(content: "Factory reset failed, exiting connection attempts")
@@ -593,12 +568,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             // For CH32V208, device is ready once port is opened (no command-response validation needed)
             if USBDevicesManager.shared.isCH32V208Connected() {
                 if self.serialPort?.isOpen == true {
-                    DispatchQueue.main.async { [weak self] in
-                        self?.isDeviceReady = true
-                        self?.errorAlertShown = false
-                        SerialPortStatus.shared.isKeyboardConnected = true
-                        SerialPortStatus.shared.isMouseConnected = true
-                    }
+                    setCH32V208DeviceReady()
                     logger.log(content: "CH32V208: Port opened successfully, device ready")
                     return true
                 }
@@ -642,64 +612,38 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         return false
     }
     
-    /// Performs a factory reset of the HID chip synchronously within the connection retry loop
-    /// Uses the existing performFactoryReset method with synchronous blocking
-    /// Ensures serial port is opened before attempting factory reset
-    /// - Returns: true if reset succeeded, false if it failed
+    private func runBlockingFactoryReset() -> Bool {
+        var result = false
+        let semaphore = DispatchSemaphore(value: 0)
+        performFactoryReset { result = $0; semaphore.signal() }
+        semaphore.wait()
+        return result
+    }
+
     private func performFactoryResetInline() -> Bool {
-        // Ensure serial port is open before attempting factory reset
         if let port = serialPort, port.isOpen {
-            // Port is already open, proceed with factory reset
-            var resetSucceeded = false
-            let semaphore = DispatchSemaphore(value: 0)
-            
-            // Call the async performFactoryReset and wait for completion
-            performFactoryReset { success in
-                resetSucceeded = success
-                semaphore.signal()
-            }
-            
-            // Block until the factory reset completes
-            semaphore.wait()
-            
-            return resetSucceeded
-        } else {
-            // Port not open, try to open it
-            logger.log(content: "Serial port not open for factory reset, attempting to open it first")
-            
-            // Try to open the serial port
-            self.serialPort = getSerialPortPathFromUSBManager()
-            guard let serialPort = self.serialPort else {
-                logger.log(content: "Failed to get serial port for factory reset")
-                return false
-            }
-            
-            // Open with low baudrate (factory reset typically requires this)
-            serialPort.baudRate = NSNumber(value: CH9329ControlChipset.LOWSPEED_BAUDRATE)
-            serialPort.delegate = self
-            serialPort.open()
-            
-            guard serialPort.isOpen else {
-                logger.log(content: "Failed to open serial port for factory reset")
-                return false
-            }
-            
-            logger.log(content: "Serial port opened successfully for factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
-            
-            var resetSucceeded = false
-            let semaphore = DispatchSemaphore(value: 0)
-            
-            // Call the async performFactoryReset and wait for completion
-            performFactoryReset { success in
-                resetSucceeded = success
-                semaphore.signal()
-            }
-            
-            // Block until the factory reset completes
-            semaphore.wait()
-            
-            return resetSucceeded
+            return runBlockingFactoryReset()
         }
+
+        logger.log(content: "Serial port not open for factory reset, attempting to open it first")
+
+        self.serialPort = getSerialPortPathFromUSBManager()
+        guard let serialPort = self.serialPort else {
+            logger.log(content: "Failed to get serial port for factory reset")
+            return false
+        }
+
+        serialPort.baudRate = NSNumber(value: CH9329ControlChipset.LOWSPEED_BAUDRATE)
+        serialPort.delegate = self
+        serialPort.open()
+
+        guard serialPort.isOpen else {
+            logger.log(content: "Failed to open serial port for factory reset")
+            return false
+        }
+
+        logger.log(content: "Serial port opened successfully for factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
+        return runBlockingFactoryReset()
     }
     
     func openSerialPort( baudrate: Int) {
@@ -719,7 +663,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 if port.isOpen {
 
                     // Successfully opened the serial port
-                    print("Serial port opened successfully at \(port.baudRate)")
+                    logger.log(content: "Serial port opened successfully at \(port.baudRate)")
                     let actualBaudRate = port.baudRate.intValue > 0 ? port.baudRate.intValue : effectiveBaudrate
                     let openedPortName = (port.path as String).components(separatedBy: "/").last ?? "Unknown"
                     DispatchQueue.main.async { [weak self] in
@@ -728,11 +672,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                         self?.baudrate = actualBaudRate
                     }
                 } else {
-                    print("the serial port fail to open")
+                    logger.log(content: "Serial port failed to open")
                 }
             }
         } else {
-            print("no serial port selected")
+            logger.log(content: "No serial port selected")
         }
 
     }
@@ -1009,42 +953,29 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         return sdOperationIdCounter
     }
     
-    /// Set SD card to host (CH32V208) - Async version
-    public func setSdToHost(force: Bool = false, completion: @escaping (Bool) -> Void) {
+    private func performSdSwitch(direction: UInt8, force: Bool, completion: @escaping (Bool) -> Void) {
         let operationId = generateSdOperationId()
-        
         responseHandler.registerSdOperation(operationId: operationId, completion: completion)
-        
-        // Set timeout for this operation
         DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
             self?.responseHandler.timeoutSdOperation(operationId: operationId)
         }
-        
         // SD_SWITCH_PREFIX has LEN=0x05 (5 data bytes).
         // Appending only the direction byte completes the 5 data bytes exactly.
         // Do NOT append any extra bytes (e.g. operationId) — it shifts the checksum
         // position and causes the device to reject the command.
         var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
-        cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.HOST)
-        
-        self.sendAsyncCommand(command: cmd, force: force)
+        cmd.append(direction)
+        sendAsyncCommand(command: cmd, force: force)
     }
-    
+
+    /// Set SD card to host (CH32V208) - Async version
+    public func setSdToHost(force: Bool = false, completion: @escaping (Bool) -> Void) {
+        performSdSwitch(direction: SerialProtocolCommands.CH32V208.SDCardDirection.HOST, force: force, completion: completion)
+    }
+
     /// Set SD card to target (CH32V208) - Async version
     public func setSdToTarget(force: Bool = false, completion: @escaping (Bool) -> Void) {
-        let operationId = generateSdOperationId()
-        
-        responseHandler.registerSdOperation(operationId: operationId, completion: completion)
-        
-        // Set timeout for this operation
-        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            self?.responseHandler.timeoutSdOperation(operationId: operationId)
-        }
-        
-        var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
-        cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.TARGET)
-        
-        self.sendAsyncCommand(command: cmd, force: force)
+        performSdSwitch(direction: SerialProtocolCommands.CH32V208.SDCardDirection.TARGET, force: force, completion: completion)
     }
     
     /// Query SD card direction - Async version
@@ -1078,6 +1009,30 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         return waitResult == .success ? result : nil
     }
     
+    private func makeSetParaCfgCommand(baudrate: Int, modeByte: UInt8) -> [UInt8] {
+        var cmd: [UInt8] = baudrate == SerialProtocolCommands.LOWSPEED_BAUDRATE ?
+            SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_9600 :
+            SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_115200
+        if cmd.count > 5 { cmd[5] = modeByte }
+        cmd.append(contentsOf: SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_POSTFIX)
+        return cmd
+    }
+
+    private func resetHidChipAndReconnect(priorityBaudrate: Int? = nil) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.resetHidChip()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.closeSerialPort()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                    self?.tryOpenSerialPort(priorityBaudrate: priorityBaudrate)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        self?.isConfiguring = false
+                    }
+                }
+            }
+        }
+    }
+
     /// Resets the device to the specified baudrate and user's preferred control mode.
     /// 
     /// This method reconfigures the CH9329 HID chip to use the preferred baudrate and
@@ -1145,39 +1100,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 // Low to high or same baudrate: direct set for CH9329
                 logger.log(content: "CH9329: Setting baudrate directly to \(preferredBaud) and mode to \(preferredMode.displayName)")
                 
-                // Determine the actual mode byte to use
-                var modeByteToUse = preferredMode.modeByteValue
-                
-                // Build set-parameter command with preferred mode
-                let prefix: [UInt8] = preferredBaud == SerialProtocolCommands.LOWSPEED_BAUDRATE ? 
-                    SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_9600 : 
-                    SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_115200
-                
-                var command: [UInt8] = prefix
-                // The mode byte is at index 5 in the prefix, so we replace it
-                if command.count > 5 {
-                    command[5] = modeByteToUse
-                }
-                command.append(contentsOf: SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_POSTFIX)
-                
+                let command = makeSetParaCfgCommand(baudrate: preferredBaud, modeByte: preferredMode.modeByteValue)
                 self.sendAsyncCommand(command: command, force: true)
                 logger.log(content: "Set param command: \(command.map { String(format: "%02X", $0) }.joined(separator: " "))")
-                
-                // Reset HID chip and restart serial port after 0.5 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.resetHidChip()
-                    
-                    // Restart the serial port
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                        self?.closeSerialPort()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                            self?.tryOpenSerialPort(priorityBaudrate: targetBaudrate)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                                self?.isConfiguring = false
-                            }
-                        }
-                    }
-                }
+                resetHidChipAndReconnect(priorityBaudrate: targetBaudrate)
             }
         }
     }
@@ -1333,37 +1259,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         // Build the SET_PARA_CFG command with the appropriate prefix for user's preferred baudrate
         let preferredBaud = UserSettings.shared.preferredBaudrate.rawValue
-        let prefix: [UInt8] = preferredBaud == SerialProtocolCommands.LOWSPEED_BAUDRATE ? 
-            SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_9600 : 
-            SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_PREFIX_115200
-        var command: [UInt8] = prefix
-        // The mode byte is at index 5 in the prefix, so we replace it
-        if command.count > 5 {
-            command[5] = modeByteToUse
-        }
-        command.append(contentsOf: SerialProtocolCommands.DeviceConfig.SET_PARA_CFG_POSTFIX)
-        
-        // Send the command
+        let command = makeSetParaCfgCommand(baudrate: preferredBaud, modeByte: modeByteToUse)
         self.sendAsyncCommand(command: command, force: true)
-        
-        let dataString = command.map { String(format: "%02X", $0) }.joined(separator: " ")
-        logger.log(content: "Control mode command sent: \(dataString)")
-        
-        // After setting the mode, send a reset command and reconnect
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.resetHidChip()
-            
-            // Restart the serial port
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.closeSerialPort()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                    self?.tryOpenSerialPort()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                        self?.isConfiguring = false
-                    }
-                }
-            }
-        }
+        logger.log(content: "Control mode command sent: \(command.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        resetHidChipAndReconnect()
     }
     
     func setDTR(_ enabled: Bool) {
@@ -1455,12 +1354,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     self.isTrying = false
                 }
                 
-                DispatchQueue.main.async { [weak self] in
-                    self?.isDeviceReady = true
-                    self?.errorAlertShown = false
-                    SerialPortStatus.shared.isKeyboardConnected = true
-                    SerialPortStatus.shared.isMouseConnected = true
-                }
+                setCH32V208DeviceReady()
             } else {
                 logger.log(content: "Failed to open CH32V208 serial port (attempt \(attempt))")
                 

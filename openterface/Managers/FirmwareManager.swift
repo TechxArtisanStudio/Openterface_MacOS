@@ -100,6 +100,9 @@ class FirmwareManager: ObservableObject {
         // Stop HID operations
         self.hidManager.stopAllHIDOperations()
         logger.log(content: "✓ HID operations stopped")
+
+        // Pause HAL periodic updates to avoid I/O conflict with direct flash access
+        HALIntegrationManager.shared.pausePeriodicHALUpdates()
         
         // Post notification to stop any other operations
         NotificationCenter.default.post(
@@ -279,9 +282,50 @@ class FirmwareManager: ObservableObject {
     /// Reads the current firmware version from the device
     func getCurrentFirmwareVersion() -> String {
         logger.log(content: "Reading current firmware version from device...")
+        if AppStatus.videoChipsetType == .ms2130s {
+            return MS2130SFlashManager.shared.getVersion() ?? "Unknown"
+        }
         return hidManager.getVersion() ?? "Unknown"
     }
-    
+
+    // Direct protocol wrappers for external firmware operations
+    func flashExternalFirmware(_ data: Data) async throws -> Bool {
+        logger.log(content: "FirmwareManager: flashExternalFirmware start, size=\(data.count)")
+        let success = await MS2130SFlashManager.shared.flashFirmware(data, progressCallback: { phase, pct in
+            Task { @MainActor in
+                self.updateStatus = phase
+                self.updateProgress = pct
+            }
+        })
+        logger.log(content: "FirmwareManager: flashExternalFirmware result=\(success)")
+        if !success {
+            throw NSError(domain: "Firmware", code: -1, userInfo: [NSLocalizedDescriptionKey: "MS2130S flash firmware failed"])
+        }
+        return success
+    }
+
+    func backupExternalFirmware(to url: URL, withTotalSize size: Int) async throws -> Bool {
+        let success = await MS2130SFlashManager.shared.backupFirmware(totalSize: size, to: url, progressCallback: { phase, pct in
+            Task { @MainActor in
+                self.backupStatus = phase
+                self.backupProgress = pct
+            }
+        })
+        if !success { throw NSError(domain: "Firmware", code: -1, userInfo: [NSLocalizedDescriptionKey: "MS2130S backup firmware failed"]) }
+        return success
+    }
+
+    func restoreExternalFirmware(from url: URL) async throws -> Bool {
+        let success = await MS2130SFlashManager.shared.restoreFirmware(from: url, progressCallback: { phase, pct in
+            Task { @MainActor in
+                self.updateStatus = phase
+                self.updateProgress = pct
+            }
+        })
+        if !success { throw NSError(domain: "Firmware", code: -1, userInfo: [NSLocalizedDescriptionKey: "MS2130S restore firmware failed"]) }
+        return success
+    }
+
     // MARK: - EEPROM Writing
     
     func loadFirmwareToEeprom() async {
@@ -302,8 +346,20 @@ class FirmwareManager: ObservableObject {
                 self.updateProgress = 0.1
             }
             
-            // Write firmware to EEPROM
-            let success = await writeEeprom(address: eepromStartAddress, data: firmwareData)
+            // Write firmware to target device
+            let success: Bool
+            if AppStatus.videoChipsetType == .ms2130s {
+                success = await MS2130SFlashManager.shared.flashFirmware(firmwareData, progressCallback: { phaseProgress, phaseValue in
+                    DispatchQueue.main.async {
+                        let overall = 0.1 + (phaseValue * 0.9)
+                        self.updateProgress = overall
+                        self.updateStatus = phaseProgress
+                        self.firmwareWriteProgressSubject.send(Int(overall*100))
+                    }
+                })
+            } else {
+                success = await writeEeprom(address: eepromStartAddress, data: firmwareData)
+            }
             
             // Signal completion
             DispatchQueue.main.async {
@@ -351,15 +407,22 @@ class FirmwareManager: ObservableObject {
     /// Public method to write firmware data to EEPROM with progress tracking
     /// This method is called from the View layer and handles progress updates
     func writeFirmwareToEeprom(_ data: Data) async -> Bool {
-        logger.log(content: "Writing \(data.count) bytes to EEPROM using HID commands...")
-        
-        // Update progress to show start of EEPROM write
+        logger.log(content: "Writing \(data.count) bytes to device firmware using HID commands...")
+
         await MainActor.run {
             self.updateProgress = 0.4
-            self.updateStatus = "Installing firmware to EEPROM..."
+            self.updateStatus = "Installing firmware..."
         }
-        
-        // Use the internal writeEeprom method with progress tracking
+
+        if AppStatus.videoChipsetType == .ms2130s {
+            return await MS2130SFlashManager.shared.flashFirmware(data, progressCallback: { phase, pct in
+                Task { @MainActor in
+                    self.updateProgress = 0.4 + 0.6 * pct
+                    self.updateStatus = phase
+                }
+            })
+        }
+
         return await writeEeprom(address: 0x0000, data: data)
     }
     
@@ -375,7 +438,29 @@ class FirmwareManager: ObservableObject {
             backupProgress = 0.0
             backupStatus = "Determining firmware size..."
         }
-        
+
+        if AppStatus.videoChipsetType == .ms2130s {
+            let defaultSize = 1024 * 1024 // fallback to 1MB
+            await MainActor.run {
+                self.backupStatus = "Reading \(defaultSize) bytes of firmware from MS2130S..."
+            }
+
+            let success = await MS2130SFlashManager.shared.backupFirmware(totalSize: defaultSize, to: backupURL, progressCallback: { step, pct in
+                Task { @MainActor in
+                    self.backupProgress = pct
+                    self.backupStatus = step
+                }
+            })
+
+            await MainActor.run {
+                isBackupInProgress = false
+            }
+
+            let message = success ? "MS2130S firmware backup succeeded" : "MS2130S firmware backup failed"
+            firmwareBackupCompleteSubject.send((success, message))
+            return
+        }
+
         // First, try to determine the actual firmware size
         let firmwareSize = await determineFirmwareSize()
         
@@ -690,8 +775,18 @@ class FirmwareManager: ObservableObject {
                 updateStatus = "Firmware file validated. Starting restore..."
             }
             
-            // Write firmware to EEPROM
-            let success = await writeEeprom(address: eepromStartAddress, data: firmwareData)
+            // Write firmware to EEPROM or external flash
+            let success: Bool
+            if AppStatus.videoChipsetType == .ms2130s {
+                success = await MS2130SFlashManager.shared.flashFirmware(firmwareData, progressCallback: { phase, pct in
+                    Task { @MainActor in
+                        self.updateProgress = 0.2 + pct * 0.8
+                        self.updateStatus = phase
+                    }
+                })
+            } else {
+                success = await writeEeprom(address: eepromStartAddress, data: firmwareData)
+            }
             
             await MainActor.run {
                 isUpdateInProgress = false

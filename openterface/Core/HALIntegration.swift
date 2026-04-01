@@ -143,6 +143,22 @@ class HALIntegrationManager {
         
         logger.log(content: "✅ HAL Integration deinitialized")
     }
+
+    /// Pause periodic HAL updates and keep existing hardware state for firmware update
+    func pausePeriodicHALUpdates() {
+        stopPeriodicHALUpdates()
+        logger.log(content: "⏹️ Periodic HAL updates paused for firmware update")
+    }
+
+    /// Resume periodic HAL updates after firmware update
+    func resumePeriodicHALUpdates() {
+        guard isInitialized else {
+            logger.log(content: "⚠️ Cannot resume periodic HAL updates: HAL not initialized")
+            return
+        }
+        setupPeriodicHALUpdates()
+        logger.log(content: "⏰ Periodic HAL updates resumed after firmware update")
+    }
     
     /// Re-integrate control chipset after selection
     /// Call this after a control chipset has been selected and communication established

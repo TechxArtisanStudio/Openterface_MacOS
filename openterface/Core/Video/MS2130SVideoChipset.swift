@@ -45,10 +45,10 @@ class MS2130SVideoChipset: BaseVideoChipset {
             supportsHDMI: true,
             supportsAudio: true,
             supportsHID: false, // MS2130S has different HID capabilities
-            supportsFirmwareUpdate: false,
+            supportsFirmwareUpdate: true, // External flash firmware update path is supported
             supportsEEPROM: false,
             maxDataTransferRate: 480_000_000, // USB 2.0 High Speed
-            features: ["HDMI Input", "Audio Capture", "Hardware Scaling"]
+            features: ["HDMI Input", "Audio Capture", "Hardware Scaling", "External Flash Firmware Update"]
         )
 
         super.init(chipsetInfo: info, capabilities: capabilities)
