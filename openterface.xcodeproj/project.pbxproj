@@ -396,6 +396,7 @@
 				295DCFB52D76A8A20034BB1E /* AudioManager.swift */,
 				F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */,
 				296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */,
+				A1B2C3F22F12345600ABCDEF /* VNC */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -498,6 +499,14 @@
 				6BC364632F025DD4001B9A07 /* WindowUtils.swift */,
 			);
 			path = ToolBar;
+			sourceTree = "<group>";
+		};
+		A1B2C3F22F12345600ABCDEF /* VNC */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */,
+			);
+			path = VNC;
 			sourceTree = "<group>";
 		};
 		BF7752D92EFFE51000FE5D0E /* Parallel */ = {
