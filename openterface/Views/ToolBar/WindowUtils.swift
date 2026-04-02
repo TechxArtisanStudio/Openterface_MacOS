@@ -126,6 +126,12 @@ final class WindowUtils {
     ///   - targetSize: The desired target size
     ///   - initialContentSize: The default content size / aspect ratio to use when none is available
     func calculateConstrainedWindowSize(for window: NSWindow, targetSize: NSSize, initialContentSize: CGSize) -> NSSize {
+        let fallbackSize = NSSize(width: max(initialContentSize.width, 640), height: max(initialContentSize.height, 360))
+
+        guard targetSize.width.isFinite, targetSize.height.isFinite else {
+            return fallbackSize
+        }
+
         // Log the lock setting and resize action
         logger.log(content: "windowWillResize called - isAspectRatioLocked: \(UserSettings.shared.isAspectRatioLocked), targetSize: \(targetSize)")
         
@@ -144,45 +150,57 @@ final class WindowUtils {
             newSize.width = max(newSize.width, window.minSize.width)
             newSize.height = max(newSize.height, window.minSize.height)
             
+            if !newSize.width.isFinite || !newSize.height.isFinite || newSize.width <= 0 || newSize.height <= 0 {
+                return fallbackSize
+            }
+
             logger.log(content: "Free resize result: \(newSize)")
             return newSize
         }
         
         logger.log(content: "Aspect ratio lock is ENABLED - enforcing aspect ratio")
         
-        // Get the height of the toolbar (if visible)
+        // Get the height consumed by window chrome.
         let toolbarHeight: CGFloat = (window.toolbar?.isVisible == true) ? window.frame.height - window.contentLayoutRect.height : 0
 
         // Determine the aspect ratio to use based on aspectRatioMode
-        let aspectRatioToUse: CGFloat
+        let rawAspectRatio: CGFloat
 
         switch UserSettings.shared.aspectRatioMode {
         case .custom:
-            aspectRatioToUse = UserSettings.shared.customAspectRatio.widthToHeightRatio
+            rawAspectRatio = UserSettings.shared.customAspectRatio.widthToHeightRatio
         case .hidResolution:
             // Try to use HID resolution first
             if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                aspectRatioToUse = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+                rawAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
             } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
-                aspectRatioToUse = CGFloat(resolution.width) / CGFloat(resolution.height)
+                rawAspectRatio = CGFloat(resolution.width) / CGFloat(resolution.height)
             } else {
                 // Fallback to initial content size if HID resolution not available
-                aspectRatioToUse = initialContentSize.width / initialContentSize.height
+                rawAspectRatio = initialContentSize.width / initialContentSize.height
             }
         case .activeResolution:
             // Use active video rect if available
             let activeVideoRect = AppStatus.activeVideoRect
             if activeVideoRect.width > 0 && activeVideoRect.height > 0 {
-                aspectRatioToUse = activeVideoRect.width / activeVideoRect.height
+                rawAspectRatio = activeVideoRect.width / activeVideoRect.height
             } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
                 // Fallback to HID resolution if active rect not available
-                aspectRatioToUse = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+                rawAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
             } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
-                aspectRatioToUse = CGFloat(resolution.width) / CGFloat(resolution.height)
+                rawAspectRatio = CGFloat(resolution.width) / CGFloat(resolution.height)
             } else {
                 // Fallback to initial content size
-                aspectRatioToUse = initialContentSize.width / initialContentSize.height
+                rawAspectRatio = initialContentSize.width / initialContentSize.height
             }
+        }
+
+        let fallbackAspectRatio = max(initialContentSize.width / max(initialContentSize.height, 1), 0.1)
+        let aspectRatioToUse: CGFloat
+        if rawAspectRatio.isFinite, rawAspectRatio > 0.01 {
+            aspectRatioToUse = rawAspectRatio
+        } else {
+            aspectRatioToUse = fallbackAspectRatio
         }
 
         // Get the screen containing the window
@@ -190,6 +208,8 @@ final class WindowUtils {
 
         // Calculate new size maintaining content area aspect ratio
         var newSize = targetSize
+        newSize.width = max(newSize.width, 1)
+        newSize.height = max(newSize.height, 1)
 
         // Adjust height calculation to account for the toolbar
         let contentHeight = newSize.width / aspectRatioToUse
@@ -221,6 +241,10 @@ final class WindowUtils {
         // Ensure we respect the window's minimum size
         newSize.width = max(newSize.width, window.minSize.width)
         newSize.height = max(newSize.height, window.minSize.height)
+
+        if !newSize.width.isFinite || !newSize.height.isFinite || newSize.width <= 0 || newSize.height <= 0 {
+            return fallbackSize
+        }
 
         logger.log(content: "Aspect ratio locked resize result: \(newSize)")
         return newSize

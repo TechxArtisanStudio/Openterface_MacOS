@@ -11,6 +11,26 @@ final class ChatWindowManager: NSObject, ChatWindowManagerProtocol, NSWindowDele
     private let dockGap: CGFloat = 8
     private var isProgrammaticDockUpdate = false
     private var pendingDockCommit: DispatchWorkItem?
+    private let logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
+
+    private func scalarSummary(_ value: CGFloat) -> String {
+        guard value.isFinite else {
+            if value.isNaN {
+                return "nan"
+            }
+            return value.sign == .minus ? "-inf" : "inf"
+        }
+
+        return String(Int(value.rounded()))
+    }
+
+    private func frameSummary(_ rect: NSRect) -> String {
+        let x = scalarSummary(rect.origin.x)
+        let y = scalarSummary(rect.origin.y)
+        let width = scalarSummary(rect.size.width)
+        let height = scalarSummary(rect.size.height)
+        return "x=\(x) y=\(y) w=\(width) h=\(height)"
+    }
 
     private override init() {
         super.init()
@@ -74,8 +94,13 @@ final class ChatWindowManager: NSObject, ChatWindowManagerProtocol, NSWindowDele
 
     func updateDockPosition(animated: Bool) {
         guard let mainWindow = resolveMainWindow(), let chatWindow = chatWindow else { return }
+        if mainWindow.inLiveResize {
+            logger.log(content: "[ResizeDebug] chat.updateDockPosition skipped mainFrame={\(frameSummary(mainWindow.frame))} chatFrame={\(frameSummary(chatWindow.frame))}")
+            return
+        }
         let width = max(320, CGFloat(UserSettings.shared.chatWindowWidth))
         let targetFrame = dockedFrame(for: mainWindow, width: width)
+        logger.log(content: "[ResizeDebug] chat.updateDockPosition begin animated=\(animated) mainFrame={\(frameSummary(mainWindow.frame))} chatFrame={\(frameSummary(chatWindow.frame))} target={\(frameSummary(targetFrame))}")
         isProgrammaticDockUpdate = true
         chatWindow.setFrame(targetFrame, display: true, animate: animated)
         isProgrammaticDockUpdate = false
@@ -97,6 +122,7 @@ final class ChatWindowManager: NSObject, ChatWindowManagerProtocol, NSWindowDele
     @objc
     private func handleChatWindowDidResize(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, window == chatWindow else { return }
+        logger.log(content: "[ResizeDebug] chat.handleChatWindowDidResize frame={\(frameSummary(window.frame))}")
         UserSettings.shared.chatWindowWidth = Double(window.frame.width)
         updateDockPosition(animated: false)
     }
@@ -104,6 +130,8 @@ final class ChatWindowManager: NSObject, ChatWindowManagerProtocol, NSWindowDele
     func windowDidMove(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, window == chatWindow else { return }
         guard !isProgrammaticDockUpdate else { return }
+
+        logger.log(content: "[ResizeDebug] chat.windowDidMove frame={\(frameSummary(window.frame))}")
 
         pendingDockCommit?.cancel()
 

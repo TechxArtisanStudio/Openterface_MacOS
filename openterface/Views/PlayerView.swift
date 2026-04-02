@@ -525,8 +525,7 @@ class PlayerView: NSView, NSWindowDelegate {
     // Get window dimensions
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        self.window?.delegate = self
-        
+
         if let window = self.window {
             let windowSize = window.frame.size
             UserSettings.shared.viewWidth = Float(windowSize.width)

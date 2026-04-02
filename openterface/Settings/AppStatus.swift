@@ -48,6 +48,14 @@ enum SDCardDirection {
     case target
 }
 
+enum ProtocolSessionState {
+    case idle
+    case switching
+    case connecting
+    case connected
+    case error
+}
+
 struct AppStatus {
     // Flags to track the currently connected chipset types
     static var videoChipsetType: VideoChipsetType = .unknown
@@ -58,6 +66,9 @@ struct AppStatus {
 
     static var isMouseInView: Bool = true
     static var isFouceWindow: Bool = true
+    static var activeConnectionProtocol: ConnectionProtocolMode = UserSettings.shared.connectionProtocolMode
+    static var protocolSessionState: ProtocolSessionState = .idle
+    static var protocolLastErrorMessage: String = ""
     static var isHDMIConnected: Bool = false
     static var isMouseEdge: Bool = false
     static var isCursorHidden: Bool = false

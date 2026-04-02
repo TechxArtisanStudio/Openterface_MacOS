@@ -79,6 +79,7 @@ struct openterfaceApp: App {
     private var chatWindowManager: ChatWindowManagerProtocol { DependencyContainer.shared.resolve(ChatWindowManagerProtocol.self) }
     
     init() {
+        UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
         // Setup dependencies before UI construction to ensure they're available
         AppDelegate.setupDependencies(container: DependencyContainer.shared)
     }
@@ -116,6 +117,7 @@ struct openterfaceApp: App {
     @State private var logModeInitialized = false
     @State private var _isAlwaysOnTop = UserSettings.shared.isAlwaysOnTop
     @State private var _keyboardLayout = UserSettings.shared.keyboardLayout
+    @State private var _connectionProtocolMode = UserSettings.shared.connectionProtocolMode
 
     var log: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -140,6 +142,7 @@ struct openterfaceApp: App {
                             switchToTarget: $_switchToTarget,
                             isAudioEnabled: _isAudioEnabled,
                             canTakePicture: _canTakePicture,
+                            canRecordVideo: _connectionProtocolMode == .kvm && _canTakePicture,
                             isRecording: _isRecording,
                             hasHdmiSignal: _hasHdmiSignal,
                             isKeyboardConnected: _isKeyboardConnected,
@@ -225,6 +228,12 @@ struct openterfaceApp: App {
                             _canTakePicture = newCanTakePicture
                             stateChanged = true
                         }
+
+                        let newConnectionProtocolMode = AppStatus.activeConnectionProtocol
+                        if _connectionProtocolMode != newConnectionProtocolMode {
+                            _connectionProtocolMode = newConnectionProtocolMode
+                            stateChanged = true
+                        }
                         
                         // Check mouse loop status
                         let isMouseRunning = mouseManager.getMouseLoopRunning()
@@ -271,6 +280,22 @@ struct openterfaceApp: App {
         .commands {
             // Customize menu
             CommandMenu("Control") {
+                Menu("Connection Protocol") {
+                    Button(action: {
+                        setConnectionProtocolMode(.kvm)
+                    }) {
+                        Text("Hardware KVM\(_connectionProtocolMode == .kvm ? " ✓" : "")")
+                    }
+
+                    Button(action: {
+                        setConnectionProtocolMode(.vnc)
+                    }) {
+                        Text("VNC Client\(_connectionProtocolMode == .vnc ? " ✓" : "")")
+                    }
+                }
+
+                Divider()
+
                 Menu("Mouse Mode"){
                     Button(action: {
                         // Check permissions for HID mode
@@ -481,7 +506,7 @@ struct openterfaceApp: App {
                     }) {
                         Text(_isRecording ? "Stop Recording" : "Start Recording")
                     }
-                    .disabled(!_canTakePicture)
+                    .disabled(_connectionProtocolMode != .kvm || !_canTakePicture)
                     
                     Divider()
                     
@@ -897,6 +922,12 @@ struct openterfaceApp: App {
                 WindowUtils.shared.updateWindowSizeThroughNotification()
             }
         }
+    }
+
+    private func setConnectionProtocolMode(_ mode: ConnectionProtocolMode) {
+        UserSettings.shared.connectionProtocolMode = mode
+        _connectionProtocolMode = mode
+        NotificationCenter.default.post(name: Notification.Name("ConnectionProtocolModeChanged"), object: nil)
     }
 }
 

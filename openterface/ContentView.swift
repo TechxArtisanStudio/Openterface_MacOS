@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var showActiveVideoRect = AppStatus.showActiveVideoRect
     @State private var showGuideOverlay = AppStatus.showGuideOverlay
     @State private var overlayActive = AppStatus.showParallelOverlay
+    @State private var currentProtocolMode: ConnectionProtocolMode = AppStatus.activeConnectionProtocol
     @State private var showMiniIndicator: Bool = false
     @State private var miniMousePos: CGPoint = CGPoint(x: 0.5, y: 0.5) // normalized (0..1), origin: top-left
     @State private var isMouseInTarget: Bool = false
@@ -121,56 +122,16 @@ struct ContentView: View {
                     }
                 }
                 .ignoresSafeArea()
-            }else{
+            } else {
                 ZStack {
-                    PlayerContainerView(captureSession: viewModel.captureSession)
-                        .onTapGesture {
-                            // click in windows
-                            if AppStatus.isExit {
-                                AppStatus.isExit = false
-                            }
-                    }
-                    
-                    // Active video rect bounding box
-                    if showActiveVideoRect {
-                        GeometryReader { geo in
-                            let rect = AppStatus.activeVideoRect
-                            let containerSize = geo.size
-                            
-                            // Only draw if rect has valid dimensions
-                            if rect.width > 0 && rect.height > 0 {
-                                Rectangle()
-                                    .stroke(Color.yellow, lineWidth: 2)
-                                    .frame(width: rect.width, height: rect.height)
-                                    .position(x: rect.origin.x + rect.width / 2, y: rect.origin.y + rect.height / 2)
-                            }
-                        }
-                        .allowsHitTesting(false)
-                    }
-
-                    if showGuideOverlay {
-                        GeometryReader { geo in
-                            let rect = AppStatus.guideHighlightRectNormalized
-                            let clampedX = max(0.0, min(1.0, rect.origin.x))
-                            let clampedY = max(0.0, min(1.0, rect.origin.y))
-                            let clampedW = max(0.0, min(1.0, rect.width))
-                            let clampedH = max(0.0, min(1.0, rect.height))
-
-                            if clampedW > 0.001 && clampedH > 0.001 {
-                                let overlayRect = CGRect(
-                                    x: clampedX * geo.size.width,
-                                    y: clampedY * geo.size.height,
-                                    width: clampedW * geo.size.width,
-                                    height: clampedH * geo.size.height
-                                )
-
-                                Rectangle()
-                                    .stroke(Color.red, lineWidth: 3)
-                                    .frame(width: overlayRect.width, height: overlayRect.height)
-                                    .position(x: overlayRect.midX, y: overlayRect.midY)
-                            }
-                        }
-                        .allowsHitTesting(false)
+                    if currentProtocolMode == .vnc {
+                        VNCFrameView()
+                    } else {
+                        KVMFrameView(
+                            captureSession: viewModel.captureSession,
+                            showActiveVideoRect: showActiveVideoRect,
+                            showGuideOverlay: showGuideOverlay
+                        )
                     }
                 }
                 
@@ -187,6 +148,7 @@ struct ContentView: View {
         }
         .onAppear {
             viewModel.checkAuthorization() // Perform authorization check when the view appears
+            NSApplication.shared.mainWindow?.title = "Openterface KVM - \(AppVersion.getVersionString())"
         }
         .onReceive(timer) { _ in
             if showInputOverlay != AppStatus.showInputOverlay {
@@ -203,6 +165,10 @@ struct ContentView: View {
             }
             if overlayActive != AppStatus.showParallelOverlay {
                 overlayActive = AppStatus.showParallelOverlay
+            }
+            let activeProtocol = AppStatus.activeConnectionProtocol
+            if currentProtocolMode != activeProtocol {
+                currentProtocolMode = activeProtocol
             }
         }
     }
