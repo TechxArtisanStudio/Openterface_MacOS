@@ -247,6 +247,28 @@ Schema:
         let savedTargetPlacement = UserDefaults.standard.string(forKey: "targetComputerPlacement")
         self.targetComputerPlacement = TargetComputerPlacement(rawValue: savedTargetPlacement ?? "") ?? .right
 
+        // Load connection protocol mode from UserDefaults
+        let savedConnectionProtocolMode = UserDefaults.standard.string(forKey: "connectionProtocolMode")
+        self.connectionProtocolMode = ConnectionProtocolMode(rawValue: savedConnectionProtocolMode ?? "") ?? .kvm
+
+        // Load VNC connection preferences
+        self.vncHost = UserDefaults.standard.string(forKey: "vncHost") ?? ""
+        let savedVNCPort = UserDefaults.standard.object(forKey: "vncPort") as? Int ?? 5900
+        self.vncPort = max(1, min(savedVNCPort, 65535))
+
+        let vncKeychainValue = VNCKeychainStore.loadPassword()
+        if !vncKeychainValue.isEmpty {
+            self.vncPassword = vncKeychainValue
+        } else {
+            // Migrate legacy password from UserDefaults to Keychain, then remove plaintext storage.
+            let legacyValue = UserDefaults.standard.string(forKey: "vncPassword") ?? ""
+            self.vncPassword = legacyValue
+            if !legacyValue.isEmpty {
+                VNCKeychainStore.savePassword(legacyValue)
+                UserDefaults.standard.removeObject(forKey: "vncPassword")
+            }
+        }
+
         // Load persisted active video rect from UserDefaults
         self.activeVideoX = UserDefaults.standard.object(forKey: "activeVideoX") as? Int ?? 0
         self.activeVideoY = UserDefaults.standard.object(forKey: "activeVideoY") as? Int ?? 0
@@ -285,9 +307,9 @@ Schema:
         self.chatWindowWidth = UserDefaults.standard.object(forKey: "chatWindowWidth") as? Double ?? 420
         self.isChatAgenticModeEnabled = UserDefaults.standard.object(forKey: "isChatAgenticModeEnabled") as? Bool ?? false
         self.chatApiBaseURL = UserDefaults.standard.string(forKey: "chatApiBaseURL") ?? "https://api.openai.com/v1"
-        let keychainValue = ChatKeychainStore.loadChatAPIKey()
-        if !keychainValue.isEmpty {
-            self.chatApiKey = keychainValue
+        let chatKeychainValue = ChatKeychainStore.loadChatAPIKey()
+        if !chatKeychainValue.isEmpty {
+            self.chatApiKey = chatKeychainValue
         } else {
             // Migrate legacy key from UserDefaults to Keychain, then remove plaintext storage.
             let legacyKey = UserDefaults.standard.string(forKey: "chatApiKey") ?? ""
@@ -452,6 +474,43 @@ Schema:
     @Published var targetComputerPlacement: TargetComputerPlacement {
         didSet {
             UserDefaults.standard.set(targetComputerPlacement.rawValue, forKey: "targetComputerPlacement")
+        }
+    }
+
+    // Connection protocol mode setting
+    @Published var connectionProtocolMode: ConnectionProtocolMode {
+        didSet {
+            UserDefaults.standard.set(connectionProtocolMode.rawValue, forKey: "connectionProtocolMode")
+        }
+    }
+
+    // VNC host name or IP
+    @Published var vncHost: String {
+        didSet {
+            UserDefaults.standard.set(vncHost, forKey: "vncHost")
+        }
+    }
+
+    // VNC TCP port
+    @Published var vncPort: Int {
+        didSet {
+            let clampedPort = max(1, min(vncPort, 65535))
+            if clampedPort != vncPort {
+                vncPort = clampedPort
+                return
+            }
+            UserDefaults.standard.set(vncPort, forKey: "vncPort")
+        }
+    }
+
+    // VNC password stored in Keychain
+    @Published var vncPassword: String {
+        didSet {
+            if vncPassword.isEmpty {
+                VNCKeychainStore.deletePassword()
+            } else {
+                VNCKeychainStore.savePassword(vncPassword)
+            }
         }
     }
 
@@ -661,6 +720,29 @@ enum KeyboardLayout: String, CaseIterable {
             return "Optimized for Windows targets"
         case .mac:
             return "Optimized for Mac targets"
+        }
+    }
+}
+
+enum ConnectionProtocolMode: String, CaseIterable {
+    case kvm = "kvm"
+    case vnc = "vnc"
+
+    var displayName: String {
+        switch self {
+        case .kvm:
+            return "Hardware KVM"
+        case .vnc:
+            return "VNC Client"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .kvm:
+            return "Use direct Openterface USB capture and HID control"
+        case .vnc:
+            return "Connect to a remote host using RFB/VNC"
         }
     }
 }
@@ -1016,6 +1098,63 @@ private enum ChatKeychainStore {
     }
 
     static func deleteChatAPIKey() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        SecItemDelete(query as CFDictionary)
+    }
+}
+
+private enum VNCKeychainStore {
+    private static let service = "com.openterface.vnc"
+    private static let account = "vnc_password"
+
+    static func loadPassword() -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let value = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return value
+    }
+
+    static func savePassword(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        let attributesToUpdate: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributesToUpdate as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        SecItemAdd(addQuery as CFDictionary, nil)
+    }
+
+    static func deletePassword() {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

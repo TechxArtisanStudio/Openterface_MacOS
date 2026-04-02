@@ -7,6 +7,7 @@ struct ToolbarContentView: ToolbarContent {
 
     var isAudioEnabled: Bool
     var canTakePicture: Bool
+    var canRecordVideo: Bool
     var isRecording: Bool
     var hasHdmiSignal: Bool?
     var isKeyboardConnected: Bool?
@@ -122,10 +123,10 @@ struct ToolbarContentView: ToolbarContent {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 16, height: 16)
-                    .foregroundColor(isRecording ? .red : (canTakePicture ? .blue : .gray))
+                    .foregroundColor(isRecording ? .red : (canRecordVideo ? .blue : .gray))
             }
-            .help(isRecording ? "Stop Recording" : "Start Video Recording")
-            .disabled(!canTakePicture)
+            .help(canRecordVideo || isRecording ? (isRecording ? "Stop Recording" : "Start Video Recording") : "Video recording is only available in KVM mode")
+            .disabled(!canRecordVideo && !isRecording)
 
             Button(action: {
                 showAspectRatioSelection()
@@ -276,6 +277,7 @@ struct ToolbarContentView_Previews: PreviewProvider {
                     switchToTarget: .constant(false),
                     isAudioEnabled: true,
                     canTakePicture: false,
+                    canRecordVideo: false,
                     isRecording: false,
                     hasHdmiSignal: nil,
                     isKeyboardConnected: nil,

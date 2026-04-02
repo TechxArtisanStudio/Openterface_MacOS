@@ -22,6 +22,7 @@
 
 import Foundation
 import AVFoundation
+import CoreGraphics
 import SwiftUI
 import ORSSerial
 
@@ -320,6 +321,26 @@ protocol PermissionManagerProtocol: AnyObject {
 
 protocol SwitchableUSBManagerProtocol: AnyObject {
     func toggleUSB(toTarget: Bool)
+}
+
+/// Protocol for protocol-mode orchestration (KVM vs VNC)
+protocol ConnectionProtocolManagerProtocol: AnyObject {
+    var currentMode: ConnectionProtocolMode { get }
+    func applyConnectionMode(_ mode: ConnectionProtocolMode, reason: String)
+}
+
+/// Protocol for VNC client lifecycle and I/O hooks
+protocol VNCClientManagerProtocol: AnyObject {
+    var isConnected: Bool { get }
+    var host: String { get }
+    var port: Int { get }
+    var currentFrame: CGImage? { get }
+
+    func connect(host: String, port: Int, password: String?)
+    func disconnect()
+    func sendPointerEvent(x: Int, y: Int, buttonMask: UInt8)
+    func sendKeyEvent(keySym: UInt32, isDown: Bool)
+    func sendClipboardText(_ text: String)
 }
 
 // MARK: - Supporting Types

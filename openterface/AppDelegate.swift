@@ -25,6 +25,10 @@ import Carbon
 import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+    private enum LiveResizeAxis {
+        case width
+        case height
+    }
     
     // MARK: - Protocol-based Dependencies
     private var audioManager: any AudioManagerProtocol
@@ -39,6 +43,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var parallelManager: any ParallelManagerProtocol
     private var chatWindowManager: any ChatWindowManagerProtocol
     private var logger: any LoggerProtocol
+    private var pendingWindowSizeUpdateAfterResize = false
+    private var shouldRestoreAspectRatioAfterLiveResize = false
+    private var liveResizeAxis: LiveResizeAxis?
+
+    private func scalarSummary(_ value: CGFloat) -> String {
+        guard value.isFinite else {
+            if value.isNaN {
+                return "nan"
+            }
+            return value.sign == .minus ? "-inf" : "inf"
+        }
+
+        return String(Int(value.rounded()))
+    }
+
+    private func frameSummary(_ rect: NSRect) -> String {
+        let x = scalarSummary(rect.origin.x)
+        let y = scalarSummary(rect.origin.y)
+        let width = scalarSummary(rect.size.width)
+        let height = scalarSummary(rect.size.height)
+        return "x=\(x) y=\(y) w=\(width) h=\(height)"
+    }
+
+    private func aspectSummary(_ size: NSSize) -> String {
+        guard size.width.isFinite, size.height.isFinite else {
+            return "invalid"
+        }
+        return String(format: "%.4f:%.4f", size.width, size.height)
+    }
+
+    private func sanitizedResizeTarget(for window: NSWindow, proposedSize: NSSize) -> NSSize {
+        let currentSize = window.frame.size
+        let toolbarHeight = max(window.frame.height - window.contentLayoutRect.height, 0)
+
+        let hasValidWidth = proposedSize.width.isFinite && proposedSize.width > 0
+        let hasValidHeight = proposedSize.height.isFinite && proposedSize.height > 0
+
+        let baseSize = NSSize(
+            width: hasValidWidth ? proposedSize.width : currentSize.width,
+            height: hasValidHeight ? proposedSize.height : currentSize.height
+        )
+
+        guard UserSettings.shared.isAspectRatioLocked else {
+            return baseSize
+        }
+
+        let ratio = desiredAspectRatio()
+        guard ratio.isFinite, ratio > 0.01 else {
+            return baseSize
+        }
+
+        let axis: LiveResizeAxis
+        if let liveResizeAxis {
+            axis = liveResizeAxis
+        } else {
+            let widthDelta = hasValidWidth ? abs(baseSize.width - currentSize.width) : 0
+            let heightDelta = hasValidHeight ? abs(baseSize.height - currentSize.height) : 0
+            axis = (!hasValidHeight || widthDelta >= heightDelta) ? .width : .height
+        }
+
+        if axis == .width, hasValidWidth {
+            let contentHeight = max(baseSize.width / ratio, 1)
+            return NSSize(width: baseSize.width, height: contentHeight + toolbarHeight)
+        }
+
+        let contentHeight = max(baseSize.height - toolbarHeight, 1)
+        return NSSize(width: contentHeight * ratio, height: baseSize.height)
+    }
+
+    private func logResizeEvent(_ event: String, window: NSWindow, extra: String = "") {
+        let identifier = window.identifier?.rawValue ?? "nil"
+        let suffix = extra.isEmpty ? "" : " \(extra)"
+        let axisDescription: String
+        switch liveResizeAxis {
+        case .width:
+            axisDescription = "width"
+        case .height:
+            axisDescription = "height"
+        case nil:
+            axisDescription = "nil"
+        }
+        logger.log(content: "[ResizeDebug] \(event) id=\(identifier) inLiveResize=\(window.inLiveResize) frame={\(frameSummary(window.frame))} content={\(frameSummary(window.contentLayoutRect))} aspect=\(aspectSummary(window.contentAspectRatio)) lock=\(UserSettings.shared.isAspectRatioLocked) axis=\(axisDescription) pendingUpdate=\(pendingWindowSizeUpdateAfterResize) restoreAspect=\(shouldRestoreAspectRatioAfterLiveResize)\(suffix)")
+    }
     
     //Use half of the screen width as initial window width
     var initialContentSize: CGSize {
@@ -82,10 +169,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         
         super.init()
+        disableWindowStateRestorationArtifacts()
         // Observe menu-related notifications so AppDelegate can keep the main View menu in sync
         NotificationCenter.default.addObserver(self, selector: #selector(handleParallelModeChanged(_:)), name: Notification.Name("ParallelModeChanged"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handlePlacementChanged(_:)), name: Notification.Name("TargetPlacementChanged"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleChatDockSideChanged(_:)), name: Notification.Name("ChatDockSideChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleConnectionProtocolModeChanged(_:)), name: Notification.Name("ConnectionProtocolModeChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleVNCConnectRequested(_:)), name: Notification.Name("VNCConnectRequested"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleVNCDisconnectRequested(_:)), name: Notification.Name("VNCDisconnectRequested"), object: nil)
     }
 
     deinit {
@@ -112,11 +203,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(ClipboardManagerProtocol.self, instance: ClipboardManager.shared as any ClipboardManagerProtocol)
         container.register(FloatingKeyboardManagerProtocol.self, instance: FloatingKeyboardManager() as any FloatingKeyboardManagerProtocol)
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
+        container.register(VNCClientManagerProtocol.self, instance: VNCClientManager.shared as any VNCClientManagerProtocol)
         container.register(CameraManagerProtocol.self, instance: CameraManager.shared as any CameraManagerProtocol)
         container.register(PermissionManagerProtocol.self, instance: PermissionManager.shared as any PermissionManagerProtocol)
         container.register(ChatManagerProtocol.self, instance: ChatManager.shared as any ChatManagerProtocol)
         container.register(ChatWindowManagerProtocol.self, instance: ChatWindowManager.shared as any ChatWindowManagerProtocol)
-        
+
         // OCR Manager (macOS 12.3+ only)
         if #available(macOS 12.3, *) {
             container.register(OCRManagerProtocol.self, instance: OCRManager.shared as any OCRManagerProtocol)
@@ -185,6 +277,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // port has had time to connect and become ready (typically within 2 seconds).
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             SerialPortManager.shared.getHidInfo()
+        }
+
+        // Apply protocol mode at launch so KVM/VNC startup behavior is explicit.
+        applyConnectionProtocolMode(UserSettings.shared.connectionProtocolMode, reason: "app launch")
+    }
+
+    @objc private func handleConnectionProtocolModeChanged(_ notification: Notification) {
+        applyConnectionProtocolMode(UserSettings.shared.connectionProtocolMode, reason: "manual switch")
+    }
+
+    @objc private func handleVNCConnectRequested(_ notification: Notification) {
+        guard UserSettings.shared.connectionProtocolMode == .vnc else {
+            AppStatus.protocolLastErrorMessage = "Switch to VNC mode first before connecting."
+            AppStatus.protocolSessionState = .error
+            return
+        }
+        VNCClientManager.shared.connect(
+            host: UserSettings.shared.vncHost,
+            port: UserSettings.shared.vncPort,
+            password: UserSettings.shared.vncPassword.isEmpty ? nil : UserSettings.shared.vncPassword
+        )
+    }
+
+    @objc private func handleVNCDisconnectRequested(_ notification: Notification) {
+        VNCClientManager.shared.disconnect()
+    }
+
+    private func applyConnectionProtocolMode(_ mode: ConnectionProtocolMode, reason: String) {
+        AppStatus.activeConnectionProtocol = mode
+        AppStatus.protocolSessionState = .switching
+        AppStatus.protocolLastErrorMessage = ""
+
+        switch mode {
+        case .kvm:
+            logger.log(content: "Connection protocol switched to KVM (\(reason))")
+            VNCClientManager.shared.disconnect()
+            serialPortManager.resumeConnectionAttempts()
+            hidManager.restartHIDOperations()
+            videoManager.startVideoSession()
+            AppStatus.protocolSessionState = .connected
+        case .vnc:
+            logger.log(content: "Connection protocol switched to VNC (\(reason)). KVM hardware streams are paused.")
+            hidManager.stopAllHIDOperations()
+            videoManager.stopVideoSession()
+            serialPortManager.pauseConnectionAttempts()
+            VNCClientManager.shared.connect(
+                host: UserSettings.shared.vncHost,
+                port: UserSettings.shared.vncPort,
+                password: UserSettings.shared.vncPassword.isEmpty ? nil : UserSettings.shared.vncPassword
+            )
         }
     }
 
@@ -287,6 +429,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 if windownName.contains(UserSettings.shared.mainWindownName) {
                     window.delegate = self
                     window.backgroundColor = NSColor.black
+                    window.isRestorable = false
                     
                     // Allow window resizing but maintain aspect ratio
                     window.styleMask.insert(.resizable)
@@ -297,6 +440,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
                     logger.log(content: "InitialContentSize: \(initialContentSize), fullInitialSize: \(fullInitialSize), initialContentSize with toolbar: \(initialFrame.size)")
                     window.setFrame(initialFrame, display: false)
+                    refreshNativeAspectRatioLock(for: window, constrainedFrameSize: fullInitialSize)
                     
                     // // Set minimum size to prevent too small windows
                     // window.minSize = NSSize(width: aspectRatio.width / 2, height: aspectRatio.height / 2)
@@ -552,6 +696,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     
     // Update window size
     func updateWindowSize(window: NSWindow) {
+        if window.inLiveResize {
+            pendingWindowSizeUpdateAfterResize = true
+            logResizeEvent("updateWindowSize deferred", window: window)
+            return
+        }
+
+        logResizeEvent("updateWindowSize begin", window: window)
+
         // Get screen size
         guard let screen = window.screen ?? NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
@@ -576,22 +728,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             width: newSize.width,
             height: newSize.height
         )
+
+        logger.log(content: "[ResizeDebug] updateWindowSize target={\(frameSummary(newFrame))} screen={\(frameSummary(screenFrame))}")
         
         window.setFrame(newFrame, display: true, animate: true)
+        refreshNativeAspectRatioLock(for: window, constrainedFrameSize: newSize)
+        logResizeEvent("updateWindowSize end", window: window)
     }
     
     func windowDidResize(_ notification: Notification) {
-        if let window = NSApplication.shared.mainWindow {
+        if let window = notification.object as? NSWindow {
+            logResizeEvent("windowDidResize", window: window)
             updateWindowAppStatus(for: window)
-            chatWindowManager.updateDockPosition(animated: false)
         }
-       handleToolbarAutoHide()
+        if let window = notification.object as? NSWindow, !window.inLiveResize {
+            handleToolbarAutoHide()
+        }
     }
 
     func windowDidMove(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
+            logResizeEvent("windowDidMove", window: window)
             updateWindowAppStatus(for: window)
-            chatWindowManager.updateDockPosition(animated: false)
+            if !window.inLiveResize {
+                chatWindowManager.updateDockPosition(animated: false)
+            }
         }
     }
 
@@ -603,16 +764,126 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         AppStatus.currentWindow = window.frame
     }
 
+    /// Compute the aspect ratio currently selected by user settings.
+    /// Falls back to initialContentSize when runtime data is unavailable.
+    private func desiredAspectRatio() -> CGFloat {
+        switch UserSettings.shared.aspectRatioMode {
+        case .custom:
+            return UserSettings.shared.customAspectRatio.widthToHeightRatio
+        case .hidResolution:
+            if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+                return CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+            }
+            if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
+                return CGFloat(resolution.width) / CGFloat(resolution.height)
+            }
+            return initialContentSize.width / max(initialContentSize.height, 1)
+        case .activeResolution:
+            let activeRect = AppStatus.activeVideoRect
+            if activeRect.width > 0 && activeRect.height > 0 {
+                return activeRect.width / activeRect.height
+            }
+            if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+                return CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+            }
+            if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
+                return CGFloat(resolution.width) / CGFloat(resolution.height)
+            }
+            return initialContentSize.width / max(initialContentSize.height, 1)
+        }
+    }
+
+    /// Apply/remove native macOS content aspect ratio lock.
+    private func refreshNativeAspectRatioLock(for window: NSWindow, constrainedFrameSize: NSSize? = nil) {
+        guard UserSettings.shared.isAspectRatioLocked else {
+            window.contentAspectRatio = .zero
+            logResizeEvent("refreshAspect unlocked", window: window)
+            return
+        }
+
+        let ratio = desiredAspectRatio()
+        guard ratio.isFinite, ratio > 0.01 else {
+            window.contentAspectRatio = NSSize(width: 16, height: 9)
+            logResizeEvent("refreshAspect fallback", window: window, extra: "ratio=\(ratio)")
+            return
+        }
+
+        if ratio >= 1 {
+            window.contentAspectRatio = NSSize(width: ratio, height: 1)
+        } else {
+            window.contentAspectRatio = NSSize(width: 1, height: 1 / ratio)
+        }
+        logResizeEvent("refreshAspect", window: window, extra: String(format: "ratio=%.6f", ratio))
+    }
+
     func windowWillResize(_ sender: NSWindow, to targetFrameSize: NSSize) -> NSSize {
-        return WindowUtils.shared.calculateConstrainedWindowSize(for: sender, targetSize: targetFrameSize, initialContentSize: self.initialContentSize)
+        logger.log(content: "[ResizeDebug] windowWillResize target={\(frameSummary(NSRect(origin: .zero, size: targetFrameSize)))} current={\(frameSummary(sender.frame))} inLiveResize=\(sender.inLiveResize)")
+
+        if sender.inLiveResize, liveResizeAxis == nil, UserSettings.shared.isAspectRatioLocked {
+            let widthValid = targetFrameSize.width.isFinite && targetFrameSize.width > 0
+            let heightValid = targetFrameSize.height.isFinite && targetFrameSize.height > 0
+            let widthDelta = widthValid ? abs(targetFrameSize.width - sender.frame.width) : 0
+            let heightDelta = heightValid ? abs(targetFrameSize.height - sender.frame.height) : 0
+            liveResizeAxis = (!heightValid || widthDelta >= heightDelta) ? .width : .height
+            logResizeEvent("windowWillResize axisLocked", window: sender)
+        }
+
+        let sanitizedSize = sanitizedResizeTarget(for: sender, proposedSize: targetFrameSize)
+        if sanitizedSize != targetFrameSize {
+            logger.log(content: "[ResizeDebug] windowWillResize sanitized={\(frameSummary(NSRect(origin: .zero, size: sanitizedSize)))}")
+        }
+        return sanitizedSize
     }
 
     func windowWillStartLiveResize(_ notification: Notification) {
-
+        stopMouseMonitor()
+        if let window = notification.object as? NSWindow {
+            shouldRestoreAspectRatioAfterLiveResize = UserSettings.shared.isAspectRatioLocked
+            liveResizeAxis = nil
+            logResizeEvent("windowWillStartLiveResize", window: window)
+        }
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
-       handleToolbarAutoHide()
+        if let window = notification.object as? NSWindow {
+            logResizeEvent("windowDidEndLiveResize begin", window: window)
+            if shouldRestoreAspectRatioAfterLiveResize {
+                let snappedSize = WindowUtils.shared.calculateConstrainedWindowSize(
+                    for: window,
+                    targetSize: window.frame.size,
+                    initialContentSize: self.initialContentSize
+                )
+
+                logger.log(content: "[ResizeDebug] windowDidEndLiveResize snappedSize={\(frameSummary(NSRect(origin: .zero, size: snappedSize)))}")
+
+                let currentFrame = window.frame
+                if abs(currentFrame.width - snappedSize.width) > 0.5 || abs(currentFrame.height - snappedSize.height) > 0.5 {
+                    let snappedFrame = NSRect(
+                        x: currentFrame.origin.x,
+                        y: currentFrame.origin.y,
+                        width: snappedSize.width,
+                        height: snappedSize.height
+                    )
+                    window.setFrame(snappedFrame, display: true, animate: false)
+                    logResizeEvent("windowDidEndLiveResize appliedSnap", window: window)
+                }
+                refreshNativeAspectRatioLock(for: window)
+            }
+            shouldRestoreAspectRatioAfterLiveResize = false
+            updateWindowAppStatus(for: window)
+            chatWindowManager.updateDockPosition(animated: false)
+            if pendingWindowSizeUpdateAfterResize {
+                pendingWindowSizeUpdateAfterResize = false
+                logResizeEvent("windowDidEndLiveResize schedulingDeferredUpdate", window: window)
+                DispatchQueue.main.async { [weak self, weak window] in
+                    guard let self = self, let window = window else { return }
+                    self.updateWindowSize(window: window)
+                }
+            }
+            logResizeEvent("windowDidEndLiveResize end", window: window)
+        }
+        liveResizeAxis = nil
+        handleToolbarAutoHide()
     }
 
     // Handle window moving between screens
@@ -623,9 +894,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let screenFrame = screen.visibleFrame
         let currentFrame = window.frame
         
-        // Calculate the current aspect ratio of the window
-        let currentAspectRatio = currentFrame.width / currentFrame.height
-        let targetAspectRatio = initialContentSize.width / initialContentSize.height
+        // Calculate the current aspect ratio of the frame and compare to desired setting.
+        let currentAspectRatio = currentFrame.width / max(currentFrame.height, 1)
+        let targetAspectRatio = desiredAspectRatio()
         
         // Check if aspect ratio is significantly different (allowing for small floating point differences)
         if abs(currentAspectRatio - targetAspectRatio) > 0.01 {
@@ -656,6 +927,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             )
             
             window.setFrame(newFrame, display: true, animate: true)
+            refreshNativeAspectRatioLock(for: window, constrainedFrameSize: finalSize)
         }
         updateWindowAppStatus(for: window)
         chatWindowManager.updateDockPosition(animated: false)
@@ -681,7 +953,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func applicationWillFinishLaunching(_ notification: Notification) {
-        
+        disableWindowStateRestorationArtifacts()
+    }
+
+    private func disableWindowStateRestorationArtifacts() {
+        let defaults = UserDefaults.standard
+
+        // Tell AppKit to ignore previously persisted UI state for this launch.
+        defaults.set(true, forKey: "ApplePersistenceIgnoreState")
+
+        // Remove stale NSWindow frame entries that may decode into invalid frames.
+        let framePrefix = "NSWindow Frame "
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(framePrefix) {
+            defaults.removeObject(forKey: key)
+        }
+
+        // Clear on-disk saved-state records that can trigger restoreStateWithCoder crashes.
+        if let bundleId = Bundle.main.bundleIdentifier {
+            let savedStatePath = ("~/Library/Saved Application State/\(bundleId).savedState" as NSString).expandingTildeInPath
+            let savedStateURL = URL(fileURLWithPath: savedStatePath, isDirectory: true)
+            try? FileManager.default.removeItem(at: savedStateURL)
+        }
+    }
+
+    // MARK: - State Restoration
+    // Disable automatic persistent UI restoration because restored window
+    // frame/state can crash on startup on some systems.
+    func applicationShouldSaveApplicationState(_ app: NSApplication) -> Bool {
+        return false
+    }
+
+    func applicationShouldRestoreApplicationState(_ app: NSApplication) -> Bool {
+        return false
     }
     
     func applicationWillUpdate(_ notification: Notification) {

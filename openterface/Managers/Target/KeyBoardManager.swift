@@ -587,6 +587,12 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         logger.log(content: "🎯 Starting keyboard event monitoring with layout: \(currentKeyboardLayout.rawValue)")
         
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
+            if AppStatus.activeConnectionProtocol == .vnc,
+               NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                VNCClientManager.shared.handleFlagsChanged(event)
+                return nil
+            }
+
             // Check if event should pass through to system windows
             if self.shouldPassThroughEvent(for: event) {
                 return event
@@ -606,6 +612,12 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            if AppStatus.activeConnectionProtocol == .vnc,
+               NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                VNCClientManager.shared.handleKeyEvent(event, isDown: true)
+                return nil
+            }
+
             // Check if event should pass through to system windows
             if self.shouldPassThroughEvent(for: event) {
                 return event
@@ -616,6 +628,12 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
 
         NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
+            if AppStatus.activeConnectionProtocol == .vnc,
+               NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                VNCClientManager.shared.handleKeyEvent(event, isDown: false)
+                return nil
+            }
+
             // Check if event should pass through to system windows
             if self.shouldPassThroughEvent(for: event) {
                 return event

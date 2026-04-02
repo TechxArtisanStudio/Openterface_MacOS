@@ -30,6 +30,7 @@ import UserNotifications
 class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
     private var logger: LoggerProtocol!
     private var videoManager: VideoManagerProtocol!
+    private var vncClientManager: (any VNCClientManagerProtocol)!
     private var audioManager: AudioManagerProtocol!
     
     // Published properties for UI status display
@@ -65,6 +66,7 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         // Initialize dependencies after super.init()
         self.logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
         self.videoManager = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
+        self.vncClientManager = DependencyContainer.shared.resolve(VNCClientManagerProtocol.self)
         self.audioManager = DependencyContainer.shared.resolve(AudioManagerProtocol.self)
         setupCaptureDirectory()
         updateCaptureStatus()
@@ -124,6 +126,12 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
     func startVideoRecording() {
         guard !isRecording else {
             logger.log(content: "Recording already in progress")
+            return
+        }
+
+        guard UserSettings.shared.connectionProtocolMode == .kvm else {
+            logger.log(content: "Video recording is unavailable in VNC mode")
+            statusMessage = "Video recording is only available in KVM mode"
             return
         }
         
@@ -257,11 +265,24 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
     }
     
     private func updateCaptureStatus() {
-        // Check if video is available from VideoManager
-        canTakePicture = videoManager.isVideoConnected && videoManager.outputDelegate != nil
+        switch UserSettings.shared.connectionProtocolMode {
+        case .kvm:
+            canTakePicture = videoManager.isVideoConnected && videoManager.outputDelegate != nil
+        case .vnc:
+            canTakePicture = vncClientManager.isConnected && vncClientManager.currentFrame != nil
+        }
     }
     
     private func captureCurrentFrame() -> NSImage? {
+        switch UserSettings.shared.connectionProtocolMode {
+        case .kvm:
+            return captureKVMCurrentFrame()
+        case .vnc:
+            return captureVNCCurrentFrame()
+        }
+    }
+
+    private func captureKVMCurrentFrame() -> NSImage? {
         // Get the current frame from VideoOutputDelegate
         guard let outputDelegate = videoManager.outputDelegate,
               let pixelBuffer = outputDelegate.getLatestFrame() else {
@@ -284,6 +305,22 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: frameWidth, height: frameHeight))
         logger.log(content: "Created NSImage with size: \(image.size)")
         
+        return image
+    }
+
+    private func captureVNCCurrentFrame() -> NSImage? {
+        guard let cgImage = vncClientManager.currentFrame else {
+            logger.log(content: "No VNC frame available for capture")
+            return nil
+        }
+
+        let frameWidth = cgImage.width
+        let frameHeight = cgImage.height
+        logger.log(content: "Captured VNC frame resolution: \(frameWidth)x\(frameHeight)")
+
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: frameWidth, height: frameHeight))
+        logger.log(content: "Created VNC NSImage with size: \(image.size)")
+
         return image
     }
     
