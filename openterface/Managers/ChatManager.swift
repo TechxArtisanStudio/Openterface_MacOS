@@ -23,6 +23,175 @@ private struct ChatCompletionResult {
     let outputTokenCount: Int?
 }
 
+private enum AIInputRouter {
+    private static func clampedAbsolute(_ value: Int) -> Int {
+        min(max(value, 0), 4096)
+    }
+
+    private static func mapToVNCFramebuffer(absX: Int, absY: Int) -> (x: Int, y: Int) {
+        let x = clampedAbsolute(absX)
+        let y = clampedAbsolute(absY)
+        let framebuffer = VNCClientManager.shared.framebufferSize
+        let width = max(Int(framebuffer.width.rounded()), 1)
+        let height = max(Int(framebuffer.height.rounded()), 1)
+
+        let mappedX = width <= 1 ? 0 : Int((Double(x) / 4096.0) * Double(width - 1))
+        let mappedY = height <= 1 ? 0 : Int((Double(y) / 4096.0) * Double(height - 1))
+        return (mappedX, mappedY)
+    }
+
+    private static func keySym(for keyCode: UInt16) -> UInt32? {
+        let named: [UInt16: UInt32] = [
+            53: 0xFF1B,  // esc
+            36: 0xFF0D,  // enter
+            48: 0xFF09,  // tab
+            49: 0x0020,  // space
+            51: 0xFF08,  // backspace
+            115: 0xFF50, // home
+            119: 0xFF57, // end
+            116: 0xFF55, // page up
+            121: 0xFF56, // page down
+            126: 0xFF52, // up
+            125: 0xFF54, // down
+            123: 0xFF51, // left
+            124: 0xFF53, // right
+            122: 0xFFBE, // f1
+            120: 0xFFBF, // f2
+            99:  0xFFC0, // f3
+            118: 0xFFC1, // f4
+            96:  0xFFC2, // f5
+            97:  0xFFC3, // f6
+            98:  0xFFC4, // f7
+            100: 0xFFC5, // f8
+            101: 0xFFC6, // f9
+            109: 0xFFC7, // f10
+            103: 0xFFC8, // f11
+            111: 0xFFC9  // f12
+        ]
+        if let symbol = named[keyCode] {
+            return symbol
+        }
+
+        let alphaNumeric: [UInt16: UInt32] = [
+            0: 0x0061, 11: 0x0062, 8: 0x0063, 2: 0x0064, 14: 0x0065,
+            3: 0x0066, 5: 0x0067, 4: 0x0068, 34: 0x0069, 38: 0x006A,
+            40: 0x006B, 37: 0x006C, 46: 0x006D, 45: 0x006E, 31: 0x006F,
+            35: 0x0070, 12: 0x0071, 15: 0x0072, 1: 0x0073, 17: 0x0074,
+            32: 0x0075, 9: 0x0076, 13: 0x0077, 7: 0x0078, 16: 0x0079,
+            6: 0x007A,
+            29: 0x0030, 18: 0x0031, 19: 0x0032, 20: 0x0033, 21: 0x0034,
+            23: 0x0035, 22: 0x0036, 26: 0x0037, 28: 0x0038, 25: 0x0039
+        ]
+        return alphaNumeric[keyCode]
+    }
+
+    private static func keySym(for scalar: UnicodeScalar) -> UInt32 {
+        switch scalar {
+        case "\n", "\r":
+            return 0xFF0D
+        case "\t":
+            return 0xFF09
+        default:
+            return scalar.value
+        }
+    }
+
+    private static func modifierKeySyms(from modifiers: NSEvent.ModifierFlags) -> [UInt32] {
+        let filtered = modifiers.intersection(.deviceIndependentFlagsMask)
+        var symbols: [UInt32] = []
+        if filtered.contains(.control) { symbols.append(0xFFE3) }
+        if filtered.contains(.option) { symbols.append(0xFFE9) }
+        if filtered.contains(.shift) { symbols.append(0xFFE1) }
+        if filtered.contains(.command) { symbols.append(0xFFEB) }
+        return symbols
+    }
+
+    static func sendMouseMove(absX: Int, absY: Int) {
+        if AppStatus.activeConnectionProtocol == .vnc {
+            let point = mapToVNCFramebuffer(absX: absX, absY: absY)
+            VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: 0x00)
+            return
+        }
+
+        HostManager.shared.handleAbsoluteMouseAction(x: clampedAbsolute(absX), y: clampedAbsolute(absY), mouseEvent: 0x00, wheelMovement: 0x00)
+    }
+
+    static func click(button: UInt8, absX: Int, absY: Int, isDoubleClick: Bool = false) {
+        if AppStatus.activeConnectionProtocol == .vnc {
+            let point = mapToVNCFramebuffer(absX: absX, absY: absY)
+            VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: 0x00)
+            Thread.sleep(forTimeInterval: 0.04)
+            VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: button)
+            Thread.sleep(forTimeInterval: 0.04)
+            VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: 0x00)
+
+            guard isDoubleClick else { return }
+            Thread.sleep(forTimeInterval: 0.12)
+            VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: button)
+            Thread.sleep(forTimeInterval: 0.04)
+            VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: 0x00)
+            return
+        }
+
+        let x = clampedAbsolute(absX)
+        let y = clampedAbsolute(absY)
+        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
+        Thread.sleep(forTimeInterval: 0.04)
+        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: button, wheelMovement: 0x00)
+        Thread.sleep(forTimeInterval: 0.04)
+        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
+
+        guard isDoubleClick else { return }
+        Thread.sleep(forTimeInterval: 0.12)
+        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: button, wheelMovement: 0x00)
+        Thread.sleep(forTimeInterval: 0.04)
+        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
+    }
+
+    static func sendText(_ text: String) {
+        guard !text.isEmpty else { return }
+
+        if AppStatus.activeConnectionProtocol == .vnc {
+            for scalar in text.unicodeScalars {
+                let keySym = keySym(for: scalar)
+                VNCClientManager.shared.sendKeyEvent(keySym: keySym, isDown: true)
+                Thread.sleep(forTimeInterval: 0.015)
+                VNCClientManager.shared.sendKeyEvent(keySym: keySym, isDown: false)
+                Thread.sleep(forTimeInterval: 0.015)
+            }
+            return
+        }
+
+        KeyboardManager.shared.sendTextToKeyboard(text: text)
+    }
+
+    static func sendShortcut(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        if AppStatus.activeConnectionProtocol == .vnc {
+            guard let mainKeySym = keySym(for: keyCode) else { return false }
+            let modifierSymbols = modifierKeySyms(from: modifiers)
+
+            for symbol in modifierSymbols {
+                VNCClientManager.shared.sendKeyEvent(keySym: symbol, isDown: true)
+            }
+
+            VNCClientManager.shared.sendKeyEvent(keySym: mainKeySym, isDown: true)
+            Thread.sleep(forTimeInterval: 0.05)
+            VNCClientManager.shared.sendKeyEvent(keySym: mainKeySym, isDown: false)
+
+            for symbol in modifierSymbols.reversed() {
+                VNCClientManager.shared.sendKeyEvent(keySym: symbol, isDown: false)
+            }
+
+            return true
+        }
+
+        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifiers, isKeyDown: true)
+        Thread.sleep(forTimeInterval: 0.05)
+        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifiers, isKeyDown: false)
+        return true
+    }
+}
+
 @MainActor
 final class ChatManager: ObservableObject, ChatManagerProtocol {
     static let shared = ChatManager()
@@ -862,20 +1031,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 agentMouseY = clampedY
                 
                 logger.log(content: "Guide Action Preparing: \(actionName) at normalized(\(String(format: "%.3f", cx)), \(String(format: "%.3f", cy))) -> clamped(\(clampedX), \(clampedY))")
-                
-                HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: 0x00, wheelMovement: 0x00)
-                try? await Task.sleep(nanoseconds: 50_000_000)
-                HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: buttonEvent, wheelMovement: 0x00)
-                try? await Task.sleep(nanoseconds: 50_000_000)
-                HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: 0x00, wheelMovement: 0x00)
-                
-                if isDoubleClick {
-                    logger.log(content: "Guide Action Executing: second click for double_click")
-                    try? await Task.sleep(nanoseconds: 140_000_000) // Delay between clicks
-                    HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: buttonEvent, wheelMovement: 0x00)
-                    try? await Task.sleep(nanoseconds: 50_000_000)
-                    HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: 0x00, wheelMovement: 0x00)
-                }
+                AIInputRouter.click(button: buttonEvent, absX: clampedX, absY: clampedY, isDoubleClick: isDoubleClick)
                 
                 actionDescription = "\(actionName) at x=\(clampedX), y=\(clampedY)"
                 logger.log(content: "Guide Action Executed: \(actionDescription)")
@@ -941,7 +1097,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             }
 
             logger.log(content: "AI Executing Text Input: '\(step)'")
-            KeyboardManager.shared.sendTextToKeyboard(text: step)
+            AIInputRouter.sendText(step)
             executedAny = true
             Thread.sleep(forTimeInterval: 0.05)
         }
@@ -970,7 +1126,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { continue }
                 logger.log(content: "AI Executing Text Input: '\(trimmed)'")
-                KeyboardManager.shared.sendTextToKeyboard(text: trimmed)
+                AIInputRouter.sendText(trimmed)
                 executedAny = true
             }
 
@@ -1104,10 +1260,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         guard let keyCode = keyCode(for: keyToken) else { return false }
 
         DependencyContainer.shared.resolve(LoggerProtocol.self).log(content: "AI Executing Shortcut: '\(shortcut)' -> resolved mod: \(modifiers.rawValue), key: \(keyCode)")
-        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifiers, isKeyDown: true)
-        Thread.sleep(forTimeInterval: 0.05)
-        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifiers, isKeyDown: false)
-        return true
+        return AIInputRouter.sendShortcut(keyCode: keyCode, modifiers: modifiers)
     }
 
     private func keyCode(for token: String) -> UInt16? {
@@ -1644,7 +1797,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 if let x = intArg(call.args["x"]), let y = intArg(call.args["y"]) {
                     let clampedX = clampAbsoluteCoordinate(x)
                     let clampedY = clampAbsoluteCoordinate(y)
-                    HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: 0x00, wheelMovement: 0x00)
+                    AIInputRouter.sendMouseMove(absX: clampedX, absY: clampedY)
                     agentMouseX = clampedX
                     agentMouseY = clampedY
                     summaries.append("move_mouse: ok (x=\(clampedX), y=\(clampedY))")
@@ -1692,7 +1845,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                     summaries.append("type_text: empty text")
                     logger.log(content: "AI Tool failed: type_text empty")
                 } else {
-                    KeyboardManager.shared.sendTextToKeyboard(text: text)
+                    AIInputRouter.sendText(text)
                     summaries.append("type_text: success (chars=\(text.count), text=\"\(text)\")")
                     logger.log(content: "AI Tool executed: type_text chars=\(text.count)")
                 }
@@ -1719,11 +1872,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         agentMouseX = x
         agentMouseY = y
 
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
-        try? await Task.sleep(nanoseconds: 40_000_000)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: button, wheelMovement: 0x00)
-        try? await Task.sleep(nanoseconds: 40_000_000)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
+        AIInputRouter.click(button: button, absX: x, absY: y)
         return (x, y)
     }
 
@@ -2209,7 +2358,7 @@ private struct TypeTextTaskAgent: TaskAgentExecutor {
             }
 
             if normalizedStatus == "completed", !textToType.isEmpty {
-                KeyboardManager.shared.sendTextToKeyboard(text: textToType)
+                AIInputRouter.sendText(textToType)
                 task.status = .completed
                 task.resultSummary = payload.result_summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     ? "Typed \(textToType.count) characters on target."
@@ -2269,10 +2418,7 @@ private struct TypeTextTaskAgent: TaskAgentExecutor {
         guard let keyCode = keyCode(for: keyToken) else { return false }
 
         DependencyContainer.shared.resolve(LoggerProtocol.self).log(content: "AI Executing Shortcut: '\(shortcut)' -> resolved mod: \(modifiers.rawValue), key: \(keyCode)")
-        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifiers, isKeyDown: true)
-        Thread.sleep(forTimeInterval: 0.05)
-        HostManager.shared.handleKeyboardEvent(keyCode: keyCode, modifierFlags: modifiers, isKeyDown: false)
-        return true
+        return AIInputRouter.sendShortcut(keyCode: keyCode, modifiers: modifiers)
     }
 
     private func keyCode(for token: String) -> UInt16? {
@@ -2392,7 +2538,7 @@ Tool: \(task.toolName)
 
         switch toolName {
         case "move_mouse":
-            HostManager.shared.handleAbsoluteMouseAction(x: targetX, y: targetY, mouseEvent: 0x00, wheelMovement: 0x00)
+            AIInputRouter.sendMouseMove(absX: targetX, absY: targetY)
 
         case "left_click":
             performClick(button: 0x01, x: targetX, y: targetY, isDoubleClick: false)
@@ -2417,19 +2563,7 @@ Tool: \(task.toolName)
     }
 
     private func performClick(button: UInt8, x: Int, y: Int, isDoubleClick: Bool) {
-        // Give cursor movement and focus changes a brief moment to settle before click down.
-        Thread.sleep(forTimeInterval: 0.08)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
-        Thread.sleep(forTimeInterval: 0.06)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: button, wheelMovement: 0x00)
-        Thread.sleep(forTimeInterval: 0.08)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
-
-        guard isDoubleClick else { return }
-        Thread.sleep(forTimeInterval: 0.12)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: button, wheelMovement: 0x00)
-        Thread.sleep(forTimeInterval: 0.08)
-        HostManager.shared.handleAbsoluteMouseAction(x: x, y: y, mouseEvent: 0x00, wheelMovement: 0x00)
+        AIInputRouter.click(button: button, absX: x, absY: y, isDoubleClick: isDoubleClick)
     }
 
     private func clampAbsolute(_ value: Int) -> Int {
