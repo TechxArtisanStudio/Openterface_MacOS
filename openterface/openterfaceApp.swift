@@ -137,6 +137,30 @@ struct openterfaceApp: App {
                 ContentView()
                     .navigationTitle("Openterface KVM - \(AppVersion.getVersionString())")
                     .modifier(appToolbarModifier)
+                    .toolbar {
+                        ToolbarContentView(
+                            showButtons: $showButtons,
+                            switchToTarget: $_switchToTarget,
+                            isAudioEnabled: _isAudioEnabled,
+                            canTakePicture: _canTakePicture,
+                            canRecordVideo: _connectionProtocolMode == .kvm && _canTakePicture,
+                            isRecording: _isRecording,
+                            hasHdmiSignal: _hasHdmiSignal,
+                            isKeyboardConnected: _isKeyboardConnected,
+                            isMouseConnected: _isMouseConnected,
+                            isMouseLoopRunning: _isMouseLoopRunning,
+                            resolutionWidth: _resolution.width,
+                            resolutionHeight: _resolution.height,
+                            fps: _fps,
+                            pixelClock: _pixelClock,
+                            serialPortName: _serialPortName,
+                            serialPortBaudRate: $_serialPortBaudRate,
+                            handleSwitchToggle: handleSwitchToggle,
+                            toggleAudio: toggleAudio,
+                            showAspectRatioSelection: showAspectRatioSelectionWindow,
+                            showUSBDevices: showUSBDevicesWindow
+                        )
+                    }
                     .onReceive(timer) { _ in
                         // Initialize paste behavior title on first run
                         if pasteBehaviorTitle == "Ask Every Time" {
