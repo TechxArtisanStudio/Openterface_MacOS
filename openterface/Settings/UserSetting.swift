@@ -247,12 +247,13 @@ Schema:
         let savedTargetPlacement = UserDefaults.standard.string(forKey: "targetComputerPlacement")
         self.targetComputerPlacement = TargetComputerPlacement(rawValue: savedTargetPlacement ?? "") ?? .right
 
-        // Load connection protocol mode from UserDefaults
-        let savedConnectionProtocolMode = UserDefaults.standard.string(forKey: "connectionProtocolMode")
-        self.connectionProtocolMode = ConnectionProtocolMode(rawValue: savedConnectionProtocolMode ?? "") ?? .kvm
+        // Always start in KVM mode; do not restore the last protocol mode.
+        self.connectionProtocolMode = .kvm
+        UserDefaults.standard.removeObject(forKey: "connectionProtocolMode")
 
         // Load VNC connection preferences
         self.vncHost = UserDefaults.standard.string(forKey: "vncHost") ?? ""
+        self.vncUsername = UserDefaults.standard.string(forKey: "vncUsername") ?? ""
         let savedVNCPort = UserDefaults.standard.object(forKey: "vncPort") as? Int ?? 5900
         self.vncPort = max(1, min(savedVNCPort, 65535))
 
@@ -480,7 +481,7 @@ Schema:
     // Connection protocol mode setting
     @Published var connectionProtocolMode: ConnectionProtocolMode {
         didSet {
-            UserDefaults.standard.set(connectionProtocolMode.rawValue, forKey: "connectionProtocolMode")
+            // Intentionally not persisted: app always defaults to KVM on startup.
         }
     }
 
@@ -488,6 +489,13 @@ Schema:
     @Published var vncHost: String {
         didSet {
             UserDefaults.standard.set(vncHost, forKey: "vncHost")
+        }
+    }
+
+    // VNC username (used for Apple ARD / macOS Screen Sharing authentication)
+    @Published var vncUsername: String {
+        didSet {
+            UserDefaults.standard.set(vncUsername, forKey: "vncUsername")
         }
     }
 

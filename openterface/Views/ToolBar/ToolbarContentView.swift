@@ -125,7 +125,7 @@ struct ToolbarContentView: ToolbarContent {
                     .frame(width: 16, height: 16)
                     .foregroundColor(isRecording ? .red : (canRecordVideo ? .blue : .gray))
             }
-            .help(canRecordVideo || isRecording ? (isRecording ? "Stop Recording" : "Start Video Recording") : "Video recording is only available in KVM mode")
+            .help(canRecordVideo || isRecording ? (isRecording ? "Stop Recording" : "Start Video Recording") : "Video recording is unavailable until a live frame is available")
             .disabled(!canRecordVideo && !isRecording)
 
             Button(action: {
