@@ -143,7 +143,7 @@ struct openterfaceApp: App {
                             switchToTarget: $_switchToTarget,
                             isAudioEnabled: _isAudioEnabled,
                             canTakePicture: _canTakePicture,
-                            canRecordVideo: _connectionProtocolMode == .kvm && _canTakePicture,
+                            canRecordVideo: _canTakePicture,
                             isRecording: _isRecording,
                             hasHdmiSignal: _hasHdmiSignal,
                             isKeyboardConnected: _isKeyboardConnected,
