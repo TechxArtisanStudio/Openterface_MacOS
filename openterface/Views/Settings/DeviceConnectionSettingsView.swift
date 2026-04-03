@@ -321,6 +321,13 @@ struct DeviceConnectionSettingsView: View {
                                     }
                             }
 
+                               HStack {
+                                   Text("Username")
+                                       .frame(width: 80, alignment: .leading)
+                                   TextField("Optional", text: $userSettings.vncUsername)
+                                       .textFieldStyle(RoundedBorderTextFieldStyle())
+                               }
+
                             HStack {
                                 Text("Password")
                                     .frame(width: 80, alignment: .leading)

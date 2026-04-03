@@ -130,12 +130,6 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             logger.log(content: "Recording already in progress")
             return
         }
-
-        guard UserSettings.shared.connectionProtocolMode == .kvm else {
-            logger.log(content: "Video recording is unavailable in VNC mode")
-            statusMessage = "Video recording is only available in KVM mode"
-            return
-        }
         
         guard canTakePicture else {
             logger.log(content: "Cannot start recording - video not available")
