@@ -142,7 +142,7 @@ struct openterfaceApp: App {
                             switchToTarget: $_switchToTarget,
                             isAudioEnabled: _isAudioEnabled,
                             canTakePicture: _canTakePicture,
-                            canRecordVideo: _connectionProtocolMode == .kvm && _canTakePicture,
+                            canRecordVideo: _canTakePicture,
                             isRecording: _isRecording,
                             hasHdmiSignal: _hasHdmiSignal,
                             isKeyboardConnected: _isKeyboardConnected,
@@ -506,7 +506,7 @@ struct openterfaceApp: App {
                     }) {
                         Text(_isRecording ? "Stop Recording" : "Start Recording")
                     }
-                    .disabled(_connectionProtocolMode != .kvm || !_canTakePicture)
+                    .disabled(!_canTakePicture && !_isRecording)
                     
                     Divider()
                     

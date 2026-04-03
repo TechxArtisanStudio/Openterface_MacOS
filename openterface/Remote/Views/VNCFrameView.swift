@@ -73,11 +73,31 @@ final class VNCInteractiveView: NSView {
         if let tracking {
             removeTrackingArea(tracking)
         }
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .activeAlways, .inVisibleRect, .mouseMoved]
+        let options: NSTrackingArea.Options = [.activeInKeyWindow, .activeAlways, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited]
         let tracking = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(tracking)
         self.tracking = tracking
         window?.acceptsMouseMovedEvents = true
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        AppStatus.isMouseInView = true
+
+        if UserSettings.shared.isAbsoluteModeMouseHide {
+            NSCursor.hide()
+            AppStatus.isCursorHidden = true
+        } else {
+            NSCursor.unhide()
+            AppStatus.isCursorHidden = false
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        AppStatus.isMouseInView = false
+        NSCursor.unhide()
+        AppStatus.isCursorHidden = false
     }
 
     override func draw(_ dirtyRect: NSRect) {

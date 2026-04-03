@@ -128,12 +128,6 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             logger.log(content: "Recording already in progress")
             return
         }
-
-        guard UserSettings.shared.connectionProtocolMode == .kvm else {
-            logger.log(content: "Video recording is unavailable in VNC mode")
-            statusMessage = "Video recording is only available in KVM mode"
-            return
-        }
         
         guard canTakePicture else {
             logger.log(content: "Cannot start recording - video not available")
@@ -363,10 +357,10 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         
         do {
             assetWriter = try AVAssetWriter(outputURL: url, fileType: .mov)
-            
-            // Get actual dimensions from video manager if available
-            let videoWidth = videoManager.dimensions.width > 0 ? Int(videoManager.dimensions.width) : 1920
-            let videoHeight = videoManager.dimensions.height > 0 ? Int(videoManager.dimensions.height) : 1080
+
+            let recordingSize = activeRecordingDimensions()
+            let videoWidth = recordingSize.width
+            let videoHeight = recordingSize.height
             
             // Video input setup
             let videoSettings: [String: Any] = [
@@ -634,9 +628,8 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
               videoInput.isReadyForMoreMediaData else {
             return
         }
-        
-        guard let outputDelegate = videoManager.outputDelegate,
-              let pixelBuffer = outputDelegate.getLatestFrame() else {
+
+                guard let pixelBuffer = currentRecordingPixelBuffer() else {
             return
         }
         
@@ -648,6 +641,88 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         } else {
             logger.log(content: "Failed to append frame to video")
         }
+    }
+
+    private func activeRecordingDimensions() -> (width: Int, height: Int) {
+        switch UserSettings.shared.connectionProtocolMode {
+        case .kvm:
+            let width = videoManager.dimensions.width > 0 ? Int(videoManager.dimensions.width) : 1920
+            let height = videoManager.dimensions.height > 0 ? Int(videoManager.dimensions.height) : 1080
+            return (max(width, 1), max(height, 1))
+        case .vnc:
+            if let currentFrame = vncClientManager.currentFrame {
+                return (max(currentFrame.width, 1), max(currentFrame.height, 1))
+            }
+            return (1920, 1080)
+        }
+    }
+
+    private func currentRecordingPixelBuffer() -> CVPixelBuffer? {
+        switch UserSettings.shared.connectionProtocolMode {
+        case .kvm:
+            guard let outputDelegate = videoManager.outputDelegate,
+                  let pixelBuffer = outputDelegate.getLatestFrame() else {
+                return nil
+            }
+            return pixelBuffer
+        case .vnc:
+            guard let currentFrame = vncClientManager.currentFrame else {
+                return nil
+            }
+            let size = activeRecordingDimensions()
+            return createPixelBuffer(from: currentFrame, width: size.width, height: size.height)
+        }
+    }
+
+    private func createPixelBuffer(from cgImage: CGImage, width: Int, height: Int) -> CVPixelBuffer? {
+        let attributes: [String: Any] = [
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+            kCVPixelBufferWidthKey as String: width,
+            kCVPixelBufferHeightKey as String: height,
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ]
+
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attributes as CFDictionary,
+            &pixelBuffer
+        )
+
+        guard status == kCVReturnSuccess, let pixelBuffer else {
+            logger.log(content: "Failed to create pixel buffer for VNC recording frame")
+            return nil
+        }
+
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+            logger.log(content: "Failed to get pixel buffer base address for VNC recording frame")
+            return nil
+        }
+
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        guard let context = CGContext(
+            data: baseAddress,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else {
+            logger.log(content: "Failed to create CGContext for VNC recording frame")
+            return nil
+        }
+
+        context.interpolationQuality = .none
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return pixelBuffer
     }
     
     private func cleanupRecording() {

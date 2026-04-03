@@ -322,11 +322,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             hidManager.stopAllHIDOperations()
             videoManager.stopVideoSession()
             serialPortManager.pauseConnectionAttempts()
-            VNCClientManager.shared.connect(
-                host: UserSettings.shared.vncHost,
-                port: UserSettings.shared.vncPort,
-                password: UserSettings.shared.vncPassword.isEmpty ? nil : UserSettings.shared.vncPassword
-            )
+            // Only auto-connect on manual switch, not on app launch (avoids connecting before network is ready)
+            if reason != "app launch" {
+                VNCClientManager.shared.connect(
+                    host: UserSettings.shared.vncHost,
+                    port: UserSettings.shared.vncPort,
+                    password: UserSettings.shared.vncPassword.isEmpty ? nil : UserSettings.shared.vncPassword
+                )
+            } else {
+                logger.log(content: "VNC auto-connect skipped at app launch. Use Connect button to connect.")
+                AppStatus.protocolSessionState = .idle
+            }
         }
     }
 

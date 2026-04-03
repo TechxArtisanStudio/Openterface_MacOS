@@ -52,6 +52,7 @@
 		6B99F59C2E9A6C650073CDA2 /* MS2109VideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */; };
 		6B99F59D2E9A6C650073CDA2 /* MS2130SVideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */; };
 		6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */; };
+		AA001VNC2E9B00000073CDA2 /* VNCConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */; };
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */; };
@@ -62,6 +63,8 @@
 		6BFCEC852F0A1CBD00CDE096 /* AspectRatioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BFCEC842F0A1CBD00CDE096 /* AspectRatioSettingsView.swift */; };
 		8678CC4677691D04E85AAD4D /* ChatWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E96037EF91732400B90B037 /* ChatWindowManager.swift */; };
 		A1B2C3F12F12345600ABCDEF /* VNCClientManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */; };
+		A1B2C3F82F12345600ABCDEF /* RFBProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */; };
+		A1B2C3FA2F12345600ABCDEF /* RFBSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */; };
 		914020FD06BFA746DFDA0018 /* ChatAttachmentViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD8EF43D4643AD20AFB4336 /* ChatAttachmentViewer.swift */; };
 		A1B2C3D42F12345600ABCDEF /* ChatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F12345600ABCDEF /* ChatManager.swift */; };
 		BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */; };
@@ -171,6 +174,7 @@
 		6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2109VideoChipset.swift; sourceTree = "<group>"; };
 		6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2130SVideoChipset.swift; sourceTree = "<group>"; };
 		6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManagerTests.swift; sourceTree = "<group>"; };
+		AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCConnectionTests.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMonitorManager.swift; sourceTree = "<group>"; };
@@ -182,6 +186,8 @@
 		6D25FAE7DD3C66A4028D252F /* ChatInputTextView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatInputTextView.swift; sourceTree = "<group>"; };
 		A1B2C3D52F12345600ABCDEF /* ChatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatManager.swift; sourceTree = "<group>"; };
 		A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCClientManager.swift; sourceTree = "<group>"; };
+		A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFBProtocol.swift; sourceTree = "<group>"; };
+		A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFBSecurity.swift; sourceTree = "<group>"; };
 		A23229FA0C4928FC050BD5DC /* ChatWindowRootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatWindowRootView.swift; sourceTree = "<group>"; };
 		AB4EAA3FD308EDC63FF1C1EB /* GuideTraceDialog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuideTraceDialog.swift; sourceTree = "<group>"; };
 		BD664382B7A4996C4BF55CEE /* TaskStepTraceDialog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStepTraceDialog.swift; sourceTree = "<group>"; };
@@ -317,6 +323,7 @@
 				53FBE7AF2B3D66D2007785B0 /* ContentView.swift */,
 				53FBE7D82B3D676A007785B0 /* Managers */,
 				53FBE7DB2B3D6789007785B0 /* Views */,
+				A1B2C4102F12345600ABCDEF /* Remote */,
 				53FBE7DE2B3D6B60007785B0 /* ViewModels */,
 				537F65D02B4E4C6100825B4F /* Settings */,
 				53FBE7B12B3D66D6007785B0 /* Assets.xcassets */,
@@ -330,6 +337,7 @@
 			isa = PBXGroup;
 			children = (
 				6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */,
+				AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */,
 				53FBE7BF2B3D66D6007785B0 /* openterfaceTests.swift */,
 				53CC660E2B8EE70C0081F927 /* LogTests.swift */,
 			);
@@ -369,7 +377,6 @@
 				295DCFB52D76A8A20034BB1E /* AudioManager.swift */,
 				F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */,
 				296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */,
-				A1B2C3F22F12345600ABCDEF /* VNC */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -386,7 +393,6 @@
 				6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */,
 				6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */,
 				A1B2C3F72F12345600ABCDEF /* KVMFrameView.swift */,
-				A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */,
 				BFD4EA952E3643CA0029BFC2 /* PasteConfirmationView.swift */,
 				BFB748FF2E35ED92004F0DAE /* ClipboardView.swift */,
 				6BAFF00E2E03E8C9004331F6 /* KeysView.swift */,
@@ -399,6 +405,33 @@
 				29E5E0DF2D6D5FBD00E1849A /* ResetFactoryView.swift */,
 				6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */,
 				BFDE57CD2E116383000BB8BB /* EdidNameView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A1B2C4102F12345600ABCDEF /* Remote */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C4112F12345600ABCDEF /* Managers */,
+				A1B2C4122F12345600ABCDEF /* Views */,
+			);
+			path = Remote;
+			sourceTree = "<group>";
+		};
+		A1B2C4112F12345600ABCDEF /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */,
+				A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */,
+				A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		A1B2C4122F12345600ABCDEF /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -440,14 +473,6 @@
 				6BC364632F025DD4001B9A07 /* WindowUtils.swift */,
 			);
 			path = ToolBar;
-			sourceTree = "<group>";
-		};
-		A1B2C3F22F12345600ABCDEF /* VNC */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */,
-			);
-			path = VNC;
 			sourceTree = "<group>";
 		};
 		BF7752D92EFFE51000FE5D0E /* Parallel */ = {
@@ -751,6 +776,8 @@
 				BF7752EE2F01328900FE5D0E /* MouseHIDSettingsView.swift in Sources */,
 				8678CC4677691D04E85AAD4D /* ChatWindowManager.swift in Sources */,
 				A1B2C3F12F12345600ABCDEF /* VNCClientManager.swift in Sources */,
+				A1B2C3F82F12345600ABCDEF /* RFBProtocol.swift in Sources */,
+				A1B2C3FA2F12345600ABCDEF /* RFBSecurity.swift in Sources */,
 				C552FAA6BE840D398AC7C509 /* ChatInputTextView.swift in Sources */,
 				1E0D3999BD765807EBBCC856 /* TaskStepTraceDialog.swift in Sources */,
 				D5573ADD3E2B5313B22E57D1 /* GuideTraceDialog.swift in Sources */,
@@ -768,6 +795,7 @@
 				53FBE7C02B3D66D6007785B0 /* openterfaceTests.swift in Sources */,
 				53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */,
 				6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */,
+				AA001VNC2E9B00000073CDA2 /* VNCConnectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
