@@ -306,4 +306,5 @@ struct DeviceConnectionSettingsView: View {
             }
         }
     }
+
 }

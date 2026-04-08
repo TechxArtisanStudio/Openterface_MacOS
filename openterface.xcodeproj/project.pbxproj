@@ -109,6 +109,7 @@
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
+		F1FEEE262F7515A900811C27 /* MS2130SFlashManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */; };
 		C383C071B84F964E918083E9 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0855F0E55FCEA43A3D3C57BE /* ChatBubbleView.swift */; };
 		C552FAA6BE840D398AC7C509 /* ChatInputTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D25FAE7DD3C66A4028D252F /* ChatInputTextView.swift */; };
 		D5573ADD3E2B5313B22E57D1 /* GuideTraceDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4EAA3FD308EDC63FF1C1EB /* GuideTraceDialog.swift */; };
