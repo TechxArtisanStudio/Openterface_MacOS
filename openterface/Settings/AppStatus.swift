@@ -139,6 +139,16 @@ struct AppStatus {
     
     static var serialPortName: String = "N/A"
     static var serialPortBaudRate: Int = 0
+
+    static var remoteEndpointHost: String = ""
+    static var remoteEndpointPort: Int = 0
+    static var remoteRxBytesTotal: UInt64 = 0
+    static var remoteTxBytesTotal: UInt64 = 0
+    static var remoteCompressionLabel: String = ""
+    static var remoteFramebufferWidth: Int = 0
+    static var remoteFramebufferHeight: Int = 0
+    static var remoteFramesPerSecond: Double = 0
+    static var remoteBandwidthMBps: Double = 0
     
     static var isUSBSwitchConnectToTarget: Bool = true
     static var isHardwareSwitchOn: Bool = false {
@@ -184,6 +194,42 @@ struct AppStatus {
         } else {
             logger.log(content: "Software switch toggled: Switching to Host device mode")
         }
+    }
+
+    static func resetRemoteNetworkStats(host: String, port: Int) {
+        remoteEndpointHost = host
+        remoteEndpointPort = port
+        remoteRxBytesTotal = 0
+        remoteTxBytesTotal = 0
+        remoteCompressionLabel = ""
+        remoteFramebufferWidth = 0
+        remoteFramebufferHeight = 0
+        remoteFramesPerSecond = 0
+        remoteBandwidthMBps = 0
+    }
+
+    static func addRemoteRxBytes(_ count: Int) {
+        guard count > 0 else { return }
+        remoteRxBytesTotal &+= UInt64(count)
+    }
+
+    static func addRemoteTxBytes(_ count: Int) {
+        guard count > 0 else { return }
+        remoteTxBytesTotal &+= UInt64(count)
+    }
+
+    static func setRemoteCompressionLabel(_ label: String) {
+        remoteCompressionLabel = label
+    }
+
+    static func setRemoteFramebufferSize(width: Int, height: Int) {
+        remoteFramebufferWidth = width
+        remoteFramebufferHeight = height
+    }
+
+    static func setRemotePerformanceStats(fps: Double, bandwidthMBps: Double) {
+        remoteFramesPerSecond = fps
+        remoteBandwidthMBps = bandwidthMBps
     }
 }
 

@@ -100,6 +100,7 @@ class Logger: LoggerProtocol {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         let dateString = dateFormatter.string(from: Date())
+        let normalizedContent = normalizeLogContent(content)
 
         var thread: String
         if Thread.isMainThread {
@@ -122,10 +123,38 @@ class Logger: LoggerProtocol {
             thread = thread.padding(toLength: 10, withPad: " ", startingAt: 0)
         }
 
-        print("\(dateString) [\(thread)] " + content)
+        print("\(dateString) [\(thread)] " + normalizedContent)
         if logToFile {
-            writeLogFile(string: "[\(thread)] " + content)
+            writeLogFile(string: "[\(thread)] " + normalizedContent)
         }
+    }
+
+    private func normalizeLogContent(_ content: String) -> String {
+        if content.hasPrefix("[RDP]") {
+            return content
+        }
+
+        if content.hasPrefix("RDP ") {
+            return "[RDP] " + String(content.dropFirst(4))
+        }
+
+        if content == "RDP" {
+            return "[RDP]"
+        }
+
+        if content.hasPrefix("RDP:") {
+            return "[RDP]:" + String(content.dropFirst(4))
+        }
+
+        if content.hasPrefix("RDPTLS ") {
+            return "[RDP][TLS] " + String(content.dropFirst(7))
+        }
+
+        if content.hasPrefix("RDPTrace ") {
+            return "[RDP][TRACE] " + String(content.dropFirst(9))
+        }
+
+        return content
     }
     
     // write append log

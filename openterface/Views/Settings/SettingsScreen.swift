@@ -16,6 +16,7 @@ struct SettingsScreen: View {
         case clipboard = "Clipboard & OCR"
         case ai = "AI Integration"
         case connection = "Device & Connection"
+        case remoteControl = "Remote Control"
         case advanced = "Advanced & Debug"
 
         var icon: String {
@@ -27,6 +28,7 @@ struct SettingsScreen: View {
             case .clipboard: return "doc.on.clipboard"
             case .ai: return "sparkles"
             case .connection: return "externaldrive.connected.to.line.below"
+            case .remoteControl: return "network"
             case .advanced: return "gearshape"
             }
         }
@@ -92,6 +94,8 @@ struct SettingsScreen: View {
                         AISettingsView()
                     case .connection:
                         DeviceConnectionSettingsView()
+                    case .remoteControl:
+                        RemoteControlSettingsView()
                     case .advanced:
                         AdvancedDebugSettingsView()
                     }

@@ -270,6 +270,27 @@ Schema:
             }
         }
 
+        // Load VNC compression preferences
+        self.vncEnableZLIBCompression = UserDefaults.standard.object(forKey: "vncEnableZLIBCompression") as? Bool ?? false
+        self.vncEnableTightCompression = UserDefaults.standard.object(forKey: "vncEnableTightCompression") as? Bool ?? false
+
+        // Load RDP connection preferences
+        self.rdpHost = UserDefaults.standard.string(forKey: "rdpHost") ?? ""
+        self.rdpUsername = UserDefaults.standard.string(forKey: "rdpUsername") ?? ""
+        self.rdpDomain = UserDefaults.standard.string(forKey: "rdpDomain") ?? ""
+        let savedRDPPort = UserDefaults.standard.object(forKey: "rdpPort") as? Int ?? 3389
+        self.rdpPort = max(1, min(savedRDPPort, 65535))
+        let rdpKeychainValue = RDPKeychainStore.loadPassword()
+        if !rdpKeychainValue.isEmpty {
+            self.rdpPassword = rdpKeychainValue
+        } else {
+            self.rdpPassword = ""
+        }
+        self.rdpEnableNLA = UserDefaults.standard.object(forKey: "rdpEnableNLA") as? Bool ?? true
+        self.rdpStrictCompatibilityMode = UserDefaults.standard.object(forKey: "rdpStrictCompatibilityMode") as? Bool ?? false
+        self.rdpDebugAllowFastPathOutputInStrictMode = UserDefaults.standard.object(forKey: "rdpDebugAllowFastPathOutputInStrictMode") as? Bool ?? false
+        self.rdpDebugAllowBitmapCodecsInStrictMode = UserDefaults.standard.object(forKey: "rdpDebugAllowBitmapCodecsInStrictMode") as? Bool ?? false
+
         // Load persisted active video rect from UserDefaults
         self.activeVideoX = UserDefaults.standard.object(forKey: "activeVideoX") as? Int ?? 0
         self.activeVideoY = UserDefaults.standard.object(forKey: "activeVideoY") as? Int ?? 0
@@ -522,6 +543,89 @@ Schema:
         }
     }
 
+    // VNC ZLIB compression toggle (encoding type 6)
+    @Published var vncEnableZLIBCompression: Bool {
+        didSet {
+            UserDefaults.standard.set(vncEnableZLIBCompression, forKey: "vncEnableZLIBCompression")
+        }
+    }
+
+    // VNC Tight compression toggle (encoding type 7)
+    @Published var vncEnableTightCompression: Bool {
+        didSet {
+            UserDefaults.standard.set(vncEnableTightCompression, forKey: "vncEnableTightCompression")
+        }
+    }
+
+    // RDP host name or IP
+    @Published var rdpHost: String {
+        didSet {
+            UserDefaults.standard.set(rdpHost, forKey: "rdpHost")
+        }
+    }
+
+    // RDP TCP port (default 3389)
+    @Published var rdpPort: Int {
+        didSet {
+            let clamped = max(1, min(rdpPort, 65535))
+            if clamped != rdpPort { rdpPort = clamped; return }
+            UserDefaults.standard.set(rdpPort, forKey: "rdpPort")
+        }
+    }
+
+    // RDP username
+    @Published var rdpUsername: String {
+        didSet {
+            UserDefaults.standard.set(rdpUsername, forKey: "rdpUsername")
+        }
+    }
+
+    // RDP domain (leave empty for workgroup / local accounts)
+    @Published var rdpDomain: String {
+        didSet {
+            UserDefaults.standard.set(rdpDomain, forKey: "rdpDomain")
+        }
+    }
+
+    // RDP password stored in Keychain
+    @Published var rdpPassword: String {
+        didSet {
+            if rdpPassword.isEmpty {
+                RDPKeychainStore.deletePassword()
+            } else {
+                RDPKeychainStore.savePassword(rdpPassword)
+            }
+        }
+    }
+
+    // Whether to request NLA (HYBRID) during RDP security negotiation.
+    @Published var rdpEnableNLA: Bool {
+        didSet {
+            UserDefaults.standard.set(rdpEnableNLA, forKey: "rdpEnableNLA")
+        }
+    }
+
+    // Strict compatibility mode disables advanced RDP capabilities that can trigger host-side disconnects.
+    @Published var rdpStrictCompatibilityMode: Bool {
+        didSet {
+            UserDefaults.standard.set(rdpStrictCompatibilityMode, forKey: "rdpStrictCompatibilityMode")
+        }
+    }
+
+    // Debug toggle: allow FASTPATH_OUTPUT_SUPPORTED while strict compatibility mode is enabled.
+    @Published var rdpDebugAllowFastPathOutputInStrictMode: Bool {
+        didSet {
+            UserDefaults.standard.set(rdpDebugAllowFastPathOutputInStrictMode, forKey: "rdpDebugAllowFastPathOutputInStrictMode")
+        }
+    }
+
+    // Debug toggle: allow BitmapCodecs capability while strict compatibility mode is enabled.
+    @Published var rdpDebugAllowBitmapCodecsInStrictMode: Bool {
+        didSet {
+            UserDefaults.standard.set(rdpDebugAllowBitmapCodecsInStrictMode, forKey: "rdpDebugAllowBitmapCodecsInStrictMode")
+        }
+    }
+
     // Chat companion window visibility
     @Published var isChatWindowVisible: Bool {
         didSet {
@@ -735,13 +839,16 @@ enum KeyboardLayout: String, CaseIterable {
 enum ConnectionProtocolMode: String, CaseIterable {
     case kvm = "kvm"
     case vnc = "vnc"
+    case rdp = "rdp"
 
     var displayName: String {
         switch self {
         case .kvm:
             return "Hardware KVM"
         case .vnc:
-            return "VNC Client"
+            return "VNC"
+        case .rdp:
+            return "Remote Desktop (RDP)"
         }
     }
 
@@ -751,6 +858,8 @@ enum ConnectionProtocolMode: String, CaseIterable {
             return "Use direct Openterface USB capture and HID control"
         case .vnc:
             return "Connect to a remote host using RFB/VNC"
+        case .rdp:
+            return "Connect to a remote host using Microsoft RDP (port 3389)"
         }
     }
 }
@@ -1169,6 +1278,52 @@ private enum VNCKeychainStore {
             kSecAttrAccount as String: account
         ]
 
+        SecItemDelete(query as CFDictionary)
+    }
+}
+
+// MARK: - RDP password Keychain storage
+
+enum RDPKeychainStore {
+    private static let service = "com.openterface.rdp"
+    private static let account = "rdp_password"
+
+    static func loadPassword() -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data,
+              let value = String(data: data, encoding: .utf8) else { return "" }
+        return value
+    }
+
+    static func savePassword(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let attrs: [String: Any] = [kSecValueData as String: data]
+        if SecItemUpdate(query as CFDictionary, attrs as CFDictionary) != errSecSuccess {
+            var addQuery = query
+            addQuery[kSecValueData as String] = data
+            SecItemAdd(addQuery as CFDictionary, nil)
+        }
+    }
+
+    static func deletePassword() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
         SecItemDelete(query as CFDictionary)
     }
 }

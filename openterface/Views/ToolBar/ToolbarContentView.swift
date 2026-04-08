@@ -140,20 +140,26 @@ struct ToolbarContentView: ToolbarContent {
         }
 
         ToolbarItem(placement: .primaryAction) {
+            let connectionMode = UserSettings.shared.connectionProtocolMode
             ResolutionView(
                 width: resolutionWidth,
                 height: resolutionHeight,
                 fps: fps,
-                helpText: "Input Resolution: \(resolutionWidth)x\(resolutionHeight)\n" +
-                    "Capture Resolution: 1920x1080\n" +
-                    "Refresh Rate: \(fps) Hz\n" +
-                    "Pixel Clock: \(pixelClock) MHz\n" +
-                    "HTotal: \(AppStatus.hidInputHTotal)\n" +
-                    "VTotal: \(AppStatus.hidInputVTotal)\n" +
-                    "Hst: \(AppStatus.hidInputHst)\n" +
-                    "Vst: \(AppStatus.hidInputVst)\n" +
-                    "Hsync Width: \(AppStatus.hidInputHsyncWidth)\n" +
-                    "Vsync Width: \(AppStatus.hidInputVsyncWidth)"
+                helpText: connectionMode == .kvm
+                    ? "Input Resolution: \(resolutionWidth)x\(resolutionHeight)\n" +
+                        "Capture Resolution: 1920x1080\n" +
+                        "Refresh Rate: \(fps) Hz\n" +
+                        "Pixel Clock: \(pixelClock) MHz\n" +
+                        "HTotal: \(AppStatus.hidInputHTotal)\n" +
+                        "VTotal: \(AppStatus.hidInputVTotal)\n" +
+                        "Hst: \(AppStatus.hidInputHst)\n" +
+                        "Vst: \(AppStatus.hidInputVst)\n" +
+                        "Hsync Width: \(AppStatus.hidInputHsyncWidth)\n" +
+                        "Vsync Width: \(AppStatus.hidInputVsyncWidth)"
+                    : "Remote Resolution: \(resolutionWidth)x\(resolutionHeight)\n" +
+                        "Remote Refresh Rate: \(fps) Hz\n" +
+                        "Compression: \(AppStatus.remoteCompressionLabel.isEmpty ? "Unknown" : AppStatus.remoteCompressionLabel)\n" +
+                        String(format: "Remote Bandwidth: %.2f MB/s", AppStatus.remoteBandwidthMBps)
             )
         }
 
@@ -191,43 +197,49 @@ struct ToolbarContentView: ToolbarContent {
         ToolbarItem(placement: .automatic) {
             // use the shared manager we’re observing
             let serialPortMgr = concreteSerialPortMgr
+            let connectionMode = UserSettings.shared.connectionProtocolMode
 
             // determine display values directly from bindings
             let displayName = serialPortName
             let displayBaud = serialPortBaudRate
 
-            Button {
-                showBaudPopover = true
-            } label: {
-                SerialInfoView(portName: displayName,
-                               baudRate: displayBaud,
-                               processingHz: UserSettings.shared.mouseEventThrottleHz)
-                    .frame(width: 140, alignment: .leading)
+            if connectionMode == .kvm {
+                Button {
+                    showBaudPopover = true
+                } label: {
+                    SerialInfoView(portName: displayName,
+                                   baudRate: displayBaud,
+                                   processingHz: UserSettings.shared.mouseEventThrottleHz)
+                        .frame(width: 140, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .popover(isPresented: $showBaudPopover) {
+                        VStack(spacing: 8) {
+                            Button("9600 bps") {
+                                logger.log(content: "Serial baudrate popover: user chose 9600")
+                                serialPortMgr.resetDeviceToBaudrate(9600)
+                                showBaudPopover = false
+                            }
+                            .onHover { hovering9600 = $0 }
+                            .shadow(color: .black.opacity(hovering9600 ? 0.25 : 0), radius: hovering9600 ? 8 : 0, x: 0, y: 2)
+
+                            Button("115200 bps") {
+                                logger.log(content: "Serial baudrate popover: user chose 115200")
+                                serialPortMgr.resetDeviceToBaudrate(115200)
+                                showBaudPopover = false
+                            }
+                            .onHover { hovering115200 = $0 }
+                            .shadow(color: .black.opacity(hovering115200 ? 0.25 : 0), radius: hovering115200 ? 8 : 0, x: 0, y: 2)
+                        }
+                        .padding(8)
+                    }
+                    .disabled(serialPortMgr.isConfiguring)
+            } else {
+                RemoteInfoView(protocolMode: connectionMode)
+                    .frame(width: 190, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            
-            .buttonStyle(PlainButtonStyle())
-            .popover(isPresented: $showBaudPopover) {
-                    VStack(spacing: 8) {
-                        Button("9600 bps") {
-                            logger.log(content: "Serial baudrate popover: user chose 9600")
-                            serialPortMgr.resetDeviceToBaudrate(9600)
-                            showBaudPopover = false
-                        }
-                        .onHover { hovering9600 = $0 }
-                        .shadow(color: .black.opacity(hovering9600 ? 0.25 : 0), radius: hovering9600 ? 8 : 0, x: 0, y: 2)
-
-                        Button("115200 bps") {
-                            logger.log(content: "Serial baudrate popover: user chose 115200")
-                            serialPortMgr.resetDeviceToBaudrate(115200)
-                            showBaudPopover = false
-                        }
-                        .onHover { hovering115200 = $0 }
-                        .shadow(color: .black.opacity(hovering115200 ? 0.25 : 0), radius: hovering115200 ? 8 : 0, x: 0, y: 2)
-                    }
-                    .padding(8)
-                }
-                .disabled(serialPortMgr.isConfiguring)
         }
 
         ToolbarItem(placement: .automatic) {
@@ -263,6 +275,59 @@ struct ToolbarContentView: ToolbarContent {
             return .orange
         case .none:
             return .gray
+        }
+    }
+}
+
+// MARK: - ViewModifier wrapper
+// Using a ViewModifier gives the compiler a concrete type context so it can
+// unambiguously pick the ToolbarContent-based toolbar(content:) overload.
+struct AppToolbarModifier: ViewModifier {
+    @Binding var showButtons: Bool
+    @Binding var switchToTarget: Bool
+    var isAudioEnabled: Bool
+    var canTakePicture: Bool
+    var canRecordVideo: Bool
+    var isRecording: Bool
+    var hasHdmiSignal: Bool?
+    var isKeyboardConnected: Bool?
+    var isMouseConnected: Bool?
+    var isMouseLoopRunning: Bool
+    var resolutionWidth: String
+    var resolutionHeight: String
+    var fps: String
+    var pixelClock: String
+    var serialPortName: String
+    @Binding var serialPortBaudRate: Int
+    var handleSwitchToggle: (Bool) -> Void
+    var toggleAudio: (Bool) -> Void
+    var showAspectRatioSelection: () -> Void
+    var showUSBDevices: () -> Void
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            ToolbarContentView(
+                showButtons: $showButtons,
+                switchToTarget: $switchToTarget,
+                isAudioEnabled: isAudioEnabled,
+                canTakePicture: canTakePicture,
+                canRecordVideo: canRecordVideo,
+                isRecording: isRecording,
+                hasHdmiSignal: hasHdmiSignal,
+                isKeyboardConnected: isKeyboardConnected,
+                isMouseConnected: isMouseConnected,
+                isMouseLoopRunning: isMouseLoopRunning,
+                resolutionWidth: resolutionWidth,
+                resolutionHeight: resolutionHeight,
+                fps: fps,
+                pixelClock: pixelClock,
+                serialPortName: serialPortName,
+                serialPortBaudRate: $serialPortBaudRate,
+                handleSwitchToggle: handleSwitchToggle,
+                toggleAudio: toggleAudio,
+                showAspectRatioSelection: showAspectRatioSelection,
+                showUSBDevices: showUSBDevices
+            )
         }
     }
 }

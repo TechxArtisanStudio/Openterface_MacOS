@@ -15,7 +15,7 @@
 *    General Public License for more details.                                *
 *                                                                            *
 *    You should have received a copy of the GNU General Public License       *
-*    along with this program. If not, see <http://www.gnu.org/licenses/>.    *
+*    along with this program. If not, see <http://www.gnu.org/licenses/>.   *
 *                                                                            *
 * ========================================================================== *
 */
@@ -23,28 +23,28 @@
 import SwiftUI
 import AppKit
 
-struct VNCFrameView: NSViewRepresentable {
-    func makeNSView(context: Context) -> VNCInteractiveView {
-        VNCInteractiveView()
+struct RDPFrameView: NSViewRepresentable {
+    func makeNSView(context: Context) -> RDPInteractiveView {
+        RDPInteractiveView()
     }
 
-    func updateNSView(_ nsView: VNCInteractiveView, context: Context) {
+    func updateNSView(_ nsView: RDPInteractiveView, context: Context) {
         nsView.refreshFrame()
     }
 }
 
-final class VNCInteractiveView: NSView {
-    private let manager = VNCClientManager.shared
+final class RDPInteractiveView: NSView {
+    private let manager = RDPClientManager.shared
     private var frameObserver: Any?
     private var tracking: NSTrackingArea?
-    private var buttonMask: UInt8 = 0
+    private var pointerFlags: UInt16 = 0
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
         frameObserver = NotificationCenter.default.addObserver(
-            forName: .vncFrameUpdated,
+            forName: .rdpFrameUpdated,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -64,9 +64,7 @@ final class VNCInteractiveView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-        true
-    }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -83,7 +81,6 @@ final class VNCInteractiveView: NSView {
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         AppStatus.isMouseInView = true
-
         if UserSettings.shared.isAbsoluteModeMouseHide {
             NSCursor.hide()
             AppStatus.isCursorHidden = true
@@ -109,7 +106,7 @@ final class VNCInteractiveView: NSView {
                 .foregroundColor: NSColor.gray,
                 .font: NSFont.systemFont(ofSize: 16, weight: .medium)
             ]
-            let text = NSString(string: "Waiting for VNC frame...")
+            let text = NSString(string: "Waiting for RDP frame...")
             let size = text.size(withAttributes: attributes)
             let rect = CGRect(
                 x: (bounds.width - size.width) / 2,
@@ -133,61 +130,83 @@ final class VNCInteractiveView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        buttonMask |= 0x01
-        sendPointer(for: event)
+        pointerFlags = 0x1000
+        sendPointer(for: event, flags: 0x8000 | pointerFlags)
     }
 
     override func mouseUp(with event: NSEvent) {
-        buttonMask &= ~UInt8(0x01)
-        sendPointer(for: event)
+        let releaseFlags = pointerFlags == 0 ? UInt16(0x1000) : pointerFlags
+        sendPointer(for: event, flags: releaseFlags)
+        pointerFlags = 0
     }
 
     override func rightMouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        buttonMask |= 0x04  // RFB: bit 2 = right button
-        sendPointer(for: event)
+        pointerFlags = 0x2000
+        sendPointer(for: event, flags: 0x8000 | pointerFlags)
     }
 
     override func rightMouseUp(with event: NSEvent) {
-        buttonMask &= ~UInt8(0x04)
-        sendPointer(for: event)
+        let releaseFlags = pointerFlags == 0 ? UInt16(0x2000) : pointerFlags
+        sendPointer(for: event, flags: releaseFlags)
+        pointerFlags = 0
     }
 
     override func otherMouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        buttonMask |= 0x02  // RFB: bit 1 = middle button
-        sendPointer(for: event)
+        pointerFlags = 0x4000
+        sendPointer(for: event, flags: 0x8000 | pointerFlags)
     }
 
     override func otherMouseUp(with event: NSEvent) {
-        buttonMask &= ~UInt8(0x02)
-        sendPointer(for: event)
+        let releaseFlags = pointerFlags == 0 ? UInt16(0x4000) : pointerFlags
+        sendPointer(for: event, flags: releaseFlags)
+        pointerFlags = 0
     }
 
     override func mouseMoved(with event: NSEvent) {
-        sendPointer(for: event)
+        sendPointer(for: event, flags: 0x0800)
     }
 
     override func mouseDragged(with event: NSEvent) {
-        sendPointer(for: event)
+        let dragFlags = pointerFlags == 0 ? UInt16(0x0800) : UInt16(0x0800 | 0x8000 | pointerFlags)
+        sendPointer(for: event, flags: dragFlags)
     }
 
     override func rightMouseDragged(with event: NSEvent) {
-        sendPointer(for: event)
+        let dragFlags = pointerFlags == 0 ? UInt16(0x0800) : UInt16(0x0800 | 0x8000 | pointerFlags)
+        sendPointer(for: event, flags: dragFlags)
     }
 
     override func otherMouseDragged(with event: NSEvent) {
-        sendPointer(for: event)
+        let dragFlags = pointerFlags == 0 ? UInt16(0x0800) : UInt16(0x0800 | 0x8000 | pointerFlags)
+        sendPointer(for: event, flags: dragFlags)
     }
 
     override func scrollWheel(with event: NSEvent) {
         guard let point = framebufferPoint(for: event) else { return }
-        manager.sendScroll(x: point.x, y: point.y, deltaY: event.scrollingDeltaY, buttonMask: buttonMask)
+        let wheelDelta: UInt16 = 0x0078
+        let wheelFlags: UInt16 = event.scrollingDeltaY > 0
+            ? UInt16(0x0200 | wheelDelta)
+            : UInt16(0x0200 | 0x0100 | wheelDelta)
+        manager.sendPointerEvent(x: point.x, y: point.y, flags: wheelFlags)
     }
 
-    private func sendPointer(for event: NSEvent) {
+    override func keyDown(with event: NSEvent) {
+        manager.handleKeyEvent(event, isDown: true)
+    }
+
+    override func keyUp(with event: NSEvent) {
+        manager.handleKeyEvent(event, isDown: false)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        manager.handleFlagsChanged(event)
+    }
+
+    private func sendPointer(for event: NSEvent, flags: UInt16) {
         guard let point = framebufferPoint(for: event) else { return }
-        manager.sendPointerEvent(x: point.x, y: point.y, buttonMask: buttonMask)
+        manager.sendPointerEvent(x: point.x, y: point.y, flags: flags)
     }
 
     private func imageRect(for image: CGImage) -> CGRect {

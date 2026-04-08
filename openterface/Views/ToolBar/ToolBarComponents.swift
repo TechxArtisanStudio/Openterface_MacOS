@@ -83,7 +83,128 @@ struct SerialInfoView: View {
     }
 }
 
-// Caps Lock indicator view - shows label with color indicating Caps state
+struct RemoteInfoView: View {
+    let protocolMode: ConnectionProtocolMode
+
+    @State private var lastSampleTime: Date = Date()
+    @State private var lastRxTotal: UInt64 = 0
+    @State private var lastTxTotal: UInt64 = 0
+    @State private var rxBytesPerSecond: Double = 0
+    @State private var txBytesPerSecond: Double = 0
+
+    private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if !compressionText.isEmpty {
+                Text(compressionText)
+                    .font(.system(size: 8, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.primary.opacity(0.10))
+                    .clipShape(Capsule())
+            }
+            Text("\(endpointText)\n↓ \(speedText(rxBytesPerSecond)) ↑ \(speedText(txBytesPerSecond))")
+                .font(.system(size: 9, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(minWidth: 210, minHeight: 30, alignment: .leading)
+        .help(tooltipText)
+        .onAppear {
+            lastSampleTime = Date()
+            lastRxTotal = AppStatus.remoteRxBytesTotal
+            lastTxTotal = AppStatus.remoteTxBytesTotal
+        }
+        .onReceive(timer) { now in
+            let elapsed = max(now.timeIntervalSince(lastSampleTime), 0.001)
+            let rxTotal = AppStatus.remoteRxBytesTotal
+            let txTotal = AppStatus.remoteTxBytesTotal
+
+            let rxDelta = rxTotal >= lastRxTotal ? (rxTotal - lastRxTotal) : 0
+            let txDelta = txTotal >= lastTxTotal ? (txTotal - lastTxTotal) : 0
+
+            rxBytesPerSecond = Double(rxDelta) / elapsed
+            txBytesPerSecond = Double(txDelta) / elapsed
+
+            lastSampleTime = now
+            lastRxTotal = rxTotal
+            lastTxTotal = txTotal
+        }
+    }
+
+    private var endpointText: String {
+        let host: String
+        let port: Int
+
+        if !AppStatus.remoteEndpointHost.isEmpty, AppStatus.remoteEndpointPort > 0 {
+            host = AppStatus.remoteEndpointHost
+            port = AppStatus.remoteEndpointPort
+        } else {
+            switch protocolMode {
+            case .vnc:
+                host = UserSettings.shared.vncHost.trimmingCharacters(in: .whitespacesAndNewlines)
+                port = UserSettings.shared.vncPort
+            case .rdp:
+                host = UserSettings.shared.rdpHost.trimmingCharacters(in: .whitespacesAndNewlines)
+                port = UserSettings.shared.rdpPort
+            case .kvm:
+                host = ""
+                port = 0
+            }
+        }
+
+        let proto = protocolMode == .rdp ? "RDP" : "VNC"
+        if host.isEmpty || port <= 0 {
+            return "\(proto) remote"
+        }
+        return "\(proto) \(host):\(port)"
+    }
+
+    private var compressionText: String {
+        let liveCompression = AppStatus.remoteCompressionLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !liveCompression.isEmpty {
+            return liveCompression
+        }
+
+        switch protocolMode {
+        case .vnc:
+            return UserSettings.shared.vncEnableZLIBCompression ? "ZLIB?" : "RAW"
+        case .rdp, .kvm:
+            return ""
+        }
+    }
+
+    private var tooltipText: String {
+        var parts: [String] = [endpointText]
+
+        if !compressionText.isEmpty {
+            parts.append("Compression: \(compressionText)")
+        }
+
+        if AppStatus.remoteFramesPerSecond > 0 {
+            parts.append(String(format: "fps=%.1f", AppStatus.remoteFramesPerSecond))
+        }
+
+        if AppStatus.remoteBandwidthMBps > 0 {
+            parts.append(String(format: "bandwidth=%.2fMB/s", AppStatus.remoteBandwidthMBps))
+        }
+
+        return parts.joined(separator: "\n")
+    }
+
+    private func speedText(_ bytesPerSecond: Double) -> String {
+        if bytesPerSecond >= 1024 * 1024 {
+            return String(format: "%.1f MB/s", bytesPerSecond / (1024 * 1024))
+        }
+        if bytesPerSecond >= 1024 {
+            return String(format: "%.1f KB/s", bytesPerSecond / 1024)
+        }
+        return String(format: "%.0f B/s", bytesPerSecond)
+    }
+}
+
+// Caps Lock indicator view - shows a small icon and label with color indicating Caps state
 struct CapsLockIndicatorView: View {
     @ObservedObject var serialPortStatus = SerialPortStatus.shared
     var body: some View {
