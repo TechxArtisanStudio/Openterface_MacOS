@@ -106,6 +106,24 @@ struct SettingsScreen: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(width: 900, height: 700)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenRemoteCredentialsManager"))) { notif in
+            // If the settings window is open on a different tab, the remote-control view
+            // is not mounted yet and would miss the original notification.
+            let isRelay = (notif.userInfo?["settingsRelay"] as? Bool) == true
+            selectedTab = .remoteControl
+
+            guard !isRelay else { return }
+
+            var userInfo = notif.userInfo ?? [:]
+            userInfo["settingsRelay"] = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NotificationCenter.default.post(
+                    name: Notification.Name("OpenRemoteCredentialsManager"),
+                    object: nil,
+                    userInfo: userInfo
+                )
+            }
+        }
     }
 }
 

@@ -44,6 +44,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
 
     private let queue = DispatchQueue(label: "com.openterface.vnc")
     private var connection: NWConnection?
+    private var connectTimeoutWorkItem: DispatchWorkItem?
     private let loggerStorage: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var framebufferWidth: Int = 0
     private var framebufferHeight: Int = 0
@@ -56,6 +57,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
         case rawOnly   // ZLIB also failed; advertise Raw only
     }
     private var fallbackLevel: FallbackLevel = .full
+    private let connectTimeoutSeconds: TimeInterval = 12
 
     var logger: LoggerProtocol { loggerStorage }
 
@@ -152,6 +154,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
 
         let nwConnection = NWConnection(host: NWEndpoint.Host(trimmedHost), port: nwPort, using: .tcp)
         connection = nwConnection
+        scheduleConnectTimeout(for: nwConnection, host: trimmedHost, port: port)
 
         let attemptLabel: String
         switch fallbackLevel {
@@ -170,19 +173,39 @@ final class VNCClientManager: VNCClientManagerProtocol {
             }
             switch state {
             case .ready:
+                self.cancelConnectTimeout()
                 self.logger.log(content: "VNC TCP connection ready")
                 self.receiveData()
             case .preparing:
                 self.logger.log(content: "VNC TCP connection preparing...")
             case .waiting(let error):
-                self.logger.log(content: "VNC TCP connection waiting: \(error.localizedDescription)")
-                self.setError("VNC connection waiting: \(error.localizedDescription)")
-                self.stopConnection(reason: "connection waiting/unreachable")
+                let pathInfo = self.pathStatusSummary(for: nwConnection)
+                self.logger.log(content: "VNC TCP connection waiting: \(self.waitingStatusMessage(for: error))\(pathInfo)")
+                if self.isLocalNetworkDenied(for: nwConnection) {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(
+                            name: .vncLocalNetworkAccessDenied,
+                            object: nil,
+                            userInfo: ["host": self.host, "port": self.port]
+                        )
+                    }
+                    self.setError("Local Network access denied for Openterface. Enable Local Network permission in System Settings > Privacy & Security > Local Network.")
+                    self.stopConnection(reason: "local network permission denied")
+                    return
+                }
+                AppStatus.protocolSessionState = .connecting
+                if self.isTransientWaitingError(error) {
+                    AppStatus.protocolLastErrorMessage = "VNC route is temporarily unavailable (system reports ENETDOWN). Waiting for path recovery..."
+                } else {
+                    AppStatus.protocolLastErrorMessage = "VNC waiting: \(error.localizedDescription)"
+                }
             case .failed(let error):
+                self.cancelConnectTimeout()
                 self.logger.log(content: "VNC connection failed: \(error.localizedDescription)")
                 self.setError("VNC connection failed: \(error.localizedDescription)")
                 self.stopConnection(reason: "connection failed")
             case .cancelled:
+                self.cancelConnectTimeout()
                 self.logger.log(content: "VNC connection cancelled")
             case .setup:
                 self.logger.log(content: "VNC TCP connection setup")
@@ -195,6 +218,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
     }
 
     private func stopConnection(reason: String) {
+        cancelConnectTimeout()
         if connection != nil {
             logger.log(content: "VNC disconnect: \(reason)")
         }
@@ -237,6 +261,85 @@ final class VNCClientManager: VNCClientManagerProtocol {
             useZLIBCompression: preferences.useZLIBCompression,
             useTightCompression: preferences.useTightCompression
         )
+    }
+
+    private func scheduleConnectTimeout(for nwConnection: NWConnection, host: String, port: Int) {
+        cancelConnectTimeout()
+
+        let timeoutWorkItem = DispatchWorkItem { [weak self, weak nwConnection] in
+            guard let self = self else { return }
+            guard self.connection === nwConnection else { return }
+            guard !self.isConnected else { return }
+
+            self.logger.log(content: "VNC connect timeout after \(self.connectTimeoutSeconds)s to \(host):\(port)")
+            self.setError("VNC connect timeout after \(Int(self.connectTimeoutSeconds))s")
+            self.stopConnection(reason: "connect timeout")
+        }
+
+        connectTimeoutWorkItem = timeoutWorkItem
+        queue.asyncAfter(deadline: .now() + connectTimeoutSeconds, execute: timeoutWorkItem)
+    }
+
+    private func cancelConnectTimeout() {
+        connectTimeoutWorkItem?.cancel()
+        connectTimeoutWorkItem = nil
+    }
+
+    private func isTransientWaitingError(_ error: NWError) -> Bool {
+        switch error {
+        case .posix(let code):
+            return code == .ENETDOWN || code == .ENETUNREACH || code == .EHOSTUNREACH || code == .ENETRESET
+        default:
+            return false
+        }
+    }
+
+    private func waitingStatusMessage(for error: NWError) -> String {
+        if case .posix(let code) = error, code == .ENETDOWN {
+            return "path temporarily unavailable (ENETDOWN). This can be transient and does not always mean the VNC host is offline."
+        }
+        return error.localizedDescription
+    }
+
+    private func pathStatusSummary(for connection: NWConnection?) -> String {
+        guard let path = connection?.currentPath else {
+            return " [path=unknown]"
+        }
+
+        let status: String
+        switch path.status {
+        case .satisfied:
+            status = "satisfied"
+        case .unsatisfied:
+            status = "unsatisfied"
+        case .requiresConnection:
+            status = "requiresConnection"
+        @unknown default:
+            status = "unknown"
+        }
+
+        let reason: String
+        switch path.unsatisfiedReason {
+        case .notAvailable:
+            reason = "notAvailable"
+        case .cellularDenied:
+            reason = "cellularDenied"
+        case .wifiDenied:
+            reason = "wifiDenied"
+        case .localNetworkDenied:
+            reason = "localNetworkDenied"
+        default:
+            reason = "unknown"
+        }
+
+        let usesWiFi = path.usesInterfaceType(.wifi)
+        let usesWired = path.usesInterfaceType(.wiredEthernet)
+        return " [path=\(status) reason=\(reason) wifi=\(usesWiFi) wired=\(usesWired)]"
+    }
+
+    private func isLocalNetworkDenied(for connection: NWConnection?) -> Bool {
+        guard let path = connection?.currentPath else { return false }
+        return path.status != .satisfied && path.unsatisfiedReason == .localNetworkDenied
     }
 
     private func receiveData() {
@@ -385,6 +488,7 @@ extension VNCClientManager: RFBProtocolHandlerDelegate {
 
 extension Notification.Name {
     static let vncFrameUpdated = Notification.Name("VNCFrameUpdated")
+    static let vncLocalNetworkAccessDenied = Notification.Name("VNCLocalNetworkAccessDenied")
 }
 
 extension VNCClientManager {

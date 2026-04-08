@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var pendingWindowSizeUpdateAfterResize = false
     private var shouldRestoreAspectRatioAfterLiveResize = false
     private var liveResizeAxis: LiveResizeAxis?
+    private var lastVNCLocalNetworkDeniedAlertTime: Date?
 
     private func scalarSummary(_ value: CGFloat) -> String {
         guard value.isFinite else {
@@ -179,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NotificationCenter.default.addObserver(self, selector: #selector(handleVNCDisconnectRequested(_:)), name: Notification.Name("VNCDisconnectRequested"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleRDPConnectRequested(_:)), name: Notification.Name("RDPConnectRequested"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleRDPDisconnectRequested(_:)), name: Notification.Name("RDPDisconnectRequested"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleVNCLocalNetworkAccessDenied(_:)), name: .vncLocalNetworkAccessDenied, object: nil)
     }
 
     deinit {
@@ -324,6 +326,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func handleRDPDisconnectRequested(_ notification: Notification) {
         RDPClientManager.shared.disconnect()
+    }
+
+    @objc private func handleVNCLocalNetworkAccessDenied(_ notification: Notification) {
+        DispatchQueue.main.async {
+            if let last = self.lastVNCLocalNetworkDeniedAlertTime,
+               Date().timeIntervalSince(last) < 5 {
+                return
+            }
+            self.lastVNCLocalNetworkDeniedAlertTime = Date()
+
+            let host = notification.userInfo?["host"] as? String ?? "configured host"
+            let port = notification.userInfo?["port"] as? Int ?? 5900
+
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Local Network Permission Required"
+            alert.informativeText = "Openterface cannot reach \(host):\(port) because Local Network access is denied.\n\nOpen System Settings > Privacy & Security > Local Network, then enable Openterface."
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "OK")
+
+            NSApp.activate(ignoringOtherApps: true)
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn,
+               let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 
     private func applyConnectionProtocolMode(_ mode: ConnectionProtocolMode, reason: String) {
