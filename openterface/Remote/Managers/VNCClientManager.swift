@@ -27,6 +27,11 @@ import AppKit
 
 final class VNCClientManager: VNCClientManagerProtocol {
 
+    private struct ProtocolPreferences {
+        let useZLIBCompression: Bool
+        let useTightCompression: Bool
+    }
+
     static let shared = VNCClientManager()
 
     private(set) var isConnected: Bool = false
@@ -45,14 +50,23 @@ final class VNCClientManager: VNCClientManagerProtocol {
     private var framebufferPixels = Data()
     private var protocolHandler: RFBProtocolHandler!
 
+    private enum FallbackLevel {
+        case full      // honour user settings
+        case zlibOnly  // Tight failed; advertise ZLIB only
+        case rawOnly   // ZLIB also failed; advertise Raw only
+    }
+    private var fallbackLevel: FallbackLevel = .full
+
     var logger: LoggerProtocol { loggerStorage }
 
     private init() {
-        protocolHandler = RFBProtocolHandler(delegate: self)
+        let preferences = currentProtocolPreferences()
+        protocolHandler = makeProtocolHandler(preferences: preferences)
     }
 
     func connect(host: String, port: Int, password: String?) {
         queue.async { [weak self] in
+            self?.fallbackLevel = .full
             self?.logger.log(content: "VNC connect requested: host=\(host) port=\(port) passwordPresent=\(password != nil && !(password!.isEmpty))")
             self?.performConnect(host: host, port: port)
         }
@@ -90,14 +104,20 @@ final class VNCClientManager: VNCClientManagerProtocol {
     }
 
     func handleKeyEvent(_ event: NSEvent, isDown: Bool) {
+        // NSEvent.charactersIgnoringModifiers requires the main thread (TSM/Carbon).
+        // Extract all properties here before dispatching to the background queue.
+        let keyCode = event.keyCode
+        let chars = event.charactersIgnoringModifiers
         queue.async { [weak self] in
-            self?.protocolHandler.handleKeyEvent(event, isDown: isDown)
+            self?.protocolHandler.handleKeyEvent(keyCode: keyCode, charactersIgnoringModifiers: chars, isDown: isDown)
         }
     }
 
     func handleFlagsChanged(_ event: NSEvent) {
+        let keyCode = event.keyCode
+        let modifierFlags = event.modifierFlags
         queue.async { [weak self] in
-            self?.protocolHandler.handleFlagsChanged(event)
+            self?.protocolHandler.handleFlagsChanged(keyCode: keyCode, modifierFlags: modifierFlags)
         }
     }
 
@@ -118,9 +138,13 @@ final class VNCClientManager: VNCClientManagerProtocol {
 
         stopConnection(reason: "reconnect")
 
+        let preferences = currentProtocolPreferences()
+        protocolHandler = makeProtocolHandler(preferences: preferences)
+
         self.host = trimmedHost
         self.port = port
         isConnected = false
+        AppStatus.resetRemoteNetworkStats(host: trimmedHost, port: port)
 
         AppStatus.protocolSessionState = .connecting
         AppStatus.protocolLastErrorMessage = ""
@@ -129,7 +153,14 @@ final class VNCClientManager: VNCClientManagerProtocol {
         let nwConnection = NWConnection(host: NWEndpoint.Host(trimmedHost), port: nwPort, using: .tcp)
         connection = nwConnection
 
-        logger.log(content: "VNC connecting to \(trimmedHost):\(port)")
+        let attemptLabel: String
+        switch fallbackLevel {
+        case .full:     attemptLabel = "attempt=1 (user settings)"
+        case .zlibOnly: attemptLabel = "attempt=2 (Tight failed, using ZLIB fallback)"
+        case .rawOnly:  attemptLabel = "attempt=3 (ZLIB failed, using Raw fallback)"
+        }
+        logger.log(content: "VNC connecting to \(trimmedHost):\(port) \(attemptLabel)")
+        logger.log(content: "VNC effective preferences: zlib=\(preferences.useZLIBCompression) tight=\(preferences.useTightCompression)")
 
         nwConnection.stateUpdateHandler = { [weak self, weak nwConnection] state in
             guard let self = self else { return }
@@ -186,9 +217,31 @@ final class VNCClientManager: VNCClientManagerProtocol {
         AppStatus.protocolLastErrorMessage = message
     }
 
+    private func currentProtocolPreferences() -> ProtocolPreferences {
+        switch fallbackLevel {
+        case .full:
+            return ProtocolPreferences(
+                useZLIBCompression: UserSettings.shared.vncEnableZLIBCompression,
+                useTightCompression: UserSettings.shared.vncEnableTightCompression
+            )
+        case .zlibOnly:
+            return ProtocolPreferences(useZLIBCompression: true, useTightCompression: false)
+        case .rawOnly:
+            return ProtocolPreferences(useZLIBCompression: false, useTightCompression: false)
+        }
+    }
+
+    private func makeProtocolHandler(preferences: ProtocolPreferences) -> RFBProtocolHandler {
+        RFBProtocolHandler(
+            delegate: self,
+            useZLIBCompression: preferences.useZLIBCompression,
+            useTightCompression: preferences.useTightCompression
+        )
+    }
+
     private func receiveData() {
         guard let conn = connection else { return }
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, isComplete, error in
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
 
             if let error = error {
@@ -199,6 +252,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
             }
 
             if let data = data, !data.isEmpty {
+                AppStatus.addRemoteRxBytes(data.count)
                 self.protocolHandler.ingest(data)
             }
 
@@ -214,6 +268,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
 
     fileprivate func send(_ data: Data) {
         guard let conn = connection else { return }
+        AppStatus.addRemoteTxBytes(data.count)
         conn.send(content: data, completion: .contentProcessed { [weak self] error in
             if let error = error {
                 self?.logger.log(content: "VNC send error: \(error.localizedDescription)")
@@ -234,13 +289,42 @@ extension VNCClientManager: RFBProtocolHandlerDelegate {
     }
 
     func rfbStopConnection(reason: String) {
-        stopConnection(reason: reason)
+        let isTightFailure = reason.contains("tight")
+        let isZlibFailure  = reason.contains("zlib") || reason == "unsupported rect encoding"
+
+        switch fallbackLevel {
+        case .full where isTightFailure:
+            fallbackLevel = .zlibOnly
+            logger.log(content: "VNC Tight failed (\(reason)); retrying with ZLIB")
+            let h = host; let p = port
+            stopConnection(reason: "tight fallback to zlib")
+            performConnect(host: h, port: p)
+        case .full where isZlibFailure:
+            fallbackLevel = .rawOnly
+            logger.log(content: "VNC ZLIB failed (\(reason)); retrying with Raw")
+            let h = host; let p = port
+            stopConnection(reason: "zlib fallback to raw")
+            performConnect(host: h, port: p)
+        case .zlibOnly where isZlibFailure || isTightFailure:
+            fallbackLevel = .rawOnly
+            logger.log(content: "VNC ZLIB failed (\(reason)); retrying with Raw")
+            let h = host; let p = port
+            stopConnection(reason: "zlib fallback to raw")
+            performConnect(host: h, port: p)
+        default:
+            stopConnection(reason: reason)
+        }
     }
 
     func rfbMarkConnected() {
         isConnected = true
         AppStatus.protocolSessionState = .connected
         AppStatus.protocolLastErrorMessage = ""
+        switch fallbackLevel {
+        case .full:     logger.log(content: "VNC connected successfully using user settings (Tight=\(UserSettings.shared.vncEnableTightCompression) ZLIB=\(UserSettings.shared.vncEnableZLIBCompression))")
+        case .zlibOnly: logger.log(content: "VNC connected using ZLIB fallback (Tight encoding was not supported by server)")
+        case .rawOnly:  logger.log(content: "VNC connected using Raw fallback (neither Tight nor ZLIB were supported)")
+        }
     }
 
     func rfbPublishFrame(_ frame: CGImage?) {
@@ -253,6 +337,7 @@ extension VNCClientManager: RFBProtocolHandlerDelegate {
     func rfbSetFramebufferSize(width: Int, height: Int) {
         framebufferWidth = width
         framebufferHeight = height
+        AppStatus.setRemoteFramebufferSize(width: width, height: height)
     }
 
     func rfbGetFramebufferSize() -> (width: Int, height: Int) {

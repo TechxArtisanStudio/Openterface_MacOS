@@ -177,6 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NotificationCenter.default.addObserver(self, selector: #selector(handleConnectionProtocolModeChanged(_:)), name: Notification.Name("ConnectionProtocolModeChanged"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleVNCConnectRequested(_:)), name: Notification.Name("VNCConnectRequested"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleVNCDisconnectRequested(_:)), name: Notification.Name("VNCDisconnectRequested"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRDPConnectRequested(_:)), name: Notification.Name("RDPConnectRequested"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRDPDisconnectRequested(_:)), name: Notification.Name("RDPDisconnectRequested"), object: nil)
     }
 
     deinit {
@@ -204,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         container.register(FloatingKeyboardManagerProtocol.self, instance: FloatingKeyboardManager() as any FloatingKeyboardManagerProtocol)
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)
         container.register(VNCClientManagerProtocol.self, instance: VNCClientManager.shared as any VNCClientManagerProtocol)
+        container.register(RDPClientManagerProtocol.self, instance: RDPClientManager.shared as any RDPClientManagerProtocol)
         container.register(CameraManagerProtocol.self, instance: CameraManager.shared as any CameraManagerProtocol)
         container.register(PermissionManagerProtocol.self, instance: PermissionManager.shared as any PermissionManagerProtocol)
         container.register(ChatManagerProtocol.self, instance: ChatManager.shared as any ChatManagerProtocol)
@@ -304,6 +307,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         VNCClientManager.shared.disconnect()
     }
 
+    @objc private func handleRDPConnectRequested(_ notification: Notification) {
+        guard UserSettings.shared.connectionProtocolMode == .rdp else {
+            AppStatus.protocolLastErrorMessage = "Switch to RDP mode first before connecting."
+            AppStatus.protocolSessionState = .error
+            return
+        }
+        RDPClientManager.shared.connect(
+            host: UserSettings.shared.rdpHost,
+            port: UserSettings.shared.rdpPort,
+            username: UserSettings.shared.rdpUsername,
+            password: UserSettings.shared.rdpPassword,
+            domain: UserSettings.shared.rdpDomain
+        )
+    }
+
+    @objc private func handleRDPDisconnectRequested(_ notification: Notification) {
+        RDPClientManager.shared.disconnect()
+    }
+
     private func applyConnectionProtocolMode(_ mode: ConnectionProtocolMode, reason: String) {
         AppStatus.activeConnectionProtocol = mode
         AppStatus.protocolSessionState = .switching
@@ -313,12 +335,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         case .kvm:
             logger.log(content: "Connection protocol switched to KVM (\(reason))")
             VNCClientManager.shared.disconnect()
+            RDPClientManager.shared.disconnect()
             serialPortManager.resumeConnectionAttempts()
             hidManager.restartHIDOperations()
             videoManager.startVideoSession()
             AppStatus.protocolSessionState = .connected
         case .vnc:
             logger.log(content: "Connection protocol switched to VNC (\(reason)). KVM hardware streams are paused.")
+            RDPClientManager.shared.disconnect()
             hidManager.stopAllHIDOperations()
             videoManager.stopVideoSession()
             serialPortManager.pauseConnectionAttempts()
@@ -331,6 +355,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 )
             } else {
                 logger.log(content: "VNC auto-connect skipped at app launch. Use Connect button to connect.")
+                AppStatus.protocolSessionState = .idle
+            }
+        case .rdp:
+            logger.log(content: "Connection protocol switched to RDP (\(reason)). KVM hardware streams are paused.")
+            VNCClientManager.shared.disconnect()
+            hidManager.stopAllHIDOperations()
+            videoManager.stopVideoSession()
+            serialPortManager.pauseConnectionAttempts()
+            // Only auto-connect on manual switch
+            if reason != "app launch" {
+                RDPClientManager.shared.connect(
+                    host: UserSettings.shared.rdpHost,
+                    port: UserSettings.shared.rdpPort,
+                    username: UserSettings.shared.rdpUsername,
+                    password: UserSettings.shared.rdpPassword,
+                    domain: UserSettings.shared.rdpDomain
+                )
+            } else {
+                logger.log(content: "RDP auto-connect skipped at app launch. Use Connect button to connect.")
                 AppStatus.protocolSessionState = .idle
             }
         }

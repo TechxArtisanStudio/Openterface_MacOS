@@ -31,6 +31,7 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
     private var logger: LoggerProtocol!
     private var videoManager: VideoManagerProtocol!
     private var vncClientManager: (any VNCClientManagerProtocol)!
+    private var rdpClientManager: (any RDPClientManagerProtocol)!
     private var audioManager: AudioManagerProtocol!
     
     // Published properties for UI status display
@@ -67,6 +68,7 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         self.logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
         self.videoManager = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
         self.vncClientManager = DependencyContainer.shared.resolve(VNCClientManagerProtocol.self)
+        self.rdpClientManager = DependencyContainer.shared.resolve(RDPClientManagerProtocol.self)
         self.audioManager = DependencyContainer.shared.resolve(AudioManagerProtocol.self)
         setupCaptureDirectory()
         updateCaptureStatus()
@@ -264,6 +266,8 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             canTakePicture = videoManager.isVideoConnected && videoManager.outputDelegate != nil
         case .vnc:
             canTakePicture = vncClientManager.isConnected && vncClientManager.currentFrame != nil
+        case .rdp:
+            canTakePicture = rdpClientManager.isConnected && rdpClientManager.currentFrame != nil
         }
     }
     
@@ -273,6 +277,8 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             return captureKVMCurrentFrame()
         case .vnc:
             return captureVNCCurrentFrame()
+        case .rdp:
+            return captureRDPCurrentFrame()
         }
     }
 
@@ -299,6 +305,15 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: frameWidth, height: frameHeight))
         logger.log(content: "Created NSImage with size: \(image.size)")
         
+        return image
+    }
+
+    private func captureRDPCurrentFrame() -> NSImage? {
+        guard let cgImage = rdpClientManager.currentFrame else {
+            logger.log(content: "No RDP frame available for capture")
+            return nil
+        }
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         return image
     }
 
@@ -654,6 +669,11 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
                 return (max(currentFrame.width, 1), max(currentFrame.height, 1))
             }
             return (1920, 1080)
+        case .rdp:
+            if let currentFrame = rdpClientManager.currentFrame {
+                return (max(currentFrame.width, 1), max(currentFrame.height, 1))
+            }
+            return (1920, 1080)
         }
     }
 
@@ -667,6 +687,12 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
             return pixelBuffer
         case .vnc:
             guard let currentFrame = vncClientManager.currentFrame else {
+                return nil
+            }
+            let size = activeRecordingDimensions()
+            return createPixelBuffer(from: currentFrame, width: size.width, height: size.height)
+        case .rdp:
+            guard let currentFrame = rdpClientManager.currentFrame else {
                 return nil
             }
             let size = activeRecordingDimensions()

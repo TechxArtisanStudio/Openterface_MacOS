@@ -340,6 +340,23 @@ protocol VNCClientManagerProtocol: AnyObject {
     func sendClipboardText(_ text: String)
 }
 
+/// Protocol for RDP client lifecycle and I/O hooks
+protocol RDPClientManagerProtocol: AnyObject {
+    var isConnected: Bool { get }
+    var host: String { get }
+    var port: Int { get }
+    var currentFrame: CGImage? { get }
+    var framebufferSize: CGSize { get }
+
+    func connect(host: String, port: Int, username: String, password: String, domain: String)
+    func disconnect()
+    func sendPointerEvent(x: Int, y: Int, flags: UInt16)
+    func sendKeyEvent(scanCode: UInt16, flags: UInt16)
+    func sendClipboardText(_ text: String)
+    func handleKeyEvent(_ event: NSEvent, isDown: Bool)
+    func handleFlagsChanged(_ event: NSEvent)
+}
+
 // MARK: - Supporting Types
 
 enum LogLevel {

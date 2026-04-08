@@ -126,6 +126,8 @@ struct ContentView: View {
                 ZStack {
                     if currentProtocolMode == .vnc {
                         VNCFrameView()
+                    } else if currentProtocolMode == .rdp {
+                        RDPFrameView()
                     } else {
                         KVMFrameView(
                             captureSession: viewModel.captureSession,

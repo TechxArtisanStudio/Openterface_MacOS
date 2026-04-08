@@ -136,30 +136,7 @@ struct openterfaceApp: App {
                 .zIndex(100)
                 ContentView()
                     .navigationTitle("Openterface KVM - \(AppVersion.getVersionString())")
-                    .toolbar {
-                        ToolbarContentView(
-                            showButtons: $showButtons,
-                            switchToTarget: $_switchToTarget,
-                            isAudioEnabled: _isAudioEnabled,
-                            canTakePicture: _canTakePicture,
-                            canRecordVideo: _canTakePicture,
-                            isRecording: _isRecording,
-                            hasHdmiSignal: _hasHdmiSignal,
-                            isKeyboardConnected: _isKeyboardConnected,
-                            isMouseConnected: _isMouseConnected,
-                            isMouseLoopRunning: _isMouseLoopRunning,
-                            resolutionWidth: _resolution.width,
-                            resolutionHeight: _resolution.height,
-                            fps: _fps,
-                            pixelClock: _pixelClock,
-                            serialPortName: _serialPortName,
-                            serialPortBaudRate: $_serialPortBaudRate,
-                            handleSwitchToggle: handleSwitchToggle,
-                            toggleAudio: toggleAudio,
-                            showAspectRatioSelection: showAspectRatioSelectionWindow,
-                            showUSBDevices: showUSBDevicesWindow
-                        )
-                    }
+                    .modifier(appToolbarModifier)
                     .onReceive(timer) { _ in
                         // Initialize paste behavior title on first run
                         if pasteBehaviorTitle == "Ask Every Time" {
@@ -245,8 +222,23 @@ struct openterfaceApp: App {
                         let pixelClockValue = Double(AppStatus.hidReadPixelClock) / 100.0
                         _pixelClock = String(format: "%.2f", pixelClockValue)
 
-                        // Only update resolution display when state changes or HDMI signal status needs updating
-                        if stateChanged || _hasHdmiSignal != nil {
+                        if _connectionProtocolMode == .vnc || _connectionProtocolMode == .rdp {
+                            let remoteWidth = AppStatus.remoteFramebufferWidth
+                            let remoteHeight = AppStatus.remoteFramebufferHeight
+                            if remoteWidth > 0, remoteHeight > 0 {
+                                _resolution.width = "\(remoteWidth)"
+                                _resolution.height = "\(remoteHeight)"
+                            } else {
+                                _resolution.width = "-"
+                                _resolution.height = "-"
+                            }
+
+                            if AppStatus.remoteFramesPerSecond > 0 {
+                                _fps = String(format: "%.1f", AppStatus.remoteFramesPerSecond)
+                            } else {
+                                _fps = "-"
+                            }
+                        } else if stateChanged || _hasHdmiSignal != nil {
                             if _hasHdmiSignal == nil {
                                 _resolution.width = "-"
                                 _resolution.height = "-"
@@ -290,7 +282,38 @@ struct openterfaceApp: App {
                     Button(action: {
                         setConnectionProtocolMode(.vnc)
                     }) {
-                        Text("VNC Client\(_connectionProtocolMode == .vnc ? " ✓" : "")")
+                        Text("VNC\(remoteSubtitle(host: UserSettings.shared.vncHost, user: UserSettings.shared.vncUsername))\(_connectionProtocolMode == .vnc ? " ✓" : "")")
+                    }
+
+                    Button(action: {
+                        setConnectionProtocolMode(.rdp)
+                    }) {
+                        Text("Remote Desktop (RDP)\(remoteSubtitle(host: UserSettings.shared.rdpHost, user: UserSettings.shared.rdpUsername))\(_connectionProtocolMode == .rdp ? " ✓" : "")")
+                    }
+
+                    Divider()
+
+                    Button(action: {
+                        let remoteProtocol: String
+                        switch _connectionProtocolMode {
+                        case .rdp:
+                            remoteProtocol = "rdp"
+                        case .vnc:
+                            remoteProtocol = "vnc"
+                        case .kvm:
+                            remoteProtocol = "vnc"
+                        }
+
+                        showSetKeyWindow()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("OpenRemoteCredentialsManager"),
+                                object: nil,
+                                userInfo: ["protocol": remoteProtocol]
+                            )
+                        }
+                    }) {
+                        Text("Manage Credentials...")
                     }
                 }
 
@@ -928,6 +951,39 @@ struct openterfaceApp: App {
         UserSettings.shared.connectionProtocolMode = mode
         _connectionProtocolMode = mode
         NotificationCenter.default.post(name: Notification.Name("ConnectionProtocolModeChanged"), object: nil)
+    }
+
+    private func remoteSubtitle(host: String, user: String) -> String {
+        let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let u = user.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !h.isEmpty else { return "" }
+        let endpoint = u.isEmpty ? h : "\(u) @ \(h)"
+        return " — \(endpoint)"
+    }
+
+    private var appToolbarModifier: AppToolbarModifier {
+        AppToolbarModifier(
+            showButtons: $showButtons,
+            switchToTarget: $_switchToTarget,
+            isAudioEnabled: _isAudioEnabled,
+            canTakePicture: _canTakePicture,
+            canRecordVideo: _canTakePicture,
+            isRecording: _isRecording,
+            hasHdmiSignal: _hasHdmiSignal,
+            isKeyboardConnected: _isKeyboardConnected,
+            isMouseConnected: _isMouseConnected,
+            isMouseLoopRunning: _isMouseLoopRunning,
+            resolutionWidth: _resolution.width,
+            resolutionHeight: _resolution.height,
+            fps: _fps,
+            pixelClock: _pixelClock,
+            serialPortName: _serialPortName,
+            serialPortBaudRate: $_serialPortBaudRate,
+            handleSwitchToggle: handleSwitchToggle,
+            toggleAudio: toggleAudio,
+            showAspectRatioSelection: showAspectRatioSelectionWindow,
+            showUSBDevices: showUSBDevicesWindow
+        )
     }
 }
 
