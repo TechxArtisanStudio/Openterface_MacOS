@@ -8,7 +8,6 @@ struct DeviceConnectionSettingsView: View {
     @State private var connectionAttempts = 0
     @State private var showingFirmwareUpdate = false
     @State private var isUpdatingBaudrate = false
-    @State private var vncPortText: String = ""
 
     var firmwareVersion: String {
         "v\(serialStatus.chipVersion)"
@@ -214,155 +213,6 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Remote Connection") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Configure network-based remote access protocols.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    GroupBox("Remote Protocol") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Label("VNC (RFB 3.8)", systemImage: "network")
-                                Spacer()
-                                Text("Available")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            }
-
-                            HStack {
-                                Label("RDP", systemImage: "network.badge.shield.half.filled")
-                                Spacer()
-                                Text("Coming Soon")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
-
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(.orange)
-                        Text("Remote transport is not active yet. Current VNC fields are saved for upcoming implementation, but an actual VNC/RDP session cannot be started in this build.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(ConnectionProtocolMode.allCases, id: \.self) { mode in
-                            Button(action: {
-                                userSettings.connectionProtocolMode = mode
-                                AppStatus.activeConnectionProtocol = mode
-                                NotificationCenter.default.post(name: Notification.Name("ConnectionProtocolModeChanged"), object: nil)
-                            }) {
-                                HStack(alignment: .top, spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(mode.displayName)
-                                            .font(.body)
-                                            .fontWeight(.medium)
-
-                                        Text(mode.description)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    if userSettings.connectionProtocolMode == mode {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.blue)
-                                            .font(.title3)
-                                    } else {
-                                        Image(systemName: "circle")
-                                            .foregroundColor(.secondary)
-                                            .font(.title3)
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 12)
-                                .background(userSettings.connectionProtocolMode == mode ? Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
-                                .cornerRadius(6)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-
-                    if userSettings.connectionProtocolMode == .vnc {
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("VNC Connection")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-
-                            HStack {
-                                Text("Host")
-                                    .frame(width: 80, alignment: .leading)
-                                TextField("127.0.0.1", text: $userSettings.vncHost)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                            }
-
-                            HStack {
-                                Text("Port")
-                                    .frame(width: 80, alignment: .leading)
-                                TextField("5900", text: $vncPortText)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .onChange(of: vncPortText) { value in
-                                        let filtered = value.filter { $0.isNumber }
-                                        if filtered != value {
-                                            vncPortText = filtered
-                                            return
-                                        }
-                                        if let port = Int(filtered) {
-                                            userSettings.vncPort = port
-                                        }
-                                    }
-                            }
-
-                               HStack {
-                                   Text("Username")
-                                       .frame(width: 80, alignment: .leading)
-                                   TextField("Optional", text: $userSettings.vncUsername)
-                                       .textFieldStyle(RoundedBorderTextFieldStyle())
-                               }
-
-                            HStack {
-                                Text("Password")
-                                    .frame(width: 80, alignment: .leading)
-                                SecureField("Optional", text: $userSettings.vncPassword)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                            }
-
-                            HStack {
-                                Button("Connect") {
-                                    NotificationCenter.default.post(name: Notification.Name("VNCConnectRequested"), object: nil)
-                                }
-                                .disabled(userSettings.vncHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                                Button("Disconnect") {
-                                    NotificationCenter.default.post(name: Notification.Name("VNCDisconnectRequested"), object: nil)
-                                }
-
-                                Spacer()
-
-                                Text(vncConnectionStatusText)
-                                    .font(.caption)
-                                    .foregroundColor(vncConnectionStatusColor)
-                            }
-
-                            if !AppStatus.protocolLastErrorMessage.isEmpty {
-                                Text(AppStatus.protocolLastErrorMessage)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-
             GroupBox("Connection Management") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -407,9 +257,6 @@ struct DeviceConnectionSettingsView: View {
                     isUpdatingBaudrate = false
                 }
             }
-        }
-        .onAppear {
-            vncPortText = "\(userSettings.vncPort)"
         }
         .sheet(isPresented: $showingFirmwareUpdate) {
             Text("Firmware Update Dialog")
