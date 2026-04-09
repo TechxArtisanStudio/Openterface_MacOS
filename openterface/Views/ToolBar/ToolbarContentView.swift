@@ -77,14 +77,7 @@ struct ToolbarContentView: ToolbarContent {
                 MacroPanelView()
             }
 
-            CapsLockIndicatorView()
-                .help("Target Caps Lock state - ON/OFF")
-
-            NumLockIndicatorView()
-                .help("Target Num Lock state - ON/OFF")
-
-            ScrollLockIndicatorView()
-                .help("Target Scroll Lock state - ON/OFF")
+            LockIndicatorsView()
 
             Button(action: {}) {
                 Image(systemName: "poweron") // spacer

@@ -26,6 +26,7 @@ import CoreGraphics
 
 class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var hostCapsLockPollTimer: Timer?
     
     static let SHIFT_KEYS = ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+", "{", "}", "|", ":", "\"", "<", ">", "?"]
     static let shared = KeyboardManager()
@@ -47,6 +48,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     @Published var isRightAltHeld = false
     @Published var isCapsLockOn = false {
         didSet {
+            guard oldValue != isCapsLockOn else { return }
+
             // Keep AppStatus host field in sync and log the change
             AppStatus.isHostCapLockOn = isCapsLockOn
             logger.log(content: "🔔 Host Caps Lock state updated: \(isCapsLockOn ? "ON" : "OFF")")
@@ -199,6 +202,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         logger.log(content: "🎹 KeyboardManager initialized with layout: \(currentKeyboardLayout.rawValue)")
         // Update caps lock state from the system at initialization
         updateInitialCapsLockState()
+        startHostCapsLockPolling()
         monitorKeyboardEvents()
     }
 
@@ -208,9 +212,28 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         // Use CoreGraphics event source to read the combined session flags
         let flags = CGEventSource.flagsState(.combinedSessionState)
         let capsLockActive = flags.contains(.maskAlphaShift)
-    isCapsLockOn = capsLockActive
-    AppStatus.isHostCapLockOn = capsLockActive
+        isCapsLockOn = capsLockActive
         logger.log(content: "🔔 Initial Caps Lock state: \(capsLockActive ? "ON" : "OFF")")
+    }
+
+    private func refreshHostCapsLockState() {
+        let flags = CGEventSource.flagsState(.combinedSessionState)
+        let capsLockActive = flags.contains(.maskAlphaShift)
+
+        if Thread.isMainThread {
+            isCapsLockOn = capsLockActive
+        } else {
+            DispatchQueue.main.async {
+                self.isCapsLockOn = capsLockActive
+            }
+        }
+    }
+
+    private func startHostCapsLockPolling() {
+        hostCapsLockPollTimer?.invalidate()
+        hostCapsLockPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.refreshHostCapsLockState()
+        }
     }
     
     // MARK: - Modifier Key State Management
