@@ -97,6 +97,7 @@
 		BFA445782F016FEA005D2937 /* DeviceConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */; };
 		C1A2B3C42F1A000100ABCDEF /* RemoteControlSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */; };
 		BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */; };
+		BB5C4A3E462F4851BD5309D4 /* WCHFlashSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */; };
 		BFA4457C2F017758005D2937 /* LogViewerDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA4457B2F017758005D2937 /* LogViewerDialog.swift */; };
 		BFABE3AE2EF678F300915509 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFABE3AD2EF678F300915509 /* AppVersion.swift */; };
 		BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */; };
@@ -234,6 +235,7 @@
 		BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeviceConnectionSettingsView.swift; sourceTree = "<group>"; };
 		C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteControlSettingsView.swift; sourceTree = "<group>"; };
 		BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdvancedDebugSettingsView.swift; sourceTree = "<group>"; };
+		D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WCHFlashSettingsView.swift; sourceTree = "<group>"; };
 		BFA4457B2F017758005D2937 /* LogViewerDialog.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogViewerDialog.swift; sourceTree = "<group>"; };
 		BFABE3AD2EF678F300915509 /* AppVersion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardWindowController.swift; sourceTree = "<group>"; };
@@ -250,6 +252,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F12FAECD2F6813C000F91607 /* serial */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = serial; sourceTree = "<group>"; };
+		FA6E02A5BA2C437D8D0F4DA3 /* WCH */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WCH; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -378,6 +381,7 @@
 			children = (
 				A1B2C3D52F12345600ABCDEF /* ChatManager.swift */,
 				F12FAECD2F6813C000F91607 /* serial */,
+				FA6E02A5BA2C437D8D0F4DA3 /* WCH */,
 				6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */,
 				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
@@ -516,6 +520,7 @@
 			children = (
 				BFA4457B2F017758005D2937 /* LogViewerDialog.swift */,
 				BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */,
+				D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */,
 				C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */,
 				BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */,
 				BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */,
@@ -600,6 +605,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F12FAECD2F6813C000F91607 /* serial */,
+				FA6E02A5BA2C437D8D0F4DA3 /* WCH */,
 			);
 			name = openterface;
 			packageProductDependencies = (
@@ -730,6 +736,7 @@
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				BFD4EA932E35EE970029BFC2 /* ManagerProtocols.swift in Sources */,
 				BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */,
+				BB5C4A3E462F4851BD5309D4 /* WCHFlashSettingsView.swift in Sources */,
 				BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				BFA4457C2F017758005D2937 /* LogViewerDialog.swift in Sources */,
