@@ -25,6 +25,11 @@ import Security
 
 final class UserSettings: ObservableObject {
     static let shared = UserSettings()
+    private static let chatPromptProfilesKey = "chatPromptProfiles"
+    private static let runtimeAIAgentDocsEnvKey = "OPENTERFACE_AI_AGENT_DOCS_ROOT"
+    private static let sourceFilePathForRuntimeDocsResolution = #filePath
+
+    private var runtimeAIAgentDefinitionCache: [String: String] = [:]
 
     static let defaultChatSystemPrompt = """
 You are Openterface Assistant, an on-device KVM copilot.
@@ -126,6 +131,8 @@ Rules:
 - Return ONLY JSON.
 - Focus only on the current task.
 - For plain typing, provide text_to_type.
+- `text_to_type` and `shortcut` MUST be ASCII-only unless the user explicitly requests a non-ASCII language/script.
+- Do NOT output Chinese/CJK characters by default. Example for iPhone search: use setting, display, brightness (not 设置, 显示, 亮度).
 - For keyboard/function keys, use angle-bracket format (example: <ctrl>l, <cmd><space>, <enter>, <f1>).
 - A modifier tag applies to the next key token (example: <ctrl>l means Ctrl+L).
 - For plain text, keep it in text_to_type and do not wrap with brackets.
@@ -150,12 +157,28 @@ Rules:
 - Return ONLY JSON.
 - Look at the "Original Goal" if provided, and ensure your next step makes progress toward it.
 - Provide exactly one next step.
+- Treat "Past Actions Taken" as already executed unless the current screenshot directly shows the action did not take effect.
+- Do not repeat substantially the same click or shortcut from "Past Actions Taken" unless the current screenshot provides direct evidence that the prior attempt failed.
+- If the screen already appears to match the goal, return a completion sentence starting with "Result:" instead of repeating the same action.
+- If completion cannot be verified from the screenshot after a similar action was already attempted, ask for clarification or a fresh screenshot instead of repeating the same step.
+- For visual theme or appearance changes, verify the outcome from the overall OS chrome when possible, including menu bar, Dock, window chrome, and background appearance, not only the selected thumbnail indicator.
 - PRIORITIZE keyboard shortcuts over mouse clicks whenever possible, as UI button location mapping is often inaccurate.
-- In `keyboard_shortcut`, function keys/modifiers must use angle-bracket format: <ctrl>, <shift>, <alt>, <cmd>, <enter>, <tab>, <f1>.
+- Use this decision order for the next step:
+    1. Prefer a direct keyboard shortcut.
+    2. If no direct shortcut exists, prefer a keyboard-driven navigation path.
+    3. Use `target_box` only when a keyboard path is not credible from the current state.
+- Use `tool` to name the action to execute. Prefer `keyboard_input` for keyboard-driven steps and `left_click`/`right_click`/`double_click` when a target click is required.
+- In `tool_input`, function keys/modifiers must use angle-bracket format: <ctrl>, <shift>, <alt>, <cmd>, <enter>, <tab>, <f1>.
 - For key combinations, modifiers should apply to the next key token (example: <ctrl>l, <ctrl><alt><delete>, <enter>).
 - For mixed typing and key actions, keep text as plain text and keys in brackets (example: baidu.com<enter>).
-- If a keyboard shortcut can accomplish the action, provide `keyboard_shortcut` and omit `target_box`.
-- If a clickable target must be used with no shortcut available, provide a normalized bounding box in `target_box`.
+- `tool_input` MUST be ASCII-only unless the user explicitly asks for non-ASCII text.
+- In keyboard-driven launch/search flows, use ASCII app names/keywords only unless the user explicitly asks for non-ASCII script.
+- Do NOT output Chinese/CJK in `tool_input` or `next_step` quoted typing examples by default.
+- If a keyboard shortcut can accomplish the action, set `tool` to `keyboard_input`, provide `tool_input`, and omit `target_box`.
+- If the goal is to open an app and a keyboard launch path is plausible, prefer that keyboard path over tapping the icon.
+- Do not return `target_box` for app launch if a reasonable keyboard path exists from the current state.
+- If a clickable target must be used with no shortcut available, set `tool` to the click action and provide a normalized bounding box in `target_box`.
+- If you use `target_box` instead of keyboard, `next_step` should briefly explain why keyboard-first was not reliable.
 - If the goal is already completed, set `next_step` to a clear completion result sentence that starts with "Result:" and describes the current outcome.
 - Never claim the action has been executed.
 - If the target is unclear, set needs_clarification=true and explain what to capture next.
@@ -167,7 +190,8 @@ Bounding box format:
 Schema:
 {
     "next_step": "single concrete instruction for the user",
-    "keyboard_shortcut": "keyboard combo like Win+E, Cmd+C, Enter (optional)",
+    "tool": "keyboard_input | left_click | right_click | double_click (optional)",
+    "tool_input": "keyboard combo/text sequence like <cmd><space>settings<enter> (optional)",
     "target_box": {
         "x": 0.10,
         "y": 0.20,
@@ -328,6 +352,8 @@ Schema:
         self.chatDockSide = ChatDockSide(rawValue: savedChatDockSide ?? "") ?? .right
         self.chatWindowWidth = UserDefaults.standard.object(forKey: "chatWindowWidth") as? Double ?? 420
         self.isChatAgenticModeEnabled = UserDefaults.standard.object(forKey: "isChatAgenticModeEnabled") as? Bool ?? false
+        self.chatAgentMaxIterations = max(1, UserDefaults.standard.object(forKey: "chatAgentMaxIterations") as? Int ?? 10)
+        self.isClickRefinementThinkingEnabled = UserDefaults.standard.object(forKey: "isClickRefinementThinkingEnabled") as? Bool ?? false
         self.chatApiBaseURL = UserDefaults.standard.string(forKey: "chatApiBaseURL") ?? "https://api.openai.com/v1"
         let chatKeychainValue = ChatKeychainStore.loadChatAPIKey()
         if !chatKeychainValue.isEmpty {
@@ -342,15 +368,134 @@ Schema:
             }
         }
         self.chatModel = UserDefaults.standard.string(forKey: "chatModel") ?? "gpt-4o-mini"
-        self.systemPrompt = UserDefaults.standard.string(forKey: "systemPrompt") ?? UserSettings.defaultChatSystemPrompt
+        let savedChatTargetSystem = UserDefaults.standard.string(forKey: "chatTargetSystem")
+        let initialChatTargetSystem = ChatTargetSystem(rawValue: savedChatTargetSystem ?? "") ?? .macOS
+        self.chatTargetSystem = initialChatTargetSystem
+        let legacySystemPrompt = UserDefaults.standard.string(forKey: "systemPrompt") ?? UserSettings.defaultChatSystemPrompt
+        let legacyPlannerPrompt = UserDefaults.standard.string(forKey: "plannerPrompt") ?? UserSettings.defaultChatPlannerPrompt
+        let legacyScreenAgentPrompt = UserDefaults.standard.string(forKey: "screenAgentPrompt") ?? UserSettings.defaultChatScreenTaskAgentPrompt
+        let legacyTypingAgentPrompt = UserDefaults.standard.string(forKey: "typingAgentPrompt") ?? UserSettings.defaultChatTypingTaskAgentPrompt
+        let rawLegacyGuidePrompt = UserDefaults.standard.string(forKey: "guidePrompt") ?? UserSettings.defaultChatGuidePrompt
+        let legacyGuidePrompt = UserSettings.sanitizedGuidePrompt(rawLegacyGuidePrompt)
         self.isChatGuideModeEnabled = UserDefaults.standard.object(forKey: "isChatGuideModeEnabled") as? Bool ?? false
         self.isChatPlannerModeEnabled = UserDefaults.standard.object(forKey: "isChatPlannerModeEnabled") as? Bool ?? false
-        self.plannerPrompt = UserDefaults.standard.string(forKey: "plannerPrompt") ?? UserSettings.defaultChatPlannerPrompt
-        self.screenAgentPrompt = UserDefaults.standard.string(forKey: "screenAgentPrompt") ?? UserSettings.defaultChatScreenTaskAgentPrompt
-        self.typingAgentPrompt = UserDefaults.standard.string(forKey: "typingAgentPrompt") ?? UserSettings.defaultChatTypingTaskAgentPrompt
-        self.guidePrompt = UserDefaults.standard.string(forKey: "guidePrompt") ?? UserSettings.defaultChatGuidePrompt
+        let loadedChatPromptProfiles = UserSettings.loadChatPromptProfiles(
+            legacySystemPrompt: legacySystemPrompt,
+            legacyPlannerPrompt: legacyPlannerPrompt,
+            legacyScreenAgentPrompt: legacyScreenAgentPrompt,
+            legacyTypingAgentPrompt: legacyTypingAgentPrompt,
+            legacyGuidePrompt: legacyGuidePrompt
+        )
+        self.chatPromptProfiles = loadedChatPromptProfiles
+        let initialProfile = loadedChatPromptProfiles[initialChatTargetSystem.rawValue] ?? UserSettings.defaultPromptProfile()
+        self.systemPrompt = initialProfile.systemPrompt
+        self.plannerPrompt = initialProfile.plannerPrompt
+        self.screenAgentPrompt = initialProfile.screenAgentPrompt
+        self.typingAgentPrompt = initialProfile.typingAgentPrompt
+        self.guidePrompt = initialProfile.guidePrompt
         let savedChatImageUploadLimit = UserDefaults.standard.string(forKey: "chatImageUploadLimit")
         self.chatImageUploadLimit = ChatImageUploadLimit(rawValue: savedChatImageUploadLimit ?? "") ?? .original
+    }
+
+    private static func defaultPromptProfile() -> ChatPromptProfile {
+        sanitizedPromptProfile(ChatPromptProfile(
+            systemPrompt: defaultChatSystemPrompt,
+            plannerPrompt: defaultChatPlannerPrompt,
+            screenAgentPrompt: defaultChatScreenTaskAgentPrompt,
+            typingAgentPrompt: defaultChatTypingTaskAgentPrompt,
+            guidePrompt: defaultChatGuidePrompt
+        ))
+    }
+
+    private static func sanitizedPromptProfile(_ profile: ChatPromptProfile) -> ChatPromptProfile {
+        ChatPromptProfile(
+            systemPrompt: sanitizedSystemPrompt(profile.systemPrompt),
+            plannerPrompt: profile.plannerPrompt,
+            screenAgentPrompt: profile.screenAgentPrompt,
+            typingAgentPrompt: profile.typingAgentPrompt,
+            guidePrompt: sanitizedGuidePrompt(profile.guidePrompt)
+        )
+    }
+
+    private static func loadChatPromptProfiles(
+        legacySystemPrompt: String,
+        legacyPlannerPrompt: String,
+        legacyScreenAgentPrompt: String,
+        legacyTypingAgentPrompt: String,
+        legacyGuidePrompt: String
+    ) -> [String: ChatPromptProfile] {
+        if let data = UserDefaults.standard.data(forKey: chatPromptProfilesKey),
+           let decoded = try? JSONDecoder().decode([String: ChatPromptProfile].self, from: data) {
+            var merged = decoded.mapValues { sanitizedPromptProfile($0) }
+            let defaults = defaultPromptProfile()
+            for target in ChatTargetSystem.allCases {
+                if merged[target.rawValue] == nil {
+                    merged[target.rawValue] = defaults
+                }
+            }
+            return merged
+        }
+
+        var defaultsByTarget: [String: ChatPromptProfile] = [:]
+        let defaults = defaultPromptProfile()
+        for target in ChatTargetSystem.allCases {
+            defaultsByTarget[target.rawValue] = defaults
+        }
+
+        // Migrate prior single-prompt configuration to macOS profile to preserve existing behavior.
+        defaultsByTarget[ChatTargetSystem.macOS.rawValue] = sanitizedPromptProfile(ChatPromptProfile(
+            systemPrompt: legacySystemPrompt,
+            plannerPrompt: legacyPlannerPrompt,
+            screenAgentPrompt: legacyScreenAgentPrompt,
+            typingAgentPrompt: legacyTypingAgentPrompt,
+            guidePrompt: legacyGuidePrompt
+        ))
+
+        return defaultsByTarget
+    }
+
+    private static func sanitizedSystemPrompt(_ prompt: String) -> String {
+        var trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip any stray target-system display name that was previously appended
+        // to the end of the prompt, regardless of separator (space, newline, etc.).
+        let targetNames = ChatTargetSystem.allCases.map(\.displayName)
+        for name in targetNames {
+            // Check suffix like "\niPhone", "\n\nmacOS", " iPhone", ". iPhone", etc.
+            while trimmedPrompt.hasSuffix(name) {
+                trimmedPrompt = String(trimmedPrompt.dropLast(name.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // If after stripping stray names we are left with the default, normalize it.
+        let trimmedDefault = defaultChatSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedPrompt == trimmedDefault {
+            return defaultChatSystemPrompt
+        }
+
+        // Also catch prompts that contain embedded "Target system profile:" from
+        // the old composed-prompt storage path.
+        if trimmedPrompt.hasPrefix(trimmedDefault), trimmedPrompt.contains("Target system profile:") {
+            return defaultChatSystemPrompt
+        }
+
+        return trimmedPrompt
+    }
+
+    private static func sanitizedGuidePrompt(_ prompt: String) -> String {
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let legacyMarkers = [
+            "For iPhone/iPad app launching, prefer Spotlight-style keyboard launch when plausible",
+            "Inside iPhone Settings lists, use <space> (not <enter>) to enter the next level.",
+            "Prefer deterministic keyboard navigation after opening Settings"
+        ]
+        if legacyMarkers.allSatisfy({ trimmedPrompt.contains($0) }) {
+            return defaultChatGuidePrompt
+        }
+        return prompt
     }
     @Published var isSerialOutput: Bool {
         didSet {
@@ -654,6 +799,25 @@ Schema:
         }
     }
 
+    // Maximum agentic loop iterations before the assistant stops and asks for clarification.
+    @Published var chatAgentMaxIterations: Int {
+        didSet {
+            let clamped = max(1, min(chatAgentMaxIterations, 30))
+            if chatAgentMaxIterations != clamped {
+                chatAgentMaxIterations = clamped
+                return
+            }
+            UserDefaults.standard.set(clamped, forKey: "chatAgentMaxIterations")
+        }
+    }
+
+    // Enables reasoning for the secondary AI request that refines click targets inside a local crop.
+    @Published var isClickRefinementThinkingEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isClickRefinementThinkingEnabled, forKey: "isClickRefinementThinkingEnabled")
+        }
+    }
+
     // OpenAI-compatible base URL (e.g. https://api.openai.com/v1)
     @Published var chatApiBaseURL: String {
         didSet {
@@ -679,10 +843,29 @@ Schema:
         }
     }
 
+    // Target system profile used to tailor AI shortcut guidance.
+    @Published var chatTargetSystem: ChatTargetSystem {
+        didSet {
+            UserDefaults.standard.set(chatTargetSystem.rawValue, forKey: "chatTargetSystem")
+            applySelectedPromptProfile(promptProfile(for: chatTargetSystem))
+        }
+    }
+
+    // Per-target-system prompt profiles for AI behavior.
+    @Published var chatPromptProfiles: [String: ChatPromptProfile] {
+        didSet {
+            guard let data = try? JSONEncoder().encode(chatPromptProfiles) else { return }
+            UserDefaults.standard.set(data, forKey: UserSettings.chatPromptProfilesKey)
+        }
+    }
+
     // Optional system prompt prepended to chat context
     @Published var systemPrompt: String {
         didSet {
             UserDefaults.standard.set(systemPrompt, forKey: "systemPrompt")
+            updateCurrentPromptProfile { profile in
+                profile.systemPrompt = systemPrompt
+            }
         }
     }
 
@@ -704,6 +887,9 @@ Schema:
     @Published var plannerPrompt: String {
         didSet {
             UserDefaults.standard.set(plannerPrompt, forKey: "plannerPrompt")
+            updateCurrentPromptProfile { profile in
+                profile.plannerPrompt = plannerPrompt
+            }
         }
     }
 
@@ -711,6 +897,9 @@ Schema:
     @Published var screenAgentPrompt: String {
         didSet {
             UserDefaults.standard.set(screenAgentPrompt, forKey: "screenAgentPrompt")
+            updateCurrentPromptProfile { profile in
+                profile.screenAgentPrompt = screenAgentPrompt
+            }
         }
     }
 
@@ -718,6 +907,9 @@ Schema:
     @Published var typingAgentPrompt: String {
         didSet {
             UserDefaults.standard.set(typingAgentPrompt, forKey: "typingAgentPrompt")
+            updateCurrentPromptProfile { profile in
+                profile.typingAgentPrompt = typingAgentPrompt
+            }
         }
     }
 
@@ -725,6 +917,9 @@ Schema:
     @Published var guidePrompt: String {
         didSet {
             UserDefaults.standard.set(guidePrompt, forKey: "guidePrompt")
+            updateCurrentPromptProfile { profile in
+                profile.guidePrompt = guidePrompt
+            }
         }
     }
 
@@ -734,6 +929,329 @@ Schema:
             UserDefaults.standard.set(chatImageUploadLimit.rawValue, forKey: "chatImageUploadLimit")
         }
     }
+
+    func promptProfile(for target: ChatTargetSystem) -> ChatPromptProfile {
+        if let profile = chatPromptProfiles[target.rawValue] {
+            return UserSettings.sanitizedPromptProfile(profile)
+        }
+        return UserSettings.defaultPromptProfile()
+    }
+
+    func updatePromptProfile(for target: ChatTargetSystem, update: (inout ChatPromptProfile) -> Void) {
+        var profile = promptProfile(for: target)
+        update(&profile)
+        profile = UserSettings.sanitizedPromptProfile(profile)
+        chatPromptProfiles[target.rawValue] = profile
+        if target == chatTargetSystem {
+            applySelectedPromptProfile(profile)
+        }
+    }
+
+    func resetChatPromptProfilesToDefaults() {
+        var defaultsByTarget: [String: ChatPromptProfile] = [:]
+        let defaults = UserSettings.defaultPromptProfile()
+        for target in ChatTargetSystem.allCases {
+            defaultsByTarget[target.rawValue] = defaults
+        }
+        chatPromptProfiles = defaultsByTarget
+        applySelectedPromptProfile(promptProfile(for: chatTargetSystem))
+    }
+
+    private func applySelectedPromptProfile(_ profile: ChatPromptProfile) {
+        let sanitizedProfile = UserSettings.sanitizedPromptProfile(profile)
+        if systemPrompt != sanitizedProfile.systemPrompt {
+            systemPrompt = sanitizedProfile.systemPrompt
+        }
+        if plannerPrompt != sanitizedProfile.plannerPrompt {
+            plannerPrompt = sanitizedProfile.plannerPrompt
+        }
+        if screenAgentPrompt != sanitizedProfile.screenAgentPrompt {
+            screenAgentPrompt = sanitizedProfile.screenAgentPrompt
+        }
+        if typingAgentPrompt != sanitizedProfile.typingAgentPrompt {
+            typingAgentPrompt = sanitizedProfile.typingAgentPrompt
+        }
+        if guidePrompt != sanitizedProfile.guidePrompt {
+            guidePrompt = sanitizedProfile.guidePrompt
+        }
+    }
+
+    private func updateCurrentPromptProfile(_ update: (inout ChatPromptProfile) -> Void) {
+        var updatedProfiles = chatPromptProfiles
+        var profile = updatedProfiles[chatTargetSystem.rawValue] ?? UserSettings.defaultPromptProfile()
+        let originalProfile = profile
+        update(&profile)
+        profile = UserSettings.sanitizedPromptProfile(profile)
+        guard profile != originalProfile else { return }
+        updatedProfiles[chatTargetSystem.rawValue] = profile
+        chatPromptProfiles = updatedProfiles
+    }
+
+    private func runtimeAIAgentDefinition(for target: ChatTargetSystem) -> String {
+        if let cached = runtimeAIAgentDefinitionCache[target.rawValue] {
+            return cached
+        }
+
+        let loaded = UserSettings.loadRuntimeAIAgentDefinition(for: target)
+        runtimeAIAgentDefinitionCache[target.rawValue] = loaded
+        return loaded
+    }
+
+    private static func loadRuntimeAIAgentDefinition(for target: ChatTargetSystem) -> String {
+        let fileNames = runtimeAIAgentMarkdownFileNames
+        for root in runtimeAIAgentDocsRootCandidates() {
+            let agentFolderURL = root.appendingPathComponent(target.agentFolderName, isDirectory: true)
+            var sections: [String] = []
+            var hasAnyContent = false
+
+            for fileName in fileNames {
+                let fileURL = agentFolderURL.appendingPathComponent(fileName)
+                guard FileManager.default.fileExists(atPath: fileURL.path),
+                      let raw = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                    continue
+                }
+
+                let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                hasAnyContent = true
+                sections.append("### \(fileName)\n\(trimmed)")
+            }
+
+            if hasAnyContent {
+                return """
+Runtime Agent Definition (\(target.displayName))
+Loaded from: \(agentFolderURL.path)
+
+\(sections.joined(separator: "\n\n"))
+"""
+            }
+        }
+
+        return ""
+    }
+
+    private static var runtimeAIAgentMarkdownFileNames: [String] {
+        ["soul.md", "tool.md", "skills.md", "memory.md", "session.md"]
+    }
+
+    func runtimeAIAgentMarkdownFileNamesForEditing() -> [String] {
+        UserSettings.runtimeAIAgentMarkdownFileNames
+    }
+
+    func runtimeAIAgentMarkdownResolvedPath(for target: ChatTargetSystem, fileName: String) -> String? {
+        guard UserSettings.runtimeAIAgentMarkdownFileNames.contains(fileName),
+              let folder = UserSettings.runtimeAIAgentResolvedFolderURL(for: target) else {
+            return nil
+        }
+        return folder.appendingPathComponent(fileName).path
+    }
+
+    func runtimeAIAgentMarkdownContent(for target: ChatTargetSystem, fileName: String) -> String? {
+        guard UserSettings.runtimeAIAgentMarkdownFileNames.contains(fileName) else {
+            return nil
+        }
+
+        if let folder = UserSettings.runtimeAIAgentResolvedFolderURL(for: target) {
+            let fileURL = folder.appendingPathComponent(fileName)
+            return try? String(contentsOf: fileURL, encoding: .utf8)
+        }
+
+        return nil
+    }
+
+    @discardableResult
+    func saveRuntimeAIAgentMarkdownContent(for target: ChatTargetSystem, fileName: String, content: String) -> String? {
+        guard UserSettings.runtimeAIAgentMarkdownFileNames.contains(fileName) else {
+            return nil
+        }
+
+        // Always write to Application Support so we never attempt to modify the read-only bundle.
+        let baseRoot = UserSettings.runtimeAIAgentPreferredWritableRootURL()
+        let folderURL = baseRoot.appendingPathComponent(target.agentFolderName, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        } catch {
+            return nil
+        }
+
+        let fileURL = folderURL.appendingPathComponent(fileName)
+        do {
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            runtimeAIAgentDefinitionCache[target.rawValue] = nil
+            return fileURL.path
+        } catch {
+            return nil
+        }
+    }
+
+    private static func runtimeAIAgentPreferredWritableRootURL() -> URL {
+        if let envValue = ProcessInfo.processInfo.environment[runtimeAIAgentDocsEnvKey],
+           !envValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let envURL = URL(fileURLWithPath: envValue, isDirectory: true)
+            if envURL.lastPathComponent == "agents" {
+                return envURL
+            }
+            return envURL.appendingPathComponent("docs/ai/agents", isDirectory: true)
+        }
+
+        // Use Application Support so saves always go to a user-writable location.
+        if let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            return appSupportURL.appendingPathComponent("Openterface/agents", isDirectory: true)
+        }
+
+        let cwdURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        return cwdURL.appendingPathComponent("docs/ai/agents", isDirectory: true)
+    }
+
+    func runtimeAIAgentResolvedFolderPath(for target: ChatTargetSystem) -> String? {
+        UserSettings.runtimeAIAgentResolvedFolderURL(for: target)?.path
+    }
+
+    func runtimeAIAgentLoadedFileNames(for target: ChatTargetSystem) -> [String] {
+        let fileNames = UserSettings.runtimeAIAgentMarkdownFileNames
+        guard let folder = UserSettings.runtimeAIAgentResolvedFolderURL(for: target) else {
+            return []
+        }
+
+        return fileNames.filter { fileName in
+            let fileURL = folder.appendingPathComponent(fileName)
+            guard FileManager.default.fileExists(atPath: fileURL.path),
+                  let raw = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                return false
+            }
+            return !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    func runtimeAIAgentRootCandidatesForDebug() -> [String] {
+        UserSettings.runtimeAIAgentDocsRootCandidates().map { $0.path }
+    }
+
+    private static func runtimeAIAgentResolvedFolderURL(for target: ChatTargetSystem) -> URL? {
+        let fileNames = runtimeAIAgentMarkdownFileNames
+
+        for root in runtimeAIAgentDocsRootCandidates() {
+            let folder = root.appendingPathComponent(target.agentFolderName, isDirectory: true)
+            for fileName in fileNames {
+                let fileURL = folder.appendingPathComponent(fileName)
+                guard FileManager.default.fileExists(atPath: fileURL.path),
+                      let raw = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                    continue
+                }
+
+                if !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return folder
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private static func runtimeAIAgentDocsRootCandidates() -> [URL] {
+        var candidates: [URL] = []
+        let fileManager = FileManager.default
+
+        func appendCandidate(_ url: URL) {
+            candidates.append(url)
+        }
+
+        func appendCandidateAndAncestors(_ url: URL) {
+            appendCandidate(url)
+            appendCandidate(url.appendingPathComponent("docs/ai/agents", isDirectory: true))
+
+            var current = url.standardizedFileURL
+            for _ in 0..<8 {
+                current.deleteLastPathComponent()
+                appendCandidate(current.appendingPathComponent("docs/ai/agents", isDirectory: true))
+            }
+        }
+
+        if let envValue = ProcessInfo.processInfo.environment[runtimeAIAgentDocsEnvKey],
+           !envValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let envURL = URL(fileURLWithPath: envValue, isDirectory: true)
+            appendCandidateAndAncestors(envURL)
+        }
+
+        // Application Support takes priority so user-saved edits are loaded first.
+        if let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            appendCandidate(appSupportURL.appendingPathComponent("Openterface/agents", isDirectory: true))
+        }
+
+        let cwdURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        appendCandidateAndAncestors(cwdURL)
+
+        if let resourceURL = Bundle.main.resourceURL {
+            appendCandidateAndAncestors(resourceURL)
+            appendCandidate(resourceURL.appendingPathComponent("agents", isDirectory: true))
+            appendCandidate(resourceURL.appendingPathComponent("ai/agents", isDirectory: true))
+            appendCandidate(resourceURL.appendingPathComponent("docs/ai/agents", isDirectory: true))
+        }
+
+        let bundleURL = Bundle.main.bundleURL
+        appendCandidateAndAncestors(bundleURL)
+
+        let executableURL = URL(fileURLWithPath: ProcessInfo.processInfo.arguments.first ?? fileManager.currentDirectoryPath)
+        appendCandidateAndAncestors(executableURL.deletingLastPathComponent())
+
+        // Development fallback: derive repo-relative docs path from source tree location.
+        let sourceURL = URL(fileURLWithPath: sourceFilePathForRuntimeDocsResolution)
+        appendCandidateAndAncestors(sourceURL.deletingLastPathComponent())
+
+        var deduped: [URL] = []
+        var seen: Set<String> = []
+
+        for candidate in candidates {
+            let standardized = candidate.standardizedFileURL
+            let path = standardized.path
+            if seen.contains(path) { continue }
+            seen.insert(path)
+            deduped.append(standardized)
+        }
+
+        // Prefer paths that actually contain any of the expected markdown files.
+        let expectedFiles = Set(runtimeAIAgentMarkdownFileNames)
+        let ranked = deduped.sorted { lhs, rhs in
+            func score(_ folder: URL) -> Int {
+                guard let entries = try? fileManager.contentsOfDirectory(atPath: folder.path) else {
+                    return 0
+                }
+                return entries.reduce(0) { partial, entry in
+                    partial + (expectedFiles.contains(entry) ? 1 : 0)
+                }
+            }
+            return score(lhs) > score(rhs)
+        }
+
+        return ranked
+    }
+
+    private func composedPrompt(_ basePrompt: String, includeRuntimeAgentDefinition: Bool = false) -> String {
+        let trimmedBase = basePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let osBlock = chatTargetSystem.promptContext
+        let typingGuardrail = chatTargetSystem.promptTypingGuardrail
+        let runtimeAgentDefinition = includeRuntimeAgentDefinition ? runtimeAIAgentDefinition(for: chatTargetSystem) : ""
+
+        var sections: [String] = []
+        if !trimmedBase.isEmpty {
+            sections.append(trimmedBase)
+        }
+        sections.append(osBlock)
+        if !typingGuardrail.isEmpty {
+            sections.append(typingGuardrail)
+        }
+        if !runtimeAgentDefinition.isEmpty {
+            sections.append(runtimeAgentDefinition)
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    var resolvedSystemPrompt: String { composedPrompt(promptProfile(for: chatTargetSystem).systemPrompt, includeRuntimeAgentDefinition: true) }
+    var resolvedPlannerPrompt: String { composedPrompt(promptProfile(for: chatTargetSystem).plannerPrompt) }
+    var resolvedScreenAgentPrompt: String { composedPrompt(promptProfile(for: chatTargetSystem).screenAgentPrompt) }
+    var resolvedTypingAgentPrompt: String { composedPrompt(promptProfile(for: chatTargetSystem).typingAgentPrompt) }
+    var resolvedGuidePrompt: String { composedPrompt(promptProfile(for: chatTargetSystem).guidePrompt) }
 
     // Persisted active video area (stored in image pixels)
     @Published var activeVideoX: Int {
@@ -1165,6 +1683,184 @@ enum ChatImageUploadLimit: String, CaseIterable, Identifiable {
         case .p1440:
             return 2560
         }
+    }
+}
+
+enum ChatTargetSystem: String, CaseIterable, Identifiable {
+    case macOS = "macOS"
+    case windows = "windows"
+    case linux = "linux"
+    case iPhone = "iPhone"
+    case iPad = "iPad"
+    case android = "android"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .macOS:
+            return "macOS"
+        case .windows:
+            return "Windows"
+        case .linux:
+            return "Linux"
+        case .iPhone:
+            return "iPhone"
+        case .iPad:
+            return "iPad"
+        case .android:
+            return "Android"
+        }
+    }
+
+    var agentFolderName: String {
+        switch self {
+        case .macOS:
+            return "macos"
+        case .windows:
+            return "windows"
+        case .linux:
+            return "linux"
+        case .iPhone:
+            return "iphone"
+        case .iPad:
+            return "ipad"
+        case .android:
+            return "android"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .macOS:
+            return "Prefer Command-based shortcuts, e.g. Cmd+C, Cmd+V, Cmd+Space, Cmd+Tab."
+        case .windows:
+            return "Prefer Ctrl/Win shortcuts, e.g. Ctrl+C, Ctrl+V, Win+R, Alt+Tab."
+        case .linux:
+            return "Prefer Ctrl/Alt/Super shortcuts, e.g. Ctrl+C, Ctrl+V, Super, Alt+Tab."
+        case .iPhone:
+            return "Prefer external-keyboard actions first when available, especially Cmd+Space to launch apps via Spotlight. Fall back to tap/gesture only when keyboard launch is not credible."
+        case .iPad:
+            return "Touch-first workflow; hardware-keyboard shortcuts can be used when appropriate, e.g. Cmd+Space, Cmd+Tab."
+        case .android:
+            return "Primarily touch workflow. Use taps/gestures; only suggest keyboard shortcuts when a hardware keyboard is clearly available."
+        }
+    }
+
+    var promptContext: String {
+        switch self {
+        case .macOS:
+            return """
+Target system profile: macOS
+- Use macOS conventions and app names.
+- Prefer Command-based shortcuts (Cmd) over Ctrl where applicable.
+- Typical examples: Cmd+C, Cmd+V, Cmd+Space, Cmd+Tab, Cmd+Q.
+"""
+        case .windows:
+            return """
+Target system profile: Windows
+- Use Windows conventions and UI terms.
+- Prefer Ctrl/Win/Alt shortcuts.
+- Typical examples: Ctrl+C, Ctrl+V, Win+R, Win+E, Alt+Tab.
+"""
+        case .linux:
+            return """
+Target system profile: Linux
+- Use Linux desktop conventions (Ctrl/Alt/Super).
+- Prefer keyboard shortcuts common to Linux desktops.
+- Typical examples: Ctrl+C, Ctrl+V, Super, Alt+Tab, Ctrl+Alt+T.
+"""
+        case .iPhone:
+            return """
+Target system profile: iPhone
+- Treat this as iPhone UI with limited keyboard navigation.
+- If the request is to open an app, first prefer the keyboard path: <cmd><space>, type the app name, then <enter>.
+- For typed app names/search text, enforce ASCII-only by default (example: setting, display, brightness).
+- Never use Chinese/CJK text (example: 设置, 显示, 亮度) unless the user explicitly requests Chinese output.
+- For Display & Brightness or Light/Dark mode requests, avoid search-term typing inside Settings.
+- Use stable navigation: open Settings, then use a counted sequence of down-arrow key presses to locate Display & Brightness, then <space>.
+- In iPhone Settings navigation, use <space> (not <enter>) to open the highlighted setting row.
+- When an external keyboard is plausibly available through Openterface, prefer keyboard-first guidance over target_box.
+- Only use `target_box` when keyboard launch/navigation is not credible or clearly unsupported from the current state.
+- If you fall back to `target_box`, explain briefly why keyboard-first was not reliable.
+"""
+        case .iPad:
+            return """
+Target system profile: iPad
+- Treat this as touch-first UI with possible hardware keyboard support.
+- Prefer tap/gesture guidance unless a keyboard shortcut is clearly faster.
+- Typical keyboard examples (if keyboard exists): Cmd+Space, Cmd+Tab, Cmd+C/Cmd+V.
+"""
+        case .android:
+            return """
+Target system profile: Android
+- Treat this as touch-first mobile UI.
+- Prefer tap/swipe/long-press instructions over keyboard shortcuts.
+- Only suggest keyboard shortcuts when a hardware keyboard is explicitly available.
+"""
+        }
+    }
+
+    var promptTypingGuardrail: String {
+        switch self {
+        case .iPhone, .iPad:
+            return """
+Typing Output Guardrail:
+- For app-launch/search typing and tool_input payloads, output ASCII-only text by default.
+- Do not output Chinese/CJK characters unless the user explicitly requests Chinese/CJK output.
+- Preferred examples: setting, display, brightness.
+"""
+        default:
+            return ""
+        }
+    }
+}
+
+struct ChatPromptProfile: Codable, Equatable {
+    var systemPrompt: String
+    var plannerPrompt: String
+    var screenAgentPrompt: String
+    var typingAgentPrompt: String
+    var guidePrompt: String
+
+    init(
+        systemPrompt: String,
+        plannerPrompt: String,
+        screenAgentPrompt: String,
+        typingAgentPrompt: String,
+        guidePrompt: String
+    ) {
+        self.systemPrompt = systemPrompt
+        self.plannerPrompt = plannerPrompt
+        self.screenAgentPrompt = screenAgentPrompt
+        self.typingAgentPrompt = typingAgentPrompt
+        self.guidePrompt = guidePrompt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case systemPrompt
+        case plannerPrompt
+        case screenAgentPrompt
+        case typingAgentPrompt
+        case guidePrompt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        systemPrompt = try container.decode(String.self, forKey: .systemPrompt)
+        plannerPrompt = try container.decode(String.self, forKey: .plannerPrompt)
+        screenAgentPrompt = try container.decode(String.self, forKey: .screenAgentPrompt)
+        typingAgentPrompt = try container.decode(String.self, forKey: .typingAgentPrompt)
+        guidePrompt = try container.decodeIfPresent(String.self, forKey: .guidePrompt) ?? UserSettings.defaultChatGuidePrompt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(systemPrompt, forKey: .systemPrompt)
+        try container.encode(plannerPrompt, forKey: .plannerPrompt)
+        try container.encode(screenAgentPrompt, forKey: .screenAgentPrompt)
+        try container.encode(typingAgentPrompt, forKey: .typingAgentPrompt)
+        try container.encode(guidePrompt, forKey: .guidePrompt)
     }
 }
 

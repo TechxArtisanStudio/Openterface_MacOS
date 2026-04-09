@@ -10,10 +10,48 @@ struct TaskStepTraceDialog: View {
     @State private var previewFileURL: URL?
     @State private var isShowingImagePreview: Bool = false
 
+    private var traceContent: String {
+        if entries.isEmpty {
+            return "No trace entries available yet."
+        }
+
+        var lines: [String] = []
+        lines.append("Trace: \(title)")
+        lines.append("Tracing \(entries.count) item\(entries.count == 1 ? "" : "s")")
+        lines.append("")
+
+        for entry in entries {
+            lines.append(entry.title)
+            lines.append(timestampText(for: entry.timestamp))
+            if !entry.body.isEmpty {
+                lines.append(entry.body)
+            }
+            if let imageFilePath = entry.imageFilePath {
+                lines.append("Image: \(imageFilePath)")
+            }
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Trace: \(title)")
-                .font(.headline)
+            HStack {
+                Text("Trace: \(title)")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    copyTrace()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy all trace")
+            }
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
@@ -24,9 +62,22 @@ struct TaskStepTraceDialog: View {
 
                     ForEach(entries) { entry in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(entry.title)
-                                .font(.subheadline)
-                                .bold()
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(entry.title)
+                                    .font(.subheadline)
+                                    .bold()
+
+                                Spacer()
+
+                                Button {
+                                    copyEntry(entry)
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Copy this log item")
+                            }
 
                             Text(timestampText(for: entry.timestamp))
                                 .font(.caption2)
@@ -96,5 +147,25 @@ struct TaskStepTraceDialog: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         return formatter.string(from: date)
+    }
+
+    private func copyEntry(_ entry: ChatTaskTraceEntry) {
+        var lines: [String] = []
+        lines.append(entry.title)
+        lines.append(timestampText(for: entry.timestamp))
+        if !entry.body.isEmpty {
+            lines.append(entry.body)
+        }
+        if let imageFilePath = entry.imageFilePath {
+            lines.append("Image: \(imageFilePath)")
+        }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+
+    private func copyTrace() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(traceContent, forType: .string)
     }
 }

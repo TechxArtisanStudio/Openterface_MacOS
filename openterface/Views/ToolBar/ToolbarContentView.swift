@@ -35,6 +35,9 @@ struct ToolbarContentView: ToolbarContent {
     // popover state for baud menu
     @State private var showBaudPopover = false
 
+    // popover state for macro panel
+    @State private var showMacrosPopover = false
+
     // hover state for each selection button
     @State private var hovering9600 = false
     @State private var hovering115200 = false
@@ -63,6 +66,16 @@ struct ToolbarContentView: ToolbarContent {
                 Image(systemName: UserSettings.shared.isChatWindowVisible ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
             }
             .help(UserSettings.shared.isChatWindowVisible ? "Hide companion chat" : "Show companion chat")
+
+            Button {
+                showMacrosPopover.toggle()
+            } label: {
+                Image(systemName: "keyboard.badge.ellipsis")
+            }
+            .help("Keyboard Macros")
+            .popover(isPresented: $showMacrosPopover) {
+                MacroPanelView()
+            }
 
             CapsLockIndicatorView()
                 .help("Target Caps Lock state - ON/OFF")

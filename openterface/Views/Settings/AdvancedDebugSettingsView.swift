@@ -250,7 +250,9 @@ struct AdvancedDebugSettingsView: View {
         userSettings.chatApiBaseURL = "https://api.openai.com/v1"
         userSettings.chatApiKey = ""
         userSettings.chatModel = "gpt-4o-mini"
+        userSettings.chatTargetSystem = .macOS
         userSettings.systemPrompt = UserSettings.defaultChatSystemPrompt
+        userSettings.resetChatPromptProfilesToDefaults()
         userSettings.isChatAgenticModeEnabled = false
         userSettings.isChatPlannerModeEnabled = false
         userSettings.plannerPrompt = UserSettings.defaultChatPlannerPrompt
@@ -337,12 +339,24 @@ struct AdvancedDebugSettingsView: View {
                 "isFullScreen": userSettings.isFullScreen,
                 "chatApiBaseURL": userSettings.chatApiBaseURL,
                 "chatModel": userSettings.chatModel,
+                "chatTargetSystem": userSettings.chatTargetSystem.rawValue,
                 "systemPrompt": userSettings.systemPrompt,
                 "isChatAgenticModeEnabled": userSettings.isChatAgenticModeEnabled,
+                "chatAgentMaxIterations": userSettings.chatAgentMaxIterations,
+                "isClickRefinementThinkingEnabled": userSettings.isClickRefinementThinkingEnabled,
                 "isChatPlannerModeEnabled": userSettings.isChatPlannerModeEnabled,
                 "plannerPrompt": userSettings.plannerPrompt,
                 "screenAgentPrompt": userSettings.screenAgentPrompt,
                 "typingAgentPrompt": userSettings.typingAgentPrompt,
+                "chatPromptProfiles": userSettings.chatPromptProfiles.mapValues { profile in
+                    [
+                        "systemPrompt": profile.systemPrompt,
+                        "plannerPrompt": profile.plannerPrompt,
+                        "screenAgentPrompt": profile.screenAgentPrompt,
+                        "typingAgentPrompt": profile.typingAgentPrompt,
+                        "guidePrompt": profile.guidePrompt
+                    ]
+                },
                 "chatImageUploadLimit": userSettings.chatImageUploadLimit.rawValue
             ]
         ]
@@ -446,12 +460,25 @@ struct AdvancedDebugSettingsView: View {
             userSettings.chatModel = chatModel
         }
 
+        if let chatTargetSystemRaw = settings["chatTargetSystem"] as? String,
+           let chatTargetSystem = ChatTargetSystem(rawValue: chatTargetSystemRaw) {
+            userSettings.chatTargetSystem = chatTargetSystem
+        }
+
         if let systemPrompt = settings["systemPrompt"] as? String {
             userSettings.systemPrompt = systemPrompt
         }
 
         if let isChatAgenticModeEnabled = settings["isChatAgenticModeEnabled"] as? Bool {
             userSettings.isChatAgenticModeEnabled = isChatAgenticModeEnabled
+        }
+
+        if let chatAgentMaxIterations = settings["chatAgentMaxIterations"] as? Int {
+            userSettings.chatAgentMaxIterations = chatAgentMaxIterations
+        }
+
+        if let isClickRefinementThinkingEnabled = settings["isClickRefinementThinkingEnabled"] as? Bool {
+            userSettings.isClickRefinementThinkingEnabled = isClickRefinementThinkingEnabled
         }
 
         if let isChatPlannerModeEnabled = settings["isChatPlannerModeEnabled"] as? Bool {
@@ -468,6 +495,30 @@ struct AdvancedDebugSettingsView: View {
 
         if let typingAgentPrompt = settings["typingAgentPrompt"] as? String {
             userSettings.typingAgentPrompt = typingAgentPrompt
+        }
+
+        if let rawProfiles = settings["chatPromptProfiles"] as? [String: [String: String]] {
+            var parsed: [String: ChatPromptProfile] = [:]
+            for (target, profile) in rawProfiles {
+                guard let systemPrompt = profile["systemPrompt"],
+                      let plannerPrompt = profile["plannerPrompt"],
+                      let screenAgentPrompt = profile["screenAgentPrompt"],
+                      let typingAgentPrompt = profile["typingAgentPrompt"] else {
+                    continue
+                }
+
+                parsed[target] = ChatPromptProfile(
+                    systemPrompt: systemPrompt,
+                    plannerPrompt: plannerPrompt,
+                    screenAgentPrompt: screenAgentPrompt,
+                    typingAgentPrompt: typingAgentPrompt,
+                    guidePrompt: profile["guidePrompt"] ?? UserSettings.defaultChatGuidePrompt
+                )
+            }
+
+            if !parsed.isEmpty {
+                userSettings.chatPromptProfiles = parsed
+            }
         }
 
         if let chatImageUploadLimitRaw = settings["chatImageUploadLimit"] as? String,

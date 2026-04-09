@@ -324,31 +324,131 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     }
     
     // MARK: - Event Handling Helper Methods
+
+    private func eventKindDescription(_ event: NSEvent) -> String {
+        switch event.type {
+        case .flagsChanged:
+            return "flagsChanged"
+        case .keyDown:
+            return "keyDown"
+        case .keyUp:
+            return "keyUp"
+        default:
+            return "\(event.type.rawValue)"
+        }
+    }
+
+    private func describeWindow(_ window: NSWindow?) -> String {
+        guard let window else { return "nil" }
+        let title = window.title.isEmpty ? "(untitled)" : window.title
+        let identifier = window.identifier?.rawValue ?? "nil"
+        return "title=\(title), identifier=\(identifier), level=\(window.level.rawValue), sheetParent=\(window.sheetParent != nil), key=\(window.isKeyWindow), main=\(window.isMainWindow), visible=\(window.isVisible)"
+    }
+
+    private func describeResponder(_ responder: NSResponder?) -> String {
+        guard let responder else { return "nil" }
+        var parts: [String] = [String(describing: type(of: responder))]
+        if let view = responder as? NSView {
+            parts.append("viewID=\(view.identifier?.rawValue ?? "nil")")
+        }
+        if let textView = responder as? NSTextView {
+            parts.append("textViewEditable=\(textView.isEditable)")
+        }
+        if responder is VNCInteractiveView {
+            parts.append("isVNCInteractiveView=true")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func logEventRouting(_ prefix: String, event: NSEvent, details: String) {
+        let chars = event.charactersIgnoringModifiers ?? event.characters ?? ""
+        logger.log(content: "⌨️ [\(prefix)] type=\(eventKindDescription(event)), keyCode=\(event.keyCode), chars='\(chars)', window={\(describeWindow(event.window))}, firstResponder={\(describeResponder(event.window?.firstResponder))}, details={\(details)}")
+    }
     
     // Check if event should pass through to system windows (settings, text inputs, etc.)
     private func shouldPassThroughEvent(for event: NSEvent) -> Bool {
-        guard let keyWindow = NSApp.keyWindow else { return false }
-        
-        // Check for specific window identifiers
-        if let identifier = keyWindow.identifier?.rawValue,
-           (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || 
-            identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow") || 
-            identifier.contains("macroCreatorDialog")) {
-            return true
+        for activeWindow in passThroughCandidateWindows(for: event) {
+            if let identifier = activeWindow.identifier?.rawValue,
+               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") ||
+                identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow") ||
+                identifier.contains("macroCreatorDialog") || identifier.contains("macroPanel") ||
+                identifier.contains("macroEditor")) {
+                logEventRouting("pass-through", event: event, details: "matched window identifier on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            let windowTitle = activeWindow.title.lowercased()
+            if windowTitle.contains("macro") {
+                logEventRouting("pass-through", event: event, details: "matched window title on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            if activeWindow.level.rawValue > NSWindow.Level.normal.rawValue || activeWindow.sheetParent != nil {
+                logEventRouting("pass-through", event: event, details: "matched modal/sheet window candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            if let firstResponder = activeWindow.firstResponder,
+               (firstResponder.isKind(of: NSTextView.self) || firstResponder.isKind(of: NSTextField.self)) {
+                logEventRouting("pass-through", event: event, details: "matched text responder {\(describeResponder(firstResponder))} on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            if let responder = activeWindow.firstResponder as? NSView,
+               let identifier = responder.identifier?.rawValue,
+               (identifier.contains("macroSequenceEditor") || identifier.contains("macroEditor")) {
+                logEventRouting("pass-through", event: event, details: "matched responder identifier {\(identifier)} on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
         }
-        
-        // Check if this is a sheet or modal dialog by examining the window level
-        if keyWindow.level.rawValue > NSWindow.Level.normal.rawValue {
-            return true
-        }
-        
-        // Check if the first responder is a text input field
-        if let firstResponder = keyWindow.firstResponder,
-           (firstResponder.isKind(of: NSTextView.self) || firstResponder.isKind(of: NSTextField.self)) {
-            return true
-        }
+
+        let candidateSummary = passThroughCandidateWindows(for: event)
+            .map { "{\(describeWindow($0))}" }
+            .joined(separator: " | ")
+        logEventRouting("target-route", event: event, details: "no local pass-through match; candidates=\(candidateSummary)")
         
         return false
+    }
+
+    private func passThroughCandidateWindows(for event: NSEvent) -> [NSWindow] {
+        var windows: [NSWindow] = []
+
+        if let eventWindow = event.window {
+            windows.append(eventWindow)
+        }
+        if let modalWindow = NSApp.modalWindow {
+            windows.append(modalWindow)
+        }
+        if let keyWindow = NSApp.keyWindow {
+            windows.append(keyWindow)
+        }
+        if let mainWindow = NSApp.mainWindow {
+            windows.append(mainWindow)
+        }
+
+        let baseWindows = windows
+        for window in baseWindows {
+            if let attachedSheet = window.attachedSheet {
+                windows.append(attachedSheet)
+            }
+            if let sheetParent = window.sheetParent {
+                windows.append(sheetParent)
+            }
+            if let childWindows = window.childWindows {
+                windows.append(contentsOf: childWindows.filter { $0.isVisible })
+            }
+            if let parentWindow = window.parent {
+                windows.append(parentWindow)
+            }
+        }
+
+        var seen = Set<ObjectIdentifier>()
+        return windows.filter { window in
+            let identifier = ObjectIdentifier(window)
+            guard !seen.contains(identifier) else { return false }
+            seen.insert(identifier)
+            return true
+        }
     }
     
     // Log modifier changes
@@ -587,16 +687,19 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         logger.log(content: "🎯 Starting keyboard event monitoring with layout: \(currentKeyboardLayout.rawValue)")
         
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
+            if self.shouldPassThroughEvent(for: event) {
+                self.logEventRouting("local-deliver", event: event, details: "returning event to local window")
+                return event
+            }
+
             if AppStatus.activeConnectionProtocol == .vnc,
                NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                self.logEventRouting("vnc-forward", event: event, details: "forwarding flagsChanged to VNCInteractiveView main responder")
                 VNCClientManager.shared.handleFlagsChanged(event)
                 return nil
             }
 
-            // Check if event should pass through to system windows
-            if self.shouldPassThroughEvent(for: event) {
-                return event
-            }
+            self.logEventRouting("host-handle", event: event, details: "processing flagsChanged locally in KeyboardManager")
             
             let modifiers = event.modifierFlags
             self.logModifierChange(modifiers)
@@ -612,32 +715,38 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            if self.shouldPassThroughEvent(for: event) {
+                self.logEventRouting("local-deliver", event: event, details: "returning keyDown to local window")
+                return event
+            }
+
             if AppStatus.activeConnectionProtocol == .vnc,
                NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                self.logEventRouting("vnc-forward", event: event, details: "forwarding keyDown to VNCInteractiveView main responder")
                 VNCClientManager.shared.handleKeyEvent(event, isDown: true)
                 return nil
             }
 
-            // Check if event should pass through to system windows
-            if self.shouldPassThroughEvent(for: event) {
-                return event
-            }
+            self.logEventRouting("host-handle", event: event, details: "processing keyDown locally in KeyboardManager")
             
             // Handle key down
             return self.handleKeyDown(event)
         }
 
         NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
+            if self.shouldPassThroughEvent(for: event) {
+                self.logEventRouting("local-deliver", event: event, details: "returning keyUp to local window")
+                return event
+            }
+
             if AppStatus.activeConnectionProtocol == .vnc,
                NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                self.logEventRouting("vnc-forward", event: event, details: "forwarding keyUp to VNCInteractiveView main responder")
                 VNCClientManager.shared.handleKeyEvent(event, isDown: false)
                 return nil
             }
 
-            // Check if event should pass through to system windows
-            if self.shouldPassThroughEvent(for: event) {
-                return event
-            }
+            self.logEventRouting("host-handle", event: event, details: "processing keyUp locally in KeyboardManager")
             
             // Handle key up
             return self.handleKeyUp(event)

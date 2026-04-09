@@ -294,6 +294,9 @@ class PlayerViewModel: NSObject, ObservableObject {
         }
         
         DispatchQueue.main.async {
+            if self.zoomLevel == newLevel {
+                return
+            }
             self.zoomLevel = newLevel
             
             // Update customZoom flag based on source and zoom level

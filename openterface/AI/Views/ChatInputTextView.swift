@@ -6,6 +6,38 @@ struct ChatInputTextView: NSViewRepresentable {
     @Binding var text: String
     let onSend: () -> Void
 
+    final class SendAwareTextView: NSTextView {
+        var onSend: (() -> Void)?
+
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            if modifiers == [.command], event.keyCode == 0 {
+                selectAll(nil)
+                return true
+            }
+
+            return super.performKeyEquivalent(with: event)
+        }
+
+        override func keyDown(with event: NSEvent) {
+            let isReturnKey = event.keyCode == 36 || event.keyCode == 76
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            if isReturnKey,
+               !hasMarkedText(),
+               !modifiers.contains(.shift),
+               !modifiers.contains(.command),
+               !modifiers.contains(.option),
+               !modifiers.contains(.control) {
+                onSend?()
+                return
+            }
+
+            super.keyDown(with: event)
+        }
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -18,59 +50,51 @@ struct ChatInputTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         guard let textView = scrollView.documentView as? NSTextView else { return scrollView }
-        textView.delegate = context.coordinator
-        textView.isRichText = false
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticDataDetectionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        textView.allowsUndo = true
-        textView.font = NSFont.preferredFont(forTextStyle: .body)
-        textView.textColor = NSColor.textColor
-        textView.backgroundColor = NSColor.textBackgroundColor
-        textView.textContainerInset = NSSize(width: 4, height: 6)
-
-        context.coordinator.setupMonitor(for: textView, onSend: onSend)
+        let sendAwareTextView: SendAwareTextView
+        if let existing = textView as? SendAwareTextView {
+            sendAwareTextView = existing
+        } else {
+            let replacement = SendAwareTextView(frame: textView.frame, textContainer: textView.textContainer)
+            replacement.minSize = textView.minSize
+            replacement.maxSize = textView.maxSize
+            replacement.isVerticallyResizable = textView.isVerticallyResizable
+            replacement.isHorizontallyResizable = textView.isHorizontallyResizable
+            replacement.autoresizingMask = textView.autoresizingMask
+            replacement.textContainerInset = textView.textContainerInset
+            replacement.textContainer?.widthTracksTextView = textView.textContainer?.widthTracksTextView ?? true
+            replacement.string = textView.string
+            scrollView.documentView = replacement
+            sendAwareTextView = replacement
+        }
+        sendAwareTextView.delegate = context.coordinator
+        sendAwareTextView.isRichText = false
+        sendAwareTextView.isAutomaticQuoteSubstitutionEnabled = false
+        sendAwareTextView.isAutomaticDashSubstitutionEnabled = false
+        sendAwareTextView.isAutomaticDataDetectionEnabled = false
+        sendAwareTextView.isAutomaticTextReplacementEnabled = false
+        sendAwareTextView.allowsUndo = true
+        sendAwareTextView.font = NSFont.preferredFont(forTextStyle: .body)
+        sendAwareTextView.textColor = NSColor.textColor
+        sendAwareTextView.backgroundColor = NSColor.textBackgroundColor
+        sendAwareTextView.textContainerInset = NSSize(width: 4, height: 6)
+        sendAwareTextView.onSend = onSend
 
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
+        guard let textView = nsView.documentView as? SendAwareTextView else { return }
         if textView.string != text {
             textView.string = text
         }
+        textView.onSend = onSend
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ChatInputTextView
-        var monitor: Any?
 
         init(_ parent: ChatInputTextView) {
             self.parent = parent
-        }
-
-        deinit {
-            if let monitor = monitor {
-                NSEvent.removeMonitor(monitor)
-            }
-        }
-
-        func setupMonitor(for textView: NSTextView, onSend: @escaping () -> Void) {
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak textView] event in
-                guard let textView = textView else { return event }
-                let isReturnKey = event.keyCode == 36 || event.keyCode == 76
-                if isReturnKey, textView.window?.firstResponder == textView {
-                    if textView.hasMarkedText() {
-                        return event // Allow IME (like Chinese Pinyin) completion
-                    }
-                    if !event.modifierFlags.contains(.shift) {
-                        onSend()
-                        return nil // Consume event to prevent newline
-                    }
-                }
-                return event
-            }
         }
 
         func textDidChange(_ notification: Notification) {

@@ -84,6 +84,9 @@ struct AppStatus {
     static var showParallelOverlay: Bool = false
     static var showGuideOverlay: Bool = false
     static var guideHighlightRectNormalized: CGRect = .zero
+    static var showAIClickOverlay: Bool = false
+    static var aiClickPointNormalized: CGPoint = CGPoint(x: 0.5, y: 0.5)
+    static var aiClickOverlayToken: UUID = UUID()
     
     //Following two status check the CTS flipping status for Mini-KVM
     static var isKeyboardConnected: Bool? = false

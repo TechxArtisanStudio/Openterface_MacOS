@@ -114,6 +114,11 @@ struct AISettingsView: View {
     @State private var isTestingConnection = false
     @State private var testConnectionMessage: String = ""
     @State private var testConnectionSucceeded = false
+    @State private var selectedAgentDocsTarget: ChatTargetSystem = .macOS
+    @State private var selectedAgentDocsFile: String = "soul.md"
+    @State private var selectedAgentDocsText: String = ""
+    @State private var selectedAgentDocsPath: String = ""
+    @State private var selectedAgentDocsStatusMessage: String = ""
 
     enum AIProviderPreset: String, CaseIterable, Identifiable {
         case openAI = "OpenAI"
@@ -204,18 +209,150 @@ struct AISettingsView: View {
                             .textFieldStyle(.roundedBorder)
                     }
 
-                    Toggle("Enable Agentic Mode (tool execution)", isOn: $userSettings.isChatAgenticModeEnabled)
-                        .toggleStyle(.switch)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Target System")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
-                    if userSettings.isChatAgenticModeEnabled {
-                        Text("Agentic Mode allows the assistant to request tool actions like capture screen, move/click mouse, and type text.")
+                        Picker("Target System", selection: $userSettings.chatTargetSystem) {
+                            ForEach(ChatTargetSystem.allCases) { target in
+                                Text(target.displayName).tag(target)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        Text(userSettings.chatTargetSystem.detail)
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                    } else {
-                        Text("Agentic Mode is off: chat will only return text guidance and will not execute tools.")
+
+                        Text("The selected target system is appended to AI prompts so shortcut recommendations match the target OS.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Runtime Agent Definition Status")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        let loadedFiles = userSettings.runtimeAIAgentLoadedFileNames(for: userSettings.chatTargetSystem)
+                        let resolvedFolder = userSettings.runtimeAIAgentResolvedFolderPath(for: userSettings.chatTargetSystem)
+
+                        if let resolvedFolder {
+                            Text("Resolved folder: \(resolvedFolder)")
+                                .font(.caption2)
+                                .textSelection(.enabled)
+                        } else {
+                            Text("Resolved folder: Not found (using built-in defaults + target profile guardrails).")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+
+                        Text("Loaded files: \(loadedFiles.isEmpty ? "none" : loadedFiles.joined(separator: ", "))")
+                            .font(.caption2)
+                            .foregroundColor(loadedFiles.isEmpty ? .orange : .secondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Runtime Agent Markdown Files")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Text("Edit the live docs used by runtime loader for each target OS agent.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+
+                        Picker("Docs Target", selection: $selectedAgentDocsTarget) {
+                            ForEach(ChatTargetSystem.allCases) { target in
+                                Text(target.displayName).tag(target)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Picker("Markdown File", selection: $selectedAgentDocsFile) {
+                            ForEach(userSettings.runtimeAIAgentMarkdownFileNamesForEditing(), id: \.self) { fileName in
+                                Text(fileName).tag(fileName)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        if !selectedAgentDocsPath.isEmpty {
+                            Text("File path: \(selectedAgentDocsPath)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .textSelection(.enabled)
+                        } else {
+                            Text("File path: Not resolved yet. Save will create it under the preferred docs root.")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+
+                        TextEditor(text: $selectedAgentDocsText)
+                            .font(.system(.body, design: .monospaced))
+                            .frame(minHeight: 240)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                            )
+
+                        HStack(spacing: 8) {
+                            Button("Reload") {
+                                loadSelectedAgentDocsFile()
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button("Save") {
+                                saveSelectedAgentDocsFile()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+
+                        if !selectedAgentDocsStatusMessage.isEmpty {
+                            Text(selectedAgentDocsStatusMessage)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Toggle("Enable Agent Mode (tool execution)", isOn: $userSettings.isChatAgenticModeEnabled)
+                        .toggleStyle(.switch)
+
+                    if userSettings.isChatAgenticModeEnabled {
+                        Text("Agent Mode allows the assistant to request tool actions like capture screen, move/click mouse, and type text.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Max Agent Iterations")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Stepper(value: $userSettings.chatAgentMaxIterations, in: 1...30) {
+                                    Text("\(userSettings.chatAgentMaxIterations)")
+                                        .font(.caption)
+                                }
+                                .labelsHidden()
+                            }
+
+                            Text("Controls how many tool-and-reasoning turns Agent Mode can use before it stops. Higher values help multi-step flows, while verified macros can save iterations by jumping directly to a known state.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("Agent Mode is off: chat will only return text guidance and will not execute tools.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Toggle("Enable Click Refinement Reasoning", isOn: $userSettings.isClickRefinementThinkingEnabled)
+                        .toggleStyle(.switch)
+
+                    Text(userSettings.isClickRefinementThinkingEnabled
+                         ? "The secondary AI request that refines click targets inside a local crop can use reasoning. This may improve hard visual matches but increases latency and token cost."
+                         : "The secondary AI request that refines click targets inside a local crop responds directly without reasoning to reduce latency and token usage.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
 
                     Toggle("Enable Multi-Agent Planning", isOn: $userSettings.isChatPlannerModeEnabled)
                         .toggleStyle(.switch)
@@ -251,54 +388,6 @@ struct AISettingsView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("System Prompt")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextEditor(text: $userSettings.systemPrompt)
-                            .frame(minHeight: 140)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                            )
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Main Agent Planner Prompt")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextEditor(text: $userSettings.plannerPrompt)
-                            .frame(minHeight: 120)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                            )
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Screen Task Agent Prompt")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextEditor(text: $userSettings.screenAgentPrompt)
-                            .frame(minHeight: 120)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                            )
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Typing Task Agent Prompt")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextEditor(text: $userSettings.typingAgentPrompt)
-                            .frame(minHeight: 120)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                            )
-                    }
-
                     Text("Text messages and captured screenshots from chat are sent to this configured AI service.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -331,12 +420,52 @@ struct AISettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+        .onAppear {
+            selectedAgentDocsTarget = userSettings.chatTargetSystem
+            loadSelectedAgentDocsFile()
+        }
+        .onChange(of: selectedAgentDocsTarget) { _ in
+            loadSelectedAgentDocsFile()
+        }
+        .onChange(of: selectedAgentDocsFile) { _ in
+            loadSelectedAgentDocsFile()
+        }
     }
 
     private var canTestConnection: Bool {
         !userSettings.chatApiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !userSettings.chatModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !userSettings.chatApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func loadSelectedAgentDocsFile() {
+        let target = selectedAgentDocsTarget
+        let fileName = selectedAgentDocsFile
+        selectedAgentDocsPath = userSettings.runtimeAIAgentMarkdownResolvedPath(for: target, fileName: fileName) ?? ""
+
+        if let content = userSettings.runtimeAIAgentMarkdownContent(for: target, fileName: fileName) {
+            selectedAgentDocsText = content
+            selectedAgentDocsStatusMessage = "Loaded \(fileName) for \(target.displayName)."
+        } else {
+            selectedAgentDocsText = ""
+            selectedAgentDocsStatusMessage = "No existing file content found for \(fileName) on \(target.displayName)."
+        }
+    }
+
+    private func saveSelectedAgentDocsFile() {
+        let target = selectedAgentDocsTarget
+        let fileName = selectedAgentDocsFile
+
+        if let savedPath = userSettings.saveRuntimeAIAgentMarkdownContent(
+            for: target,
+            fileName: fileName,
+            content: selectedAgentDocsText
+        ) {
+            selectedAgentDocsPath = savedPath
+            selectedAgentDocsStatusMessage = "Saved \(fileName) for \(target.displayName)."
+        } else {
+            selectedAgentDocsStatusMessage = "Failed to save \(fileName) for \(target.displayName)."
+        }
     }
 
     private func applyPreset(_ preset: AIProviderPreset) {
