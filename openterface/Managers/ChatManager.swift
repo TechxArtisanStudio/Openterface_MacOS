@@ -176,6 +176,50 @@ private enum AIInputRouter {
         click(button: button, absX: targetX, absY: targetY, isDoubleClick: isDoubleClick)
     }
 
+    static func animatedDrag(button: UInt8 = 0x01, startAbsX: Int? = nil, startAbsY: Int? = nil, endAbsX: Int, endAbsY: Int) {
+        let startX = clampedAbsolute(startAbsX ?? trackedMouseX)
+        let startY = clampedAbsolute(startAbsY ?? trackedMouseY)
+        let targetX = clampedAbsolute(endAbsX)
+        let targetY = clampedAbsolute(endAbsY)
+
+        sendMouseMove(absX: startX, absY: startY)
+        Thread.sleep(forTimeInterval: 0.05)
+
+        if AppStatus.activeConnectionProtocol == .vnc {
+            let startPoint = mapToVNCFramebuffer(absX: startX, absY: startY)
+            VNCClientManager.shared.sendPointerEvent(x: startPoint.x, y: startPoint.y, buttonMask: button)
+
+            let stepDelay = animatedClickDurationSeconds / Double(max(animatedClickSteps, 1))
+            for step in 1...animatedClickSteps {
+                let progress = Double(step) / Double(animatedClickSteps)
+                let interpolatedX = Int((Double(startX) + Double(targetX - startX) * progress).rounded())
+                let interpolatedY = Int((Double(startY) + Double(targetY - startY) * progress).rounded())
+                let point = mapToVNCFramebuffer(absX: interpolatedX, absY: interpolatedY)
+                VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: button)
+                Thread.sleep(forTimeInterval: stepDelay)
+            }
+
+            let targetPoint = mapToVNCFramebuffer(absX: targetX, absY: targetY)
+            VNCClientManager.shared.sendPointerEvent(x: targetPoint.x, y: targetPoint.y, buttonMask: 0x00)
+        } else {
+            HostManager.shared.handleAbsoluteMouseAction(x: startX, y: startY, mouseEvent: button, wheelMovement: 0x00)
+
+            let stepDelay = animatedClickDurationSeconds / Double(max(animatedClickSteps, 1))
+            for step in 1...animatedClickSteps {
+                let progress = Double(step) / Double(animatedClickSteps)
+                let interpolatedX = Int((Double(startX) + Double(targetX - startX) * progress).rounded())
+                let interpolatedY = Int((Double(startY) + Double(targetY - startY) * progress).rounded())
+                HostManager.shared.handleAbsoluteMouseAction(x: interpolatedX, y: interpolatedY, mouseEvent: button, wheelMovement: 0x00)
+                Thread.sleep(forTimeInterval: stepDelay)
+            }
+
+            HostManager.shared.handleAbsoluteMouseAction(x: targetX, y: targetY, mouseEvent: 0x00, wheelMovement: 0x00)
+        }
+
+        trackedMouseX = targetX
+        trackedMouseY = targetY
+    }
+
     private static func showClickOverlay(absX: Int, absY: Int) {
         let normalizedX = min(max(CGFloat(absX) / 4096.0, 0.0), 1.0)
         let normalizedY = min(max(CGFloat(absY) / 4096.0, 0.0), 1.0)
@@ -279,6 +323,7 @@ final class ChatManager: ObservableObject, ChatManagerProtocol {
     @Published private(set) var currentPlan: ChatExecutionPlan?
     @Published private(set) var plannerTraceEntries: [ChatTaskTraceEntry] = []
     @Published private(set) var guideAutoNextStatuses: [UUID: GuideAutoNextStatus] = [:]
+    @Published private(set) var agentRequestStatuses: [UUID: GuideAutoNextStatus] = [:]
 
     private var currentTask: Task<Void, Never>?
     private let encoder: JSONEncoder
@@ -294,7 +339,8 @@ final class ChatManager: ObservableObject, ChatManagerProtocol {
         MouseTaskAgent(toolName: "move_mouse"),
         MouseTaskAgent(toolName: "left_click"),
         MouseTaskAgent(toolName: "right_click"),
-        MouseTaskAgent(toolName: "double_click")
+        MouseTaskAgent(toolName: "double_click"),
+        MouseTaskAgent(toolName: "left_drag")
     ])
     private let taskStateConfirmationInstruction = """
 You are Openterface Task State Verifier.
@@ -350,9 +396,10 @@ Macro authoring rules:
     private var taskStepTraces: [UUID: [ChatTaskTraceEntry]] = [:]
     private var guideCapturePathsByMessageID: [UUID: String] = [:]
     private var pendingGuideAutoNextStarts: [UUID: Date] = [:]
+    private var pendingAgentRequestStarts: [UUID: Date] = [:]
     private let agentToolInstruction = """
 When action is required, you may call tools by returning ONLY JSON (no markdown):
-{"tool_calls":[{"tool":"capture_screen"},{"tool":"move_mouse","x":0.5,"y":0.5},{"tool":"left_click"},{"tool":"type_text","text":"hello"},{"tool":"run_verified_macro","macro_id":"UUID-or-label"}]}
+{"tool_calls":[{"tool":"capture_screen"},{"tool":"move_mouse","x":0.5,"y":0.5},{"tool":"left_click"},{"tool":"left_drag","start_x":0.2,"start_y":0.5,"x":0.8,"y":0.5},{"tool":"type_text","text":"hello"},{"tool":"run_verified_macro","macro_id":"UUID-or-label"}]}
 
 The target OS has already been configured by the app. Do not ask the user to confirm the OS again.
 
@@ -367,6 +414,7 @@ Available tools:
 - capture_screen: Capture latest target screen and use it for next reasoning step.
 - move_mouse: Move target mouse. Args: x (Float), y (Float) in 0.0...1.0.
 - left_click: Left click at current mouse location. Optional args: x (Float), y (Float) in 0.0...1.0.
+- left_drag: Hold left mouse button and drag to a destination. Args: x (Float), y (Float) destination in 0.0...1.0. Optional args: start_x (Float), start_y (Float) to begin from a specific point; otherwise current mouse position is used.
 - right_click: Right click at current mouse location. Optional args: x (Float), y (Float) in 0.0...1.0.
 - double_click: Double left click. Optional args: x (Float), y (Float) in 0.0...1.0.
 - type_text: Type text on target. Args: text (String).
@@ -670,7 +718,11 @@ If timing matters for any other reason, add an explicit delay token and explain 
 
         lastError = nil
         let storedContent = trimmed.isEmpty ? "Attached screenshot" : trimmed
-        messages.append(ChatMessage(role: .user, content: storedContent, attachmentFilePath: attachmentFileURL?.path))
+        let messageID = UUID()
+        messages.append(ChatMessage(id: messageID, role: .user, content: storedContent, attachmentFilePath: attachmentFileURL?.path))
+        if UserSettings.shared.isChatAgenticModeEnabled {
+            startAgentRequestStatus(for: messageID)
+        }
         persistHistory()
         isSending = true
 
@@ -713,11 +765,16 @@ If timing matters for any other reason, add an explicit delay token and explain 
                 }
             }
 
+            let messageID = UUID()
             self.messages.append(ChatMessage(
+                id: messageID,
                 role: .user,
                 content: skill.prompt,
                 attachmentFilePath: screenshotURL?.path
             ))
+            if UserSettings.shared.isChatAgenticModeEnabled {
+                self.startAgentRequestStatus(for: messageID)
+            }
             self.persistHistory()
 
             await self.performSend()
@@ -732,7 +789,9 @@ If timing matters for any other reason, add an explicit delay token and explain 
         taskStepTraces.removeAll()
         guideCapturePathsByMessageID.removeAll()
         guideAutoNextStatuses.removeAll()
+        agentRequestStatuses.removeAll()
         pendingGuideAutoNextStarts.removeAll()
+        pendingAgentRequestStarts.removeAll()
         clearGuideOverlay()
         persistHistory()
     }
@@ -772,6 +831,66 @@ If timing matters for any other reason, add an explicit delay token and explain 
 
     func guideAutoNextStatus(for messageID: UUID) -> GuideAutoNextStatus? {
         guideAutoNextStatuses[messageID]
+    }
+
+    func bubbleStatus(for messageID: UUID) -> GuideAutoNextStatus? {
+        if let guideStatus = guideAutoNextStatuses[messageID] {
+            return guideStatus
+        }
+
+        guard let agentRequestMessageID = agentRequestMessageID(forBubbleMessageID: messageID),
+              let agentStatus = agentRequestStatuses[agentRequestMessageID] else {
+            return nil
+        }
+
+        return preferredAgentStatusBubbleMessageID(for: agentRequestMessageID) == messageID
+            ? agentStatus
+            : nil
+    }
+
+    private func agentRequestMessageID(forBubbleMessageID messageID: UUID) -> UUID? {
+        guard let messageIndex = messages.firstIndex(where: { $0.id == messageID }) else {
+            return nil
+        }
+
+        let message = messages[messageIndex]
+        if message.role == .user {
+            return agentRequestStatuses[messageID] != nil ? messageID : nil
+        }
+
+        guard message.role == .assistant else {
+            return nil
+        }
+
+        guard messageIndex > 0,
+              let precedingUserIndex = messages[..<messageIndex].lastIndex(where: { $0.role == .user }) else {
+            return nil
+        }
+
+        let requestMessageID = messages[precedingUserIndex].id
+        return agentRequestStatuses[requestMessageID] != nil ? requestMessageID : nil
+    }
+
+    private func preferredAgentStatusBubbleMessageID(for requestMessageID: UUID) -> UUID {
+        guard let requestIndex = messages.firstIndex(where: { $0.id == requestMessageID }) else {
+            return requestMessageID
+        }
+
+        let assistantSearchStart = requestIndex + 1
+        guard assistantSearchStart < messages.endIndex else {
+            return requestMessageID
+        }
+
+        let nextUserIndex = messages[assistantSearchStart..<messages.endIndex].firstIndex(where: { $0.role == .user }) ?? messages.endIndex
+        guard assistantSearchStart < nextUserIndex else {
+            return requestMessageID
+        }
+
+        let latestAssistantMessageID = messages[assistantSearchStart..<nextUserIndex]
+            .last(where: { $0.role == .assistant })?
+            .id
+
+        return latestAssistantMessageID ?? requestMessageID
     }
 
     func respondToOSConfirmation(confirmed: Bool, suggestedSystem: ChatTargetSystem?) {
@@ -1094,7 +1213,33 @@ If timing matters for any other reason, add an explicit delay token and explain 
     }
 
     private func performSend() async {
+        let agenticEnabled = UserSettings.shared.isChatAgenticModeEnabled
+        let pendingAgentStatusMessageID = agenticEnabled ? messages.last(where: { $0.role == .user })?.id : nil
+
+        enum AgentRequestStatusDisposition {
+            case none
+            case completed
+            case failed(String)
+            case cancelled
+        }
+
+        var agentRequestStatusDisposition: AgentRequestStatusDisposition = .none
+
         defer {
+            if let pendingAgentStatusMessageID {
+                switch agentRequestStatusDisposition {
+                case .none:
+                    if Task.isCancelled {
+                        cancelAgentRequestStatus(for: pendingAgentStatusMessageID)
+                    }
+                case .completed:
+                    completeAgentRequestStatus(for: pendingAgentStatusMessageID)
+                case .failed(let errorDescription):
+                    failAgentRequestStatus(for: pendingAgentStatusMessageID, errorDescription: errorDescription)
+                case .cancelled:
+                    cancelAgentRequestStatus(for: pendingAgentStatusMessageID)
+                }
+            }
             isSending = false
             currentTask = nil
         }
@@ -1102,7 +1247,6 @@ If timing matters for any other reason, add an explicit delay token and explain 
         let baseURLString = UserSettings.shared.chatApiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = UserSettings.shared.chatModel.trimmingCharacters(in: .whitespacesAndNewlines)
         let systemPrompt = UserSettings.shared.resolvedSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agenticEnabled = UserSettings.shared.isChatAgenticModeEnabled
         let guideModeEnabled = UserSettings.shared.isChatGuideModeEnabled
 
         if !guideModeEnabled {
@@ -1110,12 +1254,14 @@ If timing matters for any other reason, add an explicit delay token and explain 
         }
 
         guard !baseURLString.isEmpty, let baseURL = URL(string: baseURLString) else {
+            agentRequestStatusDisposition = .failed("Invalid Chat API base URL")
             presentAIErrorToUser("Invalid Chat API base URL")
             logger.log(content: "AI Chat request aborted: invalid base URL -> \(baseURLString)")
             return
         }
 
         guard !model.isEmpty else {
+            agentRequestStatusDisposition = .failed("Chat model is empty")
             presentAIErrorToUser("Chat model is empty")
             logger.log(content: "AI Chat request aborted: model is empty")
             return
@@ -1126,6 +1272,7 @@ If timing matters for any other reason, add an explicit delay token and explain 
             ? (ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
             : configuredKey
         guard !apiKey.isEmpty else {
+            agentRequestStatusDisposition = .failed("Missing AI API key in Settings")
             presentAIErrorToUser("Missing AI API key in Settings")
             logger.log(content: "AI Chat request aborted: missing API key")
             return
@@ -1182,6 +1329,7 @@ If timing matters for any other reason, add an explicit delay token and explain 
                 if Task.isCancelled { return }
 
                 guard let http = response as? HTTPURLResponse else {
+                    agentRequestStatusDisposition = .failed("Invalid server response")
                     presentAIErrorToUser("Invalid server response")
                     logger.log(content: "AI Chat response error: non-HTTP response")
                     return
@@ -1207,12 +1355,14 @@ If timing matters for any other reason, add an explicit delay token and explain 
                     let errorText = detail.isEmpty
                         ? "Chat API error \(http.statusCode)."
                         : "Chat API error \(http.statusCode): \(detail)"
+                    agentRequestStatusDisposition = .failed(errorText)
                     presentAIErrorToUser(errorText)
                     return
                 }
 
                 let decoded = try JSONDecoder().decode(ChatCompletionsResponse.self, from: data)
                 guard let assistantText = decoded.choices.first?.message.content, !assistantText.isEmpty else {
+                    agentRequestStatusDisposition = .failed("Empty assistant response")
                     presentAIErrorToUser("Empty assistant response")
                     logger.log(content: "AI Chat response decode succeeded but assistant content is empty")
                     return
@@ -1230,24 +1380,35 @@ If timing matters for any other reason, add an explicit delay token and explain 
                     workingMessages.append(ChatMessage(role: .assistant, content: assistantText))
                     let toolResultMessage = ChatMessage(role: .user, content: "TOOL_RESULT:\n\(toolResult.summary)", attachmentFilePath: toolResult.attachmentFilePath)
                     workingMessages.append(toolResultMessage)
-                    messages.append(ChatMessage(role: .assistant, content: "Tool result:\n\(toolResult.summary)"))
+                    messages.append(ChatMessage(
+                        role: .assistant,
+                        content: "Tool result:\n\(toolResult.summary)",
+                        attachmentFilePath: toolResult.attachmentFilePath
+                    ))
                     persistHistory()
                     continue
                 }
 
+                agentRequestStatusDisposition = .completed
                 messages.append(ChatMessage(role: .assistant, content: assistantText))
                 persistHistory()
                 return
             }
 
             let timeoutMessage = "I reached the configured Agent Mode iteration limit (\(UserSettings.shared.chatAgentMaxIterations)) and still need guidance to continue. Please provide a fresh screenshot, raise the iteration limit, or use a verified macro if one matches the task."
+            agentRequestStatusDisposition = .completed
             messages.append(ChatMessage(role: .assistant, content: timeoutMessage))
             persistHistory()
         } catch {
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                agentRequestStatusDisposition = .cancelled
+                return
+            }
             logger.log(content: "AI Chat request failed with error: \(error.localizedDescription)")
             appendAITrace(title: "ERROR", body: error.localizedDescription)
-            presentAIErrorToUser(userFacingErrorMessage(from: error))
+            let errorMessage = userFacingErrorMessage(from: error)
+            agentRequestStatusDisposition = .failed(errorMessage)
+            presentAIErrorToUser(errorMessage)
         }
     }
 
@@ -2611,6 +2772,35 @@ Currently configured target system: \(selected.displayName)
                 }
                 logger.log(content: "AI Tool executed: left_click normalized=(\(lnx), \(lny)) abs=(\(clickPoint.x), \(clickPoint.y))")
 
+            case "left_drag", "drag_mouse", "mouse_drag", "drag":
+                guard let dragPoints = dragPoints(from: call.args) else {
+                    summaries.append("left_drag: invalid args")
+                    logger.log(content: "AI Tool failed: left_drag invalid args")
+                    continue
+                }
+
+                AIInputRouter.animatedDrag(
+                    button: 0x01,
+                    startAbsX: dragPoints.startX,
+                    startAbsY: dragPoints.startY,
+                    endAbsX: dragPoints.endX,
+                    endAbsY: dragPoints.endY
+                )
+                agentMouseX = dragPoints.endX
+                agentMouseY = dragPoints.endY
+
+                let startNX = absoluteToNormalized(dragPoints.startX)
+                let startNY = absoluteToNormalized(dragPoints.startY)
+                let endNX = absoluteToNormalized(dragPoints.endX)
+                let endNY = absoluteToNormalized(dragPoints.endY)
+                if let annotatedURL = await captureAnnotatedClickForChat(absX: dragPoints.endX, absY: dragPoints.endY, actionName: "left_drag") {
+                    attachmentPath = annotatedURL.path
+                    summaries.append("left_drag: success (start_x=\(String(format: "%.3f", startNX)), start_y=\(String(format: "%.3f", startNY)), x=\(String(format: "%.3f", endNX)), y=\(String(format: "%.3f", endNY)), image=\(annotatedURL.lastPathComponent))")
+                } else {
+                    summaries.append("left_drag: success (start_x=\(String(format: "%.3f", startNX)), start_y=\(String(format: "%.3f", startNY)), x=\(String(format: "%.3f", endNX)), y=\(String(format: "%.3f", endNY)), image=unavailable)")
+                }
+                logger.log(content: "AI Tool executed: left_drag start=(\(dragPoints.startX), \(dragPoints.startY)) end=(\(dragPoints.endX), \(dragPoints.endY))")
+
             case "right_click":
                 let clickPoint = await click(button: 0x02, args: call.args)
                 let rnx = absoluteToNormalized(clickPoint.x)
@@ -2688,6 +2878,32 @@ Currently configured target system: \(selected.displayName)
         if let v = value as? Int { return Double(v) }
         if let v = value as? String { return Double(v) }
         return nil
+    }
+
+    private func dragPoints(from args: [String: Any]) -> (startX: Int, startY: Int, endX: Int, endY: Int)? {
+        let resolvedEndX: Int
+        let resolvedEndY: Int
+        if let nx = doubleArg(args["x"]), let ny = doubleArg(args["y"]) {
+            resolvedEndX = normalizedToAbsolute(nx)
+            resolvedEndY = normalizedToAbsolute(ny)
+        } else if let nx = doubleArg(args["end_x"]), let ny = doubleArg(args["end_y"]) {
+            resolvedEndX = normalizedToAbsolute(nx)
+            resolvedEndY = normalizedToAbsolute(ny)
+        } else {
+            return nil
+        }
+
+        let resolvedStartX: Int
+        let resolvedStartY: Int
+        if let nx = doubleArg(args["start_x"]), let ny = doubleArg(args["start_y"]) {
+            resolvedStartX = normalizedToAbsolute(nx)
+            resolvedStartY = normalizedToAbsolute(ny)
+        } else {
+            resolvedStartX = agentMouseX
+            resolvedStartY = agentMouseY
+        }
+
+        return (resolvedStartX, resolvedStartY, resolvedEndX, resolvedEndY)
     }
 
     /// Convert AI-facing normalized 0.0...1.0 coordinate to internal 0...4096.
@@ -3172,6 +3388,37 @@ Locate the exact visible center of the correct icon, button, or text inside this
         guideAutoNextStatuses[messageID] = GuideAutoNextStatus(phase: .thinking, text: "Thinking...")
     }
 
+    private func startAgentRequestStatus(for messageID: UUID) {
+        let startedAt = Date()
+        pendingAgentRequestStarts[messageID] = startedAt
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(phase: .thinking, text: "Thinking...")
+    }
+
+    private func completeAgentRequestStatus(for messageID: UUID) {
+        let startedAt = pendingAgentRequestStarts.removeValue(forKey: messageID) ?? Date()
+        let elapsed = Date().timeIntervalSince(startedAt)
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(
+            phase: .completed,
+            text: "Used time: \(String(format: "%.2fs", elapsed))"
+        )
+    }
+
+    private func failAgentRequestStatus(for messageID: UUID, errorDescription: String) {
+        pendingAgentRequestStarts.removeValue(forKey: messageID)
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(
+            phase: .failed,
+            text: "Failed: \(errorDescription)"
+        )
+    }
+
+    private func cancelAgentRequestStatus(for messageID: UUID) {
+        pendingAgentRequestStarts.removeValue(forKey: messageID)
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(
+            phase: .cancelled,
+            text: "Canceled"
+        )
+    }
+
     private func completeGuideAutoNextStatus(for messageID: UUID) {
         let startedAt = pendingGuideAutoNextStarts.removeValue(forKey: messageID) ?? Date()
         let elapsed = Date().timeIntervalSince(startedAt)
@@ -3224,7 +3471,7 @@ private struct MainPlannerAgent {
         if !systemPrompt.isEmpty {
             conversation.append(.text(role: .system, text: systemPrompt))
         }
-        conversation.append(.text(role: .system, text: "Available task agent/tool pairs: screen/capture_screen, typing/type_text, macro/run_verified_macro, mouse/move_mouse, mouse/left_click, mouse/right_click, mouse/double_click."))
+        conversation.append(.text(role: .system, text: "Available task agent/tool pairs: screen/capture_screen, typing/type_text, macro/run_verified_macro, mouse/move_mouse, mouse/left_click, mouse/left_drag, mouse/right_click, mouse/double_click."))
         if !plannerPrompt.isEmpty {
             conversation.append(.text(role: .system, text: plannerPrompt))
         }
@@ -3716,6 +3963,8 @@ private struct MouseTaskAgent: TaskAgentExecutor {
         let status: String
         let x: Double?
         let y: Double?
+        let start_x: Double?
+        let start_y: Double?
         let result_summary: String
     }
 
@@ -3750,7 +3999,8 @@ Tool: \(task.toolName)
 
     Return JSON only.
     - Always provide x and y as normalized floats from 0.0 to 1.0 (fraction of screen width/height).
-    - For click tools, x and y are required (do not omit them).
+    - For click and move tools, x and y are required.
+    - For left_drag, x and y are the drag destination and optional start_x/start_y specify the drag start point.
     - Choose the center point of the exact UI element to interact with.
 """
         if let imageDataURL {
@@ -3791,6 +4041,11 @@ Tool: \(task.toolName)
         case "left_click":
             performClick(button: 0x01, x: targetX, y: targetY, isDoubleClick: false)
 
+        case "left_drag":
+            let startX = payload.start_x.map(normalizedToAbsolute)
+            let startY = payload.start_y.map(normalizedToAbsolute)
+            performDrag(startX: startX, startY: startY, endX: targetX, endY: targetY)
+
         case "right_click":
             performClick(button: 0x02, x: targetX, y: targetY, isDoubleClick: false)
 
@@ -3812,6 +4067,10 @@ Tool: \(task.toolName)
 
     private func performClick(button: UInt8, x: Int, y: Int, isDoubleClick: Bool) {
         AIInputRouter.animatedClick(button: button, absX: x, absY: y, isDoubleClick: isDoubleClick)
+    }
+
+    private func performDrag(startX: Int?, startY: Int?, endX: Int, endY: Int) {
+        AIInputRouter.animatedDrag(startAbsX: startX, startAbsY: startY, endAbsX: endX, endAbsY: endY)
     }
 
     /// Convert AI-facing normalized 0.0...1.0 coordinate to internal 0...4096.

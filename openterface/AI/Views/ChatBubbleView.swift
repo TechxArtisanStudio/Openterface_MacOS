@@ -32,7 +32,7 @@ struct ChatBubbleView: View {
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
 
-                if isCompletionMessage {
+                if showsCompletionIndicator {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .help("Task Complete")
@@ -94,11 +94,11 @@ struct ChatBubbleView: View {
                 .padding(.top, 4)
             }
                 
-            if let guideAutoNextStatus {
+            if let bubbleStatus {
                 HStack(spacing: 8) {
-                    GuideStatusIcon(phase: guideAutoNextStatus.phase)
+                    GuideStatusIcon(phase: bubbleStatus.phase)
 
-                    Text(guideAutoNextStatus.text)
+                    Text(bubbleStatus.text)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -249,29 +249,41 @@ struct ChatBubbleView: View {
         return hasShortcut || hasTarget
     }
 
-    private var guideAutoNextStatus: GuideAutoNextStatus? {
-        chatManager.guideAutoNextStatus(for: message.id)
+    private var bubbleStatus: GuideAutoNextStatus? {
+        chatManager.bubbleStatus(for: message.id)
+    }
+
+    private var showsCompletionIndicator: Bool {
+        isCompletionMessage || (message.role == .assistant && bubbleStatus?.phase == .completed)
     }
 
     private var isCompletionMessage: Bool {
         guard message.role == .assistant else { return false }
 
         let normalized = message.content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return normalized.hasPrefix("task complete")
-            || normalized.hasPrefix("result:")
-            || normalized.contains("task completed")
-            || normalized.contains("already completed")
+        if normalized.hasPrefix("result:") {
+            return true
+        }
+
+        let completionPhrases = [
+            "goal achieved",
+            "task complete",
+            "task completed",
+            "already open and loaded",
+            "already completed",
+            "is already open",
+            "is already loaded"
+        ]
+
+        return completionPhrases.contains { normalized.contains($0) }
     }
 
     @ViewBuilder
     private var renderedMessageContent: some View {
         if let tableModel = MessageTableModel.from(message.content) {
             StructuredDataTableView(table: tableModel)
-        } else if let markdownContent {
-            Text(markdownContent)
-                .font(.body)
-                .textSelection(.enabled)
-                .multilineTextAlignment(.leading)
+        } else if looksLikeMarkdown(message.content) {
+            MarkdownBubbleContentView(content: message.content)
         } else {
             Text(message.content)
                 .font(.body)
@@ -282,7 +294,12 @@ struct ChatBubbleView: View {
 
     private var markdownContent: AttributedString? {
         guard looksLikeMarkdown(message.content) else { return nil }
-        return try? AttributedString(markdown: message.content)
+        return try? AttributedString(
+            markdown: message.content,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            )
+        )
     }
 
     private var shouldShowOSConfirmationActions: Bool {
@@ -359,7 +376,33 @@ struct ChatBubbleView: View {
     private func copyMessageContent() {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(message.content, forType: .string)
+
+        guard let attributedClipboardContent else {
+            pasteboard.setString(message.content, forType: .string)
+            return
+        }
+
+        let fullRange = NSRange(location: 0, length: attributedClipboardContent.length)
+        pasteboard.setString(attributedClipboardContent.string, forType: .string)
+
+        if let rtfData = try? attributedClipboardContent.data(
+            from: fullRange,
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ) {
+            pasteboard.setData(rtfData, forType: .rtf)
+        }
+
+        if let htmlData = try? attributedClipboardContent.data(
+            from: fullRange,
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.html]
+        ) {
+            pasteboard.setData(htmlData, forType: .html)
+        }
+    }
+
+    private var attributedClipboardContent: NSAttributedString? {
+        guard let markdownContent else { return nil }
+        return NSAttributedString(markdownContent)
     }
 
     private func looksLikeMarkdown(_ content: String) -> Bool {
@@ -377,6 +420,162 @@ struct ChatBubbleView: View {
         ]
 
         return markdownMarkers.contains { trimmed.contains($0) }
+    }
+}
+
+private struct MarkdownBubbleContentView: View {
+    let content: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(MarkdownBlock.parse(content).enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .paragraph(let text):
+                    inlineMarkdownText(text)
+                        .multilineTextAlignment(.leading)
+                case .unorderedList(let items):
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("•")
+                                inlineMarkdownText(item)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    }
+                case .orderedList(let items):
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("\(index + 1).")
+                                inlineMarkdownText(item)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func inlineMarkdownText(_ text: String) -> Text {
+        if let attributed = try? AttributedString(
+            markdown: text,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            )
+        ) {
+            return Text(attributed)
+        }
+
+        return Text(text)
+    }
+}
+
+private enum MarkdownBlock {
+    case paragraph(String)
+    case unorderedList([String])
+    case orderedList([String])
+
+    static func parse(_ content: String) -> [MarkdownBlock] {
+        enum Accumulator {
+            case paragraph([String])
+            case unorderedList([String])
+            case orderedList([String])
+        }
+
+        var blocks: [MarkdownBlock] = []
+        var accumulator: Accumulator?
+
+        func flush() {
+            guard let accumulator else { return }
+            switch accumulator {
+            case .paragraph(let lines):
+                let text = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty {
+                    blocks.append(.paragraph(text))
+                }
+            case .unorderedList(let items):
+                if !items.isEmpty {
+                    blocks.append(.unorderedList(items))
+                }
+            case .orderedList(let items):
+                if !items.isEmpty {
+                    blocks.append(.orderedList(items))
+                }
+            }
+        }
+
+        for rawLine in content.components(separatedBy: .newlines) {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.isEmpty {
+                flush()
+                accumulator = nil
+                continue
+            }
+
+            if let unorderedItem = unorderedListItem(from: rawLine) {
+                switch accumulator {
+                case .unorderedList(var items):
+                    items.append(unorderedItem)
+                    accumulator = .unorderedList(items)
+                default:
+                    flush()
+                    accumulator = .unorderedList([unorderedItem])
+                }
+                continue
+            }
+
+            if let orderedItem = orderedListItem(from: rawLine) {
+                switch accumulator {
+                case .orderedList(var items):
+                    items.append(orderedItem)
+                    accumulator = .orderedList(items)
+                default:
+                    flush()
+                    accumulator = .orderedList([orderedItem])
+                }
+                continue
+            }
+
+            switch accumulator {
+            case .paragraph(var lines):
+                lines.append(rawLine)
+                accumulator = .paragraph(lines)
+            default:
+                flush()
+                accumulator = .paragraph([rawLine])
+            }
+        }
+
+        flush()
+        return blocks
+    }
+
+    private static func unorderedListItem(from line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        for marker in ["- ", "* ", "+ "] where trimmed.hasPrefix(marker) {
+            return String(trimmed.dropFirst(marker.count))
+        }
+        return nil
+    }
+
+    private static func orderedListItem(from line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard let dotIndex = trimmed.firstIndex(of: "."),
+              dotIndex > trimmed.startIndex,
+              trimmed[..<dotIndex].allSatisfy({ $0.isNumber }) else {
+            return nil
+        }
+
+        let itemStart = trimmed.index(after: dotIndex)
+        guard itemStart < trimmed.endIndex, trimmed[itemStart] == " " else {
+            return nil
+        }
+
+        return String(trimmed[trimmed.index(after: itemStart)...])
     }
 }
 
