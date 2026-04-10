@@ -46,6 +46,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     @Published var isRightCtrlHeld = false
     @Published var isLeftAltHeld = false
     @Published var isRightAltHeld = false
+    @Published var isLeftCmdHeld = false
+    @Published var isRightCmdHeld = false
     @Published var isWinHeld = false
     @Published var isCapsLockOn = false {
         didSet {
@@ -596,10 +598,12 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 55, sourceModifier: .command, isLeft: true)
                 logger.log(content: "⌘ Left Command pressed: Original=55, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
                 pressAndUpdateModifierKeyWithoutState(keyCode: targetKeyCode, showIndex: true)
+                isLeftCmdHeld = true
             } else if (rawValue & 0x110) == 0x110 { // Right Command
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 54, sourceModifier: .command, isLeft: false)
                 logger.log(content: "⌘ Right Command pressed: Original=54, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
                 pressAndUpdateModifierKeyWithoutState(keyCode: targetKeyCode, showIndex: true)
+                isRightCmdHeld = true
             }
         } else {
             // Release Command keys
@@ -612,6 +616,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             if pressedKeys.contains(rightCmdRemapped) {
                 releaseAndUpdateModifierKeyWithoutState(keyCode: rightCmdRemapped, logMessage: "⌘ Released right command key")
             }
+            isLeftCmdHeld = false
+            isRightCmdHeld = false
         }
     }
     
@@ -1086,6 +1092,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         if pressedKeys.contains(rightCmdRemapped) {
             releaseAndUpdateModifierKeyWithoutState(keyCode: rightCmdRemapped, logMessage: "Released right command for paste")
         }
+        isLeftCmdHeld = false
+        isRightCmdHeld = false
         
         // Send a general key release to ensure all modifiers are cleared on the target
         kbm.releaseKey(keys: pressedKeys)

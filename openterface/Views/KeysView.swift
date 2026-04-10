@@ -498,7 +498,7 @@ public struct FloatingKeysWindow: View {
                         }) {
                             Text("Ctrl")
                         }
-                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftCtrlHeld))
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: userSettings.keyboardLayout == .mac ? keyboardManager.isLeftCtrlHeld : keyboardManager.isLeftCmdHeld))
                         .help("Control (Left)")
                         
                         // Left side: order depends on layout
@@ -517,7 +517,7 @@ public struct FloatingKeysWindow: View {
                                 Button("Cmd", action: {
                                     keyboardManager.toggleWin()
                                 })
-                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld))
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld || keyboardManager.isLeftCmdHeld))
                                 .help("Command")
                             } else {
                                 Button({
@@ -525,7 +525,7 @@ public struct FloatingKeysWindow: View {
                                 }(), action: {
                                     keyboardManager.toggleWin()
                                 })
-                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld))
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld || keyboardManager.isLeftCtrlHeld))
                                 .help(keyboardManager.currentKeyboardLayout == .linux ? "Super" : "Windows")
                                 
                                 Button(action: {
@@ -556,7 +556,7 @@ public struct FloatingKeysWindow: View {
                                 Button("Cmd", action: {
                                     keyboardManager.toggleWin()
                                 })
-                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld))
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld || keyboardManager.isRightCmdHeld))
                                 .help("Command")
                                 
                                 Button(action: {
@@ -582,7 +582,7 @@ public struct FloatingKeysWindow: View {
                         }) {
                             Text("Ctrl")
                         }
-                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightCtrlHeld))
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: userSettings.keyboardLayout == .mac ? keyboardManager.isRightCtrlHeld : keyboardManager.isRightCmdHeld))
                         .help("Control (Right)")
                         
                         Button("◀", action: {
