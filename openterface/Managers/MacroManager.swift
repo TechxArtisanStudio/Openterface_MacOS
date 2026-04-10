@@ -192,7 +192,8 @@ final class MacroManager: ObservableObject {
 
     /// Splits the data string into special tokens (`<TAG>`, `</TAG>`) and individual characters.
     func tokenize(_ str: String) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: "</?[A-Z][A-Za-z0-9]*(?::[A-Za-z0-9-]+)?>") else {
+        // Accept both uppercase and lowercase token names (e.g. <ctrl>, <CMD>, <Super>).
+        guard let regex = try? NSRegularExpression(pattern: "</?[A-Za-z][A-Za-z0-9]*(?::[A-Za-z0-9-]+)?>") else {
             return str.map { String($0) }
         }
         let nsStr = str as NSString
@@ -214,7 +215,8 @@ final class MacroManager: ObservableObject {
     }
 
     private func macroReferenceID(from token: String) -> UUID? {
-        guard token.hasPrefix("<MACRO:"), token.hasSuffix(">") else { return nil }
+        let upper = token.uppercased()
+        guard upper.hasPrefix("<MACRO:"), token.hasSuffix(">") else { return nil }
         let startIndex = token.index(token.startIndex, offsetBy: 7)
         let endIndex = token.index(before: token.endIndex)
         return UUID(uuidString: String(token[startIndex..<endIndex]))
@@ -241,14 +243,42 @@ final class MacroManager: ObservableObject {
 /// Static execution engine — no actor isolation, safe to call from background threads.
 private struct MacroExecutionEngine {
 
+    /// Canonicalize tokens to a single form so execution is case-insensitive and
+    /// common modifier aliases resolve consistently.
+    private static func canonicalToken(_ token: String) -> String {
+        guard token.hasPrefix("<"), token.hasSuffix(">") else { return token }
+
+        let isClosing = token.hasPrefix("</")
+        let nameStart = token.index(token.startIndex, offsetBy: isClosing ? 2 : 1)
+        let nameEnd = token.index(before: token.endIndex)
+        let rawName = String(token[nameStart..<nameEnd]).uppercased()
+
+        let canonicalName: String
+        switch rawName {
+        case "CTRL", "CONTROL":
+            canonicalName = "CTRL"
+        case "SHIFT":
+            canonicalName = "SHIFT"
+        case "ALT", "OPT", "OPTION":
+            canonicalName = "ALT"
+        case "CMD", "COMMAND", "WIN", "SUPER", "META":
+            canonicalName = "CMD"
+        default:
+            canonicalName = rawName
+        }
+
+        return isClosing ? "</\(canonicalName)>" : "<\(canonicalName)>"
+    }
+
     static func run(tokens: [String], intervalMs: Int) {
         let isVNC = AppStatus.activeConnectionProtocol == .vnc
         var pending: NSEvent.ModifierFlags = []
 
-        let delaySet: Set<String> = ["<DELAY05s>", "<DELAY1S>", "<DELAY2S>", "<DELAY5S>", "<DELAY10S>"]
+        let delaySet: Set<String> = ["<DELAY05S>", "<DELAY1S>", "<DELAY2S>", "<DELAY5S>", "<DELAY10S>"]
 
         for token in tokens {
-            switch token {
+            let normalizedToken = canonicalToken(token)
+            switch normalizedToken {
 
             // ── Open modifier tags ──────────────────────────────────────────
             case "<CTRL>":  pending.insert(.control)
@@ -291,7 +321,7 @@ private struct MacroExecutionEngine {
             case "<F12>":   sendKey(111, 0xFFC9, pending, isVNC)
 
             // ── Delays ──────────────────────────────────────────────────────
-            case "<DELAY05s>": usleep(500_000)
+            case "<DELAY05S>": usleep(500_000)
             case "<DELAY1S>":  usleep(1_000_000)
             case "<DELAY2S>":  usleep(2_000_000)
             case "<DELAY5S>":  usleep(5_000_000)
@@ -308,7 +338,7 @@ private struct MacroExecutionEngine {
             }
 
             // Inter-token delay (skip for explicit delay tokens)
-            if !delaySet.contains(token) {
+            if !delaySet.contains(normalizedToken) {
                 usleep(useconds_t(max(10, intervalMs) * 1_000))
             }
         }

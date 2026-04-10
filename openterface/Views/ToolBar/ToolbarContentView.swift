@@ -1,5 +1,37 @@
 import SwiftUI
 
+// A short platform label (e.g. "Win", "Linux") in a rounded-rectangle border.
+private struct TargetOSLogoView: View {
+    let system: ChatTargetSystem
+    var size: CGFloat = 16
+
+    private var label: String {
+        switch system {
+        case .macOS:   return "Mac"
+        case .windows: return "Win"
+        case .linux:   return "Linux"
+        case .iPhone:  return "iOS"
+        case .iPad:    return "iPadOS"
+        case .android: return "Android"
+        }
+    }
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: size * 0.55, weight: .semibold, design: .rounded))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .padding(.horizontal, size * 0.25)
+            .padding(.vertical,   size * 0.1)
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.3)
+                    .stroke(Color.primary.opacity(0.55), lineWidth: 1)
+            )
+            .accessibilityLabel(system.displayName)
+    }
+}
+
+
 struct ToolbarContentView: ToolbarContent {
     // Bindings and values provided by the parent App
     @Binding var showButtons: Bool
@@ -25,6 +57,7 @@ struct ToolbarContentView: ToolbarContent {
 
     // observe the shared serial manager directly so we track configuration state
     @ObservedObject private var concreteSerialPortMgr: SerialPortManager = SerialPortManager.shared
+    @ObservedObject private var userSettings: UserSettings = .shared
 
     // Action callbacks
     var handleSwitchToggle: (Bool) -> Void
@@ -144,6 +177,38 @@ struct ToolbarContentView: ToolbarContent {
                     .foregroundColor(colorForConnectionStatus(hasHdmiSignal))
             }
             .help("Click to view Target Aspect Ratio...")
+        }
+
+        ToolbarItem(placement: .automatic) {
+            Menu {
+                ForEach(ChatTargetSystem.allCases) { system in
+                    Button {
+                        userSettings.chatTargetSystem = system
+                        // Auto-switch keyboard layout to match the target OS.
+                        switch system {
+                        case .windows:
+                            userSettings.keyboardLayout = .windows
+                        case .linux:
+                            userSettings.keyboardLayout = .linux
+                        case .macOS, .iPhone, .iPad, .android:
+                            userSettings.keyboardLayout = .mac
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            TargetOSLogoView(system: system)
+                            Text(system.displayName)
+                            if system == userSettings.chatTargetSystem {
+                                Text("✓")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                TargetOSLogoView(system: userSettings.chatTargetSystem)
+            }
+            .help("Target OS: \(userSettings.chatTargetSystem.displayName)")
         }
 
         ToolbarItem(placement: .primaryAction) {

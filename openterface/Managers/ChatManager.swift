@@ -668,14 +668,16 @@ If timing matters for any other reason, add an explicit delay token and explain 
         var balances: [String: Int] = ["CTRL": 0, "SHIFT": 0, "ALT": 0, "CMD": 0]
 
         for token in tokens where token.hasPrefix("<") && token.hasSuffix(">") {
-            if token.hasPrefix("<MACRO:") {
+            let normalizedToken = normalizedGeneratedMacroToken(token)
+
+            if normalizedToken.hasPrefix("<MACRO:") {
                 throw NSError(domain: "ChatManager", code: 46, userInfo: [NSLocalizedDescriptionKey: "AI returned a macro reference token, which is not allowed in Magic generation."])
             }
-            guard macroGeneratorSupportedTokens.contains(token) else {
+            guard macroGeneratorSupportedTokens.contains(normalizedToken) else {
                 throw NSError(domain: "ChatManager", code: 47, userInfo: [NSLocalizedDescriptionKey: "AI returned an unsupported macro token: \(token)"])
             }
 
-            switch token {
+            switch normalizedToken {
             case "<CTRL>": balances["CTRL", default: 0] += 1
             case "</CTRL>":
                 guard balances["CTRL", default: 0] > 0 else {
@@ -709,6 +711,34 @@ If timing matters for any other reason, add an explicit delay token and explain 
         if let unclosedModifier {
             throw NSError(domain: "ChatManager", code: 52, userInfo: [NSLocalizedDescriptionKey: "AI returned an unclosed <\(unclosedModifier)> modifier tag."])
         }
+    }
+
+    private func normalizedGeneratedMacroToken(_ token: String) -> String {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("<"), trimmed.hasSuffix(">") else { return trimmed }
+
+        let isClosing = trimmed.hasPrefix("</")
+        let nameStart = trimmed.index(trimmed.startIndex, offsetBy: isClosing ? 2 : 1)
+        let nameEnd = trimmed.index(before: trimmed.endIndex)
+        let rawName = String(trimmed[nameStart..<nameEnd]).uppercased()
+
+        let canonicalName: String
+        switch rawName {
+        case "CTRL", "CONTROL":
+            canonicalName = "CTRL"
+        case "SHIFT":
+            canonicalName = "SHIFT"
+        case "ALT", "OPT", "OPTION":
+            canonicalName = "ALT"
+        case "CMD", "COMMAND", "WIN", "WINDOWS", "SUPER", "META":
+            canonicalName = "CMD"
+        case "DELAY05S":
+            canonicalName = "DELAY05s"
+        default:
+            canonicalName = rawName
+        }
+
+        return isClosing ? "</\(canonicalName)>" : "<\(canonicalName)>"
     }
 
     func sendMessage(_ text: String, attachmentFileURL: URL? = nil) {
@@ -902,6 +932,15 @@ If timing matters for any other reason, add an explicit delay token and explain 
         if confirmed {
             if UserSettings.shared.chatTargetSystem != resolvedSystem {
                 UserSettings.shared.chatTargetSystem = resolvedSystem
+                // Keep keyboard layout in sync with the confirmed target OS.
+                switch resolvedSystem {
+                case .windows:
+                    UserSettings.shared.keyboardLayout = .windows
+                case .linux:
+                    UserSettings.shared.keyboardLayout = .linux
+                case .macOS, .iPhone, .iPad, .android:
+                    UserSettings.shared.keyboardLayout = .mac
+                }
             }
 
             sendMessage("Confirmed. Proceed with \(resolvedSystem.displayName)-specific guidance and continue the current task.")

@@ -14,17 +14,26 @@ struct MacroPanelView: View {
     }
 
     @ObservedObject private var manager = MacroManager.shared
+    @ObservedObject private var userSettings: UserSettings = .shared
     @State private var editingMacro: Macro? = nil
     @State private var editingIndex: Int? = nil
     @State private var showEditor = false
     @State private var showVerifiedMacros = true
+    @State private var filterByOS = true
 
     private let columns = [GridItem(.adaptive(minimum: 88), spacing: 8)]
 
+    private var currentMacroTargetSystem: MacroTargetSystem? {
+        MacroTargetSystem(rawValue: userSettings.chatTargetSystem.rawValue)
+    }
+
     private var filteredMacros: [FilteredMacro] {
         manager.macros.enumerated().compactMap { entry in
-            let matchesFilter = showVerifiedMacros ? entry.element.isVerified : !entry.element.isVerified
-            guard matchesFilter else { return nil }
+            let matchesVerified = showVerifiedMacros ? entry.element.isVerified : !entry.element.isVerified
+            guard matchesVerified else { return nil }
+            if filterByOS, let osFilter = currentMacroTargetSystem {
+                guard entry.element.targetSystem == osFilter else { return nil }
+            }
             return FilteredMacro(index: entry.offset, macro: entry.element)
         }
     }
@@ -35,7 +44,26 @@ struct MacroPanelView: View {
             HStack {
                 Text("Macros")
                     .font(.headline)
+                if filterByOS, let os = currentMacroTargetSystem {
+                    Text(os.displayName)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.15))
+                        .clipShape(Capsule())
+                }
                 Spacer()
+                Button {
+                    filterByOS.toggle()
+                } label: {
+                    Image(systemName: filterByOS ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.body)
+                        .foregroundColor(filterByOS ? .accentColor : .secondary)
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .help(filterByOS ? "Showing macros for current target OS — click to show all" : "Showing all macros — click to filter by target OS")
+
                 Button {
                     showVerifiedMacros.toggle()
                 } label: {
@@ -74,11 +102,19 @@ struct MacroPanelView: View {
                     Text(showVerifiedMacros ? "No verified macros" : "No unverified macros")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    Text(showVerifiedMacros ? "Mark a macro as verified to show it in this view." : "Create or unverify a macro to show it in this view.")
-                        .font(.caption)
-                        .foregroundColor(.secondary.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
+                    if filterByOS, let os = currentMacroTargetSystem {
+                        Text("No \(showVerifiedMacros ? "verified" : "unverified") macros for \(os.displayName). Tap the filter icon to show all OS macros.")
+                            .font(.caption)
+                            .foregroundColor(.secondary.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    } else {
+                        Text(showVerifiedMacros ? "Mark a macro as verified to show it in this view." : "Create or unverify a macro to show it in this view.")
+                            .font(.caption)
+                            .foregroundColor(.secondary.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.vertical, 24)

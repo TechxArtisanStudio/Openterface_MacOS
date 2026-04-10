@@ -1334,6 +1334,7 @@ enum PasteBehavior: String, CaseIterable {
 enum KeyboardLayout: String, CaseIterable {
     case windows = "windows"
     case mac = "mac"
+    case linux = "linux"
     
     var displayName: String {
         switch self {
@@ -1341,6 +1342,8 @@ enum KeyboardLayout: String, CaseIterable {
             return "Windows Mode"
         case .mac:
             return "Mac Mode"
+        case .linux:
+            return "Linux Mode"
         }
     }
     
@@ -1350,6 +1353,8 @@ enum KeyboardLayout: String, CaseIterable {
             return "Optimized for Windows targets"
         case .mac:
             return "Optimized for Mac targets"
+        case .linux:
+            return "Optimized for Linux targets"
         }
     }
 }

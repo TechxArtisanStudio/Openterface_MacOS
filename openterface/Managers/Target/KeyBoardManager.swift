@@ -46,6 +46,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     @Published var isRightCtrlHeld = false
     @Published var isLeftAltHeld = false
     @Published var isRightAltHeld = false
+    @Published var isWinHeld = false
     @Published var isCapsLockOn = false {
         didSet {
             guard oldValue != isCapsLockOn else { return }
@@ -78,7 +79,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
     }
     
-    // Function to toggle between Windows and Mac keyboard layouts
+    // Function to toggle between Windows, Mac, and Linux keyboard layouts
     func toggleKeyboardLayout() {
         objectWillChange.send()
         let oldLayout = currentKeyboardLayout
@@ -86,6 +87,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         case .mac:
             currentKeyboardLayout = .windows
         case .windows:
+            currentKeyboardLayout = .linux
+        case .linux:
             currentKeyboardLayout = .mac
         }
         objectWillChange.send()
@@ -106,6 +109,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         
         switch currentKeyboardLayout {
         case .windows:
+            remappedKey = getWindowsModeMapping(sourceKey: sourceKey, sourceModifier: sourceModifier, isLeft: isLeft)
+        case .linux:
             remappedKey = getWindowsModeMapping(sourceKey: sourceKey, sourceModifier: sourceModifier, isLeft: isLeft)
         case .mac:
             remappedKey = sourceKey // In Mac mode, keep original key codes
@@ -278,6 +283,19 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         isRightAltHeld.toggle()
     }
+
+    func toggleWin() {
+        if let key = kbm.fromSpecialKeyToKeyCode(code: KeyboardMapper.SpecialKey.win) {
+            if isWinHeld {
+                releaseAndUpdateModifierKeyWithoutState(keyCode: key, logMessage: "🪟 Released Win/Cmd key (toggle)")
+                isWinHeld = false
+            } else {
+                pressAndUpdateModifierKeyWithoutState(keyCode: key)
+                isWinHeld = true
+            }
+        }
+        objectWillChange.send()
+    }
     
     func toggleCapsLock() {
         isCapsLockOn.toggle()
@@ -383,8 +401,29 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         return parts.joined(separator: ", ")
     }
 
+    private func modifierKeyName(for keyCode: UInt16) -> String {
+        switch keyCode {
+        case 56: return "LeftShift"
+        case 60: return "RightShift"
+        case 59: return "LeftCtrl"
+        case 62: return "RightCtrl"
+        case 58: return "LeftAlt"
+        case 61: return "RightAlt"
+        case 55: return "LeftCmd"
+        case 54: return "RightCmd"
+        case 57: return "CapsLock"
+        default: return ""
+        }
+    }
+
     private func logEventRouting(_ prefix: String, event: NSEvent, details: String) {
-        let chars = event.charactersIgnoringModifiers ?? event.characters ?? ""
+        let chars: String
+        if event.type == .flagsChanged {
+            // `charactersIgnoringModifiers` can be invalid for modifier-only events.
+            chars = modifierKeyName(for: event.keyCode)
+        } else {
+            chars = event.charactersIgnoringModifiers ?? event.characters ?? ""
+        }
         logger.log(content: "⌨️ [\(prefix)] type=\(eventKindDescription(event)), keyCode=\(event.keyCode), chars='\(chars)', window={\(describeWindow(event.window))}, firstResponder={\(describeResponder(event.window?.firstResponder))}, details={\(details)}")
     }
     
@@ -1029,7 +1068,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             releaseAndUpdateModifierKey(keyCode: rightAltRemapped, isHeld: &isRightAltHeld, logMessage: "Released right alt for paste")
         }
         
-        // Release command keys if they're being held (they don't have state variables but might be in pressedKeys)
+        // Release Win/Cmd key if held via on-screen button
+        if isWinHeld {
+            if let key = kbm.fromSpecialKeyToKeyCode(code: KeyboardMapper.SpecialKey.win) {
+                releaseAndUpdateModifierKeyWithoutState(keyCode: key, logMessage: "Released Win/Cmd key for paste")
+            }
+            isWinHeld = false
+        }
+        
+        // Release command keys if they're being held (from physical keyboard, may differ after remapping)
         let leftCmdRemapped = getRemappedKeyCode(sourceKey: 55, sourceModifier: .command, isLeft: true)
         let rightCmdRemapped = getRemappedKeyCode(sourceKey: 54, sourceModifier: .command, isLeft: false)
         
@@ -1057,7 +1104,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             self.pressedCharacter = text
         }
         
-        // Release all modifier keys before starting paste operation
+        // Capture on-screen toggle modifier state BEFORE releasing, so sticky modifier
+        // buttons (Ctrl, Alt, Shift) apply to the character being typed.
+        let savedCtrl = isLeftCtrlHeld || isRightCtrlHeld
+        let savedAlt  = isLeftAltHeld  || isRightAltHeld
+        let savedShift = isLeftShiftHeld || isRightShiftHeld
+        
+        // Release all modifier keys (clears physical key state and toggle flags)
         releaseAllModifierKeys()
         
         // Send text to keyboard
@@ -1066,8 +1119,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // Convert character to keyboard key code
             let char = Character(String(UnicodeScalar(charString))) // Convert UTF-8 encoding back to character
             
-            // Get modifiers for character including currently held Ctrl/Alt and shift if needed
-            let modifiers = getCurrentModifiersForCharacter(char)
+            // Build modifiers from saved on-screen toggle state plus character shift requirements
+            var modifiers = NSEvent.ModifierFlags()
+            if savedCtrl  { modifiers.insert(.control) }
+            if savedAlt   { modifiers.insert(.option) }
+            if savedShift || char.isUppercase || KeyboardManager.SHIFT_KEYS.contains(String(char)) {
+                modifiers.insert(.shift)
+            }
             
             kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
             Thread.sleep(forTimeInterval: 0.03) // Wait for 30 milliseconds
@@ -1130,7 +1188,10 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 // Apply keyboard layout remapping for this combination
                 switch currentKeyboardLayout {
                 case .windows:
-                    // In Windows mode, Cmd should be sent as Ctrl (for Windows shortcuts)
+                    // In Windows mode, Cmd+Space should be sent as Ctrl+Space (for Windows shortcuts)
+                    kbm.pressKey(keys: [key], modifiers: [.control])
+                case .linux:
+                    // In Linux mode, Cmd should be sent as Ctrl (for Linux shortcuts)
                     kbm.pressKey(keys: [key], modifiers: [.control])
                 case .mac:
                     // In Mac mode, keep as Command
@@ -1161,13 +1222,25 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     // MARK: - KeyboardManagerProtocol Implementation
 
     func sendKeyboardInput(_ input: KeyboardInput) {
-        // Convert protocol input to existing method call
-        // Implementation would depend on existing keyboard input methods
+        if !pressedKeys.contains(input.keyCode) {
+            if let index = pressedKeys.firstIndex(of: 255) {
+                pressedKeys[index] = input.keyCode
+                kbm.pressKey(keys: pressedKeys, modifiers: input.modifiers)
+                Thread.sleep(forTimeInterval: 0.005)
+                kbm.releaseKey(keys: pressedKeys)
+                pressedKeys[index] = 255
+            }
+        }
     }
     
     func sendSpecialKey(_ key: SpecialKey) {
-        // Convert protocol special key to existing method call
-        // Implementation would depend on existing special key methods
+        if let index = pressedKeys.firstIndex(of: 255) {
+            pressedKeys[index] = key.keyCode
+            kbm.pressKey(keys: pressedKeys, modifiers: getCurrentModifiersForSpecialKey())
+            Thread.sleep(forTimeInterval: 0.005)
+            kbm.releaseKey(keys: pressedKeys)
+            pressedKeys[index] = 255
+        }
     }
     
     func executeKeyboardMacro(_ macro: KeyboardMacro) {
