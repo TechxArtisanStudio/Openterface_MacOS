@@ -299,7 +299,10 @@ class WCHHexFileParser {
                 for (i, byte) in lineData.enumerated() { memoryMap[base + UInt32(i)] = byte }
             case 0x01:
                 break
-            case 0x02, 0x04:
+            case 0x02: // Extended Segment Address: segment value × 16
+                guard lineData.count == 2 else { throw WCHHexParseError.invalidRecordData }
+                extendedBase = ((UInt32(lineData[0]) << 8) | UInt32(lineData[1])) << 4
+            case 0x04: // Extended Linear Address: upper 16 bits
                 guard lineData.count == 2 else { throw WCHHexParseError.invalidRecordData }
                 extendedBase = (UInt32(lineData[0]) << 24) | (UInt32(lineData[1]) << 16)
             case 0x05:

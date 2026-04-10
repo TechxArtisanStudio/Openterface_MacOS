@@ -31,7 +31,7 @@ class WCHISPManager: ObservableObject {
     // MARK: - Device scanning
 
     func scanDevices() {
-        let count = WCHUSBTransport.scanDevices()
+        let count = WCHLibusbTransport.scanDevices()
         availableDeviceCount = count
         if count == 0 {
             statusMessage = "No WCH device found in ISP mode"
@@ -53,7 +53,7 @@ class WCHISPManager: ObservableObject {
         isError = false
 
         do {
-            let transport = try WCHUSBTransport(deviceIndex: deviceIndex)
+            let transport = try WCHLibusbTransport(deviceIndex: deviceIndex)
             let f = try WCHFlashing(transport: transport)
             flashing = f
             chipInfo = f.getChipInfo()

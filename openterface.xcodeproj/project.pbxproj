@@ -37,10 +37,9 @@
 		53FBE7DD2B3D6AE5007785B0 /* PlayerContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DC2B3D6AE5007785B0 /* PlayerContainerView.swift */; };
 		53FBE7E02B3D6BA6007785B0 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7DF2B3D6BA6007785B0 /* PlayerViewModel.swift */; };
 		53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */; };
+		61450E4925F748AEBDC842BD /* RDPCredSSPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */; };
 		6B2450A32EFE5FA500BE14D8 /* FullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B2450A22EFE5FA500BE14D8 /* FullScreenView.swift */; };
 		6B487A0F2EF24F2700CD664D /* InputOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */; };
-		A1B2C3F62F12345600ABCDEF /* KVMFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F72F12345600ABCDEF /* KVMFrameView.swift */; };
-		A1B2C3F32F12345600ABCDEF /* VNCFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */; };
 		6B60EB7F2E0E7C39006874D3 /* FirmwareUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */; };
 		6B7A12692EFA42060056FC15 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */; };
 		6B7A126B2EFA42320056FC15 /* DiagnosticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7A126A2EFA42320056FC15 /* DiagnosticsViewModel.swift */; };
@@ -52,9 +51,6 @@
 		6B99F59C2E9A6C650073CDA2 /* MS2109VideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */; };
 		6B99F59D2E9A6C650073CDA2 /* MS2130SVideoChipset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */; };
 		6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */; };
-		AA001VNC2E9B00000073CDA2 /* VNCConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */; };
-		61450E4925F748AEBDC842BD /* RDPCredSSPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */; };
-		BB001RDP2F000001DEADBEEF /* RDPConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB001RDP2F000000DEADBEEF /* RDPConnectionTests.swift */; };
 		6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */; };
 		6BAFF00F2E03E8C9004331F6 /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAFF00E2E03E8C9004331F6 /* KeysView.swift */; };
 		6BBCBA992ECEBEF200DFF2DE /* InputMonitorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */; };
@@ -64,17 +60,22 @@
 		6BDA61202CF5CC13008A545E /* TipLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA611F2CF5CC13008A545E /* TipLayerManager.swift */; };
 		6BFCEC852F0A1CBD00CDE096 /* AspectRatioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BFCEC842F0A1CBD00CDE096 /* AspectRatioSettingsView.swift */; };
 		8678CC4677691D04E85AAD4D /* ChatWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E96037EF91732400B90B037 /* ChatWindowManager.swift */; };
+		914020FD06BFA746DFDA0018 /* ChatAttachmentViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD8EF43D4643AD20AFB4336 /* ChatAttachmentViewer.swift */; };
+		A1B2C3D42F12345600ABCDEF /* ChatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F12345600ABCDEF /* ChatManager.swift */; };
 		A1B2C3F12F12345600ABCDEF /* VNCClientManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */; };
+		A1B2C3F32F12345600ABCDEF /* VNCFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */; };
+		A1B2C3F62F12345600ABCDEF /* KVMFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F72F12345600ABCDEF /* KVMFrameView.swift */; };
 		A1B2C3F82F12345600ABCDEF /* RFBProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */; };
 		A1B2C3FA2F12345600ABCDEF /* RFBSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */; };
 		A1B2C3FD2F12345600ABCDEF /* RDPClientManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3FC2F12345600ABCDEF /* RDPClientManager.swift */; };
 		A1B2C3FF2F12345600ABCDEF /* RDPProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3FE2F12345600ABCDEF /* RDPProtocol.swift */; };
 		A1B2C4012F12345600ABCDEF /* RDPSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4002F12345600ABCDEF /* RDPSecurity.swift */; };
+		A1B2C4032F12345600ABCDEF /* RDPFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4022F12345600ABCDEF /* RDPFrameView.swift */; };
 		A1B2C4052F12345600ABCDEF /* RDPTLSChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4042F12345600ABCDEF /* RDPTLSChannel.swift */; };
 		A1B2C4072F12345600ABCDEF /* RDPNTLMAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4062F12345600ABCDEF /* RDPNTLMAuth.swift */; };
-		A1B2C4032F12345600ABCDEF /* RDPFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4022F12345600ABCDEF /* RDPFrameView.swift */; };
-		914020FD06BFA746DFDA0018 /* ChatAttachmentViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD8EF43D4643AD20AFB4336 /* ChatAttachmentViewer.swift */; };
-		A1B2C3D42F12345600ABCDEF /* ChatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F12345600ABCDEF /* ChatManager.swift */; };
+		AA001VNC2E9B00000073CDA2 /* VNCConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */; };
+		BB001RDP2F000001DEADBEEF /* RDPConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB001RDP2F000000DEADBEEF /* RDPConnectionTests.swift */; };
+		BB5C4A3E462F4851BD5309D4 /* WCHFlashSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */; };
 		BF149D4E2E3BD7BA003EA6AF /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */; };
 		BF7752DB2EFFE51000FE5D0E /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DA2EFFE51000FE5D0E /* BlockingView.swift */; };
 		BF7752DD2EFFE72400FE5D0E /* OverlayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7752DC2EFFE72400FE5D0E /* OverlayManager.swift */; };
@@ -95,9 +96,7 @@
 		BFA445742F016E3E005D2937 /* AudioVideoSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445732F016E3E005D2937 /* AudioVideoSettingsView.swift */; };
 		BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */; };
 		BFA445782F016FEA005D2937 /* DeviceConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */; };
-		C1A2B3C42F1A000100ABCDEF /* RemoteControlSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */; };
 		BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */; };
-		BB5C4A3E462F4851BD5309D4 /* WCHFlashSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */; };
 		BFA4457C2F017758005D2937 /* LogViewerDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA4457B2F017758005D2937 /* LogViewerDialog.swift */; };
 		BFABE3AE2EF678F300915509 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFABE3AD2EF678F300915509 /* AppVersion.swift */; };
 		BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */; };
@@ -110,11 +109,12 @@
 		BFDE57CC2E113B30000BB8BB /* FirmwareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */; };
 		BFDE57CE2E116383000BB8BB /* EdidNameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFDE57CD2E116383000BB8BB /* EdidNameView.swift */; };
 		BFF4C5132B68986000EEB092 /* ORSSerial in Frameworks */ = {isa = PBXBuildFile; productRef = BFF4C5122B68986000EEB092 /* ORSSerial */; };
-		F1FEEE262F7515A900811C27 /* MS2130SFlashManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */; };
+		C1A2B3C42F1A000100ABCDEF /* RemoteControlSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */; };
 		C383C071B84F964E918083E9 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0855F0E55FCEA43A3D3C57BE /* ChatBubbleView.swift */; };
 		C552FAA6BE840D398AC7C509 /* ChatInputTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D25FAE7DD3C66A4028D252F /* ChatInputTextView.swift */; };
 		D5573ADD3E2B5313B22E57D1 /* GuideTraceDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4EAA3FD308EDC63FF1C1EB /* GuideTraceDialog.swift */; };
 		D714C6FCD2ED72560AE19235 /* ChatPlanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197123805EF0374ECCFDBBFA /* ChatPlanCardView.swift */; };
+		F1FEEE262F7515A900811C27 /* MS2130SFlashManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,8 +171,6 @@
 		53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		6B2450A22EFE5FA500BE14D8 /* FullScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenView.swift; sourceTree = "<group>"; };
 		6B487A0E2EF24F2700CD664D /* InputOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputOverlayView.swift; sourceTree = "<group>"; };
-		A1B2C3F72F12345600ABCDEF /* KVMFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMFrameView.swift; sourceTree = "<group>"; };
-		A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCFrameView.swift; sourceTree = "<group>"; };
 		6B60EB7E2E0E7C39006874D3 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareUpdateView.swift; sourceTree = "<group>"; };
 		6B7A12682EFA42060056FC15 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		6B7A126A2EFA42320056FC15 /* DiagnosticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsViewModel.swift; sourceTree = "<group>"; };
@@ -184,9 +182,6 @@
 		6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2109VideoChipset.swift; sourceTree = "<group>"; };
 		6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MS2130SVideoChipset.swift; sourceTree = "<group>"; };
 		6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManagerTests.swift; sourceTree = "<group>"; };
-		FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPCredSSPTests.swift; sourceTree = "<group>"; };
-		BB001RDP2F000000DEADBEEF /* RDPConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPConnectionTests.swift; sourceTree = "<group>"; };
-		AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCConnectionTests.swift; sourceTree = "<group>"; };
 		6BAFEFD12E03B8E3004331F6 /* VideoOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutputDelegate.swift; sourceTree = "<group>"; };
 		6BAFF00E2E03E8C9004331F6 /* KeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
 		6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMonitorManager.swift; sourceTree = "<group>"; };
@@ -198,16 +193,20 @@
 		6D25FAE7DD3C66A4028D252F /* ChatInputTextView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatInputTextView.swift; sourceTree = "<group>"; };
 		A1B2C3D52F12345600ABCDEF /* ChatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatManager.swift; sourceTree = "<group>"; };
 		A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCClientManager.swift; sourceTree = "<group>"; };
+		A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCFrameView.swift; sourceTree = "<group>"; };
+		A1B2C3F72F12345600ABCDEF /* KVMFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMFrameView.swift; sourceTree = "<group>"; };
 		A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFBProtocol.swift; sourceTree = "<group>"; };
 		A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFBSecurity.swift; sourceTree = "<group>"; };
 		A1B2C3FC2F12345600ABCDEF /* RDPClientManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPClientManager.swift; sourceTree = "<group>"; };
 		A1B2C3FE2F12345600ABCDEF /* RDPProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPProtocol.swift; sourceTree = "<group>"; };
 		A1B2C4002F12345600ABCDEF /* RDPSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPSecurity.swift; sourceTree = "<group>"; };
+		A1B2C4022F12345600ABCDEF /* RDPFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPFrameView.swift; sourceTree = "<group>"; };
 		A1B2C4042F12345600ABCDEF /* RDPTLSChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPTLSChannel.swift; sourceTree = "<group>"; };
 		A1B2C4062F12345600ABCDEF /* RDPNTLMAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPNTLMAuth.swift; sourceTree = "<group>"; };
-		A1B2C4022F12345600ABCDEF /* RDPFrameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPFrameView.swift; sourceTree = "<group>"; };
 		A23229FA0C4928FC050BD5DC /* ChatWindowRootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatWindowRootView.swift; sourceTree = "<group>"; };
+		AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNCConnectionTests.swift; sourceTree = "<group>"; };
 		AB4EAA3FD308EDC63FF1C1EB /* GuideTraceDialog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuideTraceDialog.swift; sourceTree = "<group>"; };
+		BB001RDP2F000000DEADBEEF /* RDPConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPConnectionTests.swift; sourceTree = "<group>"; };
 		BD664382B7A4996C4BF55CEE /* TaskStepTraceDialog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStepTraceDialog.swift; sourceTree = "<group>"; };
 		BF149D4D2E3BD7BA003EA6AF /* PermissionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
 		BF26C90F2B6CCDE600ED6B96 /* openterface-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "openterface-Info.plist"; sourceTree = "<group>"; };
@@ -233,9 +232,7 @@
 		BFA445732F016E3E005D2937 /* AudioVideoSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioVideoSettingsView.swift; sourceTree = "<group>"; };
 		BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardOCRSettingsView.swift; sourceTree = "<group>"; };
 		BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeviceConnectionSettingsView.swift; sourceTree = "<group>"; };
-		C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteControlSettingsView.swift; sourceTree = "<group>"; };
 		BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdvancedDebugSettingsView.swift; sourceTree = "<group>"; };
-		D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WCHFlashSettingsView.swift; sourceTree = "<group>"; };
 		BFA4457B2F017758005D2937 /* LogViewerDialog.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogViewerDialog.swift; sourceTree = "<group>"; };
 		BFABE3AD2EF678F300915509 /* AppVersion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardWindowController.swift; sourceTree = "<group>"; };
@@ -247,7 +244,10 @@
 		BFD4EA972E369C870029BFC2 /* CameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		BFDE57CB2E113B30000BB8BB /* FirmwareManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirmwareManager.swift; sourceTree = "<group>"; };
 		BFDE57CD2E116383000BB8BB /* EdidNameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdidNameView.swift; sourceTree = "<group>"; };
+		C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteControlSettingsView.swift; sourceTree = "<group>"; };
+		D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WCHFlashSettingsView.swift; sourceTree = "<group>"; };
 		F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MS2130SFlashManager.swift; sourceTree = "<group>"; };
+		FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPCredSSPTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -433,39 +433,6 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		A1B2C4102F12345600ABCDEF /* Remote */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C4112F12345600ABCDEF /* Managers */,
-				A1B2C4122F12345600ABCDEF /* Views */,
-			);
-			path = Remote;
-			sourceTree = "<group>";
-		};
-		A1B2C4112F12345600ABCDEF /* Managers */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */,
-				A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */,
-				A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */,
-				A1B2C3FC2F12345600ABCDEF /* RDPClientManager.swift */,
-				A1B2C3FE2F12345600ABCDEF /* RDPProtocol.swift */,
-				A1B2C4002F12345600ABCDEF /* RDPSecurity.swift */,
-				A1B2C4042F12345600ABCDEF /* RDPTLSChannel.swift */,
-				A1B2C4062F12345600ABCDEF /* RDPNTLMAuth.swift */,
-			);
-			path = Managers;
-			sourceTree = "<group>";
-		};
-		A1B2C4122F12345600ABCDEF /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */,
-				A1B2C4022F12345600ABCDEF /* RDPFrameView.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		53FBE7DE2B3D6B60007785B0 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -503,6 +470,39 @@
 				6BC364632F025DD4001B9A07 /* WindowUtils.swift */,
 			);
 			path = ToolBar;
+			sourceTree = "<group>";
+		};
+		A1B2C4102F12345600ABCDEF /* Remote */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C4112F12345600ABCDEF /* Managers */,
+				A1B2C4122F12345600ABCDEF /* Views */,
+			);
+			path = Remote;
+			sourceTree = "<group>";
+		};
+		A1B2C4112F12345600ABCDEF /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3F02F12345600ABCDEF /* VNCClientManager.swift */,
+				A1B2C3F92F12345600ABCDEF /* RFBProtocol.swift */,
+				A1B2C3FB2F12345600ABCDEF /* RFBSecurity.swift */,
+				A1B2C3FC2F12345600ABCDEF /* RDPClientManager.swift */,
+				A1B2C3FE2F12345600ABCDEF /* RDPProtocol.swift */,
+				A1B2C4002F12345600ABCDEF /* RDPSecurity.swift */,
+				A1B2C4042F12345600ABCDEF /* RDPTLSChannel.swift */,
+				A1B2C4062F12345600ABCDEF /* RDPNTLMAuth.swift */,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		A1B2C4122F12345600ABCDEF /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3F42F12345600ABCDEF /* VNCFrameView.swift */,
+				A1B2C4022F12345600ABCDEF /* RDPFrameView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		BF7752D92EFFE51000FE5D0E /* Parallel */ = {
@@ -1005,6 +1005,10 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/opt/homebrew/include,
+				);
 				INFOPLIST_FILE = "openterface-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = openterface;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -1016,9 +1020,16 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.25;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"/opt/homebrew/lib/libusb-1.0.a",
+					"-framework IOKit",
+					"-framework Security",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "openterface/WCHLibusb-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -1041,6 +1052,10 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/opt/homebrew/include,
+				);
 				INFOPLIST_FILE = "openterface-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = openterface;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -1052,9 +1067,16 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.25;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"/opt/homebrew/lib/libusb-1.0.a",
+					"-framework IOKit",
+					"-framework Security",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "openterface/WCHLibusb-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
