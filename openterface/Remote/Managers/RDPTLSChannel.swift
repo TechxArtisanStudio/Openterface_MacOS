@@ -107,6 +107,26 @@ final class RDPTLSChannel {
         self.queue = queue
     }
 
+    private func connectionFailureDetail(forSocketError code: Int32, host: String, port: Int) -> String {
+        switch code {
+        case 51:
+            return "Cannot reach \(host):\(port). The network is unreachable. Check that the host is online, the address is correct, and any VPN or routing required for that network is active."
+        case 60:
+            return "Timed out while connecting to \(host):\(port). Check that the host is reachable and that the RDP port is open."
+        case 61:
+            return "Connection to \(host):\(port) was refused. Verify that Remote Desktop is enabled on the host and that the port is correct."
+        case 64, 65:
+            return "The remote host \(host) is unreachable. Check the address, network path, and firewall settings."
+        default:
+            let systemMessage = String(cString: Darwin.strerror(code))
+            return "Failed to connect to \(host):\(port): \(systemMessage)"
+        }
+    }
+
+    private func connectionFailureDetail(forErrno code: Int32, host: String, port: Int) -> String {
+        connectionFailureDetail(forSocketError: code, host: host, port: port)
+    }
+
     deinit { close() }
 
     // MARK: - Connect
@@ -181,18 +201,22 @@ final class RDPTLSChannel {
                             fcntl(fd, F_SETFL, origFlags & ~O_NONBLOCK)
                             return fd
                         }
-                        connectError = "connect SO_ERROR=\(soErr)"
+                        connectError = self.connectionFailureDetail(forSocketError: soErr, host: host, port: port)
                     } else {
-                        connectError = n == 0 ? "connect timed out" : "select errno=\(errno)"
+                        if n == 0 {
+                            connectError = self.connectionFailureDetail(forSocketError: 60, host: host, port: port)
+                        } else {
+                            connectError = self.connectionFailureDetail(forErrno: errno, host: host, port: port)
+                        }
                     }
                 } else {
-                    connectError = "connect errno=\(errno)"
+                    connectError = self.connectionFailureDetail(forErrno: errno, host: host, port: port)
                 }
                 Darwin.close(fd)
             }
             ai = info.pointee.ai_next
         }
-        throw RDPTLSError.connectFailed("\(host):\(port) – \(connectError)")
+        throw RDPTLSError.connectFailed(connectError)
     }
 
     // MARK: - TLS Upgrade

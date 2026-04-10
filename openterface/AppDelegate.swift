@@ -46,6 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var pendingWindowSizeUpdateAfterResize = false
     private var shouldRestoreAspectRatioAfterLiveResize = false
     private var liveResizeAxis: LiveResizeAxis?
+    private var isShowingProtocolErrorAlert = false
+    private var lastProtocolErrorAlertKey: String?
 
     private func scalarSummary(_ value: CGFloat) -> String {
         guard value.isFinite else {
@@ -179,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         NotificationCenter.default.addObserver(self, selector: #selector(handleVNCDisconnectRequested(_:)), name: Notification.Name("VNCDisconnectRequested"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleRDPConnectRequested(_:)), name: Notification.Name("RDPConnectRequested"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleRDPDisconnectRequested(_:)), name: Notification.Name("RDPDisconnectRequested"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleProtocolErrorNotification(_:)), name: .protocolErrorOccurred, object: nil)
     }
 
     deinit {
@@ -324,6 +327,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func handleRDPDisconnectRequested(_ notification: Notification) {
         RDPClientManager.shared.disconnect()
+    }
+
+    @objc private func handleProtocolErrorNotification(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let mode = userInfo[ProtocolErrorUserInfoKeys.mode] as? ConnectionProtocolMode,
+              let message = userInfo[ProtocolErrorUserInfoKeys.message] as? String,
+              !message.isEmpty,
+              mode == AppStatus.activeConnectionProtocol else {
+            return
+        }
+
+        let alertKey = "\(mode.rawValue):\(message)"
+        if isShowingProtocolErrorAlert && lastProtocolErrorAlertKey == alertKey {
+            return
+        }
+
+        isShowingProtocolErrorAlert = true
+        lastProtocolErrorAlertKey = alertKey
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "\(mode.displayName) Connection Error"
+            alert.informativeText = message
+            alert.addButton(withTitle: "OK")
+
+            let completion: () -> Void = { [weak self] in
+                self?.isShowingProtocolErrorAlert = false
+            }
+
+            if let window = NSApplication.shared.mainWindow ?? NSApplication.shared.windows.first(where: { $0.isVisible }) {
+                alert.beginSheetModal(for: window) { _ in
+                    completion()
+                }
+            } else {
+                alert.runModal()
+                completion()
+            }
+        }
     }
 
     private func applyConnectionProtocolMode(_ mode: ConnectionProtocolMode, reason: String) {
@@ -816,6 +860,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// Compute the aspect ratio currently selected by user settings.
     /// Falls back to initialContentSize when runtime data is unavailable.
     private func desiredAspectRatio() -> CGFloat {
+        if AppStatus.activeConnectionProtocol == .vnc || AppStatus.activeConnectionProtocol == .rdp {
+            let remoteWidth = CGFloat(AppStatus.remoteFramebufferWidth)
+            let remoteHeight = CGFloat(AppStatus.remoteFramebufferHeight)
+            if remoteWidth > 0, remoteHeight > 0 {
+                return remoteWidth / remoteHeight
+            }
+        }
+
         switch UserSettings.shared.aspectRatioMode {
         case .custom:
             return UserSettings.shared.customAspectRatio.widthToHeightRatio

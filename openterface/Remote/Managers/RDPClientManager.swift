@@ -355,6 +355,16 @@ final class RDPClientManager: RDPClientManagerProtocol {
         logger.log(content: "RDP error: \(message)")
         AppStatus.protocolSessionState = .error
         AppStatus.protocolLastErrorMessage = message
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .protocolErrorOccurred,
+                object: nil,
+                userInfo: [
+                    ProtocolErrorUserInfoKeys.mode: ConnectionProtocolMode.rdp,
+                    ProtocolErrorUserInfoKeys.message: message
+                ]
+            )
+        }
     }
 
     fileprivate func send(_ data: Data) {

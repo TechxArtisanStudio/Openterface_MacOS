@@ -50,6 +50,7 @@ struct ToolbarContentView: ToolbarContent {
     private var mouseManager: MouseManagerProtocol { DependencyContainer.shared.resolve(MouseManagerProtocol.self) }
     private var chatWindowManager: ChatWindowManagerProtocol { DependencyContainer.shared.resolve(ChatWindowManagerProtocol.self) }
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
+    private var shouldShowHardwareToggle: Bool { UserSettings.shared.connectionProtocolMode == .kvm }
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .automatic) {
@@ -170,34 +171,36 @@ struct ToolbarContentView: ToolbarContent {
         }
 
         ToolbarItem(placement: .automatic) {
-            Button(action: {
-                showUSBDevices()
-            }) {
-                HStack {
-                    Image(systemName: "keyboard.fill")
-                        .resizable()
-                        .frame(width: 16, height: 12)
-                        .foregroundColor(colorForConnectionStatus(isKeyboardConnected))
-                    Image(systemName: isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
-                        .resizable()
-                        .frame(width: isMouseLoopRunning ? 14 : 10, height: 12)
-                        .foregroundColor(colorForConnectionStatus(isMouseConnected))
+            if shouldShowHardwareToggle {
+                Button(action: {
+                    showUSBDevices()
+                }) {
+                    HStack {
+                        Image(systemName: "keyboard.fill")
+                            .resizable()
+                            .frame(width: 16, height: 12)
+                            .foregroundColor(colorForConnectionStatus(isKeyboardConnected))
+                        Image(systemName: isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
+                            .resizable()
+                            .frame(width: isMouseLoopRunning ? 14 : 10, height: 12)
+                            .foregroundColor(colorForConnectionStatus(isMouseConnected))
+                    }
                 }
-            }
-            .help(
-                """
-                KeyBoard: \(
-                    isKeyboardConnected == true ? "Connected" :
-                    isKeyboardConnected == false ? "Not found" : "Unknown"
-                )
-                Mouse: \(
-                    isMouseConnected == true ? "Connected" :
-                    isMouseConnected == false ? "Not found" : "Unknown"
-                )
+                .help(
+                    """
+                    KeyBoard: \(
+                        isKeyboardConnected == true ? "Connected" :
+                        isKeyboardConnected == false ? "Not found" : "Unknown"
+                    )
+                    Mouse: \(
+                        isMouseConnected == true ? "Connected" :
+                        isMouseConnected == false ? "Not found" : "Unknown"
+                    )
 
-                Click to view USB device details
-                """
-            )
+                    Click to view USB device details
+                    """
+                )
+            }
         }
 
         ToolbarItem(placement: .automatic) {
@@ -249,26 +252,30 @@ struct ToolbarContentView: ToolbarContent {
         }
 
         ToolbarItem(placement: .automatic) {
-            Button(action: {}) {
-                Image(systemName: "poweron") // spacer
+            if shouldShowHardwareToggle {
+                Button(action: {}) {
+                    Image(systemName: "poweron") // spacer
+                }
+                .disabled(true)
+                .buttonStyle(PlainButtonStyle())
             }
-            .disabled(true)
-            .buttonStyle(PlainButtonStyle())
         }
 
         ToolbarItemGroup(placement: .automatic) {
-            Toggle(isOn: $switchToTarget) {
-                HStack {
-                    Image(switchToTarget ? "Target_icon" : "Host_icon")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 15)
-                    Text(switchToTarget ? "Target" : "Host")
+            if shouldShowHardwareToggle {
+                Toggle(isOn: $switchToTarget) {
+                    HStack {
+                        Image(switchToTarget ? "Target_icon" : "Host_icon")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 20, height: 15)
+                        Text(switchToTarget ? "Target" : "Host")
+                    }
                 }
-            }
-            .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-            .onChange(of: switchToTarget) { newValue in
-                handleSwitchToggle(newValue)
+                .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                .onChange(of: switchToTarget) { newValue in
+                    handleSwitchToggle(newValue)
+                }
             }
         }
     }

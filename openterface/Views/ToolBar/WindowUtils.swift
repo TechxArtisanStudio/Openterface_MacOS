@@ -166,32 +166,42 @@ final class WindowUtils {
         // Determine the aspect ratio to use based on aspectRatioMode
         let rawAspectRatio: CGFloat
 
-        switch UserSettings.shared.aspectRatioMode {
-        case .custom:
-            rawAspectRatio = UserSettings.shared.customAspectRatio.widthToHeightRatio
-        case .hidResolution:
-            // Try to use HID resolution first
-            if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                rawAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-            } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
-                rawAspectRatio = CGFloat(resolution.width) / CGFloat(resolution.height)
+        if AppStatus.activeConnectionProtocol == .vnc || AppStatus.activeConnectionProtocol == .rdp {
+            let remoteWidth = CGFloat(AppStatus.remoteFramebufferWidth)
+            let remoteHeight = CGFloat(AppStatus.remoteFramebufferHeight)
+            if remoteWidth > 0, remoteHeight > 0 {
+                rawAspectRatio = remoteWidth / remoteHeight
             } else {
-                // Fallback to initial content size if HID resolution not available
                 rawAspectRatio = initialContentSize.width / initialContentSize.height
             }
-        case .activeResolution:
-            // Use active video rect if available
-            let activeVideoRect = AppStatus.activeVideoRect
-            if activeVideoRect.width > 0 && activeVideoRect.height > 0 {
-                rawAspectRatio = activeVideoRect.width / activeVideoRect.height
-            } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
-                // Fallback to HID resolution if active rect not available
-                rawAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
-            } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
-                rawAspectRatio = CGFloat(resolution.width) / CGFloat(resolution.height)
-            } else {
-                // Fallback to initial content size
-                rawAspectRatio = initialContentSize.width / initialContentSize.height
+        } else {
+            switch UserSettings.shared.aspectRatioMode {
+            case .custom:
+                rawAspectRatio = UserSettings.shared.customAspectRatio.widthToHeightRatio
+            case .hidResolution:
+                // Try to use HID resolution first
+                if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+                    rawAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+                } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
+                    rawAspectRatio = CGFloat(resolution.width) / CGFloat(resolution.height)
+                } else {
+                    // Fallback to initial content size if HID resolution not available
+                    rawAspectRatio = initialContentSize.width / initialContentSize.height
+                }
+            case .activeResolution:
+                // Use active video rect if available
+                let activeVideoRect = AppStatus.activeVideoRect
+                if activeVideoRect.width > 0 && activeVideoRect.height > 0 {
+                    rawAspectRatio = activeVideoRect.width / activeVideoRect.height
+                } else if AppStatus.hidReadResolusion.width > 0 && AppStatus.hidReadResolusion.height > 0 {
+                    // Fallback to HID resolution if active rect not available
+                    rawAspectRatio = CGFloat(AppStatus.hidReadResolusion.width) / CGFloat(AppStatus.hidReadResolusion.height)
+                } else if let resolution = HIDManager.shared.getResolution(), resolution.width > 0 && resolution.height > 0 {
+                    rawAspectRatio = CGFloat(resolution.width) / CGFloat(resolution.height)
+                } else {
+                    // Fallback to initial content size
+                    rawAspectRatio = initialContentSize.width / initialContentSize.height
+                }
             }
         }
 

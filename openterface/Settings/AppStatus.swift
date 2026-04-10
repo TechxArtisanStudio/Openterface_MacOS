@@ -226,8 +226,14 @@ struct AppStatus {
     }
 
     static func setRemoteFramebufferSize(width: Int, height: Int) {
+        let didChange = remoteFramebufferWidth != width || remoteFramebufferHeight != height
         remoteFramebufferWidth = width
         remoteFramebufferHeight = height
+        guard didChange else { return }
+
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .updateWindowSize, object: nil)
+        }
     }
 
     static func setRemotePerformanceStats(fps: Double, bandwidthMBps: Double) {
