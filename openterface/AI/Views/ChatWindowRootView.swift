@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 struct ChatWindowRootView: View {
     private enum ChatRunMode: String, CaseIterable, Identifiable {
         case chat = "Chat"
-        case agentic = "Agentic"
+        case agentic = "Agent"
         case planner = "Planner"
         case guide = "Guide"
 
@@ -14,6 +14,7 @@ struct ChatWindowRootView: View {
 
     @ObservedObject var chatManager: ChatManager
     @ObservedObject var userSettings = UserSettings.shared
+    @ObservedObject private var skillManager = SkillManager.shared
     @State private var draft: String = ""
     @State private var inputEditorHeight: CGFloat = 96
     @State private var inputEditorDragStartHeight: CGFloat?
@@ -22,7 +23,7 @@ struct ChatWindowRootView: View {
     @State private var isShowingAITrace: Bool = false
     @State private var isShowingTaskStepTrace: Bool = false
     @State private var isShowingGuideTrace: Bool = false
-    @State private var selectedGuideTraceContent: String = ""
+    @State private var selectedGuideTraceEntries: [ChatTaskTraceEntry] = []
     @State private var selectedTaskStepTraceTitle: String = ""
     @State private var selectedTaskStepTraceEntries: [ChatTaskTraceEntry] = []
 
@@ -119,6 +120,47 @@ struct ChatWindowRootView: View {
 
             Divider()
 
+            // Skills quick-action bar
+            if !skillManager.skills.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(skillManager.skills) { skill in
+                            Button {
+                                chatManager.runSkill(skill)
+                            } label: {
+                                Label(skill.name, systemImage: skill.icon)
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(chatManager.isSending)
+                            .help(skill.prompt)
+                        }
+
+                        Button {
+                            NSWorkspace.shared.open(SkillManager.skillsFolder)
+                        } label: {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open Skills folder – add your own .json skill files here")
+
+                        Button {
+                            skillManager.reload()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Reload skills from disk")
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                }
+                Divider()
+            }
+
             if let plan = chatManager.currentPlan {
                 ChatPlanCardView(
                     plan: plan,
@@ -164,8 +206,13 @@ struct ChatWindowRootView: View {
                         }
 
                         ForEach(chatManager.messages) { message in
-                            ChatBubbleView(message: message, onShowGuideTrace: { content in
-                                selectedGuideTraceContent = content
+                            ChatBubbleView(message: message, onShowGuideTrace: { messageID in
+                                if let guideEntries = chatManager.guideTraceEntries(messageID: messageID), !guideEntries.isEmpty {
+                                    selectedGuideTraceEntries = guideEntries
+                                } else {
+                                    let fallback = chatManager.traceMessage(messageID: messageID) ?? "No trace information found for this message in the current session."
+                                    selectedGuideTraceEntries = [ChatTaskTraceEntry(title: "Trace", body: fallback)]
+                                }
                                 isShowingGuideTrace = true
                             })
                                 .id(message.id)
@@ -307,7 +354,7 @@ struct ChatWindowRootView: View {
             TaskStepTraceDialog(title: selectedTaskStepTraceTitle, entries: selectedTaskStepTraceEntries)
         }
         .sheet(isPresented: $isShowingGuideTrace) {
-            GuideTraceDialog(traceContent: selectedGuideTraceContent, isPresented: $isShowingGuideTrace)
+            GuideTraceDialog(entries: selectedGuideTraceEntries, isPresented: $isShowingGuideTrace)
         }
     }
 

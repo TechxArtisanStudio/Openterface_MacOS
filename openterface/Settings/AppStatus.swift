@@ -84,6 +84,9 @@ struct AppStatus {
     static var showParallelOverlay: Bool = false
     static var showGuideOverlay: Bool = false
     static var guideHighlightRectNormalized: CGRect = .zero
+    static var showAIClickOverlay: Bool = false
+    static var aiClickPointNormalized: CGPoint = CGPoint(x: 0.5, y: 0.5)
+    static var aiClickOverlayToken: UUID = UUID()
     
     //Following two status check the CTS flipping status for Mini-KVM
     static var isKeyboardConnected: Bool? = false
@@ -223,8 +226,14 @@ struct AppStatus {
     }
 
     static func setRemoteFramebufferSize(width: Int, height: Int) {
+        let didChange = remoteFramebufferWidth != width || remoteFramebufferHeight != height
         remoteFramebufferWidth = width
         remoteFramebufferHeight = height
+        guard didChange else { return }
+
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .updateWindowSize, object: nil)
+        }
     }
 
     static func setRemotePerformanceStats(fps: Double, bandwidthMBps: Double) {

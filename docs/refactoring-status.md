@@ -150,6 +150,30 @@ The following have been **successfully converted** from singleton patterns to pr
 - [ ] Code generation tools for protocol implementations
 - [ ] Advanced dependency injection patterns
 
+## AI Prompt Architecture (Docs-First) - New
+
+### ✅ Completed
+- Added OS-specific AI agent definition system under [docs/ai/README.md](docs/ai/README.md).
+- Added registry file at [docs/ai/registry.md](docs/ai/registry.md).
+- Added six target agents in [docs/ai/agents](docs/ai/agents):
+   - `macos`
+   - `windows`
+   - `linux`
+   - `iphone`
+   - `ipad`
+   - `android`
+- Added five-file contract per OS agent:
+   - `soul.md`
+   - `tool.md`
+   - `skills.md`
+   - `memory.md`
+   - `session.md`
+
+### Deferred (Phase 2)
+- Runtime loading of these markdown definitions into chat prompt resolution.
+- Schema/version negotiation between markdown docs and persisted settings.
+- Migration path from hardcoded defaults in UserSettings to file-backed prompts.
+
 ## 🎯 Success Metrics Achieved ✅ 100% COMPLETE!
 
 ✅ **Zero Fatal Runtime Errors**: No "Service not registered" errors  

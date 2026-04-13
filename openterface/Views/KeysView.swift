@@ -44,6 +44,7 @@ struct CustomButtonStyle: ButtonStyle {
 
 public struct FloatingKeysWindow: View {
     @ObservedObject private var keyboardManager = DependencyContainer.shared.resolve(KeyboardManagerProtocol.self) as! KeyboardManager
+    @ObservedObject private var userSettings: UserSettings = .shared
     private var floatingKeyboardManager = DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self)
     let onClose: () -> Void
     @State private var showMultimediaKeys = false
@@ -497,22 +498,45 @@ public struct FloatingKeysWindow: View {
                         }) {
                             Text("Ctrl")
                         }
-                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftCtrlHeld))
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: userSettings.keyboardLayout == .mac ? keyboardManager.isLeftCtrlHeld : keyboardManager.isLeftCmdHeld))
                         .help("Control (Left)")
                         
-                        Button(keyboardManager.currentKeyboardLayout == .windows ? "Win" : "Cmd", action: {
-                            keyboardManager.sendSpecialKeyToKeyboard(code: .win)
-                        })
-                        .buttonStyle(CustomButtonStyle(isActive: keyboardManager.pressedKey == .win))
-                        .help(keyboardManager.currentKeyboardLayout == .windows ? "Windows" : "Command")
-                        
-                        Button(action: {
-                            keyboardManager.toggleLeftAlt()
-                        }) {
-                            Text(keyboardManager.currentKeyboardLayout == .windows ? "Alt" : "Opt")
+                        // Left side: order depends on layout
+                        // Mac: Ctrl | Opt | Cmd | Space
+                        // Win/Linux: Ctrl | Win/Super | Alt | Space
+                        Group {
+                            if userSettings.keyboardLayout == .mac {
+                                Button(action: {
+                                    keyboardManager.toggleLeftAlt()
+                                }) {
+                                    Text("Opt")
+                                }
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftAltHeld))
+                                .help("Option (Left)")
+                                
+                                Button("Cmd", action: {
+                                    keyboardManager.toggleWin()
+                                })
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld || keyboardManager.isLeftCmdHeld))
+                                .help("Command")
+                            } else {
+                                Button({
+                                    keyboardManager.currentKeyboardLayout == .linux ? "Super" : "Win"
+                                }(), action: {
+                                    keyboardManager.toggleWin()
+                                })
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld || keyboardManager.isLeftCtrlHeld))
+                                .help(keyboardManager.currentKeyboardLayout == .linux ? "Super" : "Windows")
+                                
+                                Button(action: {
+                                    keyboardManager.toggleLeftAlt()
+                                }) {
+                                    Text("Alt")
+                                }
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftAltHeld))
+                                .help("Alt (Left)")
+                            }
                         }
-                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isLeftAltHeld))
-                        .help(keyboardManager.currentKeyboardLayout == .windows ? "Alt (Left)" : "Option (Left)")
 
                         
                         Button(action: {
@@ -524,20 +548,41 @@ public struct FloatingKeysWindow: View {
                         .buttonStyle(CustomButtonStyle(isActive: keyboardManager.pressedKey == .space || isHostKeyCodePressed(49)))
                         .help("Spacebar")
                         
-                        Button(action: {
-                            keyboardManager.toggleRightAlt()
-                        }) {
-                            Text(keyboardManager.currentKeyboardLayout == .windows ? "Alt" : "Opt")
+                        // Right side: order depends on layout
+                        // Mac: Space | Cmd | Opt | Ctrl
+                        // Win/Linux: Space | Alt | Ctrl
+                        Group {
+                            if userSettings.keyboardLayout == .mac {
+                                Button("Cmd", action: {
+                                    keyboardManager.toggleWin()
+                                })
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isWinHeld || keyboardManager.isRightCmdHeld))
+                                .help("Command")
+                                
+                                Button(action: {
+                                    keyboardManager.toggleRightAlt()
+                                }) {
+                                    Text("Opt")
+                                }
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightAltHeld))
+                                .help("Option (Right)")
+                            } else {
+                                Button(action: {
+                                    keyboardManager.toggleRightAlt()
+                                }) {
+                                    Text("Alt")
+                                }
+                                .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightAltHeld))
+                                .help("Alt (Right)")
+                            }
                         }
-                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightAltHeld))
-                        .help(keyboardManager.currentKeyboardLayout == .windows ? "Alt (Right)" : "Option (Right)")
                         
                         Button(action: {
                             keyboardManager.toggleRightCtrl()
                         }) {
                             Text("Ctrl")
                         }
-                        .buttonStyle(CustomButtonStyle(programmaticPressed: keyboardManager.isRightCtrlHeld))
+                        .buttonStyle(CustomButtonStyle(programmaticPressed: userSettings.keyboardLayout == .mac ? keyboardManager.isRightCtrlHeld : keyboardManager.isRightCmdHeld))
                         .help("Control (Right)")
                         
                         Button("◀", action: {
@@ -584,55 +629,30 @@ public struct FloatingKeysWindow: View {
             .position(x: 32, y: 32)
             .help("Close")
             
-            // Win/Mac toggle button in top-right corner
-            HStack(spacing: 8) {
-                // Multimedia keys toggle button
-                Button(action: {
-                    showMultimediaKeys.toggle()
-                    // Adjust window height based on state
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        let newHeight: CGFloat = showMultimediaKeys ? 540 : 400
-                        floatingKeyboardManager.setFloatingKeyboardHeight(newHeight)
-                    }
-                }) {
-                    Image(systemName: showMultimediaKeys ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(red: 0.45, green: 0.45, blue: 0.45))
-                        )
+            // Multimedia keys toggle button in top-right corner
+            Button(action: {
+                showMultimediaKeys.toggle()
+                // Adjust window height based on state
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    let newHeight: CGFloat = showMultimediaKeys ? 540 : 400
+                    floatingKeyboardManager.setFloatingKeyboardHeight(newHeight)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .help(showMultimediaKeys ? "Hide Multimedia Keys" : "Show Multimedia Keys")
-                
-                // Win/Mac toggle button
-                Button(action: {
-                    keyboardManager.toggleKeyboardLayout()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: keyboardManager.currentKeyboardLayout == .windows ? 
-                              "laptopcomputer" : "applelogo")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                        Text(keyboardManager.currentKeyboardLayout == .windows ? "Win" : "Mac")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 8)
+            }) {
+                Image(systemName: showMultimediaKeys ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(keyboardManager.currentKeyboardLayout == .windows ? 
-                                  Color.blue : Color.orange)
+                            .fill(Color(red: 0.45, green: 0.45, blue: 0.45))
                     )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .help(keyboardManager.currentKeyboardLayout == .windows ? "Switch to Mac Layout" : "Switch to Windows Layout")
             }
-            .position(x: 710, y: 32)
+            .buttonStyle(PlainButtonStyle())
+            .help(showMultimediaKeys ? "Hide Multimedia Keys" : "Show Multimedia Keys")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, 20)
+            .padding(.trailing, 40)
         }
     }
 }

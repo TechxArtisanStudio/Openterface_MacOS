@@ -1,5 +1,37 @@
 import SwiftUI
 
+// A short platform label (e.g. "Win", "Linux") in a rounded-rectangle border.
+private struct TargetOSLogoView: View {
+    let system: ChatTargetSystem
+    var size: CGFloat = 16
+
+    private var label: String {
+        switch system {
+        case .macOS:   return "Mac"
+        case .windows: return "Win"
+        case .linux:   return "Linux"
+        case .iPhone:  return "iOS"
+        case .iPad:    return "iPadOS"
+        case .android: return "Android"
+        }
+    }
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: size * 0.55, weight: .semibold, design: .rounded))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .padding(.horizontal, size * 0.25)
+            .padding(.vertical,   size * 0.1)
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.3)
+                    .stroke(Color.primary.opacity(0.55), lineWidth: 1)
+            )
+            .accessibilityLabel(system.displayName)
+    }
+}
+
+
 struct ToolbarContentView: ToolbarContent {
     // Bindings and values provided by the parent App
     @Binding var showButtons: Bool
@@ -25,6 +57,7 @@ struct ToolbarContentView: ToolbarContent {
 
     // observe the shared serial manager directly so we track configuration state
     @ObservedObject private var concreteSerialPortMgr: SerialPortManager = SerialPortManager.shared
+    @ObservedObject private var userSettings: UserSettings = .shared
 
     // Action callbacks
     var handleSwitchToggle: (Bool) -> Void
@@ -34,6 +67,9 @@ struct ToolbarContentView: ToolbarContent {
 
     // popover state for baud menu
     @State private var showBaudPopover = false
+
+    // popover state for macro panel
+    @State private var showMacrosPopover = false
 
     // hover state for each selection button
     @State private var hovering9600 = false
@@ -47,6 +83,7 @@ struct ToolbarContentView: ToolbarContent {
     private var mouseManager: MouseManagerProtocol { DependencyContainer.shared.resolve(MouseManagerProtocol.self) }
     private var chatWindowManager: ChatWindowManagerProtocol { DependencyContainer.shared.resolve(ChatWindowManagerProtocol.self) }
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
+    private var shouldShowHardwareToggle: Bool { UserSettings.shared.connectionProtocolMode == .kvm }
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .automatic) {
@@ -64,14 +101,17 @@ struct ToolbarContentView: ToolbarContent {
             }
             .help(UserSettings.shared.isChatWindowVisible ? "Hide companion chat" : "Show companion chat")
 
-            CapsLockIndicatorView()
-                .help("Target Caps Lock state - ON/OFF")
+            Button {
+                showMacrosPopover.toggle()
+            } label: {
+                Image(systemName: "keyboard.badge.ellipsis")
+            }
+            .help("Keyboard Macros")
+            .popover(isPresented: $showMacrosPopover) {
+                MacroPanelView()
+            }
 
-            NumLockIndicatorView()
-                .help("Target Num Lock state - ON/OFF")
-
-            ScrollLockIndicatorView()
-                .help("Target Scroll Lock state - ON/OFF")
+            LockIndicatorsView()
 
             Button(action: {}) {
                 Image(systemName: "poweron") // spacer
@@ -139,6 +179,38 @@ struct ToolbarContentView: ToolbarContent {
             .help("Click to view Target Aspect Ratio...")
         }
 
+        ToolbarItem(placement: .automatic) {
+            Menu {
+                ForEach(ChatTargetSystem.allCases) { system in
+                    Button {
+                        userSettings.chatTargetSystem = system
+                        // Auto-switch keyboard layout to match the target OS.
+                        switch system {
+                        case .windows:
+                            userSettings.keyboardLayout = .windows
+                        case .linux:
+                            userSettings.keyboardLayout = .linux
+                        case .macOS, .iPhone, .iPad, .android:
+                            userSettings.keyboardLayout = .mac
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            TargetOSLogoView(system: system)
+                            Text(system.displayName)
+                            if system == userSettings.chatTargetSystem {
+                                Text("✓")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                TargetOSLogoView(system: userSettings.chatTargetSystem)
+            }
+            .help("Target OS: \(userSettings.chatTargetSystem.displayName)")
+        }
+
         ToolbarItem(placement: .primaryAction) {
             let connectionMode = UserSettings.shared.connectionProtocolMode
             ResolutionView(
@@ -164,34 +236,36 @@ struct ToolbarContentView: ToolbarContent {
         }
 
         ToolbarItem(placement: .automatic) {
-            Button(action: {
-                showUSBDevices()
-            }) {
-                HStack {
-                    Image(systemName: "keyboard.fill")
-                        .resizable()
-                        .frame(width: 16, height: 12)
-                        .foregroundColor(colorForConnectionStatus(isKeyboardConnected))
-                    Image(systemName: isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
-                        .resizable()
-                        .frame(width: isMouseLoopRunning ? 14 : 10, height: 12)
-                        .foregroundColor(colorForConnectionStatus(isMouseConnected))
+            if shouldShowHardwareToggle {
+                Button(action: {
+                    showUSBDevices()
+                }) {
+                    HStack {
+                        Image(systemName: "keyboard.fill")
+                            .resizable()
+                            .frame(width: 16, height: 12)
+                            .foregroundColor(colorForConnectionStatus(isKeyboardConnected))
+                        Image(systemName: isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
+                            .resizable()
+                            .frame(width: isMouseLoopRunning ? 14 : 10, height: 12)
+                            .foregroundColor(colorForConnectionStatus(isMouseConnected))
+                    }
                 }
-            }
-            .help(
-                """
-                KeyBoard: \(
-                    isKeyboardConnected == true ? "Connected" :
-                    isKeyboardConnected == false ? "Not found" : "Unknown"
-                )
-                Mouse: \(
-                    isMouseConnected == true ? "Connected" :
-                    isMouseConnected == false ? "Not found" : "Unknown"
-                )
+                .help(
+                    """
+                    KeyBoard: \(
+                        isKeyboardConnected == true ? "Connected" :
+                        isKeyboardConnected == false ? "Not found" : "Unknown"
+                    )
+                    Mouse: \(
+                        isMouseConnected == true ? "Connected" :
+                        isMouseConnected == false ? "Not found" : "Unknown"
+                    )
 
-                Click to view USB device details
-                """
-            )
+                    Click to view USB device details
+                    """
+                )
+            }
         }
 
         ToolbarItem(placement: .automatic) {
@@ -243,26 +317,30 @@ struct ToolbarContentView: ToolbarContent {
         }
 
         ToolbarItem(placement: .automatic) {
-            Button(action: {}) {
-                Image(systemName: "poweron") // spacer
+            if shouldShowHardwareToggle {
+                Button(action: {}) {
+                    Image(systemName: "poweron") // spacer
+                }
+                .disabled(true)
+                .buttonStyle(PlainButtonStyle())
             }
-            .disabled(true)
-            .buttonStyle(PlainButtonStyle())
         }
 
         ToolbarItemGroup(placement: .automatic) {
-            Toggle(isOn: $switchToTarget) {
-                HStack {
-                    Image(switchToTarget ? "Target_icon" : "Host_icon")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 15)
-                    Text(switchToTarget ? "Target" : "Host")
+            if shouldShowHardwareToggle {
+                Toggle(isOn: $switchToTarget) {
+                    HStack {
+                        Image(switchToTarget ? "Target_icon" : "Host_icon")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 20, height: 15)
+                        Text(switchToTarget ? "Target" : "Host")
+                    }
                 }
-            }
-            .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-            .onChange(of: switchToTarget) { newValue in
-                handleSwitchToggle(newValue)
+                .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
+                .onChange(of: switchToTarget) { newValue in
+                    handleSwitchToggle(newValue)
+                }
             }
         }
     }

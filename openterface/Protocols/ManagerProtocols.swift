@@ -434,8 +434,9 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     let attachmentFilePath: String?
     let guideActionRect: CGRect?
     let guideShortcut: String?
+    let guideTool: String?
 
-    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date(), attachmentFilePath: String? = nil, guideActionRect: CGRect? = nil, guideShortcut: String? = nil) {
+    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date(), attachmentFilePath: String? = nil, guideActionRect: CGRect? = nil, guideShortcut: String? = nil, guideTool: String? = nil) {
         self.id = id
         self.role = role
         self.content = content
@@ -443,6 +444,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.attachmentFilePath = attachmentFilePath
         self.guideActionRect = guideActionRect
         self.guideShortcut = guideShortcut
+        self.guideTool = guideTool
     }
 }
 

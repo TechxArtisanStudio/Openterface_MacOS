@@ -29,6 +29,8 @@ struct ContentView: View {
     @State private var showAppInfoOverlay = AppStatus.showAppInfoOverlay
     @State private var showActiveVideoRect = AppStatus.showActiveVideoRect
     @State private var showGuideOverlay = AppStatus.showGuideOverlay
+    @State private var showAIClickOverlay = AppStatus.showAIClickOverlay
+    @State private var aiClickPointNormalized = AppStatus.aiClickPointNormalized
     @State private var overlayActive = AppStatus.showParallelOverlay
     @State private var currentProtocolMode: ConnectionProtocolMode = AppStatus.activeConnectionProtocol
     @State private var showMiniIndicator: Bool = false
@@ -146,6 +148,27 @@ struct ContentView: View {
                     AppInfoOverlayView()
                         .padding()
                 }
+
+                if showAIClickOverlay {
+                    GeometryReader { geo in
+                        let indicatorDiameter: CGFloat = 42
+                        let clampedX = max(0.0, min(1.0, aiClickPointNormalized.x))
+                        let clampedY = max(0.0, min(1.0, aiClickPointNormalized.y))
+                        let centerX = clampedX * geo.size.width
+                        let centerY = clampedY * geo.size.height
+
+                        Circle()
+                            .stroke(Color.red, lineWidth: 4)
+                            .frame(width: indicatorDiameter, height: indicatorDiameter)
+                            .background(
+                                Circle()
+                                    .fill(Color.red.opacity(0.18))
+                                    .frame(width: indicatorDiameter, height: indicatorDiameter)
+                            )
+                            .position(x: centerX, y: centerY)
+                    }
+                    .allowsHitTesting(false)
+                }
             }
         }
         .onAppear {
@@ -164,6 +187,12 @@ struct ContentView: View {
             }
             if showGuideOverlay != AppStatus.showGuideOverlay {
                 showGuideOverlay = AppStatus.showGuideOverlay
+            }
+            if showAIClickOverlay != AppStatus.showAIClickOverlay {
+                showAIClickOverlay = AppStatus.showAIClickOverlay
+            }
+            if aiClickPointNormalized != AppStatus.aiClickPointNormalized {
+                aiClickPointNormalized = AppStatus.aiClickPointNormalized
             }
             if overlayActive != AppStatus.showParallelOverlay {
                 overlayActive = AppStatus.showParallelOverlay

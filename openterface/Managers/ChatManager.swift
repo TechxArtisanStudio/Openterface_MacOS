@@ -17,13 +17,45 @@ struct ChatTaskTraceEntry: Identifiable, Equatable, Codable {
     }
 }
 
+struct GuideAutoNextStatus: Equatable {
+    enum Phase: Equatable {
+        case thinking
+        case completed
+        case failed
+        case cancelled
+    }
+
+    let phase: Phase
+    let text: String
+}
+
 private struct ChatCompletionResult {
     let content: String
     let inputTokenCount: Int?
     let outputTokenCount: Int?
 }
 
+struct MacroAIDraftRequest {
+    let goal: String
+    let targetSystem: MacroTargetSystem
+    let currentLabel: String
+    let currentDescription: String
+    let currentData: String
+}
+
+struct MacroAIDraft {
+    let label: String
+    let description: String
+    let data: String
+    let intervalMs: Int
+}
+
 private enum AIInputRouter {
+    private static var trackedMouseX: Int = 2048
+    private static var trackedMouseY: Int = 2048
+    private static let animatedClickDurationSeconds: Double = 2.0
+    private static let animatedClickSteps: Int = 24
+
     private static func clampedAbsolute(_ value: Int) -> Int {
         min(max(value, 0), 4096)
     }
@@ -107,13 +139,102 @@ private enum AIInputRouter {
     }
 
     static func sendMouseMove(absX: Int, absY: Int) {
+        let clampedX = clampedAbsolute(absX)
+        let clampedY = clampedAbsolute(absY)
+        trackedMouseX = clampedX
+        trackedMouseY = clampedY
+
         if AppStatus.activeConnectionProtocol == .vnc {
-            let point = mapToVNCFramebuffer(absX: absX, absY: absY)
+            let point = mapToVNCFramebuffer(absX: clampedX, absY: clampedY)
             VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: 0x00)
             return
         }
 
-        HostManager.shared.handleAbsoluteMouseAction(x: clampedAbsolute(absX), y: clampedAbsolute(absY), mouseEvent: 0x00, wheelMovement: 0x00)
+        HostManager.shared.handleAbsoluteMouseAction(x: clampedX, y: clampedY, mouseEvent: 0x00, wheelMovement: 0x00)
+    }
+
+    static func animatedClick(button: UInt8, absX: Int, absY: Int, isDoubleClick: Bool = false) {
+        let targetX = clampedAbsolute(absX)
+        let targetY = clampedAbsolute(absY)
+        let startX = trackedMouseX
+        let startY = trackedMouseY
+
+        if startX != targetX || startY != targetY {
+            let stepDelay = animatedClickDurationSeconds / Double(max(animatedClickSteps, 1))
+            for step in 1...animatedClickSteps {
+                let progress = Double(step) / Double(animatedClickSteps)
+                let interpolatedX = Int((Double(startX) + Double(targetX - startX) * progress).rounded())
+                let interpolatedY = Int((Double(startY) + Double(targetY - startY) * progress).rounded())
+                sendMouseMove(absX: interpolatedX, absY: interpolatedY)
+                Thread.sleep(forTimeInterval: stepDelay)
+            }
+        } else {
+            sendMouseMove(absX: targetX, absY: targetY)
+        }
+
+        showClickOverlay(absX: targetX, absY: targetY)
+        click(button: button, absX: targetX, absY: targetY, isDoubleClick: isDoubleClick)
+    }
+
+    static func animatedDrag(button: UInt8 = 0x01, startAbsX: Int? = nil, startAbsY: Int? = nil, endAbsX: Int, endAbsY: Int) {
+        let startX = clampedAbsolute(startAbsX ?? trackedMouseX)
+        let startY = clampedAbsolute(startAbsY ?? trackedMouseY)
+        let targetX = clampedAbsolute(endAbsX)
+        let targetY = clampedAbsolute(endAbsY)
+
+        sendMouseMove(absX: startX, absY: startY)
+        Thread.sleep(forTimeInterval: 0.05)
+
+        if AppStatus.activeConnectionProtocol == .vnc {
+            let startPoint = mapToVNCFramebuffer(absX: startX, absY: startY)
+            VNCClientManager.shared.sendPointerEvent(x: startPoint.x, y: startPoint.y, buttonMask: button)
+
+            let stepDelay = animatedClickDurationSeconds / Double(max(animatedClickSteps, 1))
+            for step in 1...animatedClickSteps {
+                let progress = Double(step) / Double(animatedClickSteps)
+                let interpolatedX = Int((Double(startX) + Double(targetX - startX) * progress).rounded())
+                let interpolatedY = Int((Double(startY) + Double(targetY - startY) * progress).rounded())
+                let point = mapToVNCFramebuffer(absX: interpolatedX, absY: interpolatedY)
+                VNCClientManager.shared.sendPointerEvent(x: point.x, y: point.y, buttonMask: button)
+                Thread.sleep(forTimeInterval: stepDelay)
+            }
+
+            let targetPoint = mapToVNCFramebuffer(absX: targetX, absY: targetY)
+            VNCClientManager.shared.sendPointerEvent(x: targetPoint.x, y: targetPoint.y, buttonMask: 0x00)
+        } else {
+            HostManager.shared.handleAbsoluteMouseAction(x: startX, y: startY, mouseEvent: button, wheelMovement: 0x00)
+
+            let stepDelay = animatedClickDurationSeconds / Double(max(animatedClickSteps, 1))
+            for step in 1...animatedClickSteps {
+                let progress = Double(step) / Double(animatedClickSteps)
+                let interpolatedX = Int((Double(startX) + Double(targetX - startX) * progress).rounded())
+                let interpolatedY = Int((Double(startY) + Double(targetY - startY) * progress).rounded())
+                HostManager.shared.handleAbsoluteMouseAction(x: interpolatedX, y: interpolatedY, mouseEvent: button, wheelMovement: 0x00)
+                Thread.sleep(forTimeInterval: stepDelay)
+            }
+
+            HostManager.shared.handleAbsoluteMouseAction(x: targetX, y: targetY, mouseEvent: 0x00, wheelMovement: 0x00)
+        }
+
+        trackedMouseX = targetX
+        trackedMouseY = targetY
+    }
+
+    private static func showClickOverlay(absX: Int, absY: Int) {
+        let normalizedX = min(max(CGFloat(absX) / 4096.0, 0.0), 1.0)
+        let normalizedY = min(max(CGFloat(absY) / 4096.0, 0.0), 1.0)
+        let token = UUID()
+
+        DispatchQueue.main.async {
+            AppStatus.aiClickPointNormalized = CGPoint(x: normalizedX, y: normalizedY)
+            AppStatus.aiClickOverlayToken = token
+            AppStatus.showAIClickOverlay = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            guard AppStatus.aiClickOverlayToken == token else { return }
+            AppStatus.showAIClickOverlay = false
+        }
     }
 
     static func click(button: UInt8, absX: Int, absY: Int, isDoubleClick: Bool = false) {
@@ -201,6 +322,8 @@ final class ChatManager: ObservableObject, ChatManagerProtocol {
     @Published private(set) var lastError: String?
     @Published private(set) var currentPlan: ChatExecutionPlan?
     @Published private(set) var plannerTraceEntries: [ChatTaskTraceEntry] = []
+    @Published private(set) var guideAutoNextStatuses: [UUID: GuideAutoNextStatus] = [:]
+    @Published private(set) var agentRequestStatuses: [UUID: GuideAutoNextStatus] = [:]
 
     private var currentTask: Task<Void, Never>?
     private let encoder: JSONEncoder
@@ -208,15 +331,16 @@ final class ChatManager: ObservableObject, ChatManagerProtocol {
     private let historyURL: URL
     private let aiTraceURL: URL
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
-    private let maxAgentIterations = 4
     private let plannerAgent = MainPlannerAgent(maxPlannerTasks: 6)
     private let taskAgentRegistry = TaskAgentRegistry(agents: [
         ScreenTaskAgent(),
         TypeTextTaskAgent(),
+        MacroTaskAgent(),
         MouseTaskAgent(toolName: "move_mouse"),
         MouseTaskAgent(toolName: "left_click"),
         MouseTaskAgent(toolName: "right_click"),
-        MouseTaskAgent(toolName: "double_click")
+        MouseTaskAgent(toolName: "double_click"),
+        MouseTaskAgent(toolName: "left_drag")
     ])
     private let taskStateConfirmationInstruction = """
 You are Openterface Task State Verifier.
@@ -236,21 +360,80 @@ Schema:
 """
     private let taskConfirmationAttemptCount = 3
     private let taskConfirmationRetryDelayNanoseconds: UInt64 = 900_000_000
+    private let macroGeneratorSupportedTokens: Set<String> = [
+        "<CTRL>", "</CTRL>", "<SHIFT>", "</SHIFT>", "<ALT>", "</ALT>", "<CMD>", "</CMD>",
+        "<ESC>", "<BACK>", "<ENTER>", "<TAB>", "<SPACE>", "<LEFT>", "<RIGHT>", "<UP>", "<DOWN>",
+        "<HOME>", "<END>", "<DEL>", "<PGUP>", "<PGDN>",
+        "<F1>", "<F2>", "<F3>", "<F4>", "<F5>", "<F6>", "<F7>", "<F8>", "<F9>", "<F10>", "<F11>", "<F12>",
+        "<DELAY05s>", "<DELAY1S>", "<DELAY2S>", "<DELAY5S>", "<DELAY10S>"
+    ]
+    private let macroGenerationInstruction = """
+You generate Openterface keyboard macros.
+
+Return ONLY JSON with this schema:
+{
+  "label": "short macro name",
+  "description": "one sentence tooltip",
+  "data": "macro sequence using Openterface tokens",
+  "intervalMs": 80
+}
+
+Macro authoring rules:
+- Use only plain characters plus these tokens: <CTRL>, </CTRL>, <SHIFT>, </SHIFT>, <ALT>, </ALT>, <CMD>, </CMD>, <ESC>, <BACK>, <ENTER>, <TAB>, <SPACE>, <LEFT>, <RIGHT>, <UP>, <DOWN>, <HOME>, <END>, <DEL>, <PGUP>, <PGDN>, <F1>..<F12>, <DELAY05s>, <DELAY1S>, <DELAY2S>, <DELAY5S>, <DELAY10S>.
+- Do not invent tokens.
+- Do not use <MACRO:...> references.
+- Use <ENTER> instead of a literal newline.
+- Wrap modified key presses with opening and closing modifier tags, for example <CTRL>c</CTRL>.
+- Whenever a macro finishes typing a plain-text burst and then continues with another action, insert a short delay such as <DELAY05s> before the next action so visual effects and UI updates can settle.
+- Prefer the shortest stable shortcut for the requested target OS.
+- Keep label short and description practical.
+- Use intervalMs 80 unless the flow is timing-sensitive.
+- Return JSON only, with no markdown or explanation.
+"""
     private var agentMouseX: Int = 2048
     private var agentMouseY: Int = 2048
     private var pendingCapturePreviewSuppressions = 0
     private var taskStepTraces: [UUID: [ChatTaskTraceEntry]] = [:]
+    private var guideCapturePathsByMessageID: [UUID: String] = [:]
+    private var pendingGuideAutoNextStarts: [UUID: Date] = [:]
+    private var pendingAgentRequestStarts: [UUID: Date] = [:]
     private let agentToolInstruction = """
 When action is required, you may call tools by returning ONLY JSON (no markdown):
-{"tool_calls":[{"tool":"capture_screen"},{"tool":"move_mouse","x":2048,"y":2048},{"tool":"left_click"},{"tool":"type_text","text":"hello"}]}
+{"tool_calls":[{"tool":"capture_screen"},{"tool":"move_mouse","x":0.5,"y":0.5},{"tool":"left_click"},{"tool":"left_drag","start_x":0.2,"start_y":0.5,"x":0.8,"y":0.5},{"tool":"type_text","text":"hello"},{"tool":"run_verified_macro","macro_id":"UUID-or-label"}]}
+
+The target OS has already been configured by the app. Do not ask the user to confirm the OS again.
+
+Coordinate system:
+- All x/y values are normalized floats from 0.0 to 1.0.
+- 0.0 means the left/top edge of the screen; 1.0 means the right/bottom edge.
+- Estimate the element's position as a fraction of the screenshot width and height.
+- Example: if a button is at roughly 45% from left and 30% from top, use x=0.45, y=0.30.
+- NEVER output raw pixel coordinates. Always use 0.0-1.0 normalized values.
 
 Available tools:
 - capture_screen: Capture latest target screen and use it for next reasoning step.
-- move_mouse: Move target mouse. Args: x (Int), y (Int), both in absolute range 0...4096 where 4096 means 100% of screen width/height.
-- left_click: Left click at current mouse location. Optional args: x (Int), y (Int) in 0...4096.
-- right_click: Right click at current mouse location. Optional args: x (Int), y (Int) in 0...4096.
-- double_click: Double left click. Optional args: x (Int), y (Int) in 0...4096.
+- move_mouse: Move target mouse. Args: x (Float), y (Float) in 0.0...1.0.
+- left_click: Left click at current mouse location. Optional args: x (Float), y (Float) in 0.0...1.0.
+- left_drag: Hold left mouse button and drag to a destination. Args: x (Float), y (Float) destination in 0.0...1.0. Optional args: start_x (Float), start_y (Float) to begin from a specific point; otherwise current mouse position is used.
+- right_click: Right click at current mouse location. Optional args: x (Float), y (Float) in 0.0...1.0.
+- double_click: Double left click. Optional args: x (Float), y (Float) in 0.0...1.0.
 - type_text: Type text on target. Args: text (String).
+- run_verified_macro: Execute one verified macro. Args: macro_id (String, preferred UUID) or macro_label (String).
+
+Macro tool rules:
+- Prefer run_verified_macro when a verified macro can jump directly to the requested state.
+- Before using capture_screen or incremental mouse steps, check whether a verified macro already matches the user's current goal or sub-goal and use it first when it is a strong fit.
+- Only call run_verified_macro with a verified macro from the provided macro inventory.
+- Prefer macro_id over macro_label when available.
+- IMPORTANT: After running a macro, always verify the result in a NEW tool_calls response. Never include capture_screen or any other tool in the same tool_calls array as run_verified_macro, because the macro needs time to complete on the target machine before a screenshot is useful.
+- If the macro partially completes the job, continue with more tool calls until the task is actually complete.
+- If no verified macro matches, continue with the normal screen-driven tools.
+
+Mouse safety rules:
+- Only click when the intended target is clearly visible in the latest screenshot.
+- Do not guess hidden Dock icons, hidden windows, or off-screen control locations.
+- If a macro or shortcut did not bring the expected app/window to the foreground, prefer another verified macro, keyboard-driven recovery, or another capture_screen step instead of a blind click.
+- When the task is a settings change, verify the result from the full visible UI state before choosing another action.
 
 After tool execution, you will receive a TOOL_RESULT message. Continue until task done, then return normal user-facing text (not JSON).
 """
@@ -270,6 +453,37 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         let result_summary: String
     }
 
+    private struct ClickTargetRefinementPayload: Decodable {
+        let found: Bool?
+        let x: Double?
+        let y: Double?
+        let matched_element: String?
+        let confidence: Double?
+    }
+
+    private struct ChatAPIConfiguration {
+        let baseURL: URL
+        let model: String
+        let apiKey: String
+    }
+
+    private struct ClickRefinementCropResult {
+        let imageURL: URL
+        let sourceWidth: Int
+        let sourceHeight: Int
+        let cropOriginX: Int
+        let cropOriginYTop: Int
+        let cropWidth: Int
+        let cropHeight: Int
+    }
+
+    private struct MacroAIDraftPayload: Decodable {
+        let label: String
+        let description: String
+        let data: String
+        let intervalMs: Int?
+    }
+
     private struct GuideResponsePayload: Decodable {
         struct TargetBox: Decodable {
             let x: Double
@@ -279,8 +493,9 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         }
 
         let next_step: String
+        let tool: String?
+        let tool_input: String?
         let target_box: TargetBox?
-        let keyboard_shortcut: String?
         let needs_clarification: Bool?
         let clarification: String?
     }
@@ -295,6 +510,11 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         let currentPlan: ChatExecutionPlan?
         let plannerTraceEntries: [ChatTaskTraceEntry]
         let taskTraces: [PersistedTaskTrace]
+    }
+
+    private struct VerifiedMacroMatch {
+        let macro: Macro
+        let matchedBy: String
     }
 
     @MainActor
@@ -329,6 +549,198 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         loadHistory()
     }
 
+    private func currentChatAPIConfiguration() -> ChatAPIConfiguration? {
+        let baseURLString = UserSettings.shared.chatApiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = UserSettings.shared.chatModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let configuredKey = UserSettings.shared.chatApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let apiKey = configuredKey.isEmpty
+            ? (ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+            : configuredKey
+
+        guard !baseURLString.isEmpty,
+              let baseURL = URL(string: baseURLString),
+              !model.isEmpty,
+              !apiKey.isEmpty else {
+            return nil
+        }
+
+        return ChatAPIConfiguration(baseURL: baseURL, model: model, apiKey: apiKey)
+    }
+
+    func generateMacroDraft(from request: MacroAIDraftRequest) async throws -> MacroAIDraft {
+        let trimmedGoal = request.goal.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedGoal.isEmpty else {
+            throw NSError(domain: "ChatManager", code: 40, userInfo: [NSLocalizedDescriptionKey: "Describe what the macro should do."])
+        }
+
+        let baseURLString = UserSettings.shared.chatApiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = UserSettings.shared.chatModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let systemPrompt = UserSettings.shared.resolvedSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let configuredKey = UserSettings.shared.chatApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let apiKey = configuredKey.isEmpty
+            ? (ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+            : configuredKey
+
+        guard !baseURLString.isEmpty, let baseURL = URL(string: baseURLString) else {
+            throw NSError(domain: "ChatManager", code: 41, userInfo: [NSLocalizedDescriptionKey: "AI base URL is not configured."])
+        }
+        guard !model.isEmpty else {
+            throw NSError(domain: "ChatManager", code: 42, userInfo: [NSLocalizedDescriptionKey: "AI model is not configured."])
+        }
+        guard !apiKey.isEmpty else {
+            throw NSError(domain: "ChatManager", code: 43, userInfo: [NSLocalizedDescriptionKey: "AI API key is not configured."])
+        }
+
+        var conversation: [ChatCompletionsRequest.Message] = []
+        if !systemPrompt.isEmpty {
+            conversation.append(.text(role: .system, text: systemPrompt))
+        }
+        conversation.append(.text(role: .system, text: macroGenerationInstruction))
+        conversation.append(.text(role: .system, text: macroGenerationTargetGuidance(for: request.targetSystem)))
+        conversation.append(.text(role: .user, text: macroGenerationPrompt(for: request)))
+
+        let response = try await sendChatCompletion(
+            baseURL: baseURL,
+            model: model,
+            apiKey: apiKey,
+            conversation: conversation,
+            traceLabel: "MACRO_GENERATOR"
+        )
+
+        let payload = try decodeJSONPayload(MacroAIDraftPayload.self, from: response.content)
+        return try normalizedMacroDraft(from: payload)
+    }
+
+    private func macroGenerationPrompt(for request: MacroAIDraftRequest) -> String {
+        let currentLabel = request.currentLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentDescription = request.currentDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentData = request.currentData.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return """
+Generate an Openterface macro draft.
+
+Target OS: \(request.targetSystem.displayName)
+User goal: \(request.goal)
+Current label: \(currentLabel.isEmpty ? "(empty)" : currentLabel)
+Current description: \(currentDescription.isEmpty ? "(empty)" : currentDescription)
+Current sequence: \(currentData.isEmpty ? "(empty)" : currentData)
+
+Produce a draft that is ready to save in the Openterface macro editor.
+If the macro types text and then continues, add a short delay token such as <DELAY05s> after the typing step so the UI can finish visual effects before the next action.
+If timing matters for any other reason, add an explicit delay token and explain why in the description.
+"""
+    }
+
+    private func macroGenerationTargetGuidance(for targetSystem: MacroTargetSystem) -> String {
+        switch targetSystem {
+        case .macOS:
+            return "On macOS, treat <CMD> as the Command key. Prefer Command-based shortcuts such as <CMD>c</CMD>, <CMD>v</CMD>, and <CMD><SPACE></CMD> when they match the goal."
+        case .windows:
+            return "On Windows, treat <CMD> as the Windows key. Prefer Ctrl, Alt, and Windows-key shortcuts such as <CTRL>c</CTRL>, <CMD>r</CMD>, and <ALT><TAB></ALT>."
+        case .linux:
+            return "On Linux, treat <CMD> as the Super key. Prefer common desktop shortcuts such as <CTRL><ALT>t</ALT></CTRL>, <ALT><TAB></ALT>, and <CMD>l</CMD> when relevant."
+        case .iPhone, .iPad:
+            return "On iPhone and iPad with a hardware keyboard, treat <CMD> as the Command key. Prefer iPadOS-style shortcuts such as <CMD><SPACE></CMD>, <CMD><TAB></CMD>, and <CMD>h</CMD>."
+        case .android:
+            return "On Android, treat <CMD> as the Meta key. Prefer combinations that work with external keyboards, such as <ALT><TAB></ALT>, <CTRL>a</CTRL>, and <CTRL>c</CTRL> when relevant."
+        }
+    }
+
+    private func normalizedMacroDraft(from payload: MacroAIDraftPayload) throws -> MacroAIDraft {
+        let label = payload.label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = payload.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = payload.data.trimmingCharacters(in: .whitespacesAndNewlines)
+        let intervalMs = min(max(payload.intervalMs ?? 80, 10), 500)
+
+        guard !label.isEmpty else {
+            throw NSError(domain: "ChatManager", code: 44, userInfo: [NSLocalizedDescriptionKey: "AI returned an empty macro name."])
+        }
+        guard !data.isEmpty else {
+            throw NSError(domain: "ChatManager", code: 45, userInfo: [NSLocalizedDescriptionKey: "AI returned an empty macro sequence."])
+        }
+
+        try validateGeneratedMacroSequence(data)
+        return MacroAIDraft(label: label, description: description, data: data, intervalMs: intervalMs)
+    }
+
+    private func validateGeneratedMacroSequence(_ sequence: String) throws {
+        let tokens = MacroManager.shared.tokenize(sequence)
+        var balances: [String: Int] = ["CTRL": 0, "SHIFT": 0, "ALT": 0, "CMD": 0]
+
+        for token in tokens where token.hasPrefix("<") && token.hasSuffix(">") {
+            let normalizedToken = normalizedGeneratedMacroToken(token)
+
+            if normalizedToken.hasPrefix("<MACRO:") {
+                throw NSError(domain: "ChatManager", code: 46, userInfo: [NSLocalizedDescriptionKey: "AI returned a macro reference token, which is not allowed in Magic generation."])
+            }
+            guard macroGeneratorSupportedTokens.contains(normalizedToken) else {
+                throw NSError(domain: "ChatManager", code: 47, userInfo: [NSLocalizedDescriptionKey: "AI returned an unsupported macro token: \(token)"])
+            }
+
+            switch normalizedToken {
+            case "<CTRL>": balances["CTRL", default: 0] += 1
+            case "</CTRL>":
+                guard balances["CTRL", default: 0] > 0 else {
+                    throw NSError(domain: "ChatManager", code: 48, userInfo: [NSLocalizedDescriptionKey: "AI returned an unmatched </CTRL> tag."])
+                }
+                balances["CTRL", default: 0] -= 1
+            case "<SHIFT>": balances["SHIFT", default: 0] += 1
+            case "</SHIFT>":
+                guard balances["SHIFT", default: 0] > 0 else {
+                    throw NSError(domain: "ChatManager", code: 49, userInfo: [NSLocalizedDescriptionKey: "AI returned an unmatched </SHIFT> tag."])
+                }
+                balances["SHIFT", default: 0] -= 1
+            case "<ALT>": balances["ALT", default: 0] += 1
+            case "</ALT>":
+                guard balances["ALT", default: 0] > 0 else {
+                    throw NSError(domain: "ChatManager", code: 50, userInfo: [NSLocalizedDescriptionKey: "AI returned an unmatched </ALT> tag."])
+                }
+                balances["ALT", default: 0] -= 1
+            case "<CMD>": balances["CMD", default: 0] += 1
+            case "</CMD>":
+                guard balances["CMD", default: 0] > 0 else {
+                    throw NSError(domain: "ChatManager", code: 51, userInfo: [NSLocalizedDescriptionKey: "AI returned an unmatched </CMD> tag."])
+                }
+                balances["CMD", default: 0] -= 1
+            default:
+                break
+            }
+        }
+
+        let unclosedModifier = balances.first { $0.value != 0 }?.key
+        if let unclosedModifier {
+            throw NSError(domain: "ChatManager", code: 52, userInfo: [NSLocalizedDescriptionKey: "AI returned an unclosed <\(unclosedModifier)> modifier tag."])
+        }
+    }
+
+    private func normalizedGeneratedMacroToken(_ token: String) -> String {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("<"), trimmed.hasSuffix(">") else { return trimmed }
+
+        let isClosing = trimmed.hasPrefix("</")
+        let nameStart = trimmed.index(trimmed.startIndex, offsetBy: isClosing ? 2 : 1)
+        let nameEnd = trimmed.index(before: trimmed.endIndex)
+        let rawName = String(trimmed[nameStart..<nameEnd]).uppercased()
+
+        let canonicalName: String
+        switch rawName {
+        case "CTRL", "CONTROL":
+            canonicalName = "CTRL"
+        case "SHIFT":
+            canonicalName = "SHIFT"
+        case "ALT", "OPT", "OPTION":
+            canonicalName = "ALT"
+        case "CMD", "COMMAND", "WIN", "WINDOWS", "SUPER", "META":
+            canonicalName = "CMD"
+        case "DELAY05S":
+            canonicalName = "DELAY05s"
+        default:
+            canonicalName = rawName
+        }
+
+        return isClosing ? "</\(canonicalName)>" : "<\(canonicalName)>"
+    }
+
     func sendMessage(_ text: String, attachmentFileURL: URL? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || attachmentFileURL != nil else { return }
@@ -336,7 +748,11 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
 
         lastError = nil
         let storedContent = trimmed.isEmpty ? "Attached screenshot" : trimmed
-        messages.append(ChatMessage(role: .user, content: storedContent, attachmentFilePath: attachmentFileURL?.path))
+        let messageID = UUID()
+        messages.append(ChatMessage(id: messageID, role: .user, content: storedContent, attachmentFilePath: attachmentFileURL?.path))
+        if UserSettings.shared.isChatAgenticModeEnabled {
+            startAgentRequestStatus(for: messageID)
+        }
         persistHistory()
         isSending = true
 
@@ -352,12 +768,60 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         isSending = false
     }
 
+    /// Execute a skill from the Skills panel.
+    func runSkill(_ skill: ChatSkill) {
+        guard !isSending else { return }
+        if skill.captureScreen {
+            guard CameraManager.shared.canTakePicture else {
+                presentAIErrorToUser("No video source. Connect the device and ensure the video feed is active.")
+                return
+            }
+        }
+
+        lastError = nil
+        isSending = true
+
+        currentTask = Task { [weak self] in
+            guard let self = self else { return }
+
+            var screenshotURL: URL?
+            if skill.captureScreen {
+                screenshotURL = await self.captureScreenForAgent()
+                if screenshotURL == nil {
+                    self.presentAIErrorToUser("Could not capture screenshot from the target device.")
+                    self.isSending = false
+                    self.currentTask = nil
+                    return
+                }
+            }
+
+            let messageID = UUID()
+            self.messages.append(ChatMessage(
+                id: messageID,
+                role: .user,
+                content: skill.prompt,
+                attachmentFilePath: screenshotURL?.path
+            ))
+            if UserSettings.shared.isChatAgenticModeEnabled {
+                self.startAgentRequestStatus(for: messageID)
+            }
+            self.persistHistory()
+
+            await self.performSend()
+        }
+    }
+
     func clearHistory() {
         cancelSending()
         messages.removeAll()
         currentPlan = nil
         plannerTraceEntries.removeAll()
         taskStepTraces.removeAll()
+        guideCapturePathsByMessageID.removeAll()
+        guideAutoNextStatuses.removeAll()
+        agentRequestStatuses.removeAll()
+        pendingGuideAutoNextStarts.removeAll()
+        pendingAgentRequestStarts.removeAll()
         clearGuideOverlay()
         persistHistory()
     }
@@ -395,8 +859,133 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         persistHistory()
     }
 
+    func guideAutoNextStatus(for messageID: UUID) -> GuideAutoNextStatus? {
+        guideAutoNextStatuses[messageID]
+    }
+
+    func bubbleStatus(for messageID: UUID) -> GuideAutoNextStatus? {
+        if let guideStatus = guideAutoNextStatuses[messageID] {
+            return guideStatus
+        }
+
+        guard let agentRequestMessageID = agentRequestMessageID(forBubbleMessageID: messageID),
+              let agentStatus = agentRequestStatuses[agentRequestMessageID] else {
+            return nil
+        }
+
+        return preferredAgentStatusBubbleMessageID(for: agentRequestMessageID) == messageID
+            ? agentStatus
+            : nil
+    }
+
+    private func agentRequestMessageID(forBubbleMessageID messageID: UUID) -> UUID? {
+        guard let messageIndex = messages.firstIndex(where: { $0.id == messageID }) else {
+            return nil
+        }
+
+        let message = messages[messageIndex]
+        if message.role == .user {
+            return agentRequestStatuses[messageID] != nil ? messageID : nil
+        }
+
+        guard message.role == .assistant else {
+            return nil
+        }
+
+        guard messageIndex > 0,
+              let precedingUserIndex = messages[..<messageIndex].lastIndex(where: { $0.role == .user }) else {
+            return nil
+        }
+
+        let requestMessageID = messages[precedingUserIndex].id
+        return agentRequestStatuses[requestMessageID] != nil ? requestMessageID : nil
+    }
+
+    private func preferredAgentStatusBubbleMessageID(for requestMessageID: UUID) -> UUID {
+        guard let requestIndex = messages.firstIndex(where: { $0.id == requestMessageID }) else {
+            return requestMessageID
+        }
+
+        let assistantSearchStart = requestIndex + 1
+        guard assistantSearchStart < messages.endIndex else {
+            return requestMessageID
+        }
+
+        let nextUserIndex = messages[assistantSearchStart..<messages.endIndex].firstIndex(where: { $0.role == .user }) ?? messages.endIndex
+        guard assistantSearchStart < nextUserIndex else {
+            return requestMessageID
+        }
+
+        let latestAssistantMessageID = messages[assistantSearchStart..<nextUserIndex]
+            .last(where: { $0.role == .assistant })?
+            .id
+
+        return latestAssistantMessageID ?? requestMessageID
+    }
+
+    func respondToOSConfirmation(confirmed: Bool, suggestedSystem: ChatTargetSystem?) {
+        guard !isSending else { return }
+
+        let fallbackSystem = UserSettings.shared.chatTargetSystem
+        let resolvedSystem = suggestedSystem ?? fallbackSystem
+
+        if confirmed {
+            if UserSettings.shared.chatTargetSystem != resolvedSystem {
+                UserSettings.shared.chatTargetSystem = resolvedSystem
+                // Keep keyboard layout in sync with the confirmed target OS.
+                switch resolvedSystem {
+                case .windows:
+                    UserSettings.shared.keyboardLayout = .windows
+                case .linux:
+                    UserSettings.shared.keyboardLayout = .linux
+                case .macOS, .iPhone, .iPad, .android:
+                    UserSettings.shared.keyboardLayout = .mac
+                }
+            }
+
+            sendMessage("Confirmed. Proceed with \(resolvedSystem.displayName)-specific guidance and continue the current task.")
+            return
+        }
+
+        sendMessage("No, the target OS is not \(resolvedSystem.displayName). Please re-identify the OS from the current screen and ask me to confirm the correct target system before continuing.")
+    }
+
     func taskStepTraceEntries(for taskID: UUID) -> [ChatTaskTraceEntry] {
         taskStepTraces[taskID] ?? []
+    }
+
+    func guideTraceEntries(messageID: UUID) -> [ChatTaskTraceEntry]? {
+        guard let message = messages.first(where: { $0.id == messageID }) else { return nil }
+        let isGuideMessage = (message.guideActionRect != nil || message.guideShortcut != nil)
+        guard isGuideMessage else { return nil }
+
+        let guideMessages = messages.filter {
+            $0.role == .assistant && ($0.guideActionRect != nil || $0.guideShortcut != nil)
+        }
+
+        guard let traceIndex = guideMessages.firstIndex(where: { $0.id == messageID }) else {
+            return nil
+        }
+
+        let tracedMessages = Array(guideMessages.prefix(through: traceIndex))
+        return tracedMessages.enumerated().map { index, msg in
+            var bodyLines: [String] = []
+            bodyLines.append("Time: \(guideTimestampText(msg.createdAt))")
+            bodyLines.append("Action: \(guideActionDescription(for: msg))")
+            if let shortcut = guideShortcutText(for: msg) {
+                bodyLines.append("Shortcut: \(shortcut)")
+            }
+            if let targetBox = guideTargetBoxText(for: msg) {
+                bodyLines.append("Target: \(targetBox)")
+            }
+            bodyLines.append("Instruction: \(msg.content)")
+
+            return ChatTaskTraceEntry(
+                title: "Step \(index + 1)",
+                body: bodyLines.joined(separator: "\n"),
+                imageFilePath: guideCapturePathsByMessageID[msg.id]
+            )
+        }
     }
 
     func rerunLastPrompt(clearSequenceHistory: Bool = true) {
@@ -431,6 +1020,9 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             lastError = nil
             plannerTraceEntries.removeAll()
             taskStepTraces.removeAll()
+            guideCapturePathsByMessageID.removeAll()
+            guideAutoNextStatuses.removeAll()
+            pendingGuideAutoNextStarts.removeAll()
             persistHistory()
         }
 
@@ -562,6 +1154,9 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
 
     private func isGuideCompletionText(_ text: String) -> Bool {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized.hasPrefix("result:") {
+            return true
+        }
         let completionPhrases = [
             "goal achieved",
             "task complete",
@@ -657,15 +1252,40 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
     }
 
     private func performSend() async {
+        let agenticEnabled = UserSettings.shared.isChatAgenticModeEnabled
+        let pendingAgentStatusMessageID = agenticEnabled ? messages.last(where: { $0.role == .user })?.id : nil
+
+        enum AgentRequestStatusDisposition {
+            case none
+            case completed
+            case failed(String)
+            case cancelled
+        }
+
+        var agentRequestStatusDisposition: AgentRequestStatusDisposition = .none
+
         defer {
+            if let pendingAgentStatusMessageID {
+                switch agentRequestStatusDisposition {
+                case .none:
+                    if Task.isCancelled {
+                        cancelAgentRequestStatus(for: pendingAgentStatusMessageID)
+                    }
+                case .completed:
+                    completeAgentRequestStatus(for: pendingAgentStatusMessageID)
+                case .failed(let errorDescription):
+                    failAgentRequestStatus(for: pendingAgentStatusMessageID, errorDescription: errorDescription)
+                case .cancelled:
+                    cancelAgentRequestStatus(for: pendingAgentStatusMessageID)
+                }
+            }
             isSending = false
             currentTask = nil
         }
 
         let baseURLString = UserSettings.shared.chatApiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = UserSettings.shared.chatModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        let systemPrompt = UserSettings.shared.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agenticEnabled = UserSettings.shared.isChatAgenticModeEnabled
+        let systemPrompt = UserSettings.shared.resolvedSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let guideModeEnabled = UserSettings.shared.isChatGuideModeEnabled
 
         if !guideModeEnabled {
@@ -673,12 +1293,14 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         }
 
         guard !baseURLString.isEmpty, let baseURL = URL(string: baseURLString) else {
+            agentRequestStatusDisposition = .failed("Invalid Chat API base URL")
             presentAIErrorToUser("Invalid Chat API base URL")
             logger.log(content: "AI Chat request aborted: invalid base URL -> \(baseURLString)")
             return
         }
 
         guard !model.isEmpty else {
+            agentRequestStatusDisposition = .failed("Chat model is empty")
             presentAIErrorToUser("Chat model is empty")
             logger.log(content: "AI Chat request aborted: model is empty")
             return
@@ -689,6 +1311,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             ? (ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
             : configuredKey
         guard !apiKey.isEmpty else {
+            agentRequestStatusDisposition = .failed("Missing AI API key in Settings")
             presentAIErrorToUser("Missing AI API key in Settings")
             logger.log(content: "AI Chat request aborted: missing API key")
             return
@@ -712,6 +1335,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         var workingMessages = messages
 
         do {
+            let maxAgentIterations = UserSettings.shared.chatAgentMaxIterations
             for iteration in 1...maxAgentIterations {
                 let conversation = buildConversation(
                     systemPrompt: systemPrompt,
@@ -744,6 +1368,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 if Task.isCancelled { return }
 
                 guard let http = response as? HTTPURLResponse else {
+                    agentRequestStatusDisposition = .failed("Invalid server response")
                     presentAIErrorToUser("Invalid server response")
                     logger.log(content: "AI Chat response error: non-HTTP response")
                     return
@@ -769,12 +1394,14 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                     let errorText = detail.isEmpty
                         ? "Chat API error \(http.statusCode)."
                         : "Chat API error \(http.statusCode): \(detail)"
+                    agentRequestStatusDisposition = .failed(errorText)
                     presentAIErrorToUser(errorText)
                     return
                 }
 
                 let decoded = try JSONDecoder().decode(ChatCompletionsResponse.self, from: data)
                 guard let assistantText = decoded.choices.first?.message.content, !assistantText.isEmpty else {
+                    agentRequestStatusDisposition = .failed("Empty assistant response")
                     presentAIErrorToUser("Empty assistant response")
                     logger.log(content: "AI Chat response decode succeeded but assistant content is empty")
                     return
@@ -792,24 +1419,35 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                     workingMessages.append(ChatMessage(role: .assistant, content: assistantText))
                     let toolResultMessage = ChatMessage(role: .user, content: "TOOL_RESULT:\n\(toolResult.summary)", attachmentFilePath: toolResult.attachmentFilePath)
                     workingMessages.append(toolResultMessage)
-                    messages.append(ChatMessage(role: .assistant, content: "Tool result:\n\(toolResult.summary)", attachmentFilePath: toolResult.attachmentFilePath))
+                    messages.append(ChatMessage(
+                        role: .assistant,
+                        content: "Tool result:\n\(toolResult.summary)",
+                        attachmentFilePath: toolResult.attachmentFilePath
+                    ))
                     persistHistory()
                     continue
                 }
 
+                agentRequestStatusDisposition = .completed
                 messages.append(ChatMessage(role: .assistant, content: assistantText))
                 persistHistory()
                 return
             }
 
-            let timeoutMessage = "I executed the available steps but still need guidance to continue. Please provide a fresh screenshot or more detail."
+            let timeoutMessage = "I reached the configured Agent Mode iteration limit (\(UserSettings.shared.chatAgentMaxIterations)) and still need guidance to continue. Please provide a fresh screenshot, raise the iteration limit, or use a verified macro if one matches the task."
+            agentRequestStatusDisposition = .completed
             messages.append(ChatMessage(role: .assistant, content: timeoutMessage))
             persistHistory()
         } catch {
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                agentRequestStatusDisposition = .cancelled
+                return
+            }
             logger.log(content: "AI Chat request failed with error: \(error.localizedDescription)")
             appendAITrace(title: "ERROR", body: error.localizedDescription)
-            presentAIErrorToUser(userFacingErrorMessage(from: error))
+            let errorMessage = userFacingErrorMessage(from: error)
+            agentRequestStatusDisposition = .failed(errorMessage)
+            presentAIErrorToUser(errorMessage)
         }
     }
 
@@ -829,10 +1467,15 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                     imageFilePath: planningAttachment.path
                 )
             }
+            let plannerUserRequest = shouldInjectOSConfirmationPrompt(in: messages)
+                ? firstTurnOSConfirmationInstruction() + "\n\n" + latestUserMessage.content
+                : latestUserMessage.content
+
             let plannerMessages = plannerAgent.buildPlanningConversation(
                 systemPrompt: systemPrompt,
-                plannerPrompt: UserSettings.shared.plannerPrompt.trimmingCharacters(in: .whitespacesAndNewlines),
-                userRequest: latestUserMessage.content,
+                plannerPrompt: UserSettings.shared.resolvedPlannerPrompt.trimmingCharacters(in: .whitespacesAndNewlines),
+                macroInventoryPrompt: macroInventoryPrompt(),
+                userRequest: plannerUserRequest,
                 imageDataURL: planningAttachment.flatMap { dataURLForImage(atPath: $0.path) }
             )
             appendPlannerTrace(title: "Planner request", body: readableTraceParts(from: plannerMessages))
@@ -867,27 +1510,54 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             return
         }
 
+        let pendingGuideStatusMessageID = pendingGuideAutoNextStarts.keys.max { lhs, rhs in
+            (pendingGuideAutoNextStarts[lhs] ?? .distantPast) < (pendingGuideAutoNextStarts[rhs] ?? .distantPast)
+        }
+
         do {
             currentPlan = nil
             let guideAttachment = await latestPlanningAttachmentURL(fallbackAttachmentPath: latestUserMessage.attachmentFilePath)
             var conversation: [ChatCompletionsRequest.Message] = []
-            if !systemPrompt.isEmpty {
-                conversation.append(.text(role: .system, text: systemPrompt))
+            let compactGuideSystemPrompt = UserSettings.shared
+                .promptProfile(for: UserSettings.shared.chatTargetSystem)
+                .systemPrompt
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !compactGuideSystemPrompt.isEmpty {
+                conversation.append(.text(role: .system, text: compactGuideSystemPrompt))
             }
 
-            let guidePrompt = UserSettings.shared.guidePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            let guidePrompt = UserSettings.shared.resolvedGuidePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             if !guidePrompt.isEmpty {
                 conversation.append(.text(role: .system, text: guidePrompt))
             }
+            conversation.append(.text(role: .system, text: macroInventoryPrompt()))
 
-            let initialGoalText = messages.first(where: { 
+            // Start a fresh mission context after the most recent completion marker.
+            // This prevents old completed goals (for example, "open GitHub") from
+            // leaking into a new user target in the same chat history.
+            let latestUserIndex = messages.lastIndex(where: { $0.id == latestUserMessage.id })
+            let contextMessages: [ChatMessage] = {
+                guard let latestUserIndex else { return messages }
+                let prefixToLatest = Array(messages[...latestUserIndex])
+                if let lastCompletionIndex = prefixToLatest.lastIndex(where: { message in
+                    message.role == .assistant && (message.content.hasPrefix("Task Complete") || isGuideCompletionText(message.content))
+                }) {
+                    let start = lastCompletionIndex + 1
+                    if start <= latestUserIndex {
+                        return Array(messages[start...latestUserIndex])
+                    }
+                }
+                return prefixToLatest
+            }()
+
+            let initialGoalText = contextMessages.first(where: {
                 $0.role == .user && 
                 !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && 
                 $0.content != "Attached screenshot" && 
                 $0.content != "Guide me to the next action on the current screen." 
             })?.content.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
-            let pastAssistantSteps = messages
+            let pastAssistantSteps = contextMessages
                 .filter {
                     $0.role == .assistant &&
                     (($0.guideActionRect != nil || $0.guideShortcut != nil) || isGuideCompletionText($0.content))
@@ -899,14 +1569,19 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 ? "Guide me to the next action on the current screen."
                 : latestUserMessage.content
 
+            if shouldInjectOSConfirmationPrompt(in: messages) {
+                userText = firstTurnOSConfirmationInstruction() + "\n\n" + userText
+            }
+
             if !pastAssistantSteps.isEmpty {
                 let stepsList = pastAssistantSteps.enumerated()
                     .map { "- Step \($0.offset + 1): \($0.element.prefix(250))" }
                     .joined(separator: "\n")
+                let antiRepeatInstruction = "Past actions listed below were already executed. Do not repeat the same action unless the current screenshot clearly shows it is still pending. If the goal already appears complete, respond with Result:. If you cannot verify completion from this screenshot, ask for clarification instead of repeating the same step."
                 if !initialGoalText.isEmpty && initialGoalText != userText {
-                    userText = "Original Goal: \(initialGoalText)\n\nPast Actions Taken:\n\(stepsList)\n\nCurrent Request: \(userText)"
+                    userText = "Original Goal: \(initialGoalText)\n\n\(antiRepeatInstruction)\n\nPast Actions Taken:\n\(stepsList)\n\nCurrent Request: \(userText)"
                 } else {
-                    userText = "Past Actions Taken:\n\(stepsList)\n\nCurrent Request: \(userText)"
+                    userText = "\(antiRepeatInstruction)\n\nPast Actions Taken:\n\(stepsList)\n\nCurrent Request: \(userText)"
                 }
             } else {
                 if !initialGoalText.isEmpty && initialGoalText != userText {
@@ -951,7 +1626,10 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 }
             }
 
-            let guideShortcut = payload.keyboard_shortcut?
+            let guideTool = payload.tool?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let guideShortcut = payload.tool_input?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let sanitizedShortcut = (guideShortcut?.isEmpty == false) ? guideShortcut : nil
             let hasActionableGuidePayload = guideActionRect != nil || sanitizedShortcut != nil
@@ -960,18 +1638,30 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 ? "Task Complete\n\n\(baseGuideMessage)"
                 : baseGuideMessage
             
+            let guideMessageID = UUID()
             messages.append(ChatMessage(
+                id: guideMessageID,
                 role: .assistant,
                 content: finalGuideMessage,
                 guideActionRect: guideActionRect,
-                guideShortcut: sanitizedShortcut
+                guideShortcut: sanitizedShortcut,
+                guideTool: guideTool
             ))
+            if let capturePath = guideAttachment?.path {
+                guideCapturePathsByMessageID[guideMessageID] = capturePath
+            }
+            if let pendingGuideStatusMessageID {
+                completeGuideAutoNextStatus(for: pendingGuideStatusMessageID)
+            }
             persistHistory()
         } catch {
             if Task.isCancelled { return }
             logger.log(content: "AI guide-mode request failed: \(error.localizedDescription)")
             appendAITrace(title: "GUIDE_ERROR", body: error.localizedDescription)
             clearGuideOverlay()
+            if let pendingGuideStatusMessageID {
+                failGuideAutoNextStatus(for: pendingGuideStatusMessageID, errorDescription: error.localizedDescription)
+            }
             presentAIErrorToUser(userFacingErrorMessage(from: error))
         }
     }
@@ -1001,7 +1691,8 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         AppStatus.guideHighlightRectNormalized = .zero
     }
 
-    func executeGuideAction(targetBox: CGRect?, shortcut: String?, messageContent: String, autoNext: Bool) {
+    func executeGuideAction(messageID: UUID, targetBox: CGRect?, shortcut: String?, tool: String?, messageContent: String, autoNext: Bool) {
+        let anchorUserMessageID = messages.last(where: { $0.role == .user })?.id
         Task {
             var actionDescription = "unknown"
             
@@ -1014,24 +1705,32 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 let cx = targetBox.midX
                 let cy = targetBox.midY
                 
-                // Match explicit verbs, defaulting to left click
+                // Use the explicit tool first, then fall back to content heuristics.
+                let normalizedTool = tool?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
                 let contentLower = messageContent.lowercased()
-                let isRightClick = contentLower.contains("right click") || contentLower.contains("right-click")
-                let isDoubleClick = (!isRightClick && (contentLower.contains("double click") || contentLower.contains("double-click")))
+                let isRightClick = normalizedTool == "right_click" || normalizedTool == "right-click" || contentLower.contains("right click") || contentLower.contains("right-click")
+                let isDoubleClick = (!isRightClick && (normalizedTool == "double_click" || normalizedTool == "double-click" || contentLower.contains("double click") || contentLower.contains("double-click")))
                 
                 let buttonEvent: UInt8 = isRightClick ? 0x02 : 0x01
                 let actionName = isRightClick ? "right_click" : (isDoubleClick ? "double_click" : "left_click")
                 
                 let absX = Int(cx * 4096.0)
                 let absY = Int(cy * 4096.0)
-                
-                let clampedX = clampAbsoluteCoordinate(absX)
-                let clampedY = clampAbsoluteCoordinate(absY)
+                var clampedX = clampAbsoluteCoordinate(absX)
+                var clampedY = clampAbsoluteCoordinate(absY)
+
+                if let refinedPoint = await refineGuideClickTarget(absX: clampedX, absY: clampedY, instruction: messageContent) {
+                    clampedX = refinedPoint.x
+                    clampedY = refinedPoint.y
+                    if let matchedElement = refinedPoint.matchedElement, !matchedElement.isEmpty {
+                        logger.log(content: "Guide click refinement matched element: \(matchedElement)")
+                    }
+                }
                 agentMouseX = clampedX
                 agentMouseY = clampedY
                 
                 logger.log(content: "Guide Action Preparing: \(actionName) at normalized(\(String(format: "%.3f", cx)), \(String(format: "%.3f", cy))) -> clamped(\(clampedX), \(clampedY))")
-                AIInputRouter.click(button: buttonEvent, absX: clampedX, absY: clampedY, isDoubleClick: isDoubleClick)
+                AIInputRouter.animatedClick(button: buttonEvent, absX: clampedX, absY: clampedY, isDoubleClick: isDoubleClick)
                 
                 actionDescription = "\(actionName) at x=\(clampedX), y=\(clampedY)"
                 logger.log(content: "Guide Action Executed: \(actionDescription)")
@@ -1043,13 +1742,25 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             
             DispatchQueue.main.async {
                 self.clearGuideOverlay()
-                self.messages.append(ChatMessage(role: .assistant, content: messageText))
+                if autoNext {
+                    self.startGuideAutoNextStatus(for: messageID)
+                } else {
+                    self.messages.append(ChatMessage(role: .assistant, content: messageText))
+                }
                 self.persistHistory()
             }
             
             if autoNext {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 DispatchQueue.main.async {
+                    // If a newer user prompt was sent, do not continue the old mission.
+                    let latestUserMessageID = self.messages.last(where: { $0.role == .user })?.id
+                    guard latestUserMessageID == anchorUserMessageID else {
+                        self.logger.log(content: "Guide auto-next canceled: detected newer user request (starting new mission context)")
+                        self.cancelGuideAutoNextStatus(for: messageID)
+                        return
+                    }
+
                     if UserSettings.shared.isChatGuideModeEnabled {
                         self.sendMessage("Guide me to the next action on the current screen.")
                     }
@@ -1089,17 +1800,19 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         let sequenceSteps = steps.isEmpty ? [normalized] : steps
         var executedAny = false
 
-        for step in sequenceSteps {
+        for (index, step) in sequenceSteps.enumerated() {
             if executeShortcut(step) {
                 executedAny = true
-                Thread.sleep(forTimeInterval: 0.05)
+                let nextStep = index + 1 < sequenceSteps.count ? sequenceSteps[index + 1] : nil
+                Thread.sleep(forTimeInterval: guideDelayAfterPlainStep(step, nextStep: nextStep))
                 continue
             }
 
             logger.log(content: "AI Executing Text Input: '\(step)'")
             AIInputRouter.sendText(step)
             executedAny = true
-            Thread.sleep(forTimeInterval: 0.05)
+            let nextStep = index + 1 < sequenceSteps.count ? sequenceSteps[index + 1] : nil
+            Thread.sleep(forTimeInterval: guideDelayAfterPlainTextStep(step, nextStep: nextStep))
         }
 
         return executedAny
@@ -1116,24 +1829,120 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
 
         var executedAny = false
 
-        for step in steps {
+        for (index, step) in steps.enumerated() {
             switch step {
             case .shortcut(let shortcut):
                 if executeShortcut(shortcut) {
                     executedAny = true
                 }
+                let nextStep = index + 1 < steps.count ? steps[index + 1] : nil
+                Thread.sleep(forTimeInterval: guideDelayAfterBracketedStep(step, nextStep: nextStep))
             case .text(let text):
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { continue }
                 logger.log(content: "AI Executing Text Input: '\(trimmed)'")
                 AIInputRouter.sendText(trimmed)
                 executedAny = true
+                let nextStep = index + 1 < steps.count ? steps[index + 1] : nil
+                Thread.sleep(forTimeInterval: guideDelayAfterBracketedStep(step, nextStep: nextStep))
             }
-
-            Thread.sleep(forTimeInterval: 0.05)
         }
 
         return executedAny
+    }
+
+    private func guideDelayAfterPlainStep(_ step: String, nextStep: String?) -> TimeInterval {
+        let normalized = step.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if isGuideLauncherShortcut(normalized) {
+            return 0.65
+        }
+        if isGuideNavigationShortcut(normalized) {
+            return 0.22
+        }
+        if let nextStep,
+           !nextStep.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !looksLikeGuideShortcut(nextStep) {
+            return 0.18
+        }
+        return 0.12
+    }
+
+    private func guideDelayAfterPlainTextStep(_ text: String, nextStep: String?) -> TimeInterval {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0.12 }
+
+        if let nextStep {
+            let normalizedNextStep = nextStep.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if normalizedNextStep == "enter" || normalizedNextStep == "return" || normalizedNextStep == "tab" {
+                return 0.3
+            }
+        }
+
+        return 0.16
+    }
+
+    private func guideDelayAfterBracketedStep(_ step: GuideInputStep, nextStep: GuideInputStep?) -> TimeInterval {
+        switch step {
+        case .shortcut(let shortcut):
+            if isGuideLauncherShortcut(shortcut) {
+                return 0.65
+            }
+            if isGuideNavigationShortcut(shortcut) {
+                return 0.22
+            }
+            return 0.12
+        case .text(let text):
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return 0.12 }
+
+            if case .shortcut(let shortcut)? = nextStep {
+                let normalized = shortcut.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if normalized == "enter" || normalized == "return" || normalized == "tab" {
+                    return 0.3
+                }
+            }
+
+            return 0.16
+        }
+    }
+
+    private func isGuideLauncherShortcut(_ shortcut: String) -> Bool {
+        let normalized = shortcut.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let launcherShortcuts: Set<String> = [
+            "cmd+space",
+            "cmd+h",
+            "cmd+tab",
+            "ctrl+alt+t",
+            "win+r",
+            "win+e"
+        ]
+        return launcherShortcuts.contains(normalized)
+    }
+
+    private func isGuideNavigationShortcut(_ shortcut: String) -> Bool {
+        let normalized = shortcut.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let navigationShortcuts: Set<String> = [
+            "enter",
+            "return",
+            "tab",
+            "shift+tab",
+            "up",
+            "down",
+            "left",
+            "right",
+            "esc",
+            "escape"
+        ]
+        return navigationShortcuts.contains(normalized)
+    }
+
+    private func looksLikeGuideShortcut(_ step: String) -> Bool {
+        let normalized = step.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return false }
+        if normalized.contains("+") {
+            return true
+        }
+        return isGuideNavigationShortcut(normalized) || isGuideLauncherShortcut(normalized)
     }
 
     private func parseBracketedGuideInputSteps(_ input: String) -> [GuideInputStep] {
@@ -1314,22 +2123,123 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             conversation.append(.text(role: .system, text: systemPrompt))
         }
         if includeAgentTools {
-            conversation.append(.text(role: .system, text: agentToolInstruction))
+            conversation.append(.text(role: .system, text: agentToolInstruction + "\n\n" + macroInventoryPrompt()))
         }
 
         let recent = sourceMessages.suffix(30)
+        let shouldInjectFirstTurnConfirmation = !includeAgentTools && shouldInjectOSConfirmationPrompt(in: sourceMessages)
         conversation.append(contentsOf: recent.map { message in
+            let shouldPrefixUserMessage = shouldInjectFirstTurnConfirmation && message.role == .user
             if message.role == .user,
                let path = message.attachmentFilePath,
                let imageURL = dataURLForImage(atPath: path) {
-                let text = message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                var text = message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     ? "Please analyze this screenshot."
                     : message.content
+                if shouldPrefixUserMessage {
+                    text = firstTurnOSConfirmationInstruction() + "\n\n" + text
+                }
                 return .multimodal(role: message.role, text: text, imageDataURL: imageURL)
+            }
+            if shouldPrefixUserMessage {
+                return .text(role: message.role, text: firstTurnOSConfirmationInstruction() + "\n\n" + message.content)
             }
             return .text(role: message.role, text: message.content)
         })
         return conversation
+    }
+
+    private func macroInventoryPrompt() -> String {
+        let verifiedMacros = MacroManager.shared.macros.filter(\.isVerified)
+
+        var sections: [String] = []
+
+        if verifiedMacros.isEmpty {
+            sections.append("Verified executable macros:\n- No verified macros are currently available.")
+        } else {
+            let verifiedLines = verifiedMacros.map { macro in
+                let description = macro.description.trimmingCharacters(in: .whitespacesAndNewlines)
+                let detail = description.isEmpty ? macro.data : description
+                return "- id=\(macro.id.uuidString), label=\(macro.label), target=\(macro.targetSystem.displayName), detail=\(detail)"
+            }
+            sections.append("Verified executable macros:\n" + verifiedLines.joined(separator: "\n"))
+        }
+
+        sections.append("Macro tool usage:\n- Use run_verified_macro only with a verified macro from the executable list above.\n- Prefer macro_id over macro_label when calling the tool.\n- IMPORTANT: After running a macro, always verify the result in a NEW tool_calls response. Never include capture_screen or any other tool in the same tool_calls array as run_verified_macro.\n- If the macro gets close but does not fully finish the job, continue with additional tool calls instead of assuming success.")
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    private func verifiedMacroMatch(from args: [String: Any]) -> VerifiedMacroMatch? {
+        let verifiedMacros = MacroManager.shared.macros.filter(\.isVerified)
+        guard !verifiedMacros.isEmpty else { return nil }
+
+        let requestedID = ((args["macro_id"] as? String) ?? (args["id"] as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let macroID = UUID(uuidString: requestedID),
+           let matched = verifiedMacros.first(where: { $0.id == macroID }) {
+            return VerifiedMacroMatch(macro: matched, matchedBy: "id")
+        }
+
+        let requestedLabel = ((args["macro_label"] as? String) ?? (args["label"] as? String) ?? requestedID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !requestedLabel.isEmpty else { return nil }
+
+        let normalizedRequested = requestedLabel.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        if let exact = verifiedMacros.first(where: {
+            $0.label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) == normalizedRequested
+        }) {
+            return VerifiedMacroMatch(macro: exact, matchedBy: "label")
+        }
+
+        let partialMatches = verifiedMacros.filter {
+            $0.label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(normalizedRequested)
+        }
+        if partialMatches.count == 1, let matched = partialMatches.first {
+            return VerifiedMacroMatch(macro: matched, matchedBy: "partial-label")
+        }
+
+        return nil
+    }
+
+    private func shouldInjectOSConfirmationPrompt(in sourceMessages: [ChatMessage]) -> Bool {
+        let userCount = sourceMessages.filter { $0.role == .user }.count
+        let assistantCount = sourceMessages.filter { $0.role == .assistant }.count
+        return userCount == 1 && assistantCount == 0
+    }
+
+    private func firstTurnOSConfirmationInstruction() -> String {
+        let systemsList = ChatTargetSystem.allCases
+            .map { "  - \($0.displayName): \($0.detail)" }
+            .joined(separator: "\n")
+        
+        let selected = UserSettings.shared.chatTargetSystem
+        return """
+CRITICAL: Before proceeding with the user's request, examine the screenshot carefully to identify which operating system is running on the target device.
+
+Available systems to identify:
+\(systemsList)
+
+After analyzing the screenshot, you MUST explicitly identify which system you detected by stating one of these exact phrases:
+- "The target OS appears to be: macOS"
+- "The target OS appears to be: Windows"
+- "The target OS appears to be: Linux"
+- "The target OS appears to be: iPhone"
+- "The target OS appears to be: iPad"
+- "The target OS appears to be: Android"
+
+Immediately after that line, you MUST include a confirmation sentence in this exact format:
+- "Please confirm whether the target system should be set to macOS."
+- "Please confirm whether the target system should be set to Windows."
+- "Please confirm whether the target system should be set to Linux."
+- "Please confirm whether the target system should be set to iPhone."
+- "Please confirm whether the target system should be set to iPad."
+- "Please confirm whether the target system should be set to Android."
+
+Do not replace that confirmation sentence with paraphrases such as "Shall I proceed" or "Does this match". The response must contain both the exact detection line and the exact confirmation sentence so the app can open the OS selection UI reliably.
+
+Currently configured target system: \(selected.displayName)
+"""
     }
 
     private func dataURLForImage(atPath path: String) -> String? {
@@ -1337,6 +2247,62 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         guard let imagePayload = preparedImagePayload(for: url) else { return nil }
 
         return "data:\(imagePayload.mimeType);base64,\(imagePayload.data.base64EncodedString())"
+    }
+
+    private func hasTransparency(_ cgImage: CGImage) -> Bool {
+        switch cgImage.alphaInfo {
+        case .first, .last, .premultipliedFirst, .premultipliedLast, .alphaOnly:
+            break
+        default:
+            return false
+        }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        guard width > 0, height > 0 else { return false }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        let bitsPerComponent = 8
+        var pixelData = [UInt8](repeating: 255, count: height * bytesPerRow)
+
+        guard let context = CGContext(
+            data: &pixelData,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return true
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        for alphaIndex in stride(from: 3, to: pixelData.count, by: bytesPerPixel) {
+            if pixelData[alphaIndex] < 255 {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private func preferredAIImageEncoding(for cgImage: CGImage, quality: Double = 0.92) -> (data: Data, mimeType: String)? {
+        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+        let hasAlpha = hasTransparency(cgImage)
+
+        if !hasAlpha,
+           let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: quality]) {
+            return (jpegData, "image/jpeg")
+        }
+
+        if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+            return (pngData, "image/png")
+        }
+
+        return nil
     }
 
     private func preparedImagePayload(for url: URL) -> (data: Data, mimeType: String)? {
@@ -1355,13 +2321,23 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             originalMimeType = "image/png"
         }
 
-        guard let maxLongEdge = UserSettings.shared.chatImageUploadLimit.maxLongEdge else {
-            return (originalData, originalMimeType)
-        }
-
         guard let image = NSImage(contentsOf: url),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             logger.log(content: "AI image scaling skipped: failed to load image at \(url.path)")
+            return (originalData, originalMimeType)
+        }
+
+        guard let maxLongEdge = UserSettings.shared.chatImageUploadLimit.maxLongEdge else {
+            if originalMimeType == "image/jpeg" {
+                return (originalData, originalMimeType)
+            }
+
+            if let preferred = preferredAIImageEncoding(for: cgImage),
+               preferred.mimeType == "image/jpeg" || preferred.data.count < originalData.count {
+                logger.log(content: "AI image re-encoded for upload: \(url.lastPathComponent) -> \(preferred.mimeType) bytes=\(preferred.data.count) (from \(originalData.count))")
+                return preferred
+            }
+
             return (originalData, originalMimeType)
         }
 
@@ -1370,6 +2346,16 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         let longEdge = max(width, height)
 
         guard longEdge > maxLongEdge else {
+            if originalMimeType == "image/jpeg" {
+                return (originalData, originalMimeType)
+            }
+
+            if let preferred = preferredAIImageEncoding(for: cgImage),
+               preferred.mimeType == "image/jpeg" || preferred.data.count < originalData.count {
+                logger.log(content: "AI image re-encoded for upload without scaling: \(url.lastPathComponent) -> \(preferred.mimeType) bytes=\(preferred.data.count) (from \(originalData.count))")
+                return preferred
+            }
+
             return (originalData, originalMimeType)
         }
 
@@ -1399,15 +2385,14 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             return (originalData, originalMimeType)
         }
 
-        let bitmapRep = NSBitmapImageRep(cgImage: scaledCGImage)
-        guard let scaledData = bitmapRep.representation(using: .png, properties: [:]) else {
-            logger.log(content: "AI image scaling skipped: failed to encode scaled PNG for \(url.lastPathComponent)")
+        guard let scaledPayload = preferredAIImageEncoding(for: scaledCGImage) else {
+            logger.log(content: "AI image scaling skipped: failed to encode scaled image for \(url.lastPathComponent)")
             return (originalData, originalMimeType)
         }
 
-        logger.log(content: "AI image scaled for upload: \(Int(width))x\(Int(height)) -> \(targetWidth)x\(targetHeight) [limit=\(UserSettings.shared.chatImageUploadLimit.rawValue)]")
+        logger.log(content: "AI image scaled for upload: \(Int(width))x\(Int(height)) -> \(targetWidth)x\(targetHeight) [limit=\(UserSettings.shared.chatImageUploadLimit.rawValue), mime=\(scaledPayload.mimeType), bytes=\(scaledPayload.data.count)]")
 
-        return (scaledData, "image/png")
+        return scaledPayload
     }
 
     private func parseToolCalls(from text: String) -> [AgentToolCall]? {
@@ -1455,7 +2440,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
 
         let baseURLString = UserSettings.shared.chatApiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = UserSettings.shared.chatModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        let systemPrompt = UserSettings.shared.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let systemPrompt = UserSettings.shared.resolvedSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let configuredKey = UserSettings.shared.chatApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let apiKey = configuredKey.isEmpty
             ? (ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
@@ -1716,14 +2701,17 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         model: String,
         apiKey: String,
         conversation: [ChatCompletionsRequest.Message],
-        traceLabel: String
+        traceLabel: String,
+        enableThinking: Bool? = nil
     ) async throws -> ChatCompletionResult {
+        let requestStartedAt = Date()
         var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
+        request.timeoutInterval = 180
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let payload = ChatCompletionsRequest(model: model, messages: conversation)
+        let payload = ChatCompletionsRequest(model: model, messages: conversation, enableThinking: enableThinking)
         request.httpBody = try JSONEncoder().encode(payload)
 
         let requestURL = request.url?.absoluteString ?? "(nil)"
@@ -1734,6 +2722,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 "url: \(requestURL)",
                 "model: \(model)",
                 "conversationMessages: \(conversation.count)",
+                "timeoutSeconds: \(Int(request.timeoutInterval))",
                 "bodyBytes: \(request.httpBody?.count ?? 0)",
                 "readableParts:",
                 readableTraceParts(from: conversation),
@@ -1746,13 +2735,16 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         guard let http = response as? HTTPURLResponse else {
             throw NSError(domain: "ChatManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])
         }
+        let responseDuration = Date().timeIntervalSince(requestStartedAt)
 
         logger.log(content: "AI Chat response <- status=\(http.statusCode), bytes=\(data.count), trace=\(traceLabel)")
         appendAITrace(
             title: "\(traceLabel)_RESPONSE",
+            headerPrefix: Self.traceDurationHeader(from: responseDuration),
             body: [
                 "status: \(http.statusCode)",
                 "contentType: \(http.value(forHTTPHeaderField: "Content-Type") ?? "unknown")",
+                "responseTimeSeconds: \(String(format: "%.3f", responseDuration))",
                 "bytes: \(data.count)",
                 "body:",
                 traceBodyForLogging(data: data, contentType: http.value(forHTTPHeaderField: "Content-Type"))
@@ -1786,7 +2778,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             case "capture_screen", "take_screenshot", "screenshot":
                 if let fileURL = await captureScreenForAgent() {
                     attachmentPath = fileURL.path
-                    summaries.append("capture_screen: success (file=\(fileURL.lastPathComponent))")
+                    summaries.append("capture_screen: success")
                     logger.log(content: "AI Tool executed: capture_screen -> \(fileURL.path)")
                 } else {
                     summaries.append("capture_screen: failed (no image captured)")
@@ -1794,14 +2786,14 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                 }
 
             case "move_mouse":
-                if let x = intArg(call.args["x"]), let y = intArg(call.args["y"]) {
-                    let clampedX = clampAbsoluteCoordinate(x)
-                    let clampedY = clampAbsoluteCoordinate(y)
-                    AIInputRouter.sendMouseMove(absX: clampedX, absY: clampedY)
-                    agentMouseX = clampedX
-                    agentMouseY = clampedY
-                    summaries.append("move_mouse: ok (x=\(clampedX), y=\(clampedY))")
-                    logger.log(content: "AI Tool executed: move_mouse x=\(clampedX), y=\(clampedY) [abs 0...4096]")
+                if let nx = doubleArg(call.args["x"]), let ny = doubleArg(call.args["y"]) {
+                    let absX = normalizedToAbsolute(nx)
+                    let absY = normalizedToAbsolute(ny)
+                    AIInputRouter.sendMouseMove(absX: absX, absY: absY)
+                    agentMouseX = absX
+                    agentMouseY = absY
+                    summaries.append("move_mouse: ok (x=\(String(format: "%.3f", nx)), y=\(String(format: "%.3f", ny)))")
+                    logger.log(content: "AI Tool executed: move_mouse normalized=(\(nx), \(ny)) abs=(\(absX), \(absY))")
                 } else {
                     summaries.append("move_mouse: invalid args")
                     logger.log(content: "AI Tool failed: move_mouse invalid args")
@@ -1809,35 +2801,68 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
 
             case "left_click":
                 let clickPoint = await click(button: 0x01, args: call.args)
+                let lnx = absoluteToNormalized(clickPoint.x)
+                let lny = absoluteToNormalized(clickPoint.y)
                 if let annotatedURL = await captureAnnotatedClickForChat(absX: clickPoint.x, absY: clickPoint.y, actionName: "left_click") {
                     attachmentPath = annotatedURL.path
-                    summaries.append("left_click: success (x=\(clickPoint.x), y=\(clickPoint.y), image=\(annotatedURL.lastPathComponent))")
+                    summaries.append("left_click: success (x=\(String(format: "%.3f", lnx)), y=\(String(format: "%.3f", lny)), image=\(annotatedURL.lastPathComponent))")
                 } else {
-                    summaries.append("left_click: success (x=\(clickPoint.x), y=\(clickPoint.y), image=unavailable)")
+                    summaries.append("left_click: success (x=\(String(format: "%.3f", lnx)), y=\(String(format: "%.3f", lny)), image=unavailable)")
                 }
-                logger.log(content: "AI Tool executed: left_click at x=\(clickPoint.x), y=\(clickPoint.y)")
+                logger.log(content: "AI Tool executed: left_click normalized=(\(lnx), \(lny)) abs=(\(clickPoint.x), \(clickPoint.y))")
+
+            case "left_drag", "drag_mouse", "mouse_drag", "drag":
+                guard let dragPoints = dragPoints(from: call.args) else {
+                    summaries.append("left_drag: invalid args")
+                    logger.log(content: "AI Tool failed: left_drag invalid args")
+                    continue
+                }
+
+                AIInputRouter.animatedDrag(
+                    button: 0x01,
+                    startAbsX: dragPoints.startX,
+                    startAbsY: dragPoints.startY,
+                    endAbsX: dragPoints.endX,
+                    endAbsY: dragPoints.endY
+                )
+                agentMouseX = dragPoints.endX
+                agentMouseY = dragPoints.endY
+
+                let startNX = absoluteToNormalized(dragPoints.startX)
+                let startNY = absoluteToNormalized(dragPoints.startY)
+                let endNX = absoluteToNormalized(dragPoints.endX)
+                let endNY = absoluteToNormalized(dragPoints.endY)
+                if let annotatedURL = await captureAnnotatedClickForChat(absX: dragPoints.endX, absY: dragPoints.endY, actionName: "left_drag") {
+                    attachmentPath = annotatedURL.path
+                    summaries.append("left_drag: success (start_x=\(String(format: "%.3f", startNX)), start_y=\(String(format: "%.3f", startNY)), x=\(String(format: "%.3f", endNX)), y=\(String(format: "%.3f", endNY)), image=\(annotatedURL.lastPathComponent))")
+                } else {
+                    summaries.append("left_drag: success (start_x=\(String(format: "%.3f", startNX)), start_y=\(String(format: "%.3f", startNY)), x=\(String(format: "%.3f", endNX)), y=\(String(format: "%.3f", endNY)), image=unavailable)")
+                }
+                logger.log(content: "AI Tool executed: left_drag start=(\(dragPoints.startX), \(dragPoints.startY)) end=(\(dragPoints.endX), \(dragPoints.endY))")
 
             case "right_click":
                 let clickPoint = await click(button: 0x02, args: call.args)
+                let rnx = absoluteToNormalized(clickPoint.x)
+                let rny = absoluteToNormalized(clickPoint.y)
                 if let annotatedURL = await captureAnnotatedClickForChat(absX: clickPoint.x, absY: clickPoint.y, actionName: "right_click") {
                     attachmentPath = annotatedURL.path
-                    summaries.append("right_click: success (x=\(clickPoint.x), y=\(clickPoint.y), image=\(annotatedURL.lastPathComponent))")
+                    summaries.append("right_click: success (x=\(String(format: "%.3f", rnx)), y=\(String(format: "%.3f", rny)), image=\(annotatedURL.lastPathComponent))")
                 } else {
-                    summaries.append("right_click: success (x=\(clickPoint.x), y=\(clickPoint.y), image=unavailable)")
+                    summaries.append("right_click: success (x=\(String(format: "%.3f", rnx)), y=\(String(format: "%.3f", rny)), image=unavailable)")
                 }
-                logger.log(content: "AI Tool executed: right_click at x=\(clickPoint.x), y=\(clickPoint.y)")
+                logger.log(content: "AI Tool executed: right_click normalized=(\(rnx), \(rny)) abs=(\(clickPoint.x), \(clickPoint.y))")
 
             case "double_click":
-                let clickPoint = await click(button: 0x01, args: call.args)
-                try? await Task.sleep(nanoseconds: 140_000_000)
-                _ = await click(button: 0x01, args: call.args)
+                let clickPoint = await click(button: 0x01, args: call.args, isDoubleClick: true)
+                let dnx = absoluteToNormalized(clickPoint.x)
+                let dny = absoluteToNormalized(clickPoint.y)
                 if let annotatedURL = await captureAnnotatedClickForChat(absX: clickPoint.x, absY: clickPoint.y, actionName: "double_click") {
                     attachmentPath = annotatedURL.path
-                    summaries.append("double_click: success (x=\(clickPoint.x), y=\(clickPoint.y), image=\(annotatedURL.lastPathComponent))")
+                    summaries.append("double_click: success (x=\(String(format: "%.3f", dnx)), y=\(String(format: "%.3f", dny)), image=\(annotatedURL.lastPathComponent))")
                 } else {
-                    summaries.append("double_click: success (x=\(clickPoint.x), y=\(clickPoint.y), image=unavailable)")
+                    summaries.append("double_click: success (x=\(String(format: "%.3f", dnx)), y=\(String(format: "%.3f", dny)), image=unavailable)")
                 }
-                logger.log(content: "AI Tool executed: double_click at x=\(clickPoint.x), y=\(clickPoint.y)")
+                logger.log(content: "AI Tool executed: double_click normalized=(\(dnx), \(dny)) abs=(\(clickPoint.x), \(clickPoint.y))")
 
             case "type_text":
                 let text = (call.args["text"] as? String) ?? ""
@@ -1848,6 +2873,27 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
                     AIInputRouter.sendText(text)
                     summaries.append("type_text: success (chars=\(text.count), text=\"\(text)\")")
                     logger.log(content: "AI Tool executed: type_text chars=\(text.count)")
+                }
+
+            case "run_verified_macro", "execute_verified_macro", "invoke_verified_macro":
+                if let match = verifiedMacroMatch(from: call.args) {
+                    let estimatedDuration = MacroManager.shared.estimatedExecutionDuration(for: match.macro)
+                    MacroManager.shared.execute(match.macro)
+                    // Wait for the macro keystrokes to finish executing on the target, plus a buffer for UI transitions.
+                    let waitDuration = estimatedDuration + 2.0
+                    logger.log(content: "AI Tool waiting \(String(format: "%.1f", waitDuration))s for macro completion (estimated=\(String(format: "%.1f", estimatedDuration))s)")
+                    try? await Task.sleep(nanoseconds: UInt64(waitDuration * 1_000_000_000))
+                    summaries.append("run_verified_macro: success (matchedBy=\(match.matchedBy), id=\(match.macro.id.uuidString), label=\"\(match.macro.label)\", waitedSeconds=\(String(format: "%.1f", waitDuration)))")
+                    summaries.append("run_verified_macro_note: the macro keystrokes have finished; now verify the new screen state with capture_screen before any click")
+                    logger.log(content: "AI Tool executed: run_verified_macro id=\(match.macro.id.uuidString), label=\(match.macro.label), matchedBy=\(match.matchedBy)")
+                } else {
+                    let available = MacroManager.shared.macros
+                        .filter(\.isVerified)
+                        .map { "\($0.label) [\($0.id.uuidString)]" }
+                        .joined(separator: ", ")
+                    let inventory = available.isEmpty ? "none" : available
+                    summaries.append("run_verified_macro: no verified macro matched the request (available=\(inventory))")
+                    logger.log(content: "AI Tool failed: run_verified_macro no verified macro matched; available=\(inventory)")
                 }
 
             default:
@@ -1866,13 +2912,79 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         return nil
     }
 
-    private func click(button: UInt8, args: [String: Any]) async -> (x: Int, y: Int) {
-        let x = clampAbsoluteCoordinate(intArg(args["x"]) ?? agentMouseX)
-        let y = clampAbsoluteCoordinate(intArg(args["y"]) ?? agentMouseY)
+    private func doubleArg(_ value: Any?) -> Double? {
+        if let v = value as? Double { return v }
+        if let v = value as? Int { return Double(v) }
+        if let v = value as? String { return Double(v) }
+        return nil
+    }
+
+    private func dragPoints(from args: [String: Any]) -> (startX: Int, startY: Int, endX: Int, endY: Int)? {
+        let resolvedEndX: Int
+        let resolvedEndY: Int
+        if let nx = doubleArg(args["x"]), let ny = doubleArg(args["y"]) {
+            resolvedEndX = normalizedToAbsolute(nx)
+            resolvedEndY = normalizedToAbsolute(ny)
+        } else if let nx = doubleArg(args["end_x"]), let ny = doubleArg(args["end_y"]) {
+            resolvedEndX = normalizedToAbsolute(nx)
+            resolvedEndY = normalizedToAbsolute(ny)
+        } else {
+            return nil
+        }
+
+        let resolvedStartX: Int
+        let resolvedStartY: Int
+        if let nx = doubleArg(args["start_x"]), let ny = doubleArg(args["start_y"]) {
+            resolvedStartX = normalizedToAbsolute(nx)
+            resolvedStartY = normalizedToAbsolute(ny)
+        } else {
+            resolvedStartX = agentMouseX
+            resolvedStartY = agentMouseY
+        }
+
+        return (resolvedStartX, resolvedStartY, resolvedEndX, resolvedEndY)
+    }
+
+    /// Convert AI-facing normalized 0.0...1.0 coordinate to internal 0...4096.
+    private func normalizedToAbsolute(_ value: Double) -> Int {
+        clampAbsoluteCoordinate(Int((min(max(value, 0.0), 1.0) * 4096.0).rounded()))
+    }
+
+    /// Convert internal 0...4096 coordinate back to AI-facing 0.0...1.0.
+    private func absoluteToNormalized(_ value: Int) -> Double {
+        min(max(Double(value) / 4096.0, 0.0), 1.0)
+    }
+
+    private func click(button: UInt8, args: [String: Any], isDoubleClick: Bool = false) async -> (x: Int, y: Int) {
+        var x: Int
+        var y: Int
+        if let nx = doubleArg(args["x"]), let ny = doubleArg(args["y"]) {
+            x = normalizedToAbsolute(nx)
+            y = normalizedToAbsolute(ny)
+        } else {
+            x = agentMouseX
+            y = agentMouseY
+        }
+
+        if let instruction = agenticClickRefinementInstruction(args: args, isDoubleClick: isDoubleClick, button: button),
+           let refinedPoint = await refineClickTarget(
+                absX: x,
+                absY: y,
+                instruction: instruction,
+                tracePrefix: "AGENTIC_CLICK_REFINE",
+                logPrefix: "Agentic click refinement"
+           ) {
+            x = refinedPoint.x
+            y = refinedPoint.y
+            if let matchedElement = refinedPoint.matchedElement, !matchedElement.isEmpty {
+                logger.log(content: "Agentic click refinement matched element: \(matchedElement)")
+            }
+        }
+
         agentMouseX = x
         agentMouseY = y
 
-        AIInputRouter.click(button: button, absX: x, absY: y)
+        AIInputRouter.animatedClick(button: button, absX: x, absY: y, isDoubleClick: isDoubleClick)
         return (x, y)
     }
 
@@ -1934,6 +3046,206 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         return annotatedURL
     }
 
+    private func refineGuideClickTarget(absX: Int, absY: Int, instruction: String) async -> (x: Int, y: Int, matchedElement: String?)? {
+        await refineClickTarget(
+            absX: absX,
+            absY: absY,
+            instruction: instruction,
+            tracePrefix: "GUIDE_CLICK_REFINE",
+            logPrefix: "Guide click refinement"
+        )
+    }
+
+    private func refineClickTarget(absX: Int, absY: Int, instruction: String, tracePrefix: String, logPrefix: String) async -> (x: Int, y: Int, matchedElement: String?)? {
+        guard let configuration = currentChatAPIConfiguration() else {
+            let reason = "\(logPrefix) skipped: chat API configuration is incomplete"
+            logger.log(content: reason)
+            appendAITrace(title: "\(tracePrefix)_SKIPPED", body: reason)
+            return nil
+        }
+
+        guard let screenshotURL = await captureScreenForAgent() else {
+            let reason = "\(logPrefix) skipped: screen capture unavailable"
+            logger.log(content: reason)
+            appendAITrace(title: "\(tracePrefix)_SKIPPED", body: reason)
+            return nil
+        }
+
+        guard let crop = makeClickRefinementCrop(from: screenshotURL, absX: absX, absY: absY, cropSizePixels: 200) else {
+            let reason = "\(logPrefix) skipped: failed to build crop"
+            logger.log(content: reason)
+            appendAITrace(title: "\(tracePrefix)_SKIPPED", body: reason)
+            return nil
+        }
+
+        guard let imageDataURL = dataURLForImage(atPath: crop.imageURL.path) else {
+            let reason = "\(logPrefix) skipped: failed to encode crop image"
+            logger.log(content: reason)
+            appendAITrace(title: "\(tracePrefix)_SKIPPED", body: reason)
+            return nil
+        }
+
+        appendAITrace(
+            title: "\(tracePrefix)_CONTEXT",
+            body: [
+                "instruction: \(instruction)",
+                "initialAbsPoint: x=\(absX), y=\(absY)",
+                "screenshot: \(screenshotURL.path)",
+                "crop: \(crop.imageURL.path)",
+                "cropOriginTopLeft: x=\(crop.cropOriginX), y=\(crop.cropOriginYTop)",
+                "cropSize: \(crop.cropWidth)x\(crop.cropHeight)",
+                "sourceSize: \(crop.sourceWidth)x\(crop.sourceHeight)"
+            ].joined(separator: "\n")
+        )
+
+        let conversation: [ChatCompletionsRequest.Message] = [
+            .text(role: .system, text: """
+You refine click targets inside a small screenshot crop.
+
+Return ONLY JSON with this schema:
+{
+    "found": true,
+    "x": 0.50,
+    "y": 0.50,
+    "matched_element": "short description of the matched icon/button/text",
+    "confidence": 0.0
+}
+
+Rules:
+- `x` and `y` must be normalized 0.0...1.0 within the provided crop image.
+- The crop is centered near the initial predicted click point.
+- Find the exact visible center of the icon, button, or text that best matches the instruction.
+- If the target is not visible or not clear enough, return `found`: false and omit x/y.
+- Do not return markdown or extra commentary.
+"""),
+            .multimodal(role: .user, text: """
+Instruction for the target to click:
+\(instruction)
+
+This image is a 200x200 pixel crop around the model's initial click estimate.
+Locate the exact visible center of the correct icon, button, or text inside this crop.
+""", imageDataURL: imageDataURL)
+        ]
+
+        do {
+            let response = try await sendChatCompletion(
+                baseURL: configuration.baseURL,
+                model: configuration.model,
+                apiKey: configuration.apiKey,
+                conversation: conversation,
+                traceLabel: tracePrefix,
+                enableThinking: UserSettings.shared.isClickRefinementThinkingEnabled
+            )
+            let payload = try decodeJSONPayload(ClickTargetRefinementPayload.self, from: response.content)
+            guard payload.found != false,
+                  let refinedX = payload.x,
+                  let refinedY = payload.y else {
+                let reason = "\(logPrefix) returned no confident target"
+                logger.log(content: reason)
+                appendAITrace(title: "\(tracePrefix)_RESULT", body: reason)
+                return nil
+            }
+
+            let normalizedX = min(max(refinedX, 0.0), 1.0)
+            let normalizedY = min(max(refinedY, 0.0), 1.0)
+            let globalPixelX = Double(crop.cropOriginX) + Double(crop.cropWidth) * normalizedX
+            let globalPixelYTop = Double(crop.cropOriginYTop) + Double(crop.cropHeight) * normalizedY
+            let refinedAbsX = clampAbsoluteCoordinate(Int((globalPixelX / Double(max(crop.sourceWidth, 1))) * 4096.0))
+            let refinedAbsY = clampAbsoluteCoordinate(Int((globalPixelYTop / Double(max(crop.sourceHeight, 1))) * 4096.0))
+
+            let resultBody = "refinedAbsPoint: x=\(refinedAbsX), y=\(refinedAbsY)\nmatched: \(payload.matched_element ?? "unknown")\nconfidence: \(payload.confidence ?? -1)"
+            logger.log(content: "\(logPrefix) succeeded: abs=(\(refinedAbsX), \(refinedAbsY)), matched=\(payload.matched_element ?? "unknown"), confidence=\(payload.confidence ?? -1)")
+            appendAITrace(title: "\(tracePrefix)_RESULT", body: resultBody)
+            return (refinedAbsX, refinedAbsY, payload.matched_element)
+        } catch {
+            let reason = "\(logPrefix) failed: \(error.localizedDescription)"
+            logger.log(content: reason)
+            appendAITrace(title: "\(tracePrefix)_FAILED", body: reason)
+            return nil
+        }
+    }
+
+    private func agenticClickRefinementInstruction(args: [String: Any], isDoubleClick: Bool, button: UInt8) -> String? {
+        if let instruction = (args["instruction"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !instruction.isEmpty {
+            return instruction
+        }
+
+        if let description = (args["description"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+            return description
+        }
+
+        if let latestGoal = messages.last(where: { $0.role == .user && !$0.content.hasPrefix("TOOL_RESULT:") })?.content.trimmingCharacters(in: .whitespacesAndNewlines),
+           !latestGoal.isEmpty {
+            let actionName: String
+            if button == 0x02 {
+                actionName = "right click"
+            } else if isDoubleClick {
+                actionName = "double click"
+            } else {
+                actionName = "click"
+            }
+            return "\(actionName) the correct target needed for this task: \(latestGoal)"
+        }
+
+        return nil
+    }
+
+    private func makeClickRefinementCrop(from sourceURL: URL, absX: Int, absY: Int, cropSizePixels: Int) -> ClickRefinementCropResult? {
+        guard let image = NSImage(contentsOf: sourceURL),
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+
+        let sourceWidth = cgImage.width
+        let sourceHeight = cgImage.height
+        guard sourceWidth > 0, sourceHeight > 0 else { return nil }
+
+        let normalizedX = min(1.0, max(0.0, Double(absX) / 4096.0))
+        let normalizedYTop = min(1.0, max(0.0, Double(absY) / 4096.0))
+        let pixelX = Int((normalizedX * Double(sourceWidth)).rounded())
+        let pixelYTop = Int((normalizedYTop * Double(sourceHeight)).rounded())
+
+        let cropWidth = min(cropSizePixels, sourceWidth)
+        let cropHeight = min(cropSizePixels, sourceHeight)
+        let halfWidth = cropWidth / 2
+        let halfHeight = cropHeight / 2
+
+        let cropOriginX = max(0, min(sourceWidth - cropWidth, pixelX - halfWidth))
+        let cropOriginYTop = max(0, min(sourceHeight - cropHeight, pixelYTop - halfHeight))
+
+        // Captured screen images in this app are cropped in top-left image coordinates.
+        // Do not flip Y here; otherwise the refinement crop lands on the wrong area.
+        let cropRect = CGRect(x: cropOriginX, y: cropOriginYTop, width: cropWidth, height: cropHeight)
+
+        guard let croppedCGImage = cgImage.cropping(to: cropRect) else {
+            return nil
+        }
+
+        guard let encodedCrop = preferredAIImageEncoding(for: croppedCGImage) else { return nil }
+
+        let outputDir = sourceURL.deletingLastPathComponent()
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let fileExtension = encodedCrop.mimeType == "image/jpeg" ? "jpg" : "png"
+        let fileName = "click_refine_crop_\(stamp).\(fileExtension)"
+        let outputURL = outputDir.appendingPathComponent(fileName)
+
+        do {
+            try encodedCrop.data.write(to: outputURL, options: .atomic)
+            return ClickRefinementCropResult(
+                imageURL: outputURL,
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                cropOriginX: cropOriginX,
+                cropOriginYTop: cropOriginYTop,
+                cropWidth: cropWidth,
+                cropHeight: cropHeight
+            )
+        } catch {
+            logger.log(content: "Guide click refinement crop write failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     private func makeAnnotatedClickImage(from sourceURL: URL, absX: Int, absY: Int, actionName: String) -> URL? {
         guard let image = NSImage(contentsOf: sourceURL),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
@@ -1978,16 +3290,16 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         context.fillEllipse(in: dotRect)
 
         guard let annotatedCGImage = context.makeImage() else { return nil }
-        let rep = NSBitmapImageRep(cgImage: annotatedCGImage)
-        guard let pngData = rep.representation(using: .png, properties: [:]) else { return nil }
+        guard let encodedImage = preferredAIImageEncoding(for: annotatedCGImage) else { return nil }
 
         let outputDir = sourceURL.deletingLastPathComponent()
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let fileName = "\(actionName)_annotated_\(stamp).png"
+        let fileExtension = encodedImage.mimeType == "image/jpeg" ? "jpg" : "png"
+        let fileName = "\(actionName)_annotated_\(stamp).\(fileExtension)"
         let outputURL = outputDir.appendingPathComponent(fileName)
 
         do {
-            try pngData.write(to: outputURL, options: .atomic)
+            try encodedImage.data.write(to: outputURL, options: .atomic)
             return outputURL
         } catch {
             logger.log(content: "AI Tool annotation write failed: \(error.localizedDescription)")
@@ -2010,7 +3322,7 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             .appendingPathComponent("chat_history.json")
     }
 
-    private func appendAITrace(title: String, body: String) {
+    private func appendAITrace(title: String, headerPrefix: String? = nil, body: String) {
         let fileManager = FileManager.default
         do {
             try fileManager.createDirectory(at: aiTraceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -2019,7 +3331,8 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
             }
 
             let stamp = Self.traceDateFormatter.string(from: Date())
-            let entry = "\n===== \(stamp) \(title) =====\n\(body)\n"
+            let headerPrefixText = headerPrefix.map { "\($0) " } ?? ""
+            let entry = "\n===== \(stamp) \(headerPrefixText)\(title) =====\n\(body)\n"
             let data = Data(entry.utf8)
 
             if let handle = try? FileHandle(forWritingTo: aiTraceURL) {
@@ -2103,6 +3416,72 @@ After tool execution, you will receive a TOOL_RESULT message. Continue until tas
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         return formatter
     }()
+
+    private static func traceDurationHeader(from duration: TimeInterval) -> String {
+        String(format: "[responseTime: %.3fs]", duration)
+    }
+
+    private func startGuideAutoNextStatus(for messageID: UUID) {
+        let startedAt = Date()
+        pendingGuideAutoNextStarts[messageID] = startedAt
+        guideAutoNextStatuses[messageID] = GuideAutoNextStatus(phase: .thinking, text: "Thinking...")
+    }
+
+    private func startAgentRequestStatus(for messageID: UUID) {
+        let startedAt = Date()
+        pendingAgentRequestStarts[messageID] = startedAt
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(phase: .thinking, text: "Thinking...")
+    }
+
+    private func completeAgentRequestStatus(for messageID: UUID) {
+        let startedAt = pendingAgentRequestStarts.removeValue(forKey: messageID) ?? Date()
+        let elapsed = Date().timeIntervalSince(startedAt)
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(
+            phase: .completed,
+            text: "Used time: \(String(format: "%.2fs", elapsed))"
+        )
+    }
+
+    private func failAgentRequestStatus(for messageID: UUID, errorDescription: String) {
+        pendingAgentRequestStarts.removeValue(forKey: messageID)
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(
+            phase: .failed,
+            text: "Failed: \(errorDescription)"
+        )
+    }
+
+    private func cancelAgentRequestStatus(for messageID: UUID) {
+        pendingAgentRequestStarts.removeValue(forKey: messageID)
+        agentRequestStatuses[messageID] = GuideAutoNextStatus(
+            phase: .cancelled,
+            text: "Canceled"
+        )
+    }
+
+    private func completeGuideAutoNextStatus(for messageID: UUID) {
+        let startedAt = pendingGuideAutoNextStarts.removeValue(forKey: messageID) ?? Date()
+        let elapsed = Date().timeIntervalSince(startedAt)
+        guideAutoNextStatuses[messageID] = GuideAutoNextStatus(
+            phase: .completed,
+            text: "Used time: \(String(format: "%.2fs", elapsed))"
+        )
+    }
+
+    private func failGuideAutoNextStatus(for messageID: UUID, errorDescription: String) {
+        pendingGuideAutoNextStarts.removeValue(forKey: messageID)
+        guideAutoNextStatuses[messageID] = GuideAutoNextStatus(
+            phase: .failed,
+            text: "Failed: \(errorDescription)"
+        )
+    }
+
+    private func cancelGuideAutoNextStatus(for messageID: UUID) {
+        pendingGuideAutoNextStarts.removeValue(forKey: messageID)
+        guideAutoNextStatuses[messageID] = GuideAutoNextStatus(
+            phase: .cancelled,
+            text: "Canceled"
+        )
+    }
 }
 
 private struct MainPlannerAgent {
@@ -2123,6 +3502,7 @@ private struct MainPlannerAgent {
     func buildPlanningConversation(
         systemPrompt: String,
         plannerPrompt: String,
+        macroInventoryPrompt: String,
         userRequest: String,
         imageDataURL: String?
     ) -> [ChatCompletionsRequest.Message] {
@@ -2130,9 +3510,12 @@ private struct MainPlannerAgent {
         if !systemPrompt.isEmpty {
             conversation.append(.text(role: .system, text: systemPrompt))
         }
-        conversation.append(.text(role: .system, text: "Available task agent/tool pairs: screen/capture_screen, typing/type_text, mouse/move_mouse, mouse/left_click, mouse/right_click, mouse/double_click."))
+        conversation.append(.text(role: .system, text: "Available task agent/tool pairs: screen/capture_screen, typing/type_text, macro/run_verified_macro, mouse/move_mouse, mouse/left_click, mouse/left_drag, mouse/right_click, mouse/double_click."))
         if !plannerPrompt.isEmpty {
             conversation.append(.text(role: .system, text: plannerPrompt))
+        }
+        if !macroInventoryPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            conversation.append(.text(role: .system, text: macroInventoryPrompt))
         }
 
         let requestText = "User request:\n\(userRequest)\n\nReturn a concise JSON plan with at most \(maxPlannerTasks) screen tasks."
@@ -2243,7 +3626,7 @@ private struct ScreenTaskAgent: TaskAgentExecutor {
     let toolName: String = "capture_screen"
 
     func prompt(from settings: UserSettings) -> String {
-        settings.screenAgentPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.resolvedScreenAgentPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func buildTaskConversation(
@@ -2310,7 +3693,7 @@ private struct TypeTextTaskAgent: TaskAgentExecutor {
     let toolName: String = "type_text"
 
     func prompt(from settings: UserSettings) -> String {
-        settings.typingAgentPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.resolvedTypingAgentPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func buildTaskConversation(
@@ -2463,11 +3846,164 @@ private struct TypeTextTaskAgent: TaskAgentExecutor {
     }
 }
 
+private struct MacroTaskAgent: TaskAgentExecutor {
+    private struct ResponsePayload: Decodable {
+        let status: String
+        let macro_id: String?
+        let macro_label: String?
+        let result_summary: String
+    }
+
+    let agentName: String = "macro"
+    let toolName: String = "run_verified_macro"
+
+    func prompt(from settings: UserSettings) -> String {
+        """
+You are the Openterface Macro Task Agent.
+
+You are responsible for one macro selection task and one tool only: run_verified_macro.
+
+Rules:
+- Return ONLY JSON.
+- Focus only on the current task.
+- Select only from the provided verified executable macro inventory.
+- Prefer macro_id when available.
+- If no verified macro matches, return status=failed and explain why.
+
+Schema:
+{
+    "status": "completed" | "failed",
+    "macro_id": "UUID if available (optional)",
+    "macro_label": "fallback label (optional)",
+    "result_summary": "short summary for the user"
+}
+"""
+    }
+
+    func buildTaskConversation(
+        systemPrompt: String,
+        taskPrompt: String,
+        plan: ChatExecutionPlan,
+        task: ChatTask,
+        imageDataURL: String?
+    ) -> [ChatCompletionsRequest.Message] {
+        var conversation: [ChatCompletionsRequest.Message] = []
+        if !systemPrompt.isEmpty {
+            conversation.append(.text(role: .system, text: systemPrompt))
+        }
+        if !taskPrompt.isEmpty {
+            conversation.append(.text(role: .system, text: taskPrompt))
+        }
+        conversation.append(.text(role: .system, text: macroInventoryPrompt()))
+
+        let instruction = "Plan summary: \(plan.summary)\n\nTask title: \(task.title)\nTask detail: \(task.detail)\nTool: \(task.toolName)\n\nSelect the single verified macro that best completes this task."
+        if let imageDataURL {
+            conversation.append(.multimodal(role: .user, text: instruction, imageDataURL: imageDataURL))
+        } else {
+            conversation.append(.text(role: .user, text: instruction))
+        }
+
+        return conversation
+    }
+
+    func applyResponse(_ response: String, to task: inout ChatTask) {
+        guard let payload = try? decodeJSONPayload(ResponsePayload.self, from: response) else {
+            task.status = .failed
+            task.resultSummary = "Macro task failed: response was not valid JSON."
+            return
+        }
+
+        let normalizedStatus = payload.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalizedStatus == "completed" else {
+            task.status = .failed
+            task.resultSummary = payload.result_summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Macro task failed: no verified macro was selected."
+                : payload.result_summary.trimmingCharacters(in: .whitespacesAndNewlines)
+            return
+        }
+
+        guard let matchedMacro = matchedVerifiedMacro(id: payload.macro_id, label: payload.macro_label) else {
+            task.status = .failed
+            task.resultSummary = "Macro task failed: selected verified macro was not found."
+            return
+        }
+
+        MainActor.assumeIsolated {
+            MacroManager.shared.execute(matchedMacro)
+        }
+        task.status = .completed
+        let summary = payload.result_summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        task.resultSummary = summary.isEmpty
+            ? "Executed verified macro \(matchedMacro.label)."
+            : summary
+    }
+
+    private func matchedVerifiedMacro(id: String?, label: String?) -> Macro? {
+        let verifiedMacros = MainActor.assumeIsolated {
+            MacroManager.shared.macros.filter(\.isVerified)
+        }
+
+        if let id, let macroID = UUID(uuidString: id.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            if let matched = verifiedMacros.first(where: { $0.id == macroID }) {
+                return matched
+            }
+        }
+
+        let normalizedLabel = (label ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        guard !normalizedLabel.isEmpty else { return nil }
+
+        if let exact = verifiedMacros.first(where: {
+            $0.label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) == normalizedLabel
+        }) {
+            return exact
+        }
+
+        let partialMatches = verifiedMacros.filter {
+            $0.label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(normalizedLabel)
+        }
+        return partialMatches.count == 1 ? partialMatches.first : nil
+    }
+
+    private func decodeJSONPayload<T: Decodable>(_ type: T.Type, from text: String) throws -> T {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let start = trimmed.firstIndex(of: "{"), let end = trimmed.lastIndex(of: "}") else {
+            throw NSError(domain: "MacroTaskAgent", code: 1, userInfo: [NSLocalizedDescriptionKey: "Assistant response did not contain JSON"])
+        }
+
+        let candidate = String(trimmed[start...end])
+        guard let data = candidate.data(using: .utf8) else {
+            throw NSError(domain: "MacroTaskAgent", code: 2, userInfo: [NSLocalizedDescriptionKey: "Assistant JSON response was not UTF-8"])
+        }
+
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func macroInventoryPrompt() -> String {
+        let verifiedMacros = MainActor.assumeIsolated {
+            MacroManager.shared.macros.filter(\.isVerified)
+        }
+        guard !verifiedMacros.isEmpty else {
+            return "Verified executable macros:\n- No verified macros are currently available."
+        }
+
+        let lines = verifiedMacros.map { macro in
+            let description = macro.description.trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = description.isEmpty ? macro.data : description
+            return "- id=\(macro.id.uuidString), label=\(macro.label), target=\(macro.targetSystem.displayName), detail=\(detail)"
+        }
+        return "Verified executable macros:\n" + lines.joined(separator: "\n")
+    }
+}
+
 private struct MouseTaskAgent: TaskAgentExecutor {
     private struct ResponsePayload: Decodable {
         let status: String
-        let x: Int?
-        let y: Int?
+        let x: Double?
+        let y: Double?
+        let start_x: Double?
+        let start_y: Double?
         let result_summary: String
     }
 
@@ -2475,7 +4011,7 @@ private struct MouseTaskAgent: TaskAgentExecutor {
     let toolName: String
 
     func prompt(from settings: UserSettings) -> String {
-        settings.screenAgentPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.resolvedScreenAgentPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func buildTaskConversation(
@@ -2501,8 +4037,9 @@ Task detail: \(task.detail)
 Tool: \(task.toolName)
 
     Return JSON only.
-    - Always provide x and y in normalized target coordinates 0...4096.
-    - For click tools, x and y are required (do not omit them).
+    - Always provide x and y as normalized floats from 0.0 to 1.0 (fraction of screen width/height).
+    - For click and move tools, x and y are required.
+    - For left_drag, x and y are the drag destination and optional start_x/start_y specify the drag start point.
     - Choose the center point of the exact UI element to interact with.
 """
         if let imageDataURL {
@@ -2533,8 +4070,8 @@ Tool: \(task.toolName)
             task.resultSummary = "Mouse task failed: x and y are required for \(toolName)."
             return
         }
-        let targetX = clampAbsolute(rawX)
-        let targetY = clampAbsolute(rawY)
+        let targetX = normalizedToAbsolute(rawX)
+        let targetY = normalizedToAbsolute(rawY)
 
         switch toolName {
         case "move_mouse":
@@ -2542,6 +4079,11 @@ Tool: \(task.toolName)
 
         case "left_click":
             performClick(button: 0x01, x: targetX, y: targetY, isDoubleClick: false)
+
+        case "left_drag":
+            let startX = payload.start_x.map(normalizedToAbsolute)
+            let startY = payload.start_y.map(normalizedToAbsolute)
+            performDrag(startX: startX, startY: startY, endX: targetX, endY: targetY)
 
         case "right_click":
             performClick(button: 0x02, x: targetX, y: targetY, isDoubleClick: false)
@@ -2558,16 +4100,22 @@ Tool: \(task.toolName)
         task.status = .completed
         let summary = payload.result_summary.trimmingCharacters(in: .whitespacesAndNewlines)
         task.resultSummary = summary.isEmpty
-            ? "Mouse task executed using \(toolName) at normalized coordinates (\(targetX), \(targetY))."
+            ? "Mouse task executed using \(toolName) at normalized coordinates (\(String(format: "%.3f", rawX)), \(String(format: "%.3f", rawY)))."
             : summary
     }
 
     private func performClick(button: UInt8, x: Int, y: Int, isDoubleClick: Bool) {
-        AIInputRouter.click(button: button, absX: x, absY: y, isDoubleClick: isDoubleClick)
+        AIInputRouter.animatedClick(button: button, absX: x, absY: y, isDoubleClick: isDoubleClick)
     }
 
-    private func clampAbsolute(_ value: Int) -> Int {
-        min(max(value, 0), 4096)
+    private func performDrag(startX: Int?, startY: Int?, endX: Int, endY: Int) {
+        AIInputRouter.animatedDrag(startAbsX: startX, startAbsY: startY, endAbsX: endX, endAbsY: endY)
+    }
+
+    /// Convert AI-facing normalized 0.0...1.0 coordinate to internal 0...4096.
+    private func normalizedToAbsolute(_ value: Double) -> Int {
+        let clamped = min(max(value, 0.0), 1.0)
+        return min(max(Int((clamped * 4096.0).rounded()), 0), 4096)
     }
 
     private func decodeJSONPayload<T: Decodable>(_ type: T.Type, from text: String) throws -> T {
@@ -2635,6 +4183,20 @@ private struct ChatCompletionsRequest: Encodable {
     let model: String
     let messages: [Message]
     let stream: Bool = false
+    let enableThinking: Bool?
+
+    init(model: String, messages: [Message], enableThinking: Bool? = nil) {
+        self.model = model
+        self.messages = messages
+        self.enableThinking = enableThinking
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case stream
+        case enableThinking = "enable_thinking"
+    }
 }
 
 private struct ChatCompletionsResponse: Decodable {

@@ -42,3 +42,26 @@ Moreover, if you are interested in joining our dev team and [contributing](https
 
 We keep our community updated on all things Openterface KVM on our Reddit: [r/Openterface_miniKVM/](https://www.reddit.com/r/Openterface_miniKVM/). You can also join us on Discord [TechxArtisan](https://discord.gg/sFTJD6a3R8), especially for development-related discussions! Cheers!
 
+## AI Prompt System
+
+OS-specific AI agent definitions now live under `docs/ai`.
+
+- Index: [docs/ai/README.md](docs/ai/README.md)
+- Registry: [docs/ai/registry.md](docs/ai/registry.md)
+- Agents: [docs/ai/agents](docs/ai/agents)
+
+Each OS agent uses a five-file contract:
+- `soul.md`
+- `tool.md`
+- `skills.md`
+- `memory.md`
+- `session.md`
+
+Supported target agents:
+- `macos`
+- `windows`
+- `linux`
+- `iphone`
+- `ipad`
+- `android`
+

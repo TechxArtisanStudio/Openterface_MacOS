@@ -59,9 +59,7 @@ class PlayerView: NSView, NSWindowDelegate {
         )
     }
 
-    func setupLayer() {
-        logger.log(content: "Setup layer start")
-    
+    func setupLayer() {    
         self.previewLayer?.frame = self.frame
         // self.previewLayer?.contentsGravity = .resizeAspectFill
         // self.previewLayer?.videoGravity = .resizeAspectFill
@@ -83,7 +81,6 @@ class PlayerView: NSView, NSWindowDelegate {
         self.previewLayer?.backgroundColor = NSColor.black.cgColor
         self.previewLayer?.masksToBounds = true
         layer = self.previewLayer
-        logger.log(content: "Setup layer completed")
     }
     
     func observe() {
@@ -129,7 +126,7 @@ class PlayerView: NSView, NSWindowDelegate {
     @objc func handleGravitySettingsChanged(_ notification: Notification) {
         DispatchQueue.main.async {
             self.setupLayer()
-            self.logger.log(content: "Updated gravity settings: \(UserSettings.shared.gravity.rawValue)")
+            //self.logger.log(content: "Updated gravity settings: \(UserSettings.shared.gravity.rawValue)")
         }
     }
 

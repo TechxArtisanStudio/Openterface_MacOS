@@ -93,9 +93,16 @@ struct AITraceViewerDialog: View {
                 Text("AI Trace Logs")
                     .font(.headline)
                 Spacer()
+                Button(action: { copyTrace() }) {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.plain)
+                .help("Copy all trace")
+
                 Button(action: { loadTrace() }) {
                     Image(systemName: "arrow.clockwise")
                 }
+                .buttonStyle(.plain)
                 .help("Refresh AI trace contents")
             }
 
@@ -121,14 +128,6 @@ struct AITraceViewerDialog: View {
             }
 
             HStack {
-                Button(action: { copyTrace() }) {
-                    HStack {
-                        Image(systemName: "doc.on.doc")
-                        Text("Copy")
-                    }
-                }
-                .buttonStyle(.bordered)
-
                 Button(action: { clearTrace() }) {
                     HStack {
                         Image(systemName: "trash")
@@ -332,8 +331,19 @@ private struct AITraceEntryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.header)
-                .font(.headline)
+            HStack(alignment: .top, spacing: 8) {
+                Text(entry.header)
+                    .font(.headline)
+
+                Spacer()
+
+                Button(action: { copyEntry() }) {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy this trace item")
+            }
 
             if !entry.textParts.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -395,6 +405,23 @@ private struct AITraceEntryCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    private func copyEntry() {
+        var sections: [String] = [entry.header]
+
+        if !entry.textParts.isEmpty {
+            sections.append("Text")
+            sections.append(entry.textParts.joined(separator: "\n"))
+        }
+
+        if !entry.rawBody.isEmpty {
+            sections.append("Raw payload")
+            sections.append(entry.rawBody)
+        }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sections.joined(separator: "\n\n"), forType: .string)
     }
 }
 

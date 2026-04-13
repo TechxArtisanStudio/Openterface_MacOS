@@ -41,7 +41,6 @@ struct KeyMappingSettingsView: View {
                             }
                         }
                         .pickerStyle(SegmentedPickerStyle())
-                        .frame(width: 200)
 
                         Spacer()
 
@@ -66,6 +65,19 @@ struct KeyMappingSettingsView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Text("• Control (⌃) → Win Key")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else if userSettings.keyboardLayout == .linux {
+                            Text("Linux Mode Key Mapping:")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("• Cmd (⌘) → Ctrl")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("• Option (⌥) → Alt")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("• Control (⌃) → Super Key")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else {
@@ -172,7 +184,7 @@ struct SpecialKeyButton: View {
 }
 
 struct KeyTestDialog: View {
-    @State private var testText = "Hello World! 123"
+    @State private var testText = "The quick brown fox jumps over the lazy dog"
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {

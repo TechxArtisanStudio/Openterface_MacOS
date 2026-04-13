@@ -215,6 +215,16 @@ final class VNCClientManager: VNCClientManagerProtocol {
         logger.log(content: "VNC error: \(message)")
         AppStatus.protocolSessionState = .error
         AppStatus.protocolLastErrorMessage = message
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .protocolErrorOccurred,
+                object: nil,
+                userInfo: [
+                    ProtocolErrorUserInfoKeys.mode: ConnectionProtocolMode.vnc,
+                    ProtocolErrorUserInfoKeys.message: message
+                ]
+            )
+        }
     }
 
     private func currentProtocolPreferences() -> ProtocolPreferences {
@@ -385,6 +395,12 @@ extension VNCClientManager: RFBProtocolHandlerDelegate {
 
 extension Notification.Name {
     static let vncFrameUpdated = Notification.Name("VNCFrameUpdated")
+    static let protocolErrorOccurred = Notification.Name("ProtocolErrorOccurred")
+}
+
+enum ProtocolErrorUserInfoKeys {
+    static let mode = "mode"
+    static let message = "message"
 }
 
 extension VNCClientManager {

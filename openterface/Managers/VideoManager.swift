@@ -900,12 +900,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         let matchedOption = findMatchingAspectRatio(activeAspectRatio)
         // On first time, previousAspect should be nil to ensure aspect ratio is always applied
         let previousAspect: AspectRatioOption? = isAspectRatioInitialized ? UserSettings.shared.customAspectRatio : nil
-        let previousGravity = UserSettings.shared.gravity
-        let previousCustomValue = UserSettings.shared.customAspectRatioValue
-
+        
         if let matched = matchedOption {
             // Update aspect ratio if changed or if this is the first time (previousAspect is nil)
-            if previousAspect == nil || previousAspect != matched || abs(previousCustomValue - activeAspectRatio) > 0.1 {
+            if previousAspect == nil || previousAspect != matched {
                 UserSettings.shared.customAspectRatio = matched
                 isAspectRatioInitialized = true
                 logger.log(content: "Auto-matched aspect ratio: \(matched.rawValue) (aspect=\(String(format: "%.3f", activeAspectRatio)))")
@@ -915,20 +913,20 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                 logger.log(content: "Aspect ratio already set to \(matched.rawValue), no change needed")
             }
         } else {
-            // No match: check if we should update custom aspect ratio value
-            let customValueChanged = abs(previousCustomValue - activeAspectRatio) > 0.01 || (previousAspect != nil && abs(previousAspect!.widthToHeightRatio - activeAspectRatio) > 0.01)
-            
-            if customValueChanged {
-                // Store the custom aspect ratio value for future use
-                UserSettings.shared.customAspectRatioValue = activeAspectRatio
-                UserSettings.shared.gravity = .resizeAspect
-                isAspectRatioInitialized = true
-                logger.log(content: "No preset match found. Storing custom aspect ratio value: \(String(format: "%.3f", activeAspectRatio))")
-                
-                notifyAspectRatioChanged()
-            } else {
-                logger.log(content: "No aspect ratio match and custom value unchanged; no UI update posted")
+            // No match and we already have a valid aspect ratio:
+            // keep the previous setting to avoid false updates from noisy/black frames.
+            if let previous = previousAspect {
+                logger.log(content: "No preset match found (aspect=\(String(format: "%.3f", activeAspectRatio))). Keeping previous aspect ratio: \(previous.rawValue)")
+                return
             }
+
+            // First-time fallback when no previous aspect ratio exists.
+            UserSettings.shared.customAspectRatioValue = activeAspectRatio
+            UserSettings.shared.gravity = .resizeAspect
+            isAspectRatioInitialized = true
+            logger.log(content: "No preset match found. Storing initial custom aspect ratio value: \(String(format: "%.3f", activeAspectRatio))")
+
+            notifyAspectRatioChanged()
         }
     }
     

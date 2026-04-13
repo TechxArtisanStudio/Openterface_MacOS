@@ -418,6 +418,13 @@ struct openterfaceApp: App {
                     }) {
                         Text("Mac\(_keyboardLayout == .mac ? " ✓" : "")")
                     }
+                    
+                    Button(action: {
+                        UserSettings.shared.keyboardLayout = .linux
+                        _keyboardLayout = .linux
+                    }) {
+                        Text("Linux\(_keyboardLayout == .linux ? " ✓" : "")")
+                    }
                 }
                 
                 Divider()

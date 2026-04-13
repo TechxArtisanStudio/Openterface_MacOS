@@ -26,6 +26,7 @@ import CoreGraphics
 
 class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
+    private var hostCapsLockPollTimer: Timer?
     
     static let SHIFT_KEYS = ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+", "{", "}", "|", ":", "\"", "<", ">", "?"]
     static let shared = KeyboardManager()
@@ -45,8 +46,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     @Published var isRightCtrlHeld = false
     @Published var isLeftAltHeld = false
     @Published var isRightAltHeld = false
+    @Published var isLeftCmdHeld = false
+    @Published var isRightCmdHeld = false
+    @Published var isWinHeld = false
     @Published var isCapsLockOn = false {
         didSet {
+            guard oldValue != isCapsLockOn else { return }
+
             // Keep AppStatus host field in sync and log the change
             AppStatus.isHostCapLockOn = isCapsLockOn
             logger.log(content: "🔔 Host Caps Lock state updated: \(isCapsLockOn ? "ON" : "OFF")")
@@ -75,7 +81,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
     }
     
-    // Function to toggle between Windows and Mac keyboard layouts
+    // Function to toggle between Windows, Mac, and Linux keyboard layouts
     func toggleKeyboardLayout() {
         objectWillChange.send()
         let oldLayout = currentKeyboardLayout
@@ -83,6 +89,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         case .mac:
             currentKeyboardLayout = .windows
         case .windows:
+            currentKeyboardLayout = .linux
+        case .linux:
             currentKeyboardLayout = .mac
         }
         objectWillChange.send()
@@ -103,6 +111,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         
         switch currentKeyboardLayout {
         case .windows:
+            remappedKey = getWindowsModeMapping(sourceKey: sourceKey, sourceModifier: sourceModifier, isLeft: isLeft)
+        case .linux:
             remappedKey = getWindowsModeMapping(sourceKey: sourceKey, sourceModifier: sourceModifier, isLeft: isLeft)
         case .mac:
             remappedKey = sourceKey // In Mac mode, keep original key codes
@@ -199,6 +209,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         logger.log(content: "🎹 KeyboardManager initialized with layout: \(currentKeyboardLayout.rawValue)")
         // Update caps lock state from the system at initialization
         updateInitialCapsLockState()
+        startHostCapsLockPolling()
         monitorKeyboardEvents()
     }
 
@@ -208,9 +219,28 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         // Use CoreGraphics event source to read the combined session flags
         let flags = CGEventSource.flagsState(.combinedSessionState)
         let capsLockActive = flags.contains(.maskAlphaShift)
-    isCapsLockOn = capsLockActive
-    AppStatus.isHostCapLockOn = capsLockActive
+        isCapsLockOn = capsLockActive
         logger.log(content: "🔔 Initial Caps Lock state: \(capsLockActive ? "ON" : "OFF")")
+    }
+
+    private func refreshHostCapsLockState() {
+        let flags = CGEventSource.flagsState(.combinedSessionState)
+        let capsLockActive = flags.contains(.maskAlphaShift)
+
+        if Thread.isMainThread {
+            isCapsLockOn = capsLockActive
+        } else {
+            DispatchQueue.main.async {
+                self.isCapsLockOn = capsLockActive
+            }
+        }
+    }
+
+    private func startHostCapsLockPolling() {
+        hostCapsLockPollTimer?.invalidate()
+        hostCapsLockPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.refreshHostCapsLockState()
+        }
     }
     
     // MARK: - Modifier Key State Management
@@ -254,6 +284,19 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             sendSpecialKeyToKeyboard(code: KeyboardMapper.SpecialKey.rightAlt)
         }
         isRightAltHeld.toggle()
+    }
+
+    func toggleWin() {
+        if let key = kbm.fromSpecialKeyToKeyCode(code: KeyboardMapper.SpecialKey.win) {
+            if isWinHeld {
+                releaseAndUpdateModifierKeyWithoutState(keyCode: key, logMessage: "🪟 Released Win/Cmd key (toggle)")
+                isWinHeld = false
+            } else {
+                pressAndUpdateModifierKeyWithoutState(keyCode: key)
+                isWinHeld = true
+            }
+        }
+        objectWillChange.send()
     }
     
     func toggleCapsLock() {
@@ -324,31 +367,152 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     }
     
     // MARK: - Event Handling Helper Methods
+
+    private func eventKindDescription(_ event: NSEvent) -> String {
+        switch event.type {
+        case .flagsChanged:
+            return "flagsChanged"
+        case .keyDown:
+            return "keyDown"
+        case .keyUp:
+            return "keyUp"
+        default:
+            return "\(event.type.rawValue)"
+        }
+    }
+
+    private func describeWindow(_ window: NSWindow?) -> String {
+        guard let window else { return "nil" }
+        let title = window.title.isEmpty ? "(untitled)" : window.title
+        let identifier = window.identifier?.rawValue ?? "nil"
+        return "title=\(title), identifier=\(identifier), level=\(window.level.rawValue), sheetParent=\(window.sheetParent != nil), key=\(window.isKeyWindow), main=\(window.isMainWindow), visible=\(window.isVisible)"
+    }
+
+    private func describeResponder(_ responder: NSResponder?) -> String {
+        guard let responder else { return "nil" }
+        var parts: [String] = [String(describing: type(of: responder))]
+        if let view = responder as? NSView {
+            parts.append("viewID=\(view.identifier?.rawValue ?? "nil")")
+        }
+        if let textView = responder as? NSTextView {
+            parts.append("textViewEditable=\(textView.isEditable)")
+        }
+        if responder is VNCInteractiveView {
+            parts.append("isVNCInteractiveView=true")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func modifierKeyName(for keyCode: UInt16) -> String {
+        switch keyCode {
+        case 56: return "LeftShift"
+        case 60: return "RightShift"
+        case 59: return "LeftCtrl"
+        case 62: return "RightCtrl"
+        case 58: return "LeftAlt"
+        case 61: return "RightAlt"
+        case 55: return "LeftCmd"
+        case 54: return "RightCmd"
+        case 57: return "CapsLock"
+        default: return ""
+        }
+    }
+
+    private func logEventRouting(_ prefix: String, event: NSEvent, details: String) {
+        let chars: String
+        if event.type == .flagsChanged {
+            // `charactersIgnoringModifiers` can be invalid for modifier-only events.
+            chars = modifierKeyName(for: event.keyCode)
+        } else {
+            chars = event.charactersIgnoringModifiers ?? event.characters ?? ""
+        }
+        logger.log(content: "⌨️ [\(prefix)] type=\(eventKindDescription(event)), keyCode=\(event.keyCode), chars='\(chars)', window={\(describeWindow(event.window))}, firstResponder={\(describeResponder(event.window?.firstResponder))}, details={\(details)}")
+    }
     
     // Check if event should pass through to system windows (settings, text inputs, etc.)
     private func shouldPassThroughEvent(for event: NSEvent) -> Bool {
-        guard let keyWindow = NSApp.keyWindow else { return false }
-        
-        // Check for specific window identifiers
-        if let identifier = keyWindow.identifier?.rawValue,
-           (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") || 
-            identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow") || 
-            identifier.contains("macroCreatorDialog")) {
-            return true
+        for activeWindow in passThroughCandidateWindows(for: event) {
+            if let identifier = activeWindow.identifier?.rawValue,
+               (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") ||
+                identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow") ||
+                identifier.contains("macroCreatorDialog") || identifier.contains("macroPanel") ||
+                identifier.contains("macroEditor")) {
+                logEventRouting("pass-through", event: event, details: "matched window identifier on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            let windowTitle = activeWindow.title.lowercased()
+            if windowTitle.contains("macro") {
+                logEventRouting("pass-through", event: event, details: "matched window title on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            if activeWindow.level.rawValue > NSWindow.Level.normal.rawValue || activeWindow.sheetParent != nil {
+                logEventRouting("pass-through", event: event, details: "matched modal/sheet window candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            if let firstResponder = activeWindow.firstResponder,
+               (firstResponder.isKind(of: NSTextView.self) || firstResponder.isKind(of: NSTextField.self)) {
+                logEventRouting("pass-through", event: event, details: "matched text responder {\(describeResponder(firstResponder))} on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
+
+            if let responder = activeWindow.firstResponder as? NSView,
+               let identifier = responder.identifier?.rawValue,
+               (identifier.contains("macroSequenceEditor") || identifier.contains("macroEditor")) {
+                logEventRouting("pass-through", event: event, details: "matched responder identifier {\(identifier)} on candidate {\(describeWindow(activeWindow))}")
+                return true
+            }
         }
-        
-        // Check if this is a sheet or modal dialog by examining the window level
-        if keyWindow.level.rawValue > NSWindow.Level.normal.rawValue {
-            return true
-        }
-        
-        // Check if the first responder is a text input field
-        if let firstResponder = keyWindow.firstResponder,
-           (firstResponder.isKind(of: NSTextView.self) || firstResponder.isKind(of: NSTextField.self)) {
-            return true
-        }
+
+        let candidateSummary = passThroughCandidateWindows(for: event)
+            .map { "{\(describeWindow($0))}" }
+            .joined(separator: " | ")
+        logEventRouting("target-route", event: event, details: "no local pass-through match; candidates=\(candidateSummary)")
         
         return false
+    }
+
+    private func passThroughCandidateWindows(for event: NSEvent) -> [NSWindow] {
+        var windows: [NSWindow] = []
+
+        if let eventWindow = event.window {
+            windows.append(eventWindow)
+        }
+        if let modalWindow = NSApp.modalWindow {
+            windows.append(modalWindow)
+        }
+        if let keyWindow = NSApp.keyWindow {
+            windows.append(keyWindow)
+        }
+        if let mainWindow = NSApp.mainWindow {
+            windows.append(mainWindow)
+        }
+
+        let baseWindows = windows
+        for window in baseWindows {
+            if let attachedSheet = window.attachedSheet {
+                windows.append(attachedSheet)
+            }
+            if let sheetParent = window.sheetParent {
+                windows.append(sheetParent)
+            }
+            if let childWindows = window.childWindows {
+                windows.append(contentsOf: childWindows.filter { $0.isVisible })
+            }
+            if let parentWindow = window.parent {
+                windows.append(parentWindow)
+            }
+        }
+
+        var seen = Set<ObjectIdentifier>()
+        return windows.filter { window in
+            let identifier = ObjectIdentifier(window)
+            guard !seen.contains(identifier) else { return false }
+            seen.insert(identifier)
+            return true
+        }
     }
     
     // Log modifier changes
@@ -434,10 +598,12 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 55, sourceModifier: .command, isLeft: true)
                 logger.log(content: "⌘ Left Command pressed: Original=55, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
                 pressAndUpdateModifierKeyWithoutState(keyCode: targetKeyCode, showIndex: true)
+                isLeftCmdHeld = true
             } else if (rawValue & 0x110) == 0x110 { // Right Command
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 54, sourceModifier: .command, isLeft: false)
                 logger.log(content: "⌘ Right Command pressed: Original=54, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
                 pressAndUpdateModifierKeyWithoutState(keyCode: targetKeyCode, showIndex: true)
+                isRightCmdHeld = true
             }
         } else {
             // Release Command keys
@@ -450,6 +616,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             if pressedKeys.contains(rightCmdRemapped) {
                 releaseAndUpdateModifierKeyWithoutState(keyCode: rightCmdRemapped, logMessage: "⌘ Released right command key")
             }
+            isLeftCmdHeld = false
+            isRightCmdHeld = false
         }
     }
     
@@ -587,16 +755,19 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         logger.log(content: "🎯 Starting keyboard event monitoring with layout: \(currentKeyboardLayout.rawValue)")
         
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { event in
+            if self.shouldPassThroughEvent(for: event) {
+                self.logEventRouting("local-deliver", event: event, details: "returning event to local window")
+                return event
+            }
+
             if AppStatus.activeConnectionProtocol == .vnc,
                NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                self.logEventRouting("vnc-forward", event: event, details: "forwarding flagsChanged to VNCInteractiveView main responder")
                 VNCClientManager.shared.handleFlagsChanged(event)
                 return nil
             }
 
-            // Check if event should pass through to system windows
-            if self.shouldPassThroughEvent(for: event) {
-                return event
-            }
+            self.logEventRouting("host-handle", event: event, details: "processing flagsChanged locally in KeyboardManager")
             
             let modifiers = event.modifierFlags
             self.logModifierChange(modifiers)
@@ -612,32 +783,38 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            if self.shouldPassThroughEvent(for: event) {
+                self.logEventRouting("local-deliver", event: event, details: "returning keyDown to local window")
+                return event
+            }
+
             if AppStatus.activeConnectionProtocol == .vnc,
                NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                self.logEventRouting("vnc-forward", event: event, details: "forwarding keyDown to VNCInteractiveView main responder")
                 VNCClientManager.shared.handleKeyEvent(event, isDown: true)
                 return nil
             }
 
-            // Check if event should pass through to system windows
-            if self.shouldPassThroughEvent(for: event) {
-                return event
-            }
+            self.logEventRouting("host-handle", event: event, details: "processing keyDown locally in KeyboardManager")
             
             // Handle key down
             return self.handleKeyDown(event)
         }
 
         NSEvent.addLocalMonitorForEvents(matching: [.keyUp]) { event in
+            if self.shouldPassThroughEvent(for: event) {
+                self.logEventRouting("local-deliver", event: event, details: "returning keyUp to local window")
+                return event
+            }
+
             if AppStatus.activeConnectionProtocol == .vnc,
                NSApp.mainWindow?.firstResponder is VNCInteractiveView {
+                self.logEventRouting("vnc-forward", event: event, details: "forwarding keyUp to VNCInteractiveView main responder")
                 VNCClientManager.shared.handleKeyEvent(event, isDown: false)
                 return nil
             }
 
-            // Check if event should pass through to system windows
-            if self.shouldPassThroughEvent(for: event) {
-                return event
-            }
+            self.logEventRouting("host-handle", event: event, details: "processing keyUp locally in KeyboardManager")
             
             // Handle key up
             return self.handleKeyUp(event)
@@ -897,7 +1074,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             releaseAndUpdateModifierKey(keyCode: rightAltRemapped, isHeld: &isRightAltHeld, logMessage: "Released right alt for paste")
         }
         
-        // Release command keys if they're being held (they don't have state variables but might be in pressedKeys)
+        // Release Win/Cmd key if held via on-screen button
+        if isWinHeld {
+            if let key = kbm.fromSpecialKeyToKeyCode(code: KeyboardMapper.SpecialKey.win) {
+                releaseAndUpdateModifierKeyWithoutState(keyCode: key, logMessage: "Released Win/Cmd key for paste")
+            }
+            isWinHeld = false
+        }
+        
+        // Release command keys if they're being held (from physical keyboard, may differ after remapping)
         let leftCmdRemapped = getRemappedKeyCode(sourceKey: 55, sourceModifier: .command, isLeft: true)
         let rightCmdRemapped = getRemappedKeyCode(sourceKey: 54, sourceModifier: .command, isLeft: false)
         
@@ -907,6 +1092,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         if pressedKeys.contains(rightCmdRemapped) {
             releaseAndUpdateModifierKeyWithoutState(keyCode: rightCmdRemapped, logMessage: "Released right command for paste")
         }
+        isLeftCmdHeld = false
+        isRightCmdHeld = false
         
         // Send a general key release to ensure all modifiers are cleared on the target
         kbm.releaseKey(keys: pressedKeys)
@@ -925,7 +1112,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             self.pressedCharacter = text
         }
         
-        // Release all modifier keys before starting paste operation
+        // Capture on-screen toggle modifier state BEFORE releasing, so sticky modifier
+        // buttons (Ctrl, Alt, Shift) apply to the character being typed.
+        let savedCtrl = isLeftCtrlHeld || isRightCtrlHeld
+        let savedAlt  = isLeftAltHeld  || isRightAltHeld
+        let savedShift = isLeftShiftHeld || isRightShiftHeld
+        
+        // Release all modifier keys (clears physical key state and toggle flags)
         releaseAllModifierKeys()
         
         // Send text to keyboard
@@ -934,8 +1127,13 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // Convert character to keyboard key code
             let char = Character(String(UnicodeScalar(charString))) // Convert UTF-8 encoding back to character
             
-            // Get modifiers for character including currently held Ctrl/Alt and shift if needed
-            let modifiers = getCurrentModifiersForCharacter(char)
+            // Build modifiers from saved on-screen toggle state plus character shift requirements
+            var modifiers = NSEvent.ModifierFlags()
+            if savedCtrl  { modifiers.insert(.control) }
+            if savedAlt   { modifiers.insert(.option) }
+            if savedShift || char.isUppercase || KeyboardManager.SHIFT_KEYS.contains(String(char)) {
+                modifiers.insert(.shift)
+            }
             
             kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
             Thread.sleep(forTimeInterval: 0.03) // Wait for 30 milliseconds
@@ -998,7 +1196,10 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 // Apply keyboard layout remapping for this combination
                 switch currentKeyboardLayout {
                 case .windows:
-                    // In Windows mode, Cmd should be sent as Ctrl (for Windows shortcuts)
+                    // In Windows mode, Cmd+Space should be sent as Ctrl+Space (for Windows shortcuts)
+                    kbm.pressKey(keys: [key], modifiers: [.control])
+                case .linux:
+                    // In Linux mode, Cmd should be sent as Ctrl (for Linux shortcuts)
                     kbm.pressKey(keys: [key], modifiers: [.control])
                 case .mac:
                     // In Mac mode, keep as Command
@@ -1029,13 +1230,25 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     // MARK: - KeyboardManagerProtocol Implementation
 
     func sendKeyboardInput(_ input: KeyboardInput) {
-        // Convert protocol input to existing method call
-        // Implementation would depend on existing keyboard input methods
+        if !pressedKeys.contains(input.keyCode) {
+            if let index = pressedKeys.firstIndex(of: 255) {
+                pressedKeys[index] = input.keyCode
+                kbm.pressKey(keys: pressedKeys, modifiers: input.modifiers)
+                Thread.sleep(forTimeInterval: 0.005)
+                kbm.releaseKey(keys: pressedKeys)
+                pressedKeys[index] = 255
+            }
+        }
     }
     
     func sendSpecialKey(_ key: SpecialKey) {
-        // Convert protocol special key to existing method call
-        // Implementation would depend on existing special key methods
+        if let index = pressedKeys.firstIndex(of: 255) {
+            pressedKeys[index] = key.keyCode
+            kbm.pressKey(keys: pressedKeys, modifiers: getCurrentModifiersForSpecialKey())
+            Thread.sleep(forTimeInterval: 0.005)
+            kbm.releaseKey(keys: pressedKeys)
+            pressedKeys[index] = 255
+        }
     }
     
     func executeKeyboardMacro(_ macro: KeyboardMacro) {
