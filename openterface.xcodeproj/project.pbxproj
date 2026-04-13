@@ -258,6 +258,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F12FAECD2F6813C000F91607 /* serial */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = serial; sourceTree = "<group>"; };
+		FA6E02A5BA2C437D8D0F4DA3 /* WCH */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WCH; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -387,6 +388,7 @@
 			children = (
 				A1B2C3D52F12345600ABCDEF /* ChatManager.swift */,
 				F12FAECD2F6813C000F91607 /* serial */,
+				FA6E02A5BA2C437D8D0F4DA3 /* WCH */,
 				6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */,
 				BF7752D92EFFE51000FE5D0E /* Parallel */,
 				6BBCBA982ECEBEF200DFF2DE /* InputMonitorManager.swift */,
@@ -535,6 +537,7 @@
 			children = (
 				BFA4457B2F017758005D2937 /* LogViewerDialog.swift */,
 				BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */,
+				D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */,
 				C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */,
 				BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */,
 				BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */,
@@ -620,6 +623,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F12FAECD2F6813C000F91607 /* serial */,
+				FA6E02A5BA2C437D8D0F4DA3 /* WCH */,
 			);
 			name = openterface;
 			packageProductDependencies = (
@@ -751,6 +755,7 @@
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				BFD4EA932E35EE970029BFC2 /* ManagerProtocols.swift in Sources */,
 				BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */,
+				BB5C4A3E462F4851BD5309D4 /* WCHFlashSettingsView.swift in Sources */,
 				BF98F7382E35A1BD002EACD7 /* VideoChipsetHAL.swift in Sources */,
 				53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */,
 				BFA4457C2F017758005D2937 /* LogViewerDialog.swift in Sources */,
@@ -1022,6 +1027,10 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/opt/homebrew/include,
+				);
 				INFOPLIST_FILE = "openterface-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = openterface;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -1036,6 +1045,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "openterface/WCHLibusb-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -1058,6 +1068,10 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/opt/homebrew/include,
+				);
 				INFOPLIST_FILE = "openterface-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = openterface;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -1072,6 +1086,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.openterface.macOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "openterface/WCHLibusb-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
