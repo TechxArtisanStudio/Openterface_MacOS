@@ -99,6 +99,7 @@
 		BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */; };
 		BFA445782F016FEA005D2937 /* DeviceConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */; };
 		BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */; };
+		BB5C4A3E462F4851BD5309D4 /* WCHFlashSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */; };
 		BFA4457C2F017758005D2937 /* LogViewerDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA4457B2F017758005D2937 /* LogViewerDialog.swift */; };
 		BFABE3AE2EF678F300915509 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFABE3AD2EF678F300915509 /* AppVersion.swift */; };
 		BFB748FC2E35ED68004F0DAE /* ClipboardWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */; };
@@ -239,6 +240,7 @@
 		BFA445752F016F3C005D2937 /* ClipboardOCRSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardOCRSettingsView.swift; sourceTree = "<group>"; };
 		BFA445772F016FEA005D2937 /* DeviceConnectionSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeviceConnectionSettingsView.swift; sourceTree = "<group>"; };
 		BFA445792F017659005D2937 /* AdvancedDebugSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdvancedDebugSettingsView.swift; sourceTree = "<group>"; };
+		D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WCHFlashSettingsView.swift; sourceTree = "<group>"; };
 		BFA4457B2F017758005D2937 /* LogViewerDialog.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogViewerDialog.swift; sourceTree = "<group>"; };
 		BFABE3AD2EF678F300915509 /* AppVersion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		BFB748FB2E35ED67004F0DAE /* ClipboardWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardWindowController.swift; sourceTree = "<group>"; };
@@ -948,6 +950,14 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"/opt/homebrew/lib",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lusb-1.0",
+				);
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -1031,6 +1041,14 @@
 					"$(inherited)",
 					/opt/homebrew/include,
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"/opt/homebrew/lib",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lusb-1.0",
+				);
 				INFOPLIST_FILE = "openterface-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = openterface;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -1071,6 +1089,14 @@
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					/opt/homebrew/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"/opt/homebrew/lib",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lusb-1.0",
 				);
 				INFOPLIST_FILE = "openterface-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = openterface;
