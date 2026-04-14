@@ -274,6 +274,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E8F7D6C5B4A3928170645321 /* Embed libusb dylib */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"/opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH).debug.dylib",
+			);
+			name = "Embed libusb dylib";
+			outputPaths = (
+				"$(TARGET_TEMP_DIR)/libusb-temp/libusb-1.0.0.dylib",
+				"$(TARGET_TEMP_DIR)/libusb-temp/openterface.debug.dylib",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libusb-1.0.0.dylib",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH).debug.dylib",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"${TARGET_TEMP_DIR}/libusb-temp\"\ncp -f \"/opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\"\ninstall_name_tool -id \"@rpath/libusb-1.0.0.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\"\ncodesign --remove-signature \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\" || true\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --options runtime \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\"; fi\ncp -f \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\" \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/libusb-1.0.0.dylib\"\ncp -f \"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}.debug.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/openterface.debug.dylib\"\ninstall_name_tool -change \"/opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib\" \"@loader_path/../Frameworks/libusb-1.0.0.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/openterface.debug.dylib\"\ncp -f \"${TARGET_TEMP_DIR}/libusb-temp/openterface.debug.dylib\" \"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}.debug.dylib\"";
+		};
 		53FBE7B82B3D66D6007785B0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -617,6 +637,7 @@
 			buildPhases = (
 				53FBE7A62B3D66D2007785B0 /* Sources */,
 				53FBE7A72B3D66D2007785B0 /* Frameworks */,
+				E8F7D6C5B4A3928170645321 /* Embed libusb dylib */,
 				53FBE7A82B3D66D2007785B0 /* Resources */,
 			);
 			buildRules = (
