@@ -189,10 +189,18 @@ private func rdp8to64(_ b: [UInt8]) -> [UInt64] {
 }
 
 private func rdp64to8(_ w: [UInt64]) -> [UInt8] {
-    var bytes = w.flatMap { [
-        UInt8($0 >> 56), UInt8($0 >> 48 & 0xFF), UInt8($0 >> 40 & 0xFF), UInt8($0 >> 32 & 0xFF),
-        UInt8($0 >> 24 & 0xFF), UInt8($0 >> 16 & 0xFF), UInt8($0 >> 8 & 0xFF), UInt8($0 & 0xFF)
-    ] }
+    var bytes = w.flatMap { (value: UInt64) -> [UInt8] in
+        [
+            UInt8(value >> 56),
+            UInt8(value >> 48 & 0xFF),
+            UInt8(value >> 40 & 0xFF),
+            UInt8(value >> 32 & 0xFF),
+            UInt8(value >> 24 & 0xFF),
+            UInt8(value >> 16 & 0xFF),
+            UInt8(value >>  8 & 0xFF),
+            UInt8(value       & 0xFF)
+        ] as [UInt8]
+    }
     return rdpTrim(bytes)
 }
 
