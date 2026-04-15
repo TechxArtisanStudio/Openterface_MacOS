@@ -280,19 +280,13 @@
 			files = (
 			);
 			inputPaths = (
-				"/opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib",
-				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH).debug.dylib",
 			);
 			name = "Embed libusb dylib";
 			outputPaths = (
-				"$(TARGET_TEMP_DIR)/libusb-temp/libusb-1.0.0.dylib",
-				"$(TARGET_TEMP_DIR)/libusb-temp/openterface.debug.dylib",
-				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libusb-1.0.0.dylib",
-				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH).debug.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${TARGET_TEMP_DIR}/libusb-temp\"\ncp -f \"/opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\"\ninstall_name_tool -id \"@rpath/libusb-1.0.0.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\"\ncodesign --remove-signature \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\" || true\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --options runtime \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\"; fi\ncp -f \"${TARGET_TEMP_DIR}/libusb-temp/libusb-1.0.0.dylib\" \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/libusb-1.0.0.dylib\"\ncp -f \"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}.debug.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/openterface.debug.dylib\"\ninstall_name_tool -change \"/opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib\" \"@loader_path/../Frameworks/libusb-1.0.0.dylib\" \"${TARGET_TEMP_DIR}/libusb-temp/openterface.debug.dylib\"\ncp -f \"${TARGET_TEMP_DIR}/libusb-temp/openterface.debug.dylib\" \"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}.debug.dylib\"";
+			shellScript = "# libusb is now statically linked via libs/libusb-1.0.a - no dylib embedding needed\nexit 0\n";
 		};
 		53FBE7B82B3D66D6007785B0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -973,7 +967,7 @@
 				SDKROOT = macosx;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"/opt/homebrew/lib",
+					"$(PROJECT_DIR)/libs",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -1060,11 +1054,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					/opt/homebrew/include,
+					"$(PROJECT_DIR)/libs/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"/opt/homebrew/lib",
+					"$(PROJECT_DIR)/libs",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -1109,11 +1103,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					/opt/homebrew/include,
+					"$(PROJECT_DIR)/libs/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"/opt/homebrew/lib",
+					"$(PROJECT_DIR)/libs",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
