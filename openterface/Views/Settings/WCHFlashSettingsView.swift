@@ -142,8 +142,14 @@ struct WCHFlashSettingsView: View {
             GroupBox("Status") {
                 VStack(alignment: .leading, spacing: 8) {
                     if ispManager.isOperationInProgress {
-                        ProgressView(value: ispManager.operationProgress)
-                            .progressViewStyle(.linear)
+                        HStack(spacing: 10) {
+                            ProgressView(value: ispManager.operationProgress)
+                                .progressViewStyle(.linear)
+                            Text("\(Int(ispManager.operationProgress * 100))%")
+                                .font(.caption.monospacedDigit())
+                                .foregroundColor(.secondary)
+                                .frame(width: 50, alignment: .trailing)
+                        }
                     }
 
                     HStack(spacing: 6) {
