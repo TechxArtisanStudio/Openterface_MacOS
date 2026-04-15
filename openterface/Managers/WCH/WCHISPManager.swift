@@ -99,33 +99,48 @@ class WCHISPManager: ObservableObject {
             isError = true
             return
         }
-        await performOperation("Flashing") {
-            let data = try Data(contentsOf: url)
-            let binary = try self.resolveBinary(data: data, url: url)
 
+        let binary: [UInt8]
+        do {
+            let data = try Data(contentsOf: url)
+            binary = try resolveBinary(data: data, url: url)
+        } catch {
+            isError = true
+            statusMessage = "Firmware load failed: \(error)"
+            return
+        }
+
+        await performOperation("Flashing") {
             if f.isCodeFlashProtected() {
-                self.updateStatus("Unprotecting flash…", progress: 0.02)
+                await self.updateStatus("Unprotecting flash…", progress: 0.02)
                 try f.unprotect(skipReset: true)
             }
 
-            self.updateStatus("Erasing…", progress: 0.05)
+            await self.updateStatus("Erasing…", progress: 0.05)
             try f.eraseCodeFlash(firmwareSize: UInt32(binary.count))
 
-            self.updateStatus("Writing…", progress: 0.1)
+            await self.updateStatus("Writing…", progress: 0.1)
             try f.flashCode(data: binary) { p in
-                self.updateStatus("Writing… \(Int(p * 100))%", progress: 0.1 + p * 0.5)
+                Task { @MainActor in
+                    self.statusMessage = "Writing… \(Int(p * 100))%"
+                    self.operationProgress = 0.1 + p * 0.5
+                }
             }
 
-            self.updateStatus("Verifying…", progress: 0.6)
+            await self.updateStatus("Verifying…", progress: 0.6)
             try f.verifyCode(data: binary) { p in
-                self.updateStatus("Verifying… \(Int(p * 100))%", progress: 0.6 + p * 0.3)
+                Task { @MainActor in
+                    self.statusMessage = "Verifying… \(Int(p * 100))%"
+                    self.operationProgress = 0.6 + p * 0.3
+                }
             }
 
-            self.updateStatus("Resetting device…", progress: 0.95)
+            await self.updateStatus("Resetting device…", progress: 0.95)
             try f.reset()
-            self.flashing = nil
-            self.isConnected = false
+            await self.updateStatus("Flashing completed", progress: 1.0)
         }
+        self.flashing = nil
+        self.isConnected = false
     }
 
     // MARK: - Verify only
@@ -137,11 +152,23 @@ class WCHISPManager: ObservableObject {
         guard let url = selectedFirmwareURL else {
             statusMessage = "No firmware file selected"; isError = true; return
         }
-        await performOperation("Verifying") {
+
+        let binary: [UInt8]
+        do {
             let data = try Data(contentsOf: url)
-            let binary = try self.resolveBinary(data: data, url: url)
+            binary = try resolveBinary(data: data, url: url)
+        } catch {
+            isError = true
+            statusMessage = "Firmware load failed: \(error)"
+            return
+        }
+
+        await performOperation("Verifying") {
             try f.verifyCode(data: binary) { p in
-                self.updateStatus("Verifying… \(Int(p * 100))%", progress: p)
+                Task { @MainActor in
+                    self.statusMessage = "Verifying… \(Int(p * 100))%"
+                    self.operationProgress = p
+                }
             }
         }
     }
@@ -154,10 +181,13 @@ class WCHISPManager: ObservableObject {
         }
         await performOperation("Dumping firmware") {
             let dumpedData = try f.transport.dumpFirmware(flashSize: f.chip.flashSize) { p in
-                self.updateStatus("Dumping… \(Int(p * 100))%", progress: p)
+                Task { @MainActor in
+                    self.statusMessage = "Dumping… \(Int(p * 100))%"
+                    self.operationProgress = p
+                }
             }
             let saveData = Data(dumpedData)
-            await MainActor.run {
+            DispatchQueue.main.async {
                 let panel = NSSavePanel()
                 panel.nameFieldStringValue = "\(f.chip.name)_firmware.bin"
                 if panel.runModal() == .OK, let saveURL = panel.url {
@@ -177,20 +207,31 @@ class WCHISPManager: ObservableObject {
         return [UInt8](data)
     }
 
-    private nonisolated func updateStatus(_ msg: String, progress: Double) {
-        Task { @MainActor in
+    private nonisolated func updateStatus(_ msg: String, progress: Double) async {
+        await MainActor.run {
             self.statusMessage = msg
             self.operationProgress = progress
         }
     }
 
-    private func performOperation(_ name: String, operation: @escaping () async throws -> Void) async {
+    private func performOperation(_ name: String, operation: @escaping @Sendable () async throws -> Void) async {
         isOperationInProgress = true
         operationProgress = 0
         isError = false
         statusMessage = "\(name)…"
         do {
-            try await operation()
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    Task {
+                        do {
+                            try await operation()
+                            continuation.resume()
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                }
+            }
             statusMessage = "\(name) completed"
             operationProgress = 1.0
         } catch {
