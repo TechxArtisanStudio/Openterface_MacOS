@@ -1073,7 +1073,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/libs",
 				);
-				MARKETING_VERSION = 2.2;
+				MARKETING_VERSION = 2.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lusb-1.0",
@@ -1122,7 +1122,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/libs",
 				);
-				MARKETING_VERSION = 2.2;
+				MARKETING_VERSION = 2.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lusb-1.0",
