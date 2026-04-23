@@ -762,7 +762,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     }
 
     func releaseKey(keys: [UInt16]) {
-        kbm.releaseKey(keys: self.pressedKeys)
+        kbm.releaseKey(keys: keys)
     }
 
     func monitorKeyboardEvents() {
@@ -877,9 +877,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         if !pressedKeys.contains(event.keyCode) {
             if let index = pressedKeys.firstIndex(of: 255) {
                 pressedKeys[index] = event.keyCode
+                logger.log(content: "🔍 [DEBUG keyDown] Added keyCode=\(event.keyCode) at index=\(index), pressedKeys=\(pressedKeys)")
+            } else {
+                logger.log(content: "🔍 [DEBUG keyDown] NO EMPTY SLOT for keyCode=\(event.keyCode), pressedKeys=\(pressedKeys)")
             }
+        } else {
+            logger.log(content: "🔍 [DEBUG keyDown] keyCode=\(event.keyCode) already in pressedKeys=\(pressedKeys)")
         }
-        
+
+        logger.log(content: "🔍 [DEBUG keyDown] BEFORE pressKey: pressedKeys=\(pressedKeys)")
         kbm.pressKey(keys: pressedKeys, modifiers: adjustedModifiers)
 
         // NumLock (keyCode 71) toggles the target's NumLock LED — query the updated state after a short delay
@@ -911,10 +917,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         
         // Remove released key
+        logger.log(content: "🔍 [DEBUG keyUp] BEFORE remove: keyCode=\(event.keyCode), pressedKeys=\(pressedKeys)")
         if let index = pressedKeys.firstIndex(of: event.keyCode) {
             pressedKeys[index] = 255
+            logger.log(content: "🔍 [DEBUG keyUp] Cleared index=\(index), pressedKeys=\(pressedKeys)")
+        } else {
+            logger.log(content: "🔍 [DEBUG keyUp] keyCode=\(event.keyCode) NOT FOUND in pressedKeys=\(pressedKeys)")
         }
-        
+
+        logger.log(content: "🔍 [DEBUG keyUp] FINAL pressedKeys=\(pressedKeys)")
         kbm.releaseKey(keys: pressedKeys)
         return nil
     }

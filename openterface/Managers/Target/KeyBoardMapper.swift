@@ -363,10 +363,6 @@ class KeyboardMapper {
         let combinedModifiers = processModifierFlags(modifiers)
         keyDat[5] = combinedModifiers
         
-        if isRelease {
-            keyDat[7] = 0x00
-        }
-        
         keyDat[13] = calculateChecksum(data: keyDat)
         //
         // let _ = self.serialPortManager.writeByte(data:keyDat)
