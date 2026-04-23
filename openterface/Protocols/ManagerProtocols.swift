@@ -426,6 +426,20 @@ enum ChatRole: String, Codable {
     case assistant
 }
 
+/// A tappable suggestion shown beneath an assistant bubble.
+/// The user taps one to send `sendText` as if they had typed it.
+struct ChatQuickReply: Identifiable, Codable, Equatable {
+    let id: UUID
+    let label: String      // button text shown in the UI
+    let sendText: String   // text submitted when the button is tapped
+
+    init(id: UUID = UUID(), label: String, sendText: String) {
+        self.id = id
+        self.label = label
+        self.sendText = sendText
+    }
+}
+
 struct ChatMessage: Identifiable, Codable, Equatable {
     let id: UUID
     let role: ChatRole
@@ -435,8 +449,10 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     let guideActionRect: CGRect?
     let guideShortcut: String?
     let guideTool: String?
+    /// Optional one-tap reply chips rendered beneath this bubble.
+    let quickReplies: [ChatQuickReply]
 
-    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date(), attachmentFilePath: String? = nil, guideActionRect: CGRect? = nil, guideShortcut: String? = nil, guideTool: String? = nil) {
+    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date(), attachmentFilePath: String? = nil, guideActionRect: CGRect? = nil, guideShortcut: String? = nil, guideTool: String? = nil, quickReplies: [ChatQuickReply] = []) {
         self.id = id
         self.role = role
         self.content = content
@@ -445,6 +461,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.guideActionRect = guideActionRect
         self.guideShortcut = guideShortcut
         self.guideTool = guideTool
+        self.quickReplies = quickReplies
     }
 }
 
@@ -460,6 +477,8 @@ enum ChatTaskStatus: String, Codable {
 enum ChatPlanStatus: String, Codable {
     case draft
     case awaitingApproval
+    /// Plan has been approved; the agent is currently verifying the target OS before execution begins.
+    case awaitingOSConfirmation
     case approved
     case running
     case completed

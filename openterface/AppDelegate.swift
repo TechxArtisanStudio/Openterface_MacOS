@@ -392,11 +392,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             serialPortManager.pauseConnectionAttempts()
             // Only auto-connect on manual switch, not on app launch (avoids connecting before network is ready)
             if reason != "app launch" {
-                VNCClientManager.shared.connect(
-                    host: UserSettings.shared.vncHost,
-                    port: UserSettings.shared.vncPort,
-                    password: UserSettings.shared.vncPassword.isEmpty ? nil : UserSettings.shared.vncPassword
-                )
+                // Brief delay lets USB subsystem settle after stopping KVM I/O, which can
+                // momentarily take down USB-attached network adapters (RNDIS/NCM) and cause
+                // ENETDOWN on the first connection attempt.
+                let vncHost = UserSettings.shared.vncHost
+                let vncPort = UserSettings.shared.vncPort
+                let vncPassword = UserSettings.shared.vncPassword.isEmpty ? nil : UserSettings.shared.vncPassword
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    VNCClientManager.shared.connect(host: vncHost, port: vncPort, password: vncPassword)
+                }
             } else {
                 logger.log(content: "VNC auto-connect skipped at app launch. Use Connect button to connect.")
                 AppStatus.protocolSessionState = .idle

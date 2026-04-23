@@ -44,6 +44,9 @@ final class VNCClientManager: VNCClientManagerProtocol {
 
     private let queue = DispatchQueue(label: "com.openterface.vnc")
     private var connection: NWConnection?
+    private var waitingRetryTask: DispatchWorkItem?
+    private var networkWaitRetryCount: Int = 0
+    private static let maxNetworkWaitRetries = 12
     private let loggerStorage: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var framebufferWidth: Int = 0
     private var framebufferHeight: Int = 0
@@ -66,6 +69,7 @@ final class VNCClientManager: VNCClientManagerProtocol {
 
     func connect(host: String, port: Int, password: String?) {
         queue.async { [weak self] in
+            self?.networkWaitRetryCount = 0
             self?.fallbackLevel = .full
             self?.logger.log(content: "VNC connect requested: host=\(host) port=\(port) passwordPresent=\(password != nil && !(password!.isEmpty))")
             self?.performConnect(host: host, port: port)
@@ -170,14 +174,40 @@ final class VNCClientManager: VNCClientManagerProtocol {
             }
             switch state {
             case .ready:
+                self.waitingRetryTask?.cancel()
+                self.waitingRetryTask = nil
                 self.logger.log(content: "VNC TCP connection ready")
                 self.receiveData()
             case .preparing:
                 self.logger.log(content: "VNC TCP connection preparing...")
             case .waiting(let error):
                 self.logger.log(content: "VNC TCP connection waiting: \(error.localizedDescription)")
-                self.setError("VNC connection waiting: \(error.localizedDescription)")
-                self.stopConnection(reason: "connection waiting/unreachable")
+                // Cancel the stuck NWConnection — it won't self-recover from ENETDOWN.
+                // Retry with a fresh connection using exponential backoff.
+                // The guard prevents scheduling a second retry if this .waiting fires
+                // more than once before the scheduled task runs.
+                guard self.waitingRetryTask == nil else { break }
+                let attempt = self.networkWaitRetryCount
+                guard attempt < VNCClientManager.maxNetworkWaitRetries else {
+                    self.logger.log(content: "VNC network unreachable after \(attempt) retries, giving up")
+                    self.setError("VNC connection timed out: \(error.localizedDescription)")
+                    self.stopConnection(reason: "network unreachable timeout")
+                    break
+                }
+                self.networkWaitRetryCount += 1
+                // Exponential backoff: 2, 4, 8, 16, 30 seconds
+                let delay = min(pow(2.0, Double(attempt + 1)), 30.0)
+                self.logger.log(content: "VNC network waiting, retry \(attempt + 1)/\(VNCClientManager.maxNetworkWaitRetries) in \(Int(delay))s")
+                self.connection?.cancel()
+                self.connection = nil
+                let retryTask = DispatchWorkItem { [weak self] in
+                    guard let self = self else { return }
+                    self.waitingRetryTask = nil
+                    let h = self.host; let p = self.port
+                    self.performConnect(host: h, port: p)
+                }
+                self.waitingRetryTask = retryTask
+                self.queue.asyncAfter(deadline: .now() + delay, execute: retryTask)
             case .failed(let error):
                 self.logger.log(content: "VNC connection failed: \(error.localizedDescription)")
                 self.setError("VNC connection failed: \(error.localizedDescription)")
@@ -195,6 +225,8 @@ final class VNCClientManager: VNCClientManagerProtocol {
     }
 
     private func stopConnection(reason: String) {
+        waitingRetryTask?.cancel()
+        waitingRetryTask = nil
         if connection != nil {
             logger.log(content: "VNC disconnect: \(reason)")
         }
