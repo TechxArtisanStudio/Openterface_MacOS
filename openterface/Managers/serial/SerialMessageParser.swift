@@ -41,10 +41,7 @@ final class SerialMessageParser {
     func append(_ data: Data) {
         guard !data.isEmpty else { return }
 
-        if logger?.SerialDataPrint == true {
-            let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-            logger?.log(content: "Rx: \(dataString)")
-        }
+        // Rx logging is handled by SerialPortManager — skip duplicate here
 
         buffer.append(data)
         processBufferedMessages()

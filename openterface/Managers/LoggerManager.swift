@@ -34,6 +34,7 @@ class Logger: LoggerProtocol {
     static let shared = Logger()
     
     var MouseEventPrint = false
+    var KeyboardEventPrint = false
     var SerialDataPrint = false
     var HalPrint = false
     
@@ -47,6 +48,8 @@ class Logger: LoggerProtocol {
     init() {
         // Load serial output logging setting from UserSettings
         self.SerialDataPrint = UserSettings.shared.isSerialOutput
+        // Load keyboard event logging setting from UserSettings
+        self.KeyboardEventPrint = UserSettings.shared.isKeyboardEventPrintEnabled
     }
     
     
