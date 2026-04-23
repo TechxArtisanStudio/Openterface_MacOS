@@ -308,12 +308,18 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             logger.log(content: "Video preparation ignored - too frequent")
             return
         }
-        
-        // If video session is already running, return directly, but don't check isVideoSessionStarting
-        // This allows new start requests to potentially override a stuck startup process
-        if captureSession.isRunning {
+
+        // If video session is running AND has at least one input, skip — it's already working.
+        // If it's running but has NO inputs, it was started before hardware was available.
+        // Stop the empty session and re-prepare with the newly detected hardware.
+        if captureSession.isRunning && !captureSession.inputs.isEmpty {
             logger.log(content: "Video already running, skipping preparation")
             return
+        }
+
+        if captureSession.isRunning && captureSession.inputs.isEmpty {
+            logger.log(content: "Video session running but empty (no hardware at startup) — restarting with detected hardware")
+            captureSession.stopRunning()
         }
         
         // Update last start time

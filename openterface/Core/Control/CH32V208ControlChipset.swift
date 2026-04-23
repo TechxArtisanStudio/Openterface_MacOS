@@ -59,18 +59,17 @@ class CH32V208ControlChipset: BaseControlChipset {
     }
 
     override func establishCommunication() -> Bool {
-        // CH32V208 uses direct connection without baudrate detection
-        serialManager.tryOpenSerialPortForCH32V208()
+        // Block until the serial port actually opens (up to 5 seconds)
+        let success = serialManager.tryOpenSerialPortForCH32V208Sync(timeout: 5.0)
 
         currentBaudRate = serialManager.baudrate
-        let success = currentBaudRate == CH32V208ControlChipset.LOWSPEED_BAUDRATE
 
         if success {
             serialManager.isDeviceReady = true
             logger.log(content: "✅ CH32V208 communication established at \(currentBaudRate) baud")
             // Trigger HAL integration with managers after successful communication
             HALIntegrationManager.shared.reintegrateControlChipset()
-            //Get the hid info in order to know the current firmware version
+            // Get the hid info in order to know the current firmware version
             serialManager.getHidInfo()
             isConnected = true
         } else {

@@ -111,6 +111,7 @@ protocol SerialPortManagerProtocol: AnyObject {
     
     func tryOpenSerialPort(priorityBaudrate: Int?)
     func tryOpenSerialPortForCH32V208()
+    func tryOpenSerialPortForCH32V208Sync(timeout: TimeInterval) -> Bool
     func openSerialPortForFactoryReset() -> Bool 
     func closeSerialPort()
     func openSerialPort( baudrate: Int)
