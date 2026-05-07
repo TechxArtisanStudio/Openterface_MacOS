@@ -119,7 +119,6 @@ class FirmwareManager: ObservableObject {
                     if identifier.contains("main_openterface") || 
                        (!identifier.contains("edidNameWindow") &&
                         !identifier.contains("firmwareUpdateWindow") &&
-                        !identifier.contains("resetSerialToolWindow") &&
                         window.contentViewController != nil &&
                         window.isVisible) {
                         logger.log(content: "✓ Closing/hiding main window: \(window.title)")

@@ -64,6 +64,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @objc dynamic var serialPort: ORSSerialPort? {
         didSet {
+            if oldValue === serialPort {
+                serialPort?.delegate = self
+                return
+            }
             oldValue?.close()
             oldValue?.delegate = nil
             serialPort?.delegate = self
@@ -73,12 +77,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @Published var serialPorts : [ORSSerialPort] = []
     
-    var lastHIDEventTime: Date?
-    var lastSerialData: Date?
-    /// CTS pin state (CH340 data flip pin) used to detect HID activity from the Target Screen.
-    var lastCts: Bool?
-    
-    var timer: Timer?
+    var lastSerialDate: Date?
     
     @Published var baudrate:Int = 0
     
@@ -143,7 +142,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// as it prevents new attempts from being started automatically.
     @ThreadSafe(label: "com.openterface.SerialPortManager.pauseQueue")
     var isPaused: Bool = false
-    
+
     /// Tracks whether an error alert has been shown to the user.
     /// This ensures error alerts are displayed only once to avoid redundant notifications.
     @ThreadSafe(label: "com.openterface.SerialPortManager.errorAlertQueue")
@@ -241,12 +240,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
         logger.log(content: "Serial port Disconnected")
         self.retryCounter = 0
-        self.closeSerialPort()
 
         // During USB enumeration settling, disconnect events can fire spuriously while the device
         // is still physically connected. Reconnect if the device is still present.
         // Refresh device list first to get current state.
         USBDevicesManager.shared.update()
+        if self.isPaused && USBDevicesManager.shared.isOpenterfaceConnected() {
+            logger.log(content: "Serial port disconnect notification ignored while connection attempts are paused and device is still connected")
+            return
+        }
+
+        self.closeSerialPort()
+
         if USBDevicesManager.shared.isOpenterfaceConnected() {
             logger.log(content: "Device still connected after disconnect notification, re-opening port")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -255,63 +260,17 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
     }
 
-    func checkCTS() {
-        // CTS monitoring only applies to CH9329 chipset
-        if !USBDevicesManager.shared.isCH9329Connected() {
-            return
-        }
-        
-        if let cts = self.serialPort?.cts {
-            if lastCts == nil {
-                lastCts = cts
-                lastHIDEventTime = Date()
-            }
-            if lastCts != cts {
-                SerialPortStatus.shared.isKeyboardConnected = true
-                SerialPortStatus.shared.isMouseConnected = true
-                lastHIDEventTime = Date()
-                lastCts = cts
-            }
-        }
-        
-        self.checkHIDEventTime()
-    }
-
-    func checkHIDEventTime() {
-        // HID event time checking only applies to CH9329 chipset
-        if !USBDevicesManager.shared.isCH9329Connected() {
-            return
-        }
-
-        if isPaused {
-            return
-        }
-        
-        if let lastTime = lastHIDEventTime {
-            if Date().timeIntervalSince(lastTime) > 5 {
-
-                // 5 seconds pass since last HID event
-                if logger.SerialDataPrint {
-                    logger.log(content: "No hid update more than 5 second, check the HID information")
-                }
-                // Rest the time, to avoide duplicated check
-                lastHIDEventTime = Date()
-                getHidInfo()
-            }
-        }
-    }
-
     func serialPortWasOpened(_ serialPort: ORSSerialPort) {
+        messageParser.reset()
+
         if logger.SerialDataPrint { logger.log(content: "Serial opened") }
-        
-        // Start CTS monitoring for HID event detection (CH9329 only)
-        self.startCTSMonitoring()
         
         // Start SD card direction polling for CH32V208
         self.startSDCardPolling()
     }
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
+        messageParser.reset()
 
         if logger.SerialDataPrint { logger.log(content: "Serial port was closed") }
 
@@ -322,7 +281,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
         // Record the timestamp of this serial data reception
-        lastSerialData = Date()
+        lastSerialDate = Date()
         
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
         
@@ -457,12 +416,20 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
 
     private func setCH32V208DeviceReady() {
-        DispatchQueue.main.async { [weak self] in
+        let updateState = { [weak self] in
             guard let self = self else { return }
             self.isDeviceReady = true
             self.errorAlertShown = false
+            AppStatus.isControlChipsetReady = true
+            SerialPortStatus.shared.isControlChipsetReady = true
             SerialPortStatus.shared.isKeyboardConnected = true
             SerialPortStatus.shared.isMouseConnected = true
+        }
+
+        if Thread.isMainThread {
+            updateState()
+        } else {
+            DispatchQueue.main.sync(execute: updateState)
         }
     }
 
@@ -687,7 +654,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             return false
         }
 
-        logger.log(content: "Serial port opened successfully for factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
+        logger.log(content: "Run blocking factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
         return runBlockingFactoryReset()
     }
     
@@ -696,8 +663,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         let effectiveBaudrate = baudrate > 0 ? baudrate : UserSettings.shared.preferredBaudrate.rawValue
         
         self.logger.log(content: "Opening serial port at baudrate: \(effectiveBaudrate)")
+        messageParser.reset()
         self.serialPort?.baudRate = NSNumber(value: effectiveBaudrate)
         self.serialPort?.delegate = self
+        self.baudrate = effectiveBaudrate
         
         if let port = self.serialPort {
             if port.isOpen {
@@ -725,16 +694,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
 
     }
-
     
     func closeSerialPort() {
         logger.log(content: "Close serial port..")
         self.isDeviceReady = false
+        messageParser.reset()
         self.serialPort?.close()
-
-        // Stop CTS monitoring timer
-        self.timer?.invalidate()
-        self.timer = nil
         
         // Stop SD card polling timer
         self.stopSDCardPolling()
@@ -803,8 +768,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             // Set device ready to false initially - it will be set to true when proper communication is established
             self.isDeviceReady = false
             
-            // Start CTS monitoring for HID event detection
-            self.startCTSMonitoring()
+            logger.log(content: "Openterface is ready to factory reset now.")
             
             return true
         } else {
@@ -1065,7 +1029,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     private func resetHidChipAndReconnect(priorityBaudrate: Int? = nil) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.resetHidChip()
+            guard let self = self else { return }
+
+            self.resetHidChip()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.closeSerialPort()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -1191,10 +1157,15 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         guard let port = serialPort, port.isOpen else {
             logger.log(content: "Serial port not open, attempting to open it first")
             
-            // Try to open the serial port
-            tryOpenSerialPort(priorityBaudrate: nil)
+            // Connection attempts are paused during factory reset, so open the port directly.
+            guard openSerialPortForFactoryReset() else {
+                logger.log(content: "Failed to open serial port for factory reset")
+                resumeConnectionAttempts()
+                completion(false)
+                return
+            }
             
-            // Wait briefly for port to open
+            // Wait briefly for the port to settle before toggling RTS.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self = self, let port = self.serialPort, port.isOpen else {
                     self?.logger.log(content: "Failed to open serial port for factory reset")
@@ -1483,25 +1454,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 SerialPortStatus.shared.isKeyboardConnected = true
                 SerialPortStatus.shared.isMouseConnected = true
             }
-        }
-    }
-    
-    /// Start CTS monitoring for HID event detection
-    /// CTS monitoring is only needed for CH9329 chipset
-    /// For CH32V208, HID events are detected through direct serial communication
-    private func startCTSMonitoring() {
-        // Only start CTS monitoring for CH9329 chipset
-        if !USBDevicesManager.shared.isCH9329Connected() {
-            logger.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
-            return
-        }
-        
-        // Start the timer for CTS checking if not already running
-        if self.timer == nil {
-            self.timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                self.checkCTS()
-            }
-            logger.log(content: "Started CTS monitoring for CH9329 HID event detection")
         }
     }
     

@@ -83,8 +83,18 @@ final class SerialMessageParser {
             let len = bytes[4]
             let expectedLength = Int(len) + 6
             if bytes.count < expectedLength {
+                if let nextPrefixIndex = findNextMessageStart(in: bytes, from: 1) {
+                    if logger?.SerialDataPrint == true {
+                        let truncated = bytes[0..<nextPrefixIndex]
+                        let truncatedString = truncated.map { String(format: "%02X", $0) }.joined(separator: " ")
+                        logger?.log(content: "Truncated message before next header, discarding \(nextPrefixIndex) bytes: \(truncatedString)")
+                    }
+                    bytes.removeFirst(nextPrefixIndex)
+                    continue
+                }
+
                 if logger?.SerialDataPrint == true {
-                    logger?.log(content: "Incomplete message in buffer, waiting for more data, expected length: \(expectedLength), current length: \(bytes.count)")
+                    logger?.log(content: "Incomplete message in buffer, expected length: \(expectedLength), current length: \(bytes.count), current data: \(bytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
                 }
                 break
             }
@@ -100,7 +110,7 @@ final class SerialMessageParser {
                     let messageString = messageBytes.map { String(format: "%02X", $0) }.joined(separator: " ")
                     let checksumHex = String(format: "%02X", checksum)
                     let receivedHex = String(format: "%02X", receivedChecksum)
-                    logger?.log(content: "Checksum error, discard message: \(messageString), calculated: \(checksumHex), received: \(receivedHex)")
+                    logger?.log(content: "Checksum error, discard message: \(messageString), bytes count: \(bytes.count), expectedLength: \(expectedLength), calculated: \(checksumHex), received: \(receivedHex)")
                 }
             }
 

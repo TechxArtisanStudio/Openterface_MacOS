@@ -722,7 +722,10 @@ class HALIntegrationManager {
         let isReady = controlChipset.isDeviceReady
         if AppStatus.isControlChipsetReady != isReady {
             logger.log(content: "🔧 Control chipset ready status: \(isReady ? "Ready" : "Not Ready")")
-            DispatchQueue.main.async { AppStatus.isControlChipsetReady = isReady }
+            DispatchQueue.main.async {
+                AppStatus.isControlChipsetReady = isReady
+                SerialPortStatus.shared.isControlChipsetReady = isReady
+            }
         }
         
         // Check communication interface status

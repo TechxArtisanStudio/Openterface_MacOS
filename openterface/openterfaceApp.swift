@@ -597,11 +597,6 @@ struct openterfaceApp: App {
                 }
                 Divider()
                 Button(action: {
-                    showResetFactoryWindow()
-                }) {
-                    Text("Serial Reset Tool...")
-                }
-                Button(action: {
                     showFirmwareUpdateWindow()
                 }) {
                     Text("Firmware Update Tool...")
@@ -1208,44 +1203,6 @@ func showUSBDevicesWindow() {
     window.title = "USB Devices"
     window.setContentSize(NSSize(width: 400, height: 600))
     window.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
-}
-
-func showResetFactoryWindow() {
-    if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetSerialToolWindow" }) {
-        // If window already exists, make it shake and bring to front
-        
-        // Use system-provided attention request (will make window or Dock icon bounce)
-        NSApp.requestUserAttention(.criticalRequest)
-        
-        // Bring window to front
-        existingWindow.makeKeyAndOrderFront(nil)
-        existingWindow.orderFrontRegardless()
-        return
-    }
-    
-    // If window doesn't exist, create a new one
-    let resetFactoryView = ResetFactoryView()
-    let controller = NSHostingController(rootView: resetFactoryView)
-    let window = NSWindow(contentViewController: controller)
-    window.title = "Serial Reset Tool"
-    window.identifier = NSUserInterfaceItemIdentifier(rawValue: "resetSerialToolWindow")
-    window.setContentSize(NSSize(width: 400, height: 760))
-    window.styleMask = [.titled, .closable]
-    window.center()
-    window.makeKeyAndOrderFront(nil)
-    
-    // Set callback when window closes to clear references
-    window.isReleasedWhenClosed = false
-//     NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { _ in
-//         // aboutWindow = nil
-// //        if let windown = NSApp.windows.first(where: { $0.identifier?.rawValue == "resetFactoryWindow" }) {
-// //            windown.close()
-// //        }
-//     }
-    
-    // Save window reference
-    // aboutWindow = window
     NSApp.activate(ignoringOtherApps: true)
 }
 

@@ -434,7 +434,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         for activeWindow in passThroughCandidateWindows(for: event) {
             if let identifier = activeWindow.identifier?.rawValue,
                (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") ||
-                identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow") ||
+                identifier.contains("settingsWindow") ||
                 identifier.contains("macroCreatorDialog") || identifier.contains("macroPanel") ||
                 identifier.contains("macroEditor")) {
                 logEventRouting("pass-through", event: event, details: "matched window identifier on candidate {\(describeWindow(activeWindow))}")

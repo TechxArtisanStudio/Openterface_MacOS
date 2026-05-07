@@ -108,11 +108,11 @@ protocol SerialPortManagerProtocol: AnyObject {
     var isDeviceReady: Bool { get set }
     var baudrate: Int { get }
     var serialPort: ORSSerialPort? { get }
+    var lastSerialDate: Date? { get }
     
     func tryOpenSerialPort(priorityBaudrate: Int?)
     func tryOpenSerialPortForCH32V208()
     func tryOpenSerialPortForCH32V208Sync(timeout: TimeInterval) -> Bool
-    func openSerialPortForFactoryReset() -> Bool 
     func closeSerialPort()
     func openSerialPort( baudrate: Int)
     func pauseConnectionAttempts()

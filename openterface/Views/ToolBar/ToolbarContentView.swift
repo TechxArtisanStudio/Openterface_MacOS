@@ -57,6 +57,7 @@ struct ToolbarContentView: ToolbarContent {
 
     // observe the shared serial manager directly so we track configuration state
     @ObservedObject private var concreteSerialPortMgr: SerialPortManager = SerialPortManager.shared
+    @ObservedObject private var serialPortStatus: SerialPortStatus = .shared
     @ObservedObject private var userSettings: UserSettings = .shared
 
     // Action callbacks
@@ -74,6 +75,7 @@ struct ToolbarContentView: ToolbarContent {
     // hover state for each selection button
     @State private var hovering9600 = false
     @State private var hovering115200 = false
+    @State private var isAwaitingControlChipsetReady = false
 
     // Resolve dependencies directly when needed
     private var floatingKeyboardManager: FloatingKeyboardManagerProtocol { DependencyContainer.shared.resolve(FloatingKeyboardManagerProtocol.self) }
@@ -84,6 +86,7 @@ struct ToolbarContentView: ToolbarContent {
     private var chatWindowManager: ChatWindowManagerProtocol { DependencyContainer.shared.resolve(ChatWindowManagerProtocol.self) }
     private var logger: LoggerProtocol { DependencyContainer.shared.resolve(LoggerProtocol.self) }
     private var shouldShowHardwareToggle: Bool { UserSettings.shared.connectionProtocolMode == .kvm }
+    private var isShowingBaudrateTransition: Bool { isAwaitingControlChipsetReady }
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .automatic) {
@@ -241,18 +244,38 @@ struct ToolbarContentView: ToolbarContent {
                     showUSBDevices()
                 }) {
                     HStack {
-                        Image(systemName: "keyboard.fill")
-                            .resizable()
-                            .frame(width: 16, height: 12)
-                            .foregroundColor(colorForConnectionStatus(isKeyboardConnected))
-                        Image(systemName: isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
-                            .resizable()
-                            .frame(width: isMouseLoopRunning ? 14 : 10, height: 12)
-                            .foregroundColor(colorForConnectionStatus(isMouseConnected))
+                        if isShowingBaudrateTransition {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 16, height: 12)
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 14, height: 12)
+                        } else {
+                            Image(systemName: "keyboard.fill")
+                                .resizable()
+                                .frame(width: 16, height: 12)
+                                .foregroundColor(colorForConnectionStatus(isKeyboardConnected))
+                            Image(systemName: isMouseLoopRunning ? "cursor.rays" : "computermouse.fill")
+                                .resizable()
+                                .frame(width: isMouseLoopRunning ? 14 : 10, height: 12)
+                                .foregroundColor(colorForConnectionStatus(isMouseConnected))
+                        }
+                    }
+                }
+                .onChange(of: serialPortStatus.isControlChipsetReady) { isReady in
+                    if isAwaitingControlChipsetReady && isReady {
+                        isAwaitingControlChipsetReady = false
                     }
                 }
                 .help(
+                    isShowingBaudrateTransition
+                    ? """
+                    Updating serial baudrate...
+
+                    Keyboard and mouse will reconnect automatically when the control chipset is ready.
                     """
+                    : """
                     KeyBoard: \(
                         isKeyboardConnected == true ? "Connected" :
                         isKeyboardConnected == false ? "Not found" : "Unknown"
@@ -292,6 +315,7 @@ struct ToolbarContentView: ToolbarContent {
                         VStack(spacing: 8) {
                             Button("9600 bps") {
                                 logger.log(content: "Serial baudrate popover: user chose 9600")
+                                isAwaitingControlChipsetReady = true
                                 serialPortMgr.resetDeviceToBaudrate(9600)
                                 showBaudPopover = false
                             }
@@ -300,6 +324,7 @@ struct ToolbarContentView: ToolbarContent {
 
                             Button("115200 bps") {
                                 logger.log(content: "Serial baudrate popover: user chose 115200")
+                                isAwaitingControlChipsetReady = true
                                 serialPortMgr.resetDeviceToBaudrate(115200)
                                 showBaudPopover = false
                             }
