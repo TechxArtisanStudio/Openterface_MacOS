@@ -160,7 +160,7 @@ Schema:
 
     /// Handle a quick-reply chip tap: submit the chip's sendText as a user message.
     func sendQuickReply(_ reply: ChatQuickReply) {
-        sendMessage(reply.sendText)
+        sendMessage(reply.sendText, attachmentFileURL: nil)
     }
 
     /// Execute a skill from the Skills panel.

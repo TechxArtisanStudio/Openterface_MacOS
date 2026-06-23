@@ -1225,7 +1225,7 @@ func showFirmwareUpdateWindow() {
     let window = NSWindow(contentViewController: controller)
     window.title = "Firmware Update Tool"
     window.identifier = NSUserInterfaceItemIdentifier(rawValue: "firmwareUpdateWindow")
-    window.setContentSize(NSSize(width: 400, height: 600))
+    window.setContentSize(NSSize(width: 600, height: 600))
     window.styleMask = [.titled, .closable]
     window.center()
     window.makeKeyAndOrderFront(nil)
