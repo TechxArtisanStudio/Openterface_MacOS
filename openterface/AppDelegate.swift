@@ -382,7 +382,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             RDPClientManager.shared.disconnect()
             serialPortManager.resumeConnectionAttempts()
             hidManager.restartHIDOperations()
-            videoManager.startVideoSession()
+            // Use prepareVideo() instead of startVideoSession() to ensure
+            // the video input is added before starting the session.
+            // This is critical at app launch when the device is already connected.
+            videoManager.prepareVideo()
             AppStatus.protocolSessionState = .connected
         case .vnc:
             logger.log(content: "Connection protocol switched to VNC (\(reason)). KVM hardware streams are paused.")

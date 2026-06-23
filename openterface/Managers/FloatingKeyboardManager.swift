@@ -48,18 +48,14 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
             }
         }
  
-        // Observe main window focus loss notifications
+        // Observe app losing active focus (e.g., user switches to another app)
+        // This is better than observing didResignMain, which fires when clicking the floating keyboard itself
         focusLostObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didResignMainNotification,
+            forName: NSApplication.didResignActiveNotification,
             object: nil,
             queue: .main
-        ) { [weak self] notification in
-            // Check if the window losing focus is the main window
-            if let window = notification.object as? NSWindow,
-               let identifier = window.identifier?.rawValue,
-               identifier.contains("main_openterface") {
-                self?.closeFloatingKeysWindow()
-            }
+        ) { [weak self] _ in
+            self?.closeFloatingKeysWindow()
         }
     }
     
@@ -92,7 +88,14 @@ public class FloatingKeyboardManager: FloatingKeyboardManagerProtocol {
         window.styleMask = NSWindow.StyleMask([.borderless])
         window.setContentSize(NSSize(width: 800, height: 410))
         window.isMovableByWindowBackground = true
-        window.level = NSWindow.Level.floating
+        // Use a level above the main window so the floating keyboard is never occluded
+        // when the main window is set to .floating (always-on-top).
+        let mainWindowLevel = NSApplication.shared.windows
+            .first(where: { $0.identifier?.rawValue.contains(UserSettings.shared.mainWindownName) ?? false })?
+            .level ?? .normal
+        let keyboardWindowLevel = NSWindow.Level(rawValue: mainWindowLevel.rawValue + 1)
+        window.level = keyboardWindowLevel
+        logger.log(content: "Floating keyboard window level set to \(keyboardWindowLevel.rawValue) (main window: \(mainWindowLevel.rawValue))")
         window.backgroundColor = NSColor.clear
         window.isOpaque = false
         window.hasShadow = false
