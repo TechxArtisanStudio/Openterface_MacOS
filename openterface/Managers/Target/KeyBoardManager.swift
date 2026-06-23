@@ -447,7 +447,9 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 return true
             }
 
-            if activeWindow.level.rawValue > NSWindow.Level.normal.rawValue || activeWindow.sheetParent != nil {
+            if (activeWindow.sheetParent != nil) ||
+               (activeWindow.level.rawValue > NSWindow.Level.normal.rawValue &&
+                !(activeWindow.identifier?.rawValue.contains(UserSettings.shared.mainWindownName) ?? false)) {
                 logEventRouting("pass-through", event: event, details: "matched modal/sheet window candidate {\(describeWindow(activeWindow))}")
                 return true
             }
