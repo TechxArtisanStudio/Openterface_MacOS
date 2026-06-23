@@ -250,7 +250,7 @@ struct FirmwareUpdateView: View {
                             }
                             .buttonStyle(.borderedProminent)
                         } else {
-                            Button("Proceed with Update") {
+                            Button("Update Now") {
                                 showingConfirmation = true
                             }
                             .buttonStyle(.borderedProminent)
@@ -304,7 +304,7 @@ struct FirmwareUpdateView: View {
                 .padding()
             }
         }
-        .frame(width: 500, height: 500)
+        .frame(width: 550, height: 500)
         .onAppear {
             loadFirmwareVersions()
             setupFirmwareManagerObservers()
