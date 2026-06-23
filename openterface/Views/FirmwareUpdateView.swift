@@ -51,8 +51,16 @@ enum FirmwareError: LocalizedError {
 }
 
 struct FirmwareUpdateView: View {
+    enum FirmwareTab: String, CaseIterable, Identifiable {
+        case videoFirmware = "Video"
+        case wchFirmware = "Keyboard & Mouse"
+
+        var id: String { rawValue }
+    }
+
     private let logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     @StateObject private var firmwareManager: FirmwareManager
+    @State private var selectedTab: FirmwareTab = .videoFirmware
     @State private var currentVersion: String = "Checking..."
     @State private var latestVersion: String = "Checking.."
     @State private var showingConfirmation: Bool = false
@@ -60,18 +68,69 @@ struct FirmwareUpdateView: View {
     @State private var backupAlertMessage: String = ""
     @State private var showingUpdateCompletionAlert: Bool = false
     @State private var updateSuccess: Bool = false
-    @State private var showingRestoreConfirmation: Bool = false
-    @State private var showingRestoreWarning: Bool = false
     @State private var showingFlashConfirmation: Bool = false
-    @State private var selectedRestoreFile: URL?
+    @State private var showingFlashWarning: Bool = false
     @State private var selectedFlashFile: URL?
     @Environment(\.dismiss) private var dismiss
-    
+
     init() {
         self._firmwareManager = StateObject(wrappedValue: FirmwareManager.shared)
     }
-    
+
     var body: some View {
+        VStack(spacing: 0) {
+            // Segmented tab bar
+            Picker("", selection: $selectedTab) {
+                ForEach(FirmwareTab.allCases) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            Divider()
+
+            // Tab content
+            switch selectedTab {
+            case .videoFirmware:
+                videoFirmwareContent
+            case .wchFirmware:
+                wchFirmwareContent
+            }
+        }
+        .frame(width: 700, height: 720)
+    }
+
+    private var wchFirmwareContent: some View {
+        if AppStatus.controlChipsetType == .ch32v208 {
+            return AnyView(WCHFlashSettingsView().padding())
+        } else {
+            return AnyView(wchNotAvailableView)
+        }
+    }
+
+    private var wchNotAvailableView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.orange)
+            Text("Keyboard & Mouse Firmware Upgrade Not Available")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text("The connected device control chip is not upgradable, so upgrading the keyboard and mouse firmware is not available in this device.")
+                .font(.callout)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    private var videoFirmwareContent: some View {
         VStack(spacing: 20) {
             
             if !firmwareManager.isUpdateInProgress {
@@ -224,15 +283,8 @@ struct FirmwareUpdateView: View {
                         }
                         .keyboardShortcut(.escape)
                         
-                        Button("Restore Firmware...") {
-                            showingRestoreWarning = true
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(firmwareManager.isUpdateInProgress || firmwareManager.isBackupInProgress)
-                        .help("Restore firmware from a backup file")
-                        
                         Button("Flash Local Firmware") {
-                            showFlashFileSelector()
+                            showingFlashWarning = true
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(firmwareManager.isUpdateInProgress || firmwareManager.isBackupInProgress)
@@ -304,7 +356,7 @@ struct FirmwareUpdateView: View {
                 .padding()
             }
         }
-        .frame(width: 550, height: 500)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             loadFirmwareVersions()
             setupFirmwareManagerObservers()
@@ -334,13 +386,13 @@ struct FirmwareUpdateView: View {
                 Text("Firmware update failed. Please try again or contact support.")
             }
         }
-        .alert("⚠️ Firmware Restore Warning", isPresented: $showingRestoreWarning) {
+        .alert("⚠️ Firmware Flash Warning", isPresented: $showingFlashWarning) {
             Button("Cancel", role: .cancel) { }
             Button("I Understand the Risks", role: .destructive) {
-                showRestoreFileSelector()
+                showFlashFileSelector()
             }
         } message: {
-            Text("WARNING: Restoring firmware from a file is a potentially dangerous operation that could permanently damage your device.\n\n• Only use firmware files specifically designed for your device\n• Ensure the file is from a trusted source\n• Do not interrupt the process once started\n• The device may become unusable if incorrect firmware is installed\n\nProceed only if you understand these risks.")
+            Text("WARNING: Flashing a local firmware file is a potentially dangerous operation that could permanently damage your device.\n\n• Only use firmware files specifically designed for your device\n• Ensure the file is from a trusted source\n• Do not interrupt the process once started\n• The device may become unusable if incorrect firmware is installed\n\nProceed only if you understand these risks.")
         }
         .alert("Confirm Flash Local Firmware", isPresented: $showingFlashConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -349,14 +401,6 @@ struct FirmwareUpdateView: View {
             }
         } message: {
             Text("You have selected firmware file: \(selectedFlashFile?.lastPathComponent ?? "<unknown>")\n\nThis will write directly to the device flash memory. Make sure your device is connected and you have the correct firmware file.")
-        }
-        .alert("Confirm Firmware Restore", isPresented: $showingRestoreConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Restore Now", role: .destructive) {
-                startFirmwareRestore()
-            }
-        } message: {
-            Text("Are you sure you want to restore firmware from the selected file? This process cannot be undone and may render your device unusable if the firmware is incompatible.")
         }
     }
     
@@ -480,34 +524,13 @@ struct FirmwareUpdateView: View {
         await firmwareManager.backupFirmware(to: backupURL)
     }
     
-    // MARK: - Firmware Restore Functions
-    
-    private func showRestoreFileSelector() {
-        let openPanel = NSOpenPanel()
-        openPanel.title = "Select Firmware File to Restore"
-        openPanel.message = "Choose the firmware backup file (.bin) to restore"
-        openPanel.allowedContentTypes = [.data]
-        openPanel.allowsMultipleSelection = false
-        openPanel.canChooseDirectories = false
-        openPanel.canChooseFiles = true
-
-        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
-            openPanel.directoryURL = desktopURL
-        }
-
-        openPanel.begin { response in
-            if response == .OK, let url = openPanel.url {
-                selectedRestoreFile = url
-                showingRestoreConfirmation = true
-            }
-        }
-    }
+    // MARK: - Firmware Flash Functions
 
     private func showFlashFileSelector() {
         let openPanel = NSOpenPanel()
         openPanel.title = "Select Local Firmware File to Flash"
         openPanel.message = "Choose the local firmware file (.bin) to flash to device"
-        openPanel.allowedContentTypes = [.data]
+        openPanel.allowedFileTypes = ["bin"]
         openPanel.allowsMultipleSelection = false
         openPanel.canChooseDirectories = false
         openPanel.canChooseFiles = true
@@ -521,14 +544,6 @@ struct FirmwareUpdateView: View {
                 selectedFlashFile = url
                 showingFlashConfirmation = true
             }
-        }
-    }
-
-    private func startFirmwareRestore() {
-        guard let restoreFile = selectedRestoreFile else { return }
-
-        Task {
-            await performFirmwareRestore(from: restoreFile)
         }
     }
 
@@ -603,19 +618,6 @@ struct FirmwareUpdateView: View {
                 firmwareManager.isUpdateInProgress = false
             }
         }
-    }
-    
-    private func performFirmwareRestore(from fileURL: URL) async {
-        // Step 1: Stop all operations before firmware restore
-        await MainActor.run {
-            firmwareManager.updateStatus = "Stopping operations..."
-            firmwareManager.updateProgress = 0.0
-        }
-        
-        await stopAllOperations()
-        
-        // Step 2: Use FirmwareManager to handle the restore process
-        await firmwareManager.restoreFirmware(from: fileURL)
     }
     
     private func getCurrentChipsetDisplay() -> String {
