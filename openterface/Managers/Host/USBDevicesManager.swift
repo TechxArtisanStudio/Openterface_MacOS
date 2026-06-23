@@ -219,10 +219,14 @@ class USBDevicesManager: USBDevicesManagerProtocol {
         // Reset to unknown first
         // AppStatus.videoChipsetType = .unknown
         // AppStatus.controlChipsetType = .unknown
-        
-        // Reset device references
+
+        // Reset device references (both local and AppStatus) to ensure they stay in sync.
+        // Previously only the local references were reset, which could cause AppStatus
+        // to hold stale device references when no devices were found in this scan.
         videoChipDevice = nil
         controlChipDevice = nil
+        AppStatus.videoChipDevice = nil
+        AppStatus.controlChipDevice = nil
         
         // Check grouped Openterface devices first
         for deviceGroup in AppStatus.groupOpenterfaceDevices {
