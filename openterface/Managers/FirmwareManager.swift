@@ -204,75 +204,121 @@ class FirmwareManager: ObservableObject {
     /// Fetches the latest firmware version information from the remote server
     /// Selects the appropriate version based on current chipset type
     func fetchLatestFirmwareVersion() async -> String {
-        guard let url = URL(string: "https://assets.openterface.com/openterface/firmware/minikvm_latest_firmware2.txt") else {
-            logger.log(content: "Invalid firmware info URL")
+        let urlString = "https://assets.openterface.com/openterface/firmware/minikvm_latest_firmware2.txt"
+        guard let url = URL(string: urlString) else {
+            logger.log(content: "Invalid firmware info URL: \(urlString)")
             return "Unknown"
         }
-        
+
+        logger.log(content: "Fetching firmware version from: \(urlString)")
         do {
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 30
             config.timeoutIntervalForResource = 60
             let session = URLSession(configuration: config)
-            
+
             let (data, response) = try await session.data(from: url)
-            
+
             // Check HTTP response
             if let httpResponse = response as? HTTPURLResponse {
+                logger.log(content: "HTTP response status: \(httpResponse.statusCode), contentLength: \(data.count) bytes")
                 if httpResponse.statusCode != 200 {
+                    let headers = httpResponse.allHeaderFields.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+                    logger.log(content: "Headers: \(headers)")
                     logger.log(content: "Failed to fetch firmware version: HTTP \(httpResponse.statusCode)")
                     return "Unknown"
                 }
+            } else {
+                logger.log(content: "Response is not an HTTPURLResponse (unexpected). Data length: \(data.count)")
             }
-            
+
             guard let responseString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
-                logger.log(content: "Failed to decode firmware info response")
+                logger.log(content: "Failed to decode firmware info response. First 16 bytes (hex): \(data.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " "))")
                 return "Unknown"
             }
-            
-            logger.log(content: "Firmware info response: \(responseString)")
-            
+
+            logger.log(content: "Firmware info response (\(responseString.count) chars): \(responseString)")
+
             // Parse the firmware info based on chipset type
             // Format: "25022713,Openterface_Firmware_250306.bin" for MS2109
             //         "25022713,Openterface_Firmware_2109s_250306.bin,2109s" for MS2109S
             //         "25052210,Openterface_Firmware_2130s_250522.bin,2130s" for MS2130S
             let lines = responseString.components(separatedBy: .newlines)
+            logger.log(content: "Response contains \(lines.count) line(s)")
             var selectedLine: String?
-            
+
             // Select the appropriate line based on current chipset
             switch AppStatus.videoChipsetType {
             case .ms2130s:
+                logger.log(content: "Selecting firmware for chipset: ms2130s")
                 // Look for line containing "2130s"
                 selectedLine = lines.first { line in
                     line.contains("2130s")
                 }
             case .ms2109s:
+                logger.log(content: "Selecting firmware for chipset: ms2109s")
                 // Look for line containing "2109s"
                 selectedLine = lines.first { line in
                     line.contains("2109s")
                 }
             default:
+                logger.log(content: "Selecting firmware for chipset: ms2109 (no suffix)")
                 // For MS2109, use the line without a chipset suffix
                 selectedLine = lines.first { line in
                     !line.contains("2130s") && !line.contains("2109s")
                 }
             }
-            
+
             guard let selectedLine = selectedLine else {
-                logger.log(content: "Failed to find suitable firmware for current chipset")
+                logger.log(content: "Failed to find suitable firmware for current chipset. Lines: \(lines)")
                 return "Unknown"
             }
-            
+
+            logger.log(content: "Selected line: \(selectedLine)")
+
             // Extract version number before the comma
             let components = selectedLine.components(separatedBy: ",")
             if let versionString = components.first, !versionString.isEmpty {
                 logger.log(content: "Latest firmware version: \(versionString)")
                 return versionString
             } else {
-                logger.log(content: "Failed to parse firmware version from response")
+                logger.log(content: "Failed to parse firmware version from response. Components: \(components)")
                 return "Unknown"
             }
+        } catch let error as URLError {
+            // Deep diagnostics for URLError — surfaced only in the catch path
+            logger.log(content: "❌ fetchLatestFirmwareVersion URLError code: \(error.code.rawValue) (\(error.code.rawValue.description))")
+            logger.log(content: "❌ Localized: \(error.localizedDescription)")
+            logger.log(content: "❌ Failure url string: \(error.failureURLString ?? "nil")")
+            logger.log(content: "❌ User info keys: \(error.userInfo.keys.joined(separator: ", "))")
+            if let underlying = error.userInfo[NSUnderlyingErrorKey] as? Error {
+                logger.log(content: "❌ Underlying error: \(underlying.localizedDescription)")
+            }
+            if let peerChain = error.userInfo["NSErrorPeerCertificateChain"] as? [SecCertificate] {
+                for (i, cert) in peerChain.enumerated() {
+                    let subject = (SecCertificateCopySubjectSummary(cert) as String?) ?? "<unknown subject>"
+                    logger.log(content: "❌ Peer cert [\(i)]: \(subject)")
+                }
+            }
+            if let trust = error.userInfo["NSErrorPeerTrust"] {
+                // 'as? SecTrust' is a no-op — SecTrust is an always-bridged CF type.
+                // Call SecTrustEvaluateWithError directly to surface whether the chain validates.
+                let trusted = SecTrustEvaluateWithError(trust as! SecTrust, nil)
+                logger.log(content: "❌ Peer trust available — SecTrustEvaluateWithError: \(trusted ? "trusted" : "FAILED")")
+            }
+            // Inspect underlying CFNetwork error if any
+            let nsError = error as NSError
+            logger.log(content: "❌ NSError domain='\(nsError.domain)' code=\(nsError.code)")
+            if let cfInfo = nsError.userInfo as? [String: Any] {
+                for (k, v) in cfInfo {
+                    logger.log(content: "   userInfo[\(k)] = \(v)")
+                }
+            }
+            logger.log(content: "Failed to fetch latest firmware version: \(error.localizedDescription)")
+            return "Unknown"
         } catch {
+            logger.log(content: "❌ fetchLatestFirmwareVersion unexpected error type=\(type(of: error)), \(error.localizedDescription)")
+            logger.log(content: "❌ Full error: \(error)")
             logger.log(content: "Failed to fetch latest firmware version: \(error.localizedDescription)")
             return "Unknown"
         }
@@ -502,7 +548,7 @@ class FirmwareManager: ObservableObject {
             isBackupInProgress = false
             if success {
                 let checksumStatus = checksumResult.isValid ? "✅ Verified" : "⚠ Invalid"
-                let message = "Firmware backup completed successfully!\n\nFile saved as: \(backupURL.lastPathComponent)\nSize: \(firmwareData.count) bytes\nLocation: \(backupURL.deletingLastPathComponent().path)\n\nChecksum Status: \(checksumStatus)\n\(checksumResult.message)"
+                let message = "Firmware backup completed successfully!\n\nFile saved as: \(backupURL.lastPathComponent)\nSize: \(firmwareData.count) bytes\nLocation: \(backupURL.deletingLastPathComponent().path)\n\nChecksum Status:\n\(checksumStatus)\n\(checksumResult.message)"
                 firmwareBackupCompleteSubject.send((true, message))
             } else {
                 let message = "Failed to save firmware backup file. Please check permissions and try again."
@@ -520,9 +566,9 @@ class FirmwareManager: ObservableObject {
             return defaultFirmwareSize
         }
         
-        // Check for valid MS2109 firmware signature (bytes 0x00-0x01 should be A5 5A)
-        guard headerData.count >= 4 && headerData[0] == 0xA5 && headerData[1] == 0x5A else {
-            logger.log(content: "⚠ Invalid firmware signature: \(String(format: "%02X %02X", headerData[0], headerData[1])) (expected: A5 5A)")
+        // Check for valid MS2109 firmware signature (bytes 0x00-0x01 should be 5A A5)
+        guard headerData.count >= 4 && headerData[0] == 0x5A && headerData[1] == 0xA5 else {
+            logger.log(content: "⚠ Invalid firmware signature: \(String(format: "%02X %02X", headerData[0], headerData[1])) (expected: 5A A5)")
             logger.log(content: "Using default firmware size: \(defaultFirmwareSize) bytes")
             return defaultFirmwareSize
         }
@@ -696,7 +742,7 @@ class FirmwareManager: ObservableObject {
         
         // Header checksum: Based on Python implementation for MS2109
         // Range: bytes 0x02-0x2F (from offset 2 to 47, total 46 bytes)
-        // Excludes the first 2 signature bytes (A5 5A)
+        // Excludes the first 2 signature bytes (5A A5)
         var headerSum: UInt32 = 0
         
         // Sum bytes from 0x02 to 0x2F (46 bytes) - exclude signature bytes at 0x00-0x01

@@ -65,3 +65,11 @@ Supported target agents:
 - `ipad`
 - `android`
 
+## Firmware Upgrade
+
+The hardware firmware update tool (Video + Keyboard & Mouse) lives in a
+standalone window accessible from the Settings menu. See
+[docs/firmware-upgrade.md](docs/firmware-upgrade.md) for details on supported
+chipsets, the upgrade workflow for each tab, and the underlying backend
+modules.
+
