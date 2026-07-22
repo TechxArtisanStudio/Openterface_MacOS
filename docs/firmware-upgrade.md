@@ -25,11 +25,21 @@ and picks the matching backend.
 
 ### Control Chipset (Tab 2)
 
-| Chipset  | Supported | Notes                                        |
-|----------|-----------|----------------------------------------------|
-| CH32V208 | ✅        | WCH ISP / bootloader mode required           |
-| CH9329   | ❌        | No flashable control firmware on this device |
-| Unknown  | ❌        | Not detected                                 |
+| Chipset  | Supported | Notes                                                       |
+|----------|-----------|-------------------------------------------------------------|
+| CH32V208 | ✅        | WCH ISP / bootloader mode required (see dedicated guide 👇) |
+| CH9329   | ❌        | No flashable control firmware on this device                |
+| Unknown  | ❌        | Not detected                                                |
+
+> 📖 **CH32V208 flashing instructions** — covering **KeyMod** (use **Openterface
+> KeyCmd**), **Mini-KVM** (newer revisions), and **KVM-GO** (USB 2.0 & 3.0) —
+> including the BOOT-button sequence, step-by-step workflow, verification,
+> dumping, and troubleshooting, are in a dedicated document:
+> **[ch32-flashing-guide.md](ch32-flashing-guide.md)**.
+
+Users must put the device into ISP (bootloader) mode before the app can flash
+or verify the CH32V208 control chip. Without this step the device will not be
+detected by `WCHISPManager.scanDevices()`.
 
 The availability check is performed at render time by reading
 `AppStatus.controlChipsetType`. When the connected control chip is **not**

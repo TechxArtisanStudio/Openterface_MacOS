@@ -73,3 +73,36 @@ standalone window accessible from the Settings menu. See
 chipsets, the upgrade workflow for each tab, and the underlying backend
 modules.
 
+### CH32V208 (Keyboard & Mouse) — Flashing Guide
+
+This applies to all three product lines that use a CH32V208 control chip:
+**Openterface KeyMod**, **Openterface Mini-KVM** (newer revisions), and
+**Openterface KVM-GO** (USB 2.0 & 3.0). The BOOT-button hardware steps are
+the same for all three; the only difference is which software you use:
+
+- **Mini-KVM / KVM-GO** → use this app (Openterface MacOS)
+- **KeyMod** → use the **Openterface KeyCmd** app instead
+
+Flashing the CH32V208 control chip requires putting the device into **ISP
+(bootloader) mode** by holding the **BOOT** button while plugging in USB —
+the chip boots into HID mode by default and cannot be flashed otherwise.
+
+👉 Full instructions (supported products, prerequisites, step-by-step,
+troubleshooting, FAQ):
+**[docs/ch32-flashing-guide.md](docs/ch32-flashing-guide.md)**
+
+Quick summary (identical hardware steps for KeyMod / Mini-KVM / KVM-GO):
+
+| Step | Action |
+|------|--------|
+| 1 | Unplug the device from the host USB port. |
+| 2 | Press and **hold** the **BOOT** button. |
+| 3 | While holding BOOT, **plug** the USB cable back in. |
+| 4 | Release BOOT — the CH32V208 now enumerates as a WCH ISP device. |
+| 5 | **Mini-KVM / KVM-GO:** Open this app → **Settings → Firmware Upgrade → Keyboard & Mouse** → **Scan → Connect → Flash Firmware**. |
+| 5' | **KeyMod:** Open **Openterface KeyCmd** → follow its flashing workflow. |
+
+> ⚠️ If the device is not detected at step 5, repeat steps 2–4. A normal
+> plug-in (without holding BOOT) leaves the chip in HID mode, which the ISP
+> backend cannot see.
+
