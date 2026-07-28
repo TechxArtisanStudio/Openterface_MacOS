@@ -44,22 +44,22 @@ struct AdvancedDebugSettingsView: View {
             GroupBox("Debug & Logging") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Enable serial output logging", isOn: $userSettings.isSerialOutput)
-                        .onChange(of: userSettings.isSerialOutput) { enabled in
+                        .onChangeCompat(of: userSettings.isSerialOutput) { enabled in
                             Logger.shared.SerialDataPrint = enabled
                         }
                     
                     Toggle("Enable mouse event logging", isOn: $userSettings.isMouseEventPrintEnabled)
-                        .onChange(of: userSettings.isMouseEventPrintEnabled) { enabled in
+                        .onChangeCompat(of: userSettings.isMouseEventPrintEnabled) { enabled in
                             Logger.shared.MouseEventPrint = enabled
                         }
 
                     Toggle("Enable keyboard event logging", isOn: $userSettings.isKeyboardEventPrintEnabled)
-                        .onChange(of: userSettings.isKeyboardEventPrintEnabled) { enabled in
+                        .onChangeCompat(of: userSettings.isKeyboardEventPrintEnabled) { enabled in
                             Logger.shared.KeyboardEventPrint = enabled
                         }
 
                     Toggle("Enable HAL print logging", isOn: $userSettings.isHalPrintEnabled)
-                        .onChange(of: userSettings.isHalPrintEnabled) { enabled in
+                        .onChangeCompat(of: userSettings.isHalPrintEnabled) { enabled in
                             Logger.shared.HalPrint = enabled
                         }
                     

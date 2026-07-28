@@ -192,7 +192,7 @@ struct RemoteControlSettingsView: View {
                     .frame(width: 80, alignment: .leading)
                 TextField("5900", text: $vncPortText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .onChange(of: vncPortText) { value in
+                    .onChangeCompat(of: vncPortText) { value in
                         let filtered = value.filter { $0.isNumber }
                         if filtered != value { vncPortText = filtered; return }
                         if let port = Int(filtered) { userSettings.vncPort = port }

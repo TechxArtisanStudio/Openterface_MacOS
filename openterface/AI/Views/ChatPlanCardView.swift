@@ -123,7 +123,7 @@ struct ChatPlanCardView: View {
                         }
                     }
                 }
-                .onChange(of: runningTaskID) { taskID in
+                .onChangeCompat(of: runningTaskID) { taskID in
                     guard let taskID else { return }
                     withAnimation(.easeOut(duration: 0.18)) {
                         taskProxy.scrollTo(taskID, anchor: .center)

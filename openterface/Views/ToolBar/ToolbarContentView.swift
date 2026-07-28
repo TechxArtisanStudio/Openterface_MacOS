@@ -263,7 +263,7 @@ struct ToolbarContentView: ToolbarContent {
                         }
                     }
                 }
-                .onChange(of: serialPortStatus.isControlChipsetReady) { isReady in
+                .onChangeCompat(of: serialPortStatus.isControlChipsetReady) { isReady in
                     if isAwaitingControlChipsetReady && isReady {
                         isAwaitingControlChipsetReady = false
                     }
@@ -363,7 +363,7 @@ struct ToolbarContentView: ToolbarContent {
                     }
                 }
                 .toggleStyle(SwitchToggleStyle(width: 30, height: 16))
-                .onChange(of: switchToTarget) { newValue in
+                .onChangeCompat(of: switchToTarget) { newValue in
                     handleSwitchToggle(newValue)
                 }
             }

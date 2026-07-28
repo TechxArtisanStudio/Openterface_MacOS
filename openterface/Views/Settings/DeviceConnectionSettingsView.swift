@@ -85,7 +85,7 @@ struct DeviceConnectionSettingsView: View {
                         }
                         .pickerStyle(MenuPickerStyle())
                         .frame(width: 200)
-                        .onChange(of: userSettings.preferredBaudrate) { newBaudrate in
+                        .onChangeCompat(of: userSettings.preferredBaudrate) { newBaudrate in
                             if serialPortManager.isDeviceReady {
                                 isUpdatingBaudrate = true
                                 applyBaudrateChange()
@@ -250,7 +250,7 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
         }
-        .onChange(of: serialPortManager.isDeviceReady) { isReady in
+        .onChangeCompat(of: serialPortManager.isDeviceReady) { isReady in
             // Reset the updating flag when device reconnects after baudrate change
             if isReady && isUpdatingBaudrate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

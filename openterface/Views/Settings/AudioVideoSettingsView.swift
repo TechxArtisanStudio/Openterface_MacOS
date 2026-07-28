@@ -14,7 +14,7 @@ struct AudioVideoSettingsView: View {
             GroupBox("Audio Control") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Enable audio streaming", isOn: $userSettings.isAudioEnabled)
-                        .onChange(of: userSettings.isAudioEnabled) { enabled in
+                        .onChangeCompat(of: userSettings.isAudioEnabled) { enabled in
                             audioManager.setAudioEnabled(enabled)
                         }
                     

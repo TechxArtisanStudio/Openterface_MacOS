@@ -250,10 +250,10 @@ struct MouseHIDSettingsView: View {
             updateHIDStatus()
             detectCurrentPreset()
         }
-        .onChange(of: userSettings.mouseEventThrottleHz) { _ in
+        .onChangeCompat(of: userSettings.mouseEventThrottleHz) { _ in
             detectCurrentPreset()
         }
-        .onChange(of: userSettings.preferredBaudrate) { _ in
+        .onChangeCompat(of: userSettings.preferredBaudrate) { _ in
             detectCurrentPreset()
         }
     }

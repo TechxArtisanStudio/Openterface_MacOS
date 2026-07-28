@@ -36,7 +36,7 @@ struct EdidNameView: View {
     @State private var isNameValid: Bool = true
     @State private var validationMessage: String = ""
     @State private var cancellables = Set<AnyCancellable>()
-    @FocusState private var isTextFieldFocused: Bool
+    FocusStateCompat private var isTextFieldFocused: Bool
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -98,11 +98,11 @@ struct EdidNameView: View {
                             TextField("Enter new monitor name", text: $newEdidName)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.system(.body, design: .monospaced))
-                                .focused($isTextFieldFocused)
+                                .focusedCompat($isTextFieldFocused)
                                 .onTapGesture {
                                     isTextFieldFocused = true
                                 }
-                                .onChange(of: newEdidName) { newValue in
+                                .onChangeCompat(of: newEdidName) { newValue in
                                     validateEdidName(newValue)
                                 }
                             

@@ -424,10 +424,10 @@ struct AISettingsView: View {
             selectedAgentDocsTarget = userSettings.chatTargetSystem
             loadSelectedAgentDocsFile()
         }
-        .onChange(of: selectedAgentDocsTarget) { _ in
+        .onChangeCompat(of: selectedAgentDocsTarget) { _ in
             loadSelectedAgentDocsFile()
         }
-        .onChange(of: selectedAgentDocsFile) { _ in
+        .onChangeCompat(of: selectedAgentDocsFile) { _ in
             loadSelectedAgentDocsFile()
         }
     }

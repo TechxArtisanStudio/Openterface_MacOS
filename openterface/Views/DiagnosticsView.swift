@@ -254,7 +254,7 @@ struct DiagnosticsView: View {
                                 .padding(12)
                             }
                             .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
-                            .onChange(of: viewModel.statusMessages.count) { _ in
+                            .onChangeCompat(of: viewModel.statusMessages.count) { _ in
                                 // Scroll to the last message
                                 if !viewModel.statusMessages.isEmpty {
                                     let lastIndex = viewModel.statusMessages.count - 1

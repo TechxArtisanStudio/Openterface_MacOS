@@ -220,7 +220,7 @@ struct ChatWindowRootView: View {
                     }
                     .padding(12)
                 }
-                .onChange(of: chatManager.messages.count) { _ in
+                .onChangeCompat(of: chatManager.messages.count) { _ in
                     if let lastId = chatManager.messages.last?.id {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo(lastId, anchor: .bottom)
