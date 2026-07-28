@@ -35,11 +35,17 @@ jobs:
         echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> $GITHUB_ENV
         echo "Using Xcode: $XCODE_PATH"
 
-    # Detect whether this is a fork PR (secrets are unavailable for fork PRs)
+    # Detect whether this is a fork PR or signing should be skipped (secrets are unavailable for fork PRs)
     - name: Set build context
       id: context
+      env:
+        # Set to 'true' to force unsigned build (useful for testing without valid certs)
+        FORCE_UNSIGNED: 'true'
       run: |
-        if [[ "${{ github.event_name }}" == "pull_request" && \
+        if [[ "${FORCE_UNSIGNED}" == "true" ]]; then
+          echo "can_sign=false" >> $GITHUB_OUTPUT
+          echo "Force unsigned build (FORCE_UNSIGNED=true)."
+        elif [[ "${{ github.event_name }}" == "pull_request" && \
               "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
           echo "can_sign=false" >> $GITHUB_OUTPUT
           echo "This is a fork PR — code signing will be skipped (secrets unavailable)."
