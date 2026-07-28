@@ -15,7 +15,7 @@ env:
   # PBXFileSystemSynchronizedRootGroup which require Xcode 16.
   # Xcode 16 supports deployment targets as low as macOS 10.13,
   # so targeting macOS 11 (Big Sur) is fully supported.
-  DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+  # We dynamically detect the installed Xcode 16.x version.
 
 jobs:
   build:
@@ -23,6 +23,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Detect Xcode 16
+      run: |
+        # Find the latest Xcode 16.x installation on the runner
+        XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+        if [ -z "$XCODE_PATH" ]; then
+          echo "ERROR: No Xcode 16.x found on runner"
+          ls /Applications/ | grep -i xcode
+          exit 1
+        fi
+        echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> $GITHUB_ENV
+        echo "Using Xcode: $XCODE_PATH"
 
     # Detect whether this is a fork PR (secrets are unavailable for fork PRs)
     - name: Set build context
