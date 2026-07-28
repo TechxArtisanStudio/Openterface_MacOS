@@ -193,7 +193,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     static func setupDependencies(container: DependencyContainer) {
         // Register concrete implementations with their protocols
         container.register(LoggerProtocol.self, instance: Logger.shared as any LoggerProtocol)
-        container.register(USBDevicesManagerProtocol.self, instance: USBDevicesManager.shared as any USBDevicesManagerProtocol)
+        if #available(macOS 12.0, *) {
+            container.register(USBDevicesManagerProtocol.self, instance: USBDevicesManager.shared as any USBDevicesManagerProtocol)
+        }
         container.register(HIDManagerProtocol.self, instance: HIDManager.shared as any HIDManagerProtocol)
         container.register(AudioManagerProtocol.self, instance: AudioManager.shared as any AudioManagerProtocol)
         container.register(VideoManagerProtocol.self, instance: VideoManager.shared as any VideoManagerProtocol)

@@ -783,7 +783,7 @@ private struct CredentialsManagerDialog: View {
                             selectedEditorEntry = entry
                             showEditor = true
                         }
-                        Button("Delete", role: .destructive) {
+                        Button("Delete") {
                             store.delete(entry)
                         }
                     }
@@ -813,7 +813,7 @@ private struct CredentialsManagerDialog: View {
                 }
                 .disabled(store.selectedCredential(for: selectedProtocol) == nil)
 
-                Button("Delete", role: .destructive) {
+                Button("Delete") {
                     if let selected = store.selectedCredential(for: selectedProtocol) {
                         store.delete(selected)
                     }

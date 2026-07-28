@@ -457,12 +457,12 @@ struct DiagnosticsView: View {
             Button("Enable Logging Only") {
                 viewModel.enableLogging()
             }
-            Button("Later", role: .cancel) { }
+            Button("Later") { }
         } message: {
             Text("Enable logging to save detailed diagnostics for troubleshooting.\n\nLog file: \(viewModel.logFilePath)\n\nWould you like to enable serial data logging as well?")
         }
         .alertCompat("USB Hub Warning", isPresented: $viewModel.showDepthWarningAlert) {
-            Button("I Understand", role: .cancel) {
+            Button("I Understand") {
                 // Allow tests to proceed after user acknowledges
             }
         } message: {
@@ -675,21 +675,21 @@ struct DiagnosticsView: View {
 // Helper extensions for borders
 extension View {
     func borderTop() -> some View {
-        overlay(alignment: .top) {
+        overlayCompat(alignment: .top) {
             Divider()
                 .offset(y: 0)
         }
     }
     
     func borderBottom() -> some View {
-        overlay(alignment: .bottom) {
+        overlayCompat(alignment: .bottom) {
             Divider()
                 .offset(y: 0)
         }
     }
     
     func borderRight() -> some View {
-        overlay(alignment: .trailing) {
+        overlayCompat(alignment: .trailing) {
             Divider()
                 .offset(x: 0)
                 .rotationEffect(.degrees(90))

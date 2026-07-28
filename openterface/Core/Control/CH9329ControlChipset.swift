@@ -121,10 +121,11 @@ class CH9329ControlChipset: BaseControlChipset {
     // MARK: - CH9329 Specific Methods
 
     private func startCTSMonitoring() -> Bool {
-        guard USBDevicesManager.shared.isCH9329Connected() else {
-            logger.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
+        guard #available(macOS 12.0, *) else {
+            logger.log(content: "USB device monitoring requires macOS 12+")
             return false
         }
+        guard USBDevicesManager.shared.isCH9329Connected() else {
 
         guard ctsMonitoringTimer == nil else {
             return true
@@ -147,6 +148,10 @@ class CH9329ControlChipset: BaseControlChipset {
     }
 
     private func checkCTSState() {
+        guard #available(macOS 12.0, *) else {
+            stopCTSMonitoring()
+            return
+        }
         guard USBDevicesManager.shared.isCH9329Connected() else {
             stopCTSMonitoring()
             return

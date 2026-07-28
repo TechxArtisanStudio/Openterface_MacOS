@@ -211,8 +211,8 @@ struct EdidNameView: View {
             }
         }
         .alertCompat("Confirm EDID Name Update", isPresented: $showingConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Update", role: .destructive) {
+            Button("Cancel") { }
+            Button("Update") {
                 updateEdidName()
             }
         } message: {

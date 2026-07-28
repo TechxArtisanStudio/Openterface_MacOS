@@ -217,7 +217,7 @@ struct MacroGridButton: View {
             Button { onRun() } label: { Label("Run", systemImage: "play.fill") }
             Button { onEdit() } label: { Label("Edit", systemImage: "pencil") }
             Divider()
-            Button(role: .destructive) { onDelete() } label: {
+            Button { onDelete() } label: {
                 Label("Delete", systemImage: "trash")
             }
         }

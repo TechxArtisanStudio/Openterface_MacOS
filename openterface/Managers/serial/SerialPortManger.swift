@@ -1071,7 +1071,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         let preferredMode = UserSettings.shared.controlMode
         
         // Check if this is CH32V208
-        let isCH32V208 = USBDevicesManager.shared.isCH32V208Connected()
+        var isCH32V208 = false
+        if #available(macOS 12.0, *) {
+            isCH32V208 = USBDevicesManager.shared.isCH32V208Connected()
+        }
         
         if isCH32V208 {
             // For CH32V208, just close and reopen with new baudrate
@@ -1265,12 +1268,14 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         // Special handling: if changing TO compatibility mode from a non-compatibility mode, use 0x02
         if mode == .compatibility && self.baudrate != 0 {
             // Check if current mode is not already compatibility mode
+        if #available(macOS 12.0, *) {
             let currentModeIsCompatibility = USBDevicesManager.shared.isCH9329Connected()
             if currentModeIsCompatibility {
                 // User is switching FROM non-compatibility TO compatibility, use 0x02
                 logger.log(content: "Switching to compatibility mode from non-compatibility - using mode byte 0x02 instead of 0x82")
                 modeByteToUse = 0x02
             }
+        }
         }
         
         // Build the SET_PARA_CFG command with the appropriate prefix for user's preferred baudrate

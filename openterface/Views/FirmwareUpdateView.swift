@@ -362,8 +362,8 @@ struct FirmwareUpdateView: View {
             setupFirmwareManagerObservers()
         }
         .alertCompat("Confirm Firmware Update", isPresented: $showingConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Update Now", role: .destructive) {
+            Button("Cancel") { }
+            Button("Update Now") {
                 startFirmwareUpdate()
             }
         } message: {
@@ -387,16 +387,16 @@ struct FirmwareUpdateView: View {
             }
         }
         .alertCompat("⚠️ Firmware Flash Warning", isPresented: $showingFlashWarning) {
-            Button("Cancel", role: .cancel) { }
-            Button("I Understand the Risks", role: .destructive) {
+            Button("Cancel") { }
+            Button("I Understand the Risks") {
                 showFlashFileSelector()
             }
         } message: {
             Text("WARNING: Flashing a local firmware file is a potentially dangerous operation that could permanently damage your device.\n\n• Only use firmware files specifically designed for your device\n• Ensure the file is from a trusted source\n• Do not interrupt the process once started\n• The device may become unusable if incorrect firmware is installed\n\nProceed only if you understand these risks.")
         }
         .alertCompat("Confirm Flash Local Firmware", isPresented: $showingFlashConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Flash Now", role: .destructive) {
+            Button("Cancel") { }
+            Button("Flash Now") {
                 startFirmwareFlash()
             }
         } message: {
