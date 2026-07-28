@@ -31,7 +31,7 @@ class WCHUSBTransport: WCHTransport {
     static func scanDevices() -> Int {
         guard let matchDict = IOServiceMatching(kIOUSBDeviceClassName) else { return 0 }
         var iterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, matchDict, &iterator) == KERN_SUCCESS else { return 0 }
+        guard IOServiceGetMatchingServices(ioMainPortDefault(), matchDict, &iterator) == KERN_SUCCESS else { return 0 }
         defer { IOObjectRelease(iterator) }
 
         var count = 0
@@ -55,7 +55,7 @@ class WCHUSBTransport: WCHTransport {
             throw WCHTransportError.deviceOpenFailed
         }
         var iterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, matchDict, &iterator) == KERN_SUCCESS else {
+        guard IOServiceGetMatchingServices(ioMainPortDefault(), matchDict, &iterator) == KERN_SUCCESS else {
             throw WCHTransportError.deviceOpenFailed
         }
         defer { IOObjectRelease(iterator) }
@@ -123,7 +123,7 @@ class WCHUSBTransport: WCHTransport {
             throw WCHTransportError.interfaceCreationFailed
         }
         var ifIterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, ifMatchDict, &ifIterator) == KERN_SUCCESS else {
+        guard IOServiceGetMatchingServices(ioMainPortDefault(), ifMatchDict, &ifIterator) == KERN_SUCCESS else {
             throw WCHTransportError.interfaceCreationFailed
         }
         defer { IOObjectRelease(ifIterator) }

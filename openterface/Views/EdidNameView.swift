@@ -25,6 +25,7 @@ import Foundation
 import Combine
 import AppKit
 
+@available(macOS 12.0, *)
 struct EdidNameView: View {
     @StateObject private var firmwareManager = FirmwareManager.shared
     @State private var currentEdidName: String = "Loading..."
@@ -159,7 +160,7 @@ struct EdidNameView: View {
                         }
                         .disabled(!isNameValid || newEdidName.isEmpty || newEdidName == currentEdidName)
                         .keyboardShortcut(.return)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                     }
                 }
                 .padding()

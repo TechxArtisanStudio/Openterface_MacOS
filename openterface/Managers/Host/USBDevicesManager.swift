@@ -72,7 +72,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     func getUSBDevices() -> [USBDeviceInfo] {
         var devices = [USBDeviceInfo]()
         
-        let masterPort: mach_port_t = kIOMainPortDefault
+        let masterPort: mach_port_t = ioMainPortDefault()
         let matchingDict = IOServiceMatching(kIOUSBDeviceClassName)
         
         var iterator: io_iterator_t = 0

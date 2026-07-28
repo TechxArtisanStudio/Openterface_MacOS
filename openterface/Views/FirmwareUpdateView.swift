@@ -50,6 +50,7 @@ enum FirmwareError: LocalizedError {
     }
 }
 
+@available(macOS 12.0, *)
 struct FirmwareUpdateView: View {
     enum FirmwareTab: String, CaseIterable, Identifiable {
         case videoFirmware = "Video"
@@ -286,7 +287,7 @@ struct FirmwareUpdateView: View {
                         Button("Flash Local Firmware") {
                             showingFlashWarning = true
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                         .disabled(firmwareManager.isUpdateInProgress || firmwareManager.isBackupInProgress)
                         .help("Select a local .bin file and write it to the device directly")
 
@@ -300,12 +301,12 @@ struct FirmwareUpdateView: View {
                                     dismiss()
                                 }
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminentCompat)
                         } else {
                             Button("Update Now") {
                                 showingConfirmation = true
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminentCompat)
                             .disabled(currentVersion == latestVersion || currentVersion == "Unknown" || latestVersion == "Unknown" || firmwareManager.isBackupInProgress || isCurrentVersionNewer())
                         }
                     }
@@ -341,7 +342,7 @@ struct FirmwareUpdateView: View {
                                 Button("Close Application") {
                                     NSApplication.shared.terminate(nil)
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.borderedProminentCompat)
                                 .controlSize(.large)
                             }
                             

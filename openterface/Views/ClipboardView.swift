@@ -102,7 +102,7 @@ struct ClipboardView: View {
                     Text(content)
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.primary)
-                        .textSelection(.enabled)
+                        .textSelectionCompat(enabled: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                         .background(Color(NSColor.textBackgroundColor))

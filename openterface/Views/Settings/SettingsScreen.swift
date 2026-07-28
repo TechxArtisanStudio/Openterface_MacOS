@@ -241,7 +241,7 @@ struct AISettingsView: View {
                         if let resolvedFolder {
                             Text("Resolved folder: \(resolvedFolder)")
                                 .font(.caption2)
-                                .textSelection(.enabled)
+                                .textSelectionCompat(enabled: true)
                         } else {
                             Text("Resolved folder: Not found (using built-in defaults + target profile guardrails).")
                                 .font(.caption2)
@@ -280,7 +280,7 @@ struct AISettingsView: View {
                             Text("File path: \(selectedAgentDocsPath)")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                                .textSelection(.enabled)
+                                .textSelectionCompat(enabled: true)
                         } else {
                             Text("File path: Not resolved yet. Save will create it under the preferred docs root.")
                                 .font(.caption2)
@@ -304,7 +304,7 @@ struct AISettingsView: View {
                             Button("Save") {
                                 saveSelectedAgentDocsFile()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminentCompat)
                         }
 
                         if !selectedAgentDocsStatusMessage.isEmpty {
@@ -406,7 +406,7 @@ struct AISettingsView: View {
                                 Text(isTestingConnection ? "Testing..." : "Test Connection")
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                         .disabled(isTestingConnection || !canTestConnection)
 
                         if !testConnectionMessage.isEmpty {

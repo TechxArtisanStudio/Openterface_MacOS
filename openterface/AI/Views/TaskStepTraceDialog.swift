@@ -86,7 +86,7 @@ struct TaskStepTraceDialog: View {
                             if !entry.body.isEmpty {
                                 Text(entry.body)
                                     .font(.system(size: 12, weight: .regular, design: .monospaced))
-                                    .textSelection(.enabled)
+                                    .textSelectionCompat(enabled: true)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
 

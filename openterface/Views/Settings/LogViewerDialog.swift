@@ -352,7 +352,7 @@ private struct AITraceEntryCard: View {
                     ForEach(entry.textParts, id: \.self) { item in
                         Text(item)
                             .font(.system(size: 12, weight: .regular, design: .monospaced))
-                            .textSelection(.enabled)
+                            .textSelectionCompat(enabled: true)
                     }
                 }
             }
@@ -364,7 +364,7 @@ private struct AITraceEntryCard: View {
                     ForEach(entry.imageParts, id: \.self) { item in
                         Text(item)
                             .font(.system(size: 12, weight: .regular, design: .monospaced))
-                            .textSelection(.enabled)
+                            .textSelectionCompat(enabled: true)
                     }
                 }
             }
@@ -390,7 +390,7 @@ private struct AITraceEntryCard: View {
                 if showRaw {
                     Text(entry.rawBody)
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
-                        .textSelection(.enabled)
+                        .textSelectionCompat(enabled: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }

@@ -1242,7 +1242,7 @@ class DiagnosticsViewModel: NSObject, ObservableObject {
         servicesToMatch.addEntries(from: matchingDict)
         
         var iterator: io_iterator_t = 0
-        let kernelResult = IOServiceGetMatchingServices(kIOMainPortDefault, servicesToMatch as CFDictionary, &iterator)
+        let kernelResult = IOServiceGetMatchingServices(ioMainPortDefault(), servicesToMatch as CFDictionary, &iterator)
         
         if kernelResult != KERN_SUCCESS {
             return false

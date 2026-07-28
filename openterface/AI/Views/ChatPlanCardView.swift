@@ -39,7 +39,7 @@ struct ChatPlanCardView: View {
                     Button("Approve") {
                         onApprove()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminentCompat)
                     .disabled(isBusy)
                 }
 
@@ -179,7 +179,7 @@ struct ChatPlanCardView: View {
                     chatManager.confirmPlanOS(confirmed: true, newSystem: effectiveSelected)
                     selectedOSOverride = nil
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminentCompat)
 
                 Button("Cancel Plan") {
                     chatManager.confirmPlanOS(confirmed: false, newSystem: nil)

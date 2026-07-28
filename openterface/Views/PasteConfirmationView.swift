@@ -55,7 +55,7 @@ struct PasteConfirmationView: View {
                 ScrollView {
                     Text(clipboardContent)
                         .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
+                        .textSelectionCompat(enabled: true)
                         .padding(8)
                         .background(Color(NSColor.textBackgroundColor))
                         .cornerRadius(6)
@@ -119,7 +119,7 @@ struct PasteConfirmationView: View {
                     onPasteToTarget()
                 }
                 .keyboardShortcut(.return, modifiers: [])
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminentCompat)
             }
         }
         .padding(20)

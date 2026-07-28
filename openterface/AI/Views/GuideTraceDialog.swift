@@ -86,7 +86,7 @@ struct GuideTraceDialog: View {
 
                             Text(entry.body)
                                 .font(.system(.body, design: .monospaced))
-                                .textSelection(.enabled)
+                                .textSelectionCompat(enabled: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
                             if let imageFilePath = entry.imageFilePath,

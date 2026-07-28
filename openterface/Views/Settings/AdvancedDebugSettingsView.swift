@@ -32,7 +32,7 @@ struct AdvancedDebugSettingsView: View {
                             Text("Open Diagnostics Tool")
                         }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminentCompat)
                     
                     Text("Tests include cable detection, serial connection, baudrate configuration, and stress testing")
                         .font(.caption2)
@@ -104,7 +104,7 @@ struct AdvancedDebugSettingsView: View {
                                 Text("Export Settings")
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                         
                         Button(action: importSettings) {
                             HStack {

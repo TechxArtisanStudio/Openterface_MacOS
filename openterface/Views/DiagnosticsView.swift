@@ -22,6 +22,7 @@
 
 import SwiftUI
 
+@available(macOS 12.0, *)
 struct DiagnosticsView: View {
     @ObservedObject var viewModel: DiagnosticsViewModel
     @Environment(\.dismiss) var dismiss
@@ -246,7 +247,7 @@ struct DiagnosticsView: View {
                                                 .font(.system(size: 12, design: .monospaced))
                                                 .foregroundColor(colorScheme == .dark ? .white : .black)
                                                 .lineLimit(nil)
-                                                .textSelection(.enabled)
+                                                .textSelectionCompat(enabled: true)
                                                 .id(index)
                                         }
                                     }
@@ -307,7 +308,7 @@ struct DiagnosticsView: View {
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundColor(colorScheme == .dark ? .white : .black)
                                         .lineLimit(nil)
-                                        .textSelection(.enabled)
+                                        .textSelectionCompat(enabled: true)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 .padding(12)

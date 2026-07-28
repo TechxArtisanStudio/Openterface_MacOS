@@ -212,7 +212,7 @@ struct AspectRatioSettingsView: View {
                     Text("OK")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminentCompat)
             }
             
             Spacer()

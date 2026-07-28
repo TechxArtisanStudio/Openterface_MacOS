@@ -106,8 +106,8 @@ struct WCHFlashSettingsView: View {
                             Label("Flash Firmware", systemImage: "bolt.fill")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
+                        .buttonStyle(.borderedProminentCompat)
+                        .tintCompat(.orange)
                         .disabled(!canOperate)
 
                         // Verify button

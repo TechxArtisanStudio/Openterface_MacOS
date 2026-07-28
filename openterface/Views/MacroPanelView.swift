@@ -5,6 +5,7 @@ import AppKit
 
 /// Popover panel showing the user's keyboard macros.
 /// Macros can be executed with a single click and managed via context menus.
+@available(macOS 12.0, *)
 struct MacroPanelView: View {
     private struct FilteredMacro: Identifiable {
         let index: Int

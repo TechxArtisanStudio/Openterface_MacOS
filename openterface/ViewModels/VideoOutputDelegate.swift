@@ -4,6 +4,7 @@ import VideoToolbox
 import AppKit
 
 /// Delegate for handling video data output
+@available(macOS 12.0, *)
 class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)

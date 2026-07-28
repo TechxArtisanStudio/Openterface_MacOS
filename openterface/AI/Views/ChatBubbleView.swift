@@ -3,6 +3,7 @@ import AppKit
 import UniformTypeIdentifiers
 import Foundation
 
+@available(macOS 12.0, *)
 struct ChatBubbleView: View {
     let message: ChatMessage
     var onShowGuideTrace: ((UUID) -> Void)? = nil
@@ -133,7 +134,7 @@ struct ChatBubbleView: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                         .controlSize(.small)
                     }
                 }
@@ -175,7 +176,7 @@ struct ChatBubbleView: View {
                         } label: {
                             Text("Apply & Continue")
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                         .controlSize(.small)
                         
                         Button("Re-examine") {
@@ -222,7 +223,7 @@ struct ChatBubbleView: View {
                                 ?? UserSettings.shared.chatTargetSystem.displayName
                             Text("Continue with \(label)")
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminentCompat)
                         .controlSize(.small)
 
                         Button("Cancel") {
@@ -339,7 +340,7 @@ struct ChatBubbleView: View {
         } else {
             Text(message.content)
                 .font(.body)
-                .textSelection(.enabled)
+                .textSelectionCompat(enabled: true)
                 .multilineTextAlignment(.leading)
         }
     }
@@ -734,7 +735,7 @@ private struct StructuredDataTableView: View {
                 Text(value)
                     .font(isHeader ? .caption.weight(.semibold) : .caption)
                     .foregroundColor(.primary)
-                    .textSelection(.enabled)
+                    .textSelectionCompat(enabled: true)
                     .frame(width: cellWidth, alignment: .leading)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)

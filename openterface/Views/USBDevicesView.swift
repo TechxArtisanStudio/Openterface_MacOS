@@ -811,7 +811,7 @@ struct SelectableDetailRow: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.primary)
                 .frame(width: 100, alignment: .leading)
-                .textSelection(.enabled)
+                .textSelectionCompat(enabled: true)
             
             Text(value)
                 .font(.system(size: 14, design: .monospaced))
@@ -820,7 +820,7 @@ struct SelectableDetailRow: View {
                 .padding(.vertical, 4)
                 .background(Color(.textBackgroundColor))
                 .cornerRadius(4)
-                .textSelection(.enabled)
+                .textSelectionCompat(enabled: true)
             
             Spacer()
         }

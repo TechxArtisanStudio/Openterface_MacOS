@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(macOS 12.0, *)
 struct RemoteControlSettingsView: View {
     @ObservedObject private var userSettings = UserSettings.shared
     @StateObject private var credentialsStore = RemoteCredentialsStore.shared
@@ -826,7 +827,7 @@ private struct CredentialsManagerDialog: View {
                     onDone()
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminentCompat)
             }
         }
         .padding(20)
@@ -936,7 +937,7 @@ private struct CredentialEditorDialog: View {
                     dismiss()
                 }
                 .disabled(entry.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminentCompat)
             }
         }
         .padding(20)
