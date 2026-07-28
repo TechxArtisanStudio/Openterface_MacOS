@@ -123,3 +123,111 @@ func ioMainPortDefault() -> mach_port_t {
         return kIOMasterPortDefault  // deprecated but functional on macOS 11
     }
 }
+
+// MARK: - GroupBoxCompat (macOS 12+)
+
+/// A macOS 11-compatible `GroupBox` with a string title.
+/// On macOS 12+, uses native `GroupBox(_ title:content:)`.
+/// On macOS 11, wraps content in a VStack with a title Text.
+@ViewBuilder
+func GroupBoxCompat<S: StringProtocol>(
+    _ title: S,
+    @ViewBuilder content: () -> some View
+) -> some View {
+    if #available(macOS 12.0, *) {
+        GroupBox(title, content: content)
+    } else {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).font(.headline)
+                content()
+            }
+        }
+    }
+}
+
+// MARK: - .overlay(alignment:) Compatibility (macOS 12+)
+
+extension View {
+    /// A macOS 11-compatible `.overlay(alignment:content:)` (macOS 12+).
+    /// On macOS 11, falls back to the older `.overlay()` without alignment support.
+    @ViewBuilder
+    func overlayCompat<V: View>(
+        alignment: Alignment = .center,
+        @ViewBuilder content: () -> V
+    ) -> some View {
+        if #available(macOS 12.0, *) {
+            self.overlay(alignment: alignment, content: content)
+        } else {
+            self.overlay(content())
+        }
+    }
+}
+
+// MARK: - Color(nsColor:) Compatibility (macOS 12+)
+
+extension Color {
+    /// A macOS 11-compatible Color from NSColor.
+    /// On macOS 12+, uses native `Color(nsColor:)`.
+    /// On macOS 11, converts manually via CGColor.
+    static func compat(nsColor: NSColor) -> Color {
+        if #available(macOS 12.0, *) {
+            return Color(nsColor: nsColor)
+        } else {
+            return Color(nsColor.cgColor)
+        }
+    }
+}
+
+// MARK: - CVBufferCopyAttachment Compatibility (macOS 12+)
+
+import CoreVideo
+import CoreMedia
+
+/// A macOS 11-compatible wrapper for `CVBufferGetAttachment`.
+/// `CVBufferCopyAttachment` is macOS 12+; on macOS 11 we use the older `CVBufferGetAttachment`.
+func cvBufferCopyAttachmentCompat<T>(
+    _ buffer: CVBuffer,
+    key: CFString,
+    type: T.Type
+) -> T? {
+    if #available(macOS 12.0, *) {
+        return CVBufferCopyAttachment(buffer, key, nil) as? T
+    } else {
+        return CVBufferGetAttachment(buffer, key, nil)?.takeUnretainedValue() as? T
+    }
+}
+
+// MARK: - .alert() Compatibility (macOS 12+)
+
+extension View {
+    /// A macOS 11-compatible `.alert` with actions and message (macOS 12+).
+    /// On macOS 11, this is a no-op (alert doesn't show).
+    @ViewBuilder
+    func alertCompat<A: View, M: View>(
+        _ title: String,
+        isPresented: Binding<Bool>,
+        @ViewBuilder actions: () -> A,
+        @ViewBuilder message: () -> M
+    ) -> some View {
+        if #available(macOS 12.0, *) {
+            self.alert(title, isPresented: isPresented, actions: actions, message: message)
+        } else {
+            self
+        }
+    }
+    
+    /// A macOS 11-compatible `.alert` with actions only (no message).
+    @ViewBuilder
+    func alertCompat<A: View>(
+        _ title: String,
+        isPresented: Binding<Bool>,
+        @ViewBuilder actions: () -> A
+    ) -> some View {
+        if #available(macOS 12.0, *) {
+            self.alert(title, isPresented: isPresented, actions: actions)
+        } else {
+            self
+        }
+    }
+}

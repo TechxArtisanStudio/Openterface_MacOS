@@ -161,7 +161,7 @@ struct AISettingsView: View {
                 .font(.title2)
                 .bold()
 
-            GroupBox("Provider Configuration") {
+            GroupBoxCompat("Provider Configuration") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure the OpenAI-compatible endpoint used by the docked chat window")
                         .font(.caption)

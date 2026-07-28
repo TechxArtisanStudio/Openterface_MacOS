@@ -22,10 +22,9 @@
 
 import SwiftUI
 
-@available(macOS 12.0, *)
 struct DiagnosticsView: View {
     @ObservedObject var viewModel: DiagnosticsViewModel
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.presentationMode) var presentationMode
     @Environment(\.colorScheme) var colorScheme
     @State private var showLoggingAlert = true
     @State private var showStatusAndResults = false
@@ -44,7 +43,7 @@ struct DiagnosticsView: View {
                 
                 Spacer()
                 
-                Button(action: { dismiss() }) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
                         .foregroundColor(.secondary)
@@ -54,7 +53,7 @@ struct DiagnosticsView: View {
                 .help("Close diagnostics")
             }
             .padding(16)
-            .background(colorScheme == .dark ? Color(nsColor: .controlBackgroundColor) : Color(.sRGB, red: 0.7, green: 0.7, blue: 0.7))
+            .background(colorScheme == .dark ? Color.compat(nsColor: .controlBackgroundColor) : Color(.sRGB, red: 0.7, green: 0.7, blue: 0.7))
             .borderBottom()
             
             HStack(spacing: 0) {
@@ -84,10 +83,10 @@ struct DiagnosticsView: View {
                             .progressViewStyle(LinearProgressViewStyle(tint: viewModel.allTestsCompleted ? .green : .blue))
                     }
                     .padding(12)
-                    .background(Color(nsColor: .controlBackgroundColor))
+                    .background(Color.compat(nsColor: .controlBackgroundColor))
                 }
                 .frame(width: 200)
-                .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
+                .background(colorScheme == .dark ? Color.compat(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
                 .borderRight()
                 
                 // Right content area
@@ -115,7 +114,7 @@ struct DiagnosticsView: View {
 
                         }
                         .padding(12)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                        .background(Color.compat(nsColor: .controlBackgroundColor))
                         .cornerRadius(8)
                     }
                     .padding(16)
@@ -186,7 +185,7 @@ struct DiagnosticsView: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                         .padding(10)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                        .background(Color.compat(nsColor: .controlBackgroundColor))
                         .cornerRadius(6)
                     }
                     .padding(16)
@@ -254,7 +253,7 @@ struct DiagnosticsView: View {
                                 }
                                 .padding(12)
                             }
-                            .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
+                            .background(colorScheme == .dark ? Color.compat(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
                             .onChangeCompat(of: viewModel.statusMessages.count) { _ in
                                 // Scroll to the last message
                                 if !viewModel.statusMessages.isEmpty {
@@ -313,11 +312,11 @@ struct DiagnosticsView: View {
                                 }
                                 .padding(12)
                             }
-                            .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
+                            .background(colorScheme == .dark ? Color.compat(nsColor: .windowBackgroundColor) : Color(.sRGB, red: 0.98, green: 0.98, blue: 0.99))
                             .frame(height: 200)
                         }
                     }
-                    .background(Color(nsColor: .controlBackgroundColor))
+                    .background(Color.compat(nsColor: .controlBackgroundColor))
                     
                     Spacer()
                     
@@ -373,7 +372,7 @@ struct DiagnosticsView: View {
                                 .progressViewStyle(LinearProgressViewStyle())
                         }
                         .padding(12)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                        .background(Color.compat(nsColor: .controlBackgroundColor))
                         .cornerRadius(6)
                         .padding(16)
                     }
@@ -439,18 +438,18 @@ struct DiagnosticsView: View {
                         .disabled(viewModel.isTestRunning)
                     }
                     .padding(16)
-                    .background(colorScheme == .dark ? Color(nsColor: .controlBackgroundColor) : Color(.sRGB, red: 0.7, green: 0.7, blue: 0.7))
+                    .background(colorScheme == .dark ? Color.compat(nsColor: .controlBackgroundColor) : Color(.sRGB, red: 0.7, green: 0.7, blue: 0.7))
                     .borderTop()
                 }
             }
         }
         .frame(minWidth: 900, minHeight: 600)
-        .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white)
+        .background(colorScheme == .dark ? Color.compat(nsColor: .windowBackgroundColor) : Color.white)
         .onAppear {
             // Perform device depth check immediately when view appears
             viewModel.checkDeviceDepthOnViewAppear()
         }
-        .alert("Enable Diagnostic Logging", isPresented: $showLoggingAlert) {
+        .alertCompat("Enable Diagnostic Logging", isPresented: $showLoggingAlert) {
             Button("Enable Both") {
                 viewModel.enableLogging()
                 viewModel.enableSerialLogging()
@@ -462,7 +461,7 @@ struct DiagnosticsView: View {
         } message: {
             Text("Enable logging to save detailed diagnostics for troubleshooting.\n\nLog file: \(viewModel.logFilePath)\n\nWould you like to enable serial data logging as well?")
         }
-        .alert("USB Hub Warning", isPresented: $viewModel.showDepthWarningAlert) {
+        .alertCompat("USB Hub Warning", isPresented: $viewModel.showDepthWarningAlert) {
             Button("I Understand", role: .cancel) {
                 // Allow tests to proceed after user acknowledges
             }

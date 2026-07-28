@@ -11,7 +11,7 @@ struct AudioVideoSettingsView: View {
                 .bold()
             
             // Audio Settings
-            GroupBox("Audio Control") {
+            GroupBoxCompat("Audio Control") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Enable audio streaming", isOn: $userSettings.isAudioEnabled)
                         .onChangeCompat(of: userSettings.isAudioEnabled) { enabled in
@@ -47,7 +47,7 @@ struct AudioVideoSettingsView: View {
             }
             
             // Video Settings
-            GroupBox("Display & Video Settings") {
+            GroupBoxCompat("Display & Video Settings") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Full screen mode", isOn: $userSettings.isFullScreen)
                     

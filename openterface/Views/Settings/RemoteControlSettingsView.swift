@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(macOS 12.0, *)
 struct RemoteControlSettingsView: View {
     @ObservedObject private var userSettings = UserSettings.shared
     @StateObject private var credentialsStore = RemoteCredentialsStore.shared
@@ -14,7 +13,7 @@ struct RemoteControlSettingsView: View {
                 .font(.title2)
                 .bold()
 
-            GroupBox("Remote Connection") {
+            GroupBoxCompat("Remote Connection") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure network-based remote access protocols.")
                         .font(.caption)
@@ -57,7 +56,7 @@ struct RemoteControlSettingsView: View {
 
     @ViewBuilder
     private var remoteProtocolBox: some View {
-        GroupBox("Remote Protocol") {
+        GroupBoxCompat("Remote Protocol") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label("VNC (RFB 3.8)", systemImage: "network")
@@ -731,7 +730,7 @@ private struct CredentialsManagerDialog: View {
     let initialProtocol: RemoteCredentialProtocolType
     let onDone: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
     @State private var selectedProtocol: RemoteCredentialProtocolType
     @State private var selectedEditorEntry: RemoteCredentialEntry?
     @State private var showEditor = false
@@ -825,7 +824,7 @@ private struct CredentialsManagerDialog: View {
 
                 Button("Done") {
                     onDone()
-                    dismiss()
+                    presentationMode.wrappedValue.dismiss()
                 }
                 .buttonStyle(.borderedProminentCompat)
             }
@@ -842,7 +841,7 @@ private struct CredentialsManagerDialog: View {
 
 private struct CredentialEditorDialog: View {
     @ObservedObject var store: RemoteCredentialsStore
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
 
     @State private var entry: RemoteCredentialEntry
     @State private var password: String
@@ -926,7 +925,7 @@ private struct CredentialEditorDialog: View {
             HStack {
                 Spacer()
                 Button("Cancel") {
-                    dismiss()
+                    presentationMode.wrappedValue.dismiss()
                 }
                 Button("Save") {
                     if entry.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -934,7 +933,7 @@ private struct CredentialEditorDialog: View {
                     }
                     store.upsert(entry, password: password)
                     store.selectCredential(id: entry.id, for: entry.protocolType)
-                    dismiss()
+                    presentationMode.wrappedValue.dismiss()
                 }
                 .disabled(entry.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .buttonStyle(.borderedProminentCompat)

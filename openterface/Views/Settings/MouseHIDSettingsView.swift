@@ -93,7 +93,7 @@ struct MouseHIDSettingsView: View {
                 .fontWeight(.bold)
 
             // Performance Presets
-            GroupBox("Performance Presets") {
+            GroupBoxCompat("Performance Presets") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Quick settings for different use cases")
                         .font(.caption)
@@ -154,7 +154,7 @@ struct MouseHIDSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Mouse Event Throttling") {
+            GroupBoxCompat("Mouse Event Throttling") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Event Rate Limit (Hz):")
@@ -188,7 +188,7 @@ struct MouseHIDSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Mouse Control Mode") {
+            GroupBoxCompat("Mouse Control Mode") {
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("Mouse mode", selection: $userSettings.MouseControl) {
                         Text("Absolute").tag(MouseControlMode.absolute)
@@ -222,7 +222,7 @@ struct MouseHIDSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("HID Device Status") {
+            GroupBoxCompat("HID Device Status") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("HDMI Status:")

@@ -14,7 +14,7 @@ struct KeyMappingSettingsView: View {
                 .font(.title2)
                 .bold()
 
-            GroupBox("Global Application Shortcuts") {
+            GroupBoxCompat("Global Application Shortcuts") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("These shortcuts work globally when Openterface is active")
                         .font(.caption)
@@ -31,7 +31,7 @@ struct KeyMappingSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Target Device Keyboard Layout") {
+            GroupBoxCompat("Target Device Keyboard Layout") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Layout mode:")
@@ -100,7 +100,7 @@ struct KeyMappingSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Special Key Combinations") {
+            GroupBoxCompat("Special Key Combinations") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Quick access to common key combinations for target device")
                         .font(.caption)
@@ -121,7 +121,7 @@ struct KeyMappingSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Special Key Behaviors") {
+            GroupBoxCompat("Special Key Behaviors") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         VStack(alignment: .leading) {

@@ -25,7 +25,6 @@ import Foundation
 import Combine
 import AppKit
 
-@available(macOS 12.0, *)
 struct EdidNameView: View {
     @StateObject private var firmwareManager = FirmwareManager.shared
     @State private var currentEdidName: String = "Loading..."
@@ -37,8 +36,8 @@ struct EdidNameView: View {
     @State private var isNameValid: Bool = true
     @State private var validationMessage: String = ""
     @State private var cancellables = Set<AnyCancellable>()
-    FocusStateCompat private var isTextFieldFocused: Bool
-    @Environment(\.dismiss) private var dismiss
+    @FocusStateCompat private var isTextFieldFocused: Bool
+    @Environment(\.presentationMode) private var presentationMode
     
     var body: some View {
         VStack(spacing: 20) {
@@ -149,7 +148,7 @@ struct EdidNameView: View {
                     // Action buttons
                     HStack {
                         Button("Cancel") {
-                            dismiss()
+                            presentationMode.wrappedValue.dismiss()
                         }
                         .keyboardShortcut(.escape)
                         
@@ -211,7 +210,7 @@ struct EdidNameView: View {
                 isTextFieldFocused = true
             }
         }
-        .alert("Confirm EDID Name Update", isPresented: $showingConfirmation) {
+        .alertCompat("Confirm EDID Name Update", isPresented: $showingConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Update", role: .destructive) {
                 updateEdidName()
@@ -219,13 +218,13 @@ struct EdidNameView: View {
         } message: {
             Text("Are you sure you want to change the monitor name from '\(currentEdidName)' to '\(newEdidName)'?\n\nThis will modify the firmware and require a device reconnection.")
         }
-        .alert(updateSuccess ? "Update Successful" : "Update Failed", isPresented: $showingCompletionAlert) {
+        .alertCompat(updateSuccess ? "Update Successful" : "Update Failed", isPresented: $showingCompletionAlert) {
             if updateSuccess {
                 Button("Close App") {
                     NSApplication.shared.terminate(nil)
                 }
                 Button("OK") {
-                    dismiss()
+                    presentationMode.wrappedValue.dismiss()
                 }
             } else {
                 Button("OK") {

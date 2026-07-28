@@ -18,7 +18,7 @@ struct AdvancedDebugSettingsView: View {
                 .font(.title2)
                 .bold()
             
-            GroupBox("Device Diagnostics") {
+            GroupBoxCompat("Device Diagnostics") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Run comprehensive hardware and connection tests")
                         .font(.caption)
@@ -41,7 +41,7 @@ struct AdvancedDebugSettingsView: View {
                 .padding(.vertical, 8)
             }
             
-            GroupBox("Debug & Logging") {
+            GroupBoxCompat("Debug & Logging") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Enable serial output logging", isOn: $userSettings.isSerialOutput)
                         .onChangeCompat(of: userSettings.isSerialOutput) { enabled in
@@ -91,7 +91,7 @@ struct AdvancedDebugSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Settings Management") {
+            GroupBoxCompat("Settings Management") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Export or import your configuration settings")
                         .font(.caption)
@@ -124,7 +124,7 @@ struct AdvancedDebugSettingsView: View {
                 .padding(.vertical, 8)
             }
             
-            GroupBox("Reset & Restore") {
+            GroupBoxCompat("Reset & Restore") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Reset application settings to default values")
                         .font(.caption)
@@ -146,7 +146,7 @@ struct AdvancedDebugSettingsView: View {
                 .padding(.vertical, 8)
             }
             
-            GroupBox("Application Information") {
+            GroupBoxCompat("Application Information") {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Version:")
@@ -179,17 +179,17 @@ struct AdvancedDebugSettingsView: View {
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(viewModel: diagnosticsViewModel)
         }
-        .alert("Export Successful", isPresented: $showingExportSuccess) {
+        .alertCompat("Export Successful", isPresented: $showingExportSuccess) {
             Button("OK") { }
         } message: {
             Text("Settings have been successfully exported.")
         }
-        .alert("Import Successful", isPresented: $showingImportSuccess) {
+        .alertCompat("Import Successful", isPresented: $showingImportSuccess) {
             Button("OK") { }
         } message: {
             Text("Settings have been successfully imported and applied.")
         }
-        .alert("Error", isPresented: $showingError) {
+        .alertCompat("Error", isPresented: $showingError) {
             Button("OK") { }
         } message: {
             Text(errorMessage)

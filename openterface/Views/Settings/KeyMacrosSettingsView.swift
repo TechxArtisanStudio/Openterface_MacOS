@@ -11,7 +11,7 @@ struct KeyMacrosSettingsView: View {
                 .font(.title2)
                 .bold()
 
-            GroupBox("Macro Management") {
+            GroupBoxCompat("Macro Management") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Create and manage keyboard macros for common tasks")
@@ -43,7 +43,7 @@ struct KeyMacrosSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Common Macro Templates") {
+            GroupBoxCompat("Common Macro Templates") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Quick templates for common scenarios")
                         .font(.caption)

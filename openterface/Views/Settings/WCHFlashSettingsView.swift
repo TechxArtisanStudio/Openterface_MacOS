@@ -14,7 +14,7 @@ struct WCHFlashSettingsView: View {
                 .foregroundColor(.secondary)
 
             // MARK: - Device
-            GroupBox("Device") {
+            GroupBoxCompat("Device") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
                         deviceStatusIndicator
@@ -55,7 +55,7 @@ struct WCHFlashSettingsView: View {
             }
 
             // MARK: - Firmware file
-            GroupBox("Firmware File") {
+            GroupBoxCompat("Firmware File") {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Image(systemName: "doc.badge.ellipsis")
@@ -96,7 +96,7 @@ struct WCHFlashSettingsView: View {
             }
 
             // MARK: - Operations
-            GroupBox("Operations") {
+            GroupBoxCompat("Operations") {
                 VStack(spacing: 10) {
                     HStack(spacing: 12) {
                         // Flash button
@@ -139,7 +139,7 @@ struct WCHFlashSettingsView: View {
             }
 
             // MARK: - Progress / Status
-            GroupBox("Status") {
+            GroupBoxCompat("Status") {
                 VStack(alignment: .leading, spacing: 8) {
                     if ispManager.isOperationInProgress {
                         HStack(spacing: 10) {

@@ -4,7 +4,6 @@ import VideoToolbox
 import AppKit
 
 /// Delegate for handling video data output
-@available(macOS 12.0, *)
 class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
@@ -33,7 +32,7 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         let yCbCrMatrixKey = kCVImageBufferYCbCrMatrix_ITU_R_709_2
 
         // Check if the transfer function key is already set
-        let existingTransferFunctionAttachment = CVBufferCopyAttachment(pixelBuffer, kCVImageBufferTransferFunctionKey, nil)
+        let existingTransferFunctionAttachment = CVBufferGetAttachment(pixelBuffer, kCVImageBufferTransferFunctionKey, nil)
         if existingTransferFunctionAttachment == nil {
             CVBufferSetAttachment(pixelBuffer,
                                   kCVImageBufferTransferFunctionKey,
@@ -42,7 +41,7 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
 
         // Check if the YCbCr matrix key is already set
-        let existingYCbCrMatrixAttachment = CVBufferCopyAttachment(pixelBuffer, kCVImageBufferYCbCrMatrixKey, nil)
+        let existingYCbCrMatrixAttachment = CVBufferGetAttachment(pixelBuffer, kCVImageBufferYCbCrMatrixKey, nil)
         if existingYCbCrMatrixAttachment == nil {
             CVBufferSetAttachment(pixelBuffer,
                                   kCVImageBufferYCbCrMatrixKey,

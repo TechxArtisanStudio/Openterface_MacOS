@@ -3,7 +3,6 @@ import AppKit
 import UniformTypeIdentifiers
 import Foundation
 
-@available(macOS 12.0, *)
 struct ChatBubbleView: View {
     let message: ChatMessage
     var onShowGuideTrace: ((UUID) -> Void)? = nil
@@ -740,14 +739,14 @@ private struct StructuredDataTableView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                     .background(isHeader ? Color.secondary.opacity(0.10) : Color.clear)
-                    .overlay(alignment: .trailing) {
+                    .overlayCompat(alignment: .trailing) {
                         Rectangle()
                             .fill(Color.secondary.opacity(0.12))
                             .frame(width: 1)
                     }
             }
         }
-        .overlay(alignment: .bottom) {
+        .overlayCompat(alignment: .bottom) {
             Rectangle()
                 .fill(Color.secondary.opacity(0.12))
                 .frame(height: 1)

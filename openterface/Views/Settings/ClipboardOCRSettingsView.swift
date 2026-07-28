@@ -11,7 +11,7 @@ struct ClipboardOCRSettingsView: View {
                 .font(.title2)
                 .bold()
 
-            GroupBox("Clipboard Behavior") {
+            GroupBoxCompat("Clipboard Behavior") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure how Cmd+V paste events are handled")
                         .font(.caption)

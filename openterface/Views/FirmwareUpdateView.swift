@@ -50,7 +50,6 @@ enum FirmwareError: LocalizedError {
     }
 }
 
-@available(macOS 12.0, *)
 struct FirmwareUpdateView: View {
     enum FirmwareTab: String, CaseIterable, Identifiable {
         case videoFirmware = "Video"
@@ -72,7 +71,7 @@ struct FirmwareUpdateView: View {
     @State private var showingFlashConfirmation: Bool = false
     @State private var showingFlashWarning: Bool = false
     @State private var selectedFlashFile: URL?
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
 
     init() {
         self._firmwareManager = StateObject(wrappedValue: FirmwareManager.shared)
@@ -279,7 +278,7 @@ struct FirmwareUpdateView: View {
                             if let window = NSApp.keyWindow {
                                 window.close()
                             } else {
-                                dismiss()
+                                presentationMode.wrappedValue.dismiss()
                             }
                         }
                         .keyboardShortcut(.escape)
@@ -298,7 +297,7 @@ struct FirmwareUpdateView: View {
                                 if let window = NSApp.keyWindow {
                                     window.close()
                                 } else {
-                                    dismiss()
+                                    presentationMode.wrappedValue.dismiss()
                                 }
                             }
                             .buttonStyle(.borderedProminentCompat)
@@ -362,7 +361,7 @@ struct FirmwareUpdateView: View {
             loadFirmwareVersions()
             setupFirmwareManagerObservers()
         }
-        .alert("Confirm Firmware Update", isPresented: $showingConfirmation) {
+        .alertCompat("Confirm Firmware Update", isPresented: $showingConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Update Now", role: .destructive) {
                 startFirmwareUpdate()
@@ -370,12 +369,12 @@ struct FirmwareUpdateView: View {
         } message: {
             Text("Are you sure you want to proceed with the firmware update? This process cannot be undone.")
         }
-        .alert("Firmware Backup", isPresented: $showingBackupAlert) {
+        .alertCompat("Firmware Backup", isPresented: $showingBackupAlert) {
             Button("OK") { }
         } message: {
             Text(backupAlertMessage)
         }
-        .alert("Firmware Update Complete", isPresented: $showingUpdateCompletionAlert) {
+        .alertCompat("Firmware Update Complete", isPresented: $showingUpdateCompletionAlert) {
             Button("I Understand") {
                 // Exit the application
                 NSApplication.shared.terminate(nil)
@@ -387,7 +386,7 @@ struct FirmwareUpdateView: View {
                 Text("Firmware update failed. Please try again or contact support.")
             }
         }
-        .alert("⚠️ Firmware Flash Warning", isPresented: $showingFlashWarning) {
+        .alertCompat("⚠️ Firmware Flash Warning", isPresented: $showingFlashWarning) {
             Button("Cancel", role: .cancel) { }
             Button("I Understand the Risks", role: .destructive) {
                 showFlashFileSelector()
@@ -395,7 +394,7 @@ struct FirmwareUpdateView: View {
         } message: {
             Text("WARNING: Flashing a local firmware file is a potentially dangerous operation that could permanently damage your device.\n\n• Only use firmware files specifically designed for your device\n• Ensure the file is from a trusted source\n• Do not interrupt the process once started\n• The device may become unusable if incorrect firmware is installed\n\nProceed only if you understand these risks.")
         }
-        .alert("Confirm Flash Local Firmware", isPresented: $showingFlashConfirmation) {
+        .alertCompat("Confirm Flash Local Firmware", isPresented: $showingFlashConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Flash Now", role: .destructive) {
                 startFirmwareFlash()

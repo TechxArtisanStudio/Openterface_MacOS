@@ -19,7 +19,7 @@ struct DeviceConnectionSettingsView: View {
                 .font(.title2)
                 .bold()
 
-            GroupBox("Device Information") {
+            GroupBoxCompat("Device Information") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Control Chipset Ready:")
@@ -73,7 +73,7 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Serial Port Configuration") {
+            GroupBoxCompat("Serial Port Configuration") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Preferred Baudrate:")
@@ -144,7 +144,7 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Control Mode Configuration") {
+            GroupBoxCompat("Control Mode Configuration") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Select the operation mode for the HID chip:")
                         .font(.caption)
@@ -213,7 +213,7 @@ struct DeviceConnectionSettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            GroupBox("Connection Management") {
+            GroupBoxCompat("Connection Management") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Button("Restart HID Operations") {
