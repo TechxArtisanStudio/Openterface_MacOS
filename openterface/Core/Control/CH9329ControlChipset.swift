@@ -126,6 +126,9 @@ class CH9329ControlChipset: BaseControlChipset {
             return false
         }
         guard USBDevicesManager.shared.isCH9329Connected() else {
+            logger.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
+            return false
+        }
 
         guard ctsMonitoringTimer == nil else {
             return true

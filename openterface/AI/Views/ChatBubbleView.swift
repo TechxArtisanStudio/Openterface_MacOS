@@ -3,6 +3,7 @@ import AppKit
 import UniformTypeIdentifiers
 import Foundation
 
+@available(macOS 12.0, *)
 struct ChatBubbleView: View {
     let message: ChatMessage
     var onShowGuideTrace: ((UUID) -> Void)? = nil

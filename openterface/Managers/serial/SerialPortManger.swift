@@ -199,6 +199,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func tryConnectOpenterface(){
+        guard #available(macOS 12.0, *) else { return }
         // Refresh USB device list so chipset type flags reflect current state.
         // This is essential for recovery paths that may run before periodic updates.
         USBDevicesManager.shared.update()
@@ -222,6 +223,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
 
     @objc func serialPortsWereConnected(_ notification: Notification) {
+        guard #available(macOS 12.0, *) else { return }
         if !self.isTrying && !self.isPaused {
             // Refresh USB device list so isCH32V208Connected() / isCH9329Connected() reflect
             // the newly connected device before tryConnectOpenterface() reads them.
@@ -238,6 +240,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
+        guard #available(macOS 12.0, *) else { return }
         logger.log(content: "Serial port Disconnected")
         self.retryCounter = 0
 
@@ -570,6 +573,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     // Helper method: Try to connect with specified baud rate
     private func tryConnectWithBaudrate(_ baudrate: Int) -> Bool {
+        guard #available(macOS 12.0, *) else { return false }
         self.serialPort = getSerialPortPathFromUSBManager()
         DispatchQueue.main.async { SerialPortStatus.shared.serialPortBaudRate = baudrate }
 
@@ -1466,6 +1470,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// The response is handled by SerialResponseHandler.handleSdDirectionResponse which
     /// publishes the result via @Published sdCardDirection — no callbacks needed.
     private func startSDCardPolling() {
+        guard #available(macOS 12.0, *) else { return }
         guard USBDevicesManager.shared.isCH32V208Connected() else { return }
         stopSDCardPolling()
         
@@ -1494,6 +1499,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// This method tries to find the serial port path based on the detected control chip device
     /// or falls back to the default USB serial device identified during device grouping
     private func getSerialPortPathFromUSBManager() -> ORSSerialPort? {
+        guard #available(macOS 12.0, *) else { return nil }
         // Get the expected serial device path from USB device manager
         if let expectedPath = USBDevicesManager.shared.getExpectedSerialDevicePath() {
             logger.log(content: "USB device manager provided expected serial device path hint: \(expectedPath)")

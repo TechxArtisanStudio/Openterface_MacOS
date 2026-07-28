@@ -27,19 +27,6 @@ extension View {
     }
 }
 
-// MARK: - .focused() Compatibility (macOS 12+)
-
-extension View {
-    @ViewBuilder
-    func focusedCompat(_ binding: Binding<Bool>) -> some View {
-        if #available(macOS 12.0, *) {
-            self.focused(binding)
-        } else {
-            self
-        }
-    }
-}
-
 // MARK: - .textSelection() Compatibility (macOS 12+)
 
 extension View {
@@ -88,26 +75,6 @@ struct BorderedProminentCompatButtonStyle: ButtonStyle {
 extension ButtonStyle where Self == BorderedProminentCompatButtonStyle {
     static var borderedProminentCompat: BorderedProminentCompatButtonStyle {
         BorderedProminentCompatButtonStyle()
-    }
-}
-
-// MARK: - FocusState shim (macOS 12+)
-
-@propertyWrapper
-struct FocusStateCompat: DynamicProperty {
-    @State private var isFocused: Bool = false
-
-    var wrappedValue: Bool {
-        get { isFocused }
-        nonmutating set { isFocused = newValue }
-    }
-
-    var projectedValue: Binding<Bool> {
-        $isFocused
-    }
-
-    init() {
-        self._isFocused = State(initialValue: false)
     }
 }
 

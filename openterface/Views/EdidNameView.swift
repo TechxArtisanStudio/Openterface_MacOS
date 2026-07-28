@@ -36,7 +36,6 @@ struct EdidNameView: View {
     @State private var isNameValid: Bool = true
     @State private var validationMessage: String = ""
     @State private var cancellables = Set<AnyCancellable>()
-    @FocusStateCompat private var isTextFieldFocused: Bool
     @Environment(\.presentationMode) private var presentationMode
     
     var body: some View {
@@ -98,9 +97,7 @@ struct EdidNameView: View {
                             TextField("Enter new monitor name", text: $newEdidName)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.system(.body, design: .monospaced))
-                                .focusedCompat($isTextFieldFocused)
                                 .onTapGesture {
-                                    isTextFieldFocused = true
                                 }
                                 .onChangeCompat(of: newEdidName) { newValue in
                                     validateEdidName(newValue)
@@ -207,7 +204,6 @@ struct EdidNameView: View {
             setupSubscriptions()
             // Auto-focus the text field after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isTextFieldFocused = true
             }
         }
         .alertCompat("Confirm EDID Name Update", isPresented: $showingConfirmation) {
@@ -237,7 +233,6 @@ struct EdidNameView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             // When window becomes key, focus the text field
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isTextFieldFocused = true
             }
         }
     }

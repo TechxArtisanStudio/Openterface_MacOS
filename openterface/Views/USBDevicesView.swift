@@ -110,7 +110,9 @@ struct USBDevicesView: View {
                 // This will update the serial port display in the tree
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     // Re-update USB devices to refresh serial port information in the display
-                    USBDevicesManager.shared.update()
+                    if #available(macOS 12.0, *) {
+                        USBDevicesManager.shared.update()
+                    }
                 }
             }
         }

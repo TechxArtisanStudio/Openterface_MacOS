@@ -206,16 +206,24 @@ struct ChatWindowRootView: View {
                         }
 
                         ForEach(chatManager.messages) { message in
-                            ChatBubbleView(message: message, onShowGuideTrace: { messageID in
-                                if let guideEntries = chatManager.guideTraceEntries(messageID: messageID), !guideEntries.isEmpty {
-                                    selectedGuideTraceEntries = guideEntries
-                                } else {
-                                    let fallback = chatManager.traceMessage(messageID: messageID) ?? "No trace information found for this message in the current session."
-                                    selectedGuideTraceEntries = [ChatTaskTraceEntry(title: "Trace", body: fallback)]
-                                }
-                                isShowingGuideTrace = true
-                            })
-                                .id(message.id)
+                            if #available(macOS 12.0, *) {
+                                ChatBubbleView(message: message, onShowGuideTrace: { messageID in
+                                    if let guideEntries = chatManager.guideTraceEntries(messageID: messageID), !guideEntries.isEmpty {
+                                        selectedGuideTraceEntries = guideEntries
+                                    } else {
+                                        let fallback = chatManager.traceMessage(messageID: messageID) ?? "No trace information found for this message in the current session."
+                                        selectedGuideTraceEntries = [ChatTaskTraceEntry(title: "Trace", body: fallback)]
+                                    }
+                                    isShowingGuideTrace = true
+                                })
+                                    .id(message.id)
+                            } else {
+                                Text(message.content)
+                                    .padding(8)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(8)
+                                    .id(message.id)
+                            }
                         }
                     }
                     .padding(12)
