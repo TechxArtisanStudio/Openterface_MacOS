@@ -10,12 +10,11 @@ on:
 permissions:
   contents: write
 
-env:
-  # Use Xcode 16.x — the project uses objectVersion 70 and
-  # PBXFileSystemSynchronizedRootGroup which require Xcode 16.
-  # Xcode 16 supports deployment targets as low as macOS 10.13,
-  # so targeting macOS 11 (Big Sur) is fully supported.
-  # We dynamically detect the installed Xcode 16.x version.
+# Use Xcode 16.x — the project uses objectVersion 70 and
+# PBXFileSystemSynchronizedRootGroup which require Xcode 16.
+# Xcode 16 supports deployment targets as low as macOS 10.13,
+# so targeting macOS 11 (Big Sur) is fully supported.
+# We dynamically detect the installed Xcode 16.x version.
 
 jobs:
   build:

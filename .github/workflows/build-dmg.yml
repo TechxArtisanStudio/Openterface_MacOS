@@ -142,7 +142,6 @@ jobs:
     # Unsigned compilation check for fork PRs
     - name: Build macOS App (unsigned — fork PR)
       if: steps.context.outputs.can_sign == 'false'
-      env:
       run: |
         xcodebuild -scheme "openterface" \
           -configuration Release \
