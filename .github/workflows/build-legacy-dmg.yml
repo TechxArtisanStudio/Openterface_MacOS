@@ -159,17 +159,34 @@ jobs:
       run: |
         echo "=== Building Legacy (unsigned) with Xcode 16 ==="
         xcodebuild -version
+
         xcodebuild -scheme "openterface" \
           -configuration Release \
+          -archivePath "build/Openterface.xcarchive" \
+          archive \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
-          MACOSX_DEPLOYMENT_TARGET=11.0 \
-          build
+          MACOSX_DEPLOYMENT_TARGET=11.0
+
+        # Create unsigned export options plist
+        UNSIGNED_PLIST='unsignedExportOptions.plist'
+        echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" > "$UNSIGNED_PLIST"
+        echo "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">" >> "$UNSIGNED_PLIST"
+        echo "<plist version=\"1.0\">" >> "$UNSIGNED_PLIST"
+        echo "<dict>" >> "$UNSIGNED_PLIST"
+        echo "    <key>method</key>" >> "$UNSIGNED_PLIST"
+        echo "    <string>mac-application</string>" >> "$UNSIGNED_PLIST"
+        echo "</dict>" >> "$UNSIGNED_PLIST"
+        echo "</plist>" >> "$UNSIGNED_PLIST"
+
+        xcodebuild -exportArchive \
+          -archivePath "build/Openterface.xcarchive" \
+          -exportPath "build/export" \
+          -exportOptionsPlist "$UNSIGNED_PLIST"
 
     # Verify the app targets macOS 11
     - name: Verify macOS 11 compatibility
-      if: steps.context.outputs.can_sign == 'true'
       run: |
         echo "=== Verifying minimum system version ==="
         /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "build/export/Openterface.app/Contents/Info.plist" || echo "LSMinimumSystemVersion not set (uses deployment target)"
@@ -199,10 +216,24 @@ jobs:
 
     # Create DMG
     - name: Install create-dmg
-      if: steps.context.outputs.can_sign == 'true'
       run: brew install create-dmg
 
-    - name: Create Legacy DMG
+    - name: Create Legacy DMG (unsigned)
+      if: steps.context.outputs.can_sign == 'false'
+      run: |
+        create-dmg \
+          --volname "Openterface" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --icon "Openterface.app" 200 190 \
+          --hide-extension "Openterface.app" \
+          --app-drop-link 600 185 \
+          "build/Openterface-Legacy.dmg" \
+          "build/export/Openterface.app"
+        echo "Unsigned legacy DMG created (no notarization)"
+
+    - name: Create Legacy DMG (signed + notarized)
       if: steps.context.outputs.can_sign == 'true'
       run: |
         create-dmg \
@@ -220,7 +251,6 @@ jobs:
 
     # Upload DMG as artifact
     - name: Upload Legacy DMG artifact
-      if: steps.context.outputs.can_sign == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: Openterface-KVM-Legacy
