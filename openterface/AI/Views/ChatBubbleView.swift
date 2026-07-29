@@ -525,13 +525,15 @@ private struct MarkdownBubbleContentView: View {
     }
 
     private func inlineMarkdownText(_ text: String) -> Text {
-        if let attributed = try? AttributedString(
-            markdown: text,
-            options: AttributedString.MarkdownParsingOptions(
-                interpretedSyntax: .inlineOnlyPreservingWhitespace
-            )
-        ) {
-            return Text(attributed)
+        if #available(macOS 12.0, *) {
+            if let attributed = try? AttributedString(
+                markdown: text,
+                options: AttributedString.MarkdownParsingOptions(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace
+                )
+            ) {
+                return Text(attributed)
+            }
         }
 
         return Text(text)
