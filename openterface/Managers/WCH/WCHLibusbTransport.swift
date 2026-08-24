@@ -13,6 +13,39 @@
 
 import Foundation
 
+/// Information about a scanned WCH bootloader device
+struct ScannedDevice: Identifiable {
+    let id: Int           // index in libusb device list (used for connect)
+    let busNumber: UInt8
+    let deviceAddress: UInt8
+    let vendorID: UInt16
+    let productID: UInt16
+    let serialNumber: String?
+    let manufacturer: String?
+    let product: String?
+    let portPath: [UInt8]  // USB port topology path
+
+    var displayName: String {
+        // Prefer product name + port path for user-friendly identification
+        let prod = product ?? "WCH Device"
+        let port = portPath.map { String($0) }.joined(separator: "-")
+        if let serial = serialNumber, !serial.isEmpty {
+            return "\(prod) [Port \(port), S/N: \(serial)]"
+        }
+        return "\(prod) [Port \(port)]"
+    }
+
+    var detailedInfo: String {
+        var info = "VID: 0x\(String(format: "%04X", vendorID)) PID: 0x\(String(format: "%04X", productID))"
+        info += "\nBus: \(busNumber) Address: \(deviceAddress)"
+        info += "\nPort Path: \(portPath.map { String($0) }.joined(separator: "-"))"
+        if let mfr = manufacturer { info += "\nManufacturer: \(mfr)" }
+        if let prod = product { info += "\nProduct: \(prod)" }
+        if let serial = serialNumber, !serial.isEmpty { info += "\nSerial: \(serial)" }
+        return info
+    }
+}
+
 /// USB transport using libusb-1.0. Replaces the IOKit-based WCHUSBTransport
 /// which fails on macOS 12+ when the device is driven by AppleUSBHost.
 class WCHLibusbTransport: WCHTransport {
@@ -33,31 +66,94 @@ class WCHLibusbTransport: WCHTransport {
 
     // MARK: – Static helpers
 
-    /// Returns the number of WCH bootloader devices currently attached.
-    static func scanDevices() -> Int {
+    /// Returns information about all WCH bootloader devices currently attached.
+    static func scanDevices() -> [ScannedDevice] {
         var ctx: OpaquePointer?
         guard libusb_init(&ctx) == LIBUSB_SUCCESS.rawValue else {
             print("[WCHLibusbTransport] Failed to initialise libusb")
-            return 0
+            return []
         }
         defer { libusb_exit(ctx) }
 
         var list: UnsafeMutablePointer<OpaquePointer?>?
         let count = libusb_get_device_list(ctx, &list)
-        guard count > 0, let deviceList = list else { return 0 }
+        guard count > 0, let deviceList = list else { return [] }
         defer { libusb_free_device_list(deviceList, 1) }
 
-        var found = 0
+        var devices: [ScannedDevice] = []
+        var matchIndex = 0
         for i in 0..<count {
             guard let dev = deviceList[Int(i)] else { continue }
             var desc = libusb_device_descriptor()
             guard libusb_get_device_descriptor(dev, &desc) == LIBUSB_SUCCESS.rawValue else { continue }
             if vendorIDs.contains(desc.idVendor) && desc.idProduct == productID {
-                print("[WCHLibusbTransport] Found WCH device #\(found): vid=0x\(String(desc.idVendor, radix: 16)) pid=0x\(String(desc.idProduct, radix: 16))")
-                found += 1
+                let bus = libusb_get_bus_number(dev)
+                let addr = libusb_get_device_address(dev)
+
+                // Get port path (physical USB topology)
+                var portNumbers = [UInt8](repeating: 0, count: 7)
+                let portCount = libusb_get_port_numbers(dev, &portNumbers, Int32(portNumbers.count))
+                let portPath = portCount > 0 ? Array(portNumbers.prefix(Int(portCount))) : []
+
+                // Open device to read string descriptors
+                var handle: OpaquePointer?
+                let opened = libusb_open(dev, &handle) == LIBUSB_SUCCESS.rawValue
+                let h = opened ? handle : nil
+
+                // Read manufacturer string
+                var manufacturer: String? = nil
+                if let h = h, desc.iManufacturer > 0 {
+                    var buf = [UInt8](repeating: 0, count: 256)
+                    let rc = buf.withUnsafeMutableBufferPointer { ptr -> Int32 in
+                        libusb_get_string_descriptor_ascii(h, desc.iManufacturer, ptr.baseAddress!, Int32(ptr.count))
+                    }
+                    if rc > 0 {
+                        manufacturer = String(bytes: buf.prefix(Int(rc)), encoding: .ascii)
+                    }
+                }
+
+                // Read product string
+                var product: String? = nil
+                if let h = h, desc.iProduct > 0 {
+                    var buf = [UInt8](repeating: 0, count: 256)
+                    let rc = buf.withUnsafeMutableBufferPointer { ptr -> Int32 in
+                        libusb_get_string_descriptor_ascii(h, desc.iProduct, ptr.baseAddress!, Int32(ptr.count))
+                    }
+                    if rc > 0 {
+                        product = String(bytes: buf.prefix(Int(rc)), encoding: .ascii)
+                    }
+                }
+
+                // Read serial number
+                var serial: String? = nil
+                if let h = h, desc.iSerialNumber > 0 {
+                    var buf = [UInt8](repeating: 0, count: 256)
+                    let rc = buf.withUnsafeMutableBufferPointer { ptr -> Int32 in
+                        libusb_get_string_descriptor_ascii(h, desc.iSerialNumber, ptr.baseAddress!, Int32(ptr.count))
+                    }
+                    if rc > 0 {
+                        serial = String(bytes: buf.prefix(Int(rc)), encoding: .ascii)
+                    }
+                }
+
+                if let h = h { libusb_close(h) }
+
+                devices.append(ScannedDevice(
+                    id: matchIndex,
+                    busNumber: bus,
+                    deviceAddress: addr,
+                    vendorID: desc.idVendor,
+                    productID: desc.idProduct,
+                    serialNumber: serial,
+                    manufacturer: manufacturer,
+                    product: product,
+                    portPath: portPath
+                ))
+                print("[WCHLibusbTransport] Found WCH device #\(matchIndex): bus=\(bus) addr=\(addr) port=\(portPath.map { String($0) }.joined(separator: "-")) vid=0x\(String(desc.idVendor, radix: 16)) pid=0x\(String(desc.idProduct, radix: 16)) mfr=\(manufacturer ?? "N/A") prod=\(product ?? "N/A") serial=\(serial ?? "N/A")")
+                matchIndex += 1
             }
         }
-        return found
+        return devices
     }
 
     // MARK: – Init / deinit

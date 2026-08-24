@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WCHFlashSettingsView: View {
     @StateObject private var ispManager = WCHISPManager.shared
+    @State private var selectedDeviceIndex: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -31,14 +32,45 @@ struct WCHFlashSettingsView: View {
                         Spacer()
                     }
 
+                    // Device picker when multiple devices found
+                    if ispManager.scannedDevices.count > 1 {
+                        Picker("Device:", selection: $selectedDeviceIndex) {
+                            ForEach(ispManager.scannedDevices) { device in
+                                Text(device.displayName).tag(device.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .disabled(ispManager.isConnected || ispManager.isOperationInProgress)
+                    }
+
+                    // Show VID/PID and details for scanned devices
+                    if !ispManager.scannedDevices.isEmpty {
+                        let displayDevice: ScannedDevice? = ispManager.scannedDevices.count > 1
+                            ? ispManager.scannedDevices.first(where: { $0.id == selectedDeviceIndex })
+                            : ispManager.scannedDevices.first
+                        if let device = displayDevice {
+                            Text(device.detailedInfo)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .padding(6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
                     HStack(spacing: 10) {
                         Button("Scan") {
                             ispManager.scanDevices()
+                            // Auto-select first device after scan
+                            if !ispManager.scannedDevices.isEmpty {
+                                selectedDeviceIndex = ispManager.scannedDevices[0].id
+                            }
                         }
                         .disabled(ispManager.isOperationInProgress)
 
-                        if ispManager.availableDeviceCount > 0 {
-                            Text("\(ispManager.availableDeviceCount) device(s) found")
+                        if ispManager.scannedDevices.count > 1 {
+                            Text("\(ispManager.scannedDevices.count) devices found")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -46,9 +78,9 @@ struct WCHFlashSettingsView: View {
                         Spacer()
 
                         Button(ispManager.isConnected ? "Disconnect" : "Connect") {
-                            Task { await ispManager.connect() }
+                            Task { await ispManager.connect(deviceIndex: selectedDeviceIndex) }
                         }
-                        .disabled(ispManager.isOperationInProgress || (!ispManager.isConnected && ispManager.availableDeviceCount == 0))
+                        .disabled(ispManager.isOperationInProgress || (!ispManager.isConnected && ispManager.scannedDevices.isEmpty))
                     }
                 }
                 .padding(6)

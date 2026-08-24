@@ -13,7 +13,7 @@ class WCHISPManager: ObservableObject {
 
     // MARK: - Published state
 
-    @Published var availableDeviceCount: Int = 0
+    @Published var scannedDevices: [ScannedDevice] = []
     @Published var isConnected: Bool = false
     @Published var isOperationInProgress: Bool = false
     @Published var operationProgress: Double = 0.0
@@ -21,6 +21,9 @@ class WCHISPManager: ObservableObject {
     @Published var isError: Bool = false
     @Published var chipInfo: String = ""
     @Published var selectedFirmwareURL: URL?
+
+    /// Backward-compatible count
+    var availableDeviceCount: Int { scannedDevices.count }
 
     // MARK: - Private
 
@@ -31,12 +34,12 @@ class WCHISPManager: ObservableObject {
     // MARK: - Device scanning
 
     func scanDevices() {
-        let count = WCHLibusbTransport.scanDevices()
-        availableDeviceCount = count
-        if count == 0 {
+        let devices = WCHLibusbTransport.scanDevices()
+        scannedDevices = devices
+        if devices.isEmpty {
             statusMessage = "No WCH device found in ISP mode"
         } else {
-            statusMessage = "Found \(count) WCH device(s)"
+            statusMessage = "Found \(devices.count) WCH device(s)"
         }
     }
 
