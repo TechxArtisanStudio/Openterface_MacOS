@@ -105,11 +105,11 @@ struct FirmwareUpdateView: View {
     }
 
     private var wchFirmwareContent: some View {
-        if AppStatus.controlChipsetType == .ch32v208 {
-            return AnyView(WCHFlashSettingsView().padding())
-        } else {
-            return AnyView(wchNotAvailableView)
-        }
+        // if AppStatus.controlChipsetType == .ch32v208 {
+        return AnyView(WCHFlashSettingsView().padding())
+        // } else {
+        //     return AnyView(wchNotAvailableView)
+        // }
     }
 
     private var wchNotAvailableView: some View {

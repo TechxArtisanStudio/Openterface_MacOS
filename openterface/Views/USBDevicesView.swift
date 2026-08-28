@@ -554,9 +554,21 @@ struct USBDevicesView: View {
                     Text("USB Device Tree")
                         .font(.headline)
                         .padding(.leading)
-                    
+
                     Spacer()
-                    
+
+                    Button(action: {
+                        USBDevicesManager.shared.update()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.accentColor)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Refresh USB device tree")
+
                     Button(action: copyUSBTreeInfo) {
                         HStack(spacing: 4) {
                             Image(systemName: "doc.on.doc")

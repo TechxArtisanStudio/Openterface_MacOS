@@ -144,6 +144,10 @@ class WCHFlashing {
     }
 
     func verifyCode(data: [UInt8], progressCallback: ((Double) -> Void)? = nil) throws {
+        // Code flash can't be read back directly (no codeRead command in WCH ISP — dataRead
+        // targets data flash/EEPROM, a different memory region). The device-side .verify command
+        // is the only way: send the encrypted firmware to the bootloader and let it compare
+        // internally against what's actually in code flash.
         let ispKeyBytes = [UInt8](repeating: 0x00, count: 0x1E)
         let ispKeyResponse = try transport.transfer(command: .ispKey(key: ispKeyBytes))
         guard case .ok(let keyPayload) = ispKeyResponse, !keyPayload.isEmpty else {
@@ -158,6 +162,22 @@ class WCHFlashing {
             address += UInt32(chunk.count)
             progressCallback?(Double(address) / Double(data.count))
         }
+        // Final empty chunk signals end-of-verify (matches flashCode's terminator)
+        try verifyChunk(address: address, data: [])
+    }
+
+    private func verifyChunk(address: UInt32, data: [UInt8]) throws {
+        let encrypted = xorEncrypt(data: data)
+        let padding = UInt8.random(in: 0...255)
+        let response = try transport.transfer(command: .verify(address: address, padding: padding, data: encrypted))
+        guard response.isOK else { throw WCHFlashingError.verifyFailed }
+    }
+
+    /// Read the chip's code flash back as plaintext bytes.
+    /// The bootloader allows `.dataRead` from code-flash addresses; this mirrors `dumpFirmware`
+    /// on the transport but is exposed at the flashing layer with a progress callback.
+    func dumpCodeFlash(size: UInt32, progressCallback: ((Double) -> Void)? = nil) throws -> [UInt8] {
+        try transport.dumpFirmware(flashSize: size, progressCallback: progressCallback)
     }
 
     // MARK: - EEPROM
@@ -215,13 +235,6 @@ class WCHFlashing {
         guard response.isOK else { throw WCHFlashingError.programFailed }
     }
 
-    private func verifyChunk(address: UInt32, data: [UInt8]) throws {
-        let encrypted = xorEncrypt(data: data)
-        let padding = UInt8.random(in: 0...255)
-        let response = try transport.transfer(command: .verify(address: address, padding: padding, data: encrypted))
-        guard response.isOK else { throw WCHFlashingError.verifyFailed }
-    }
-
     private func writeDataChunk(address: UInt32, data: [UInt8]) throws {
         let encrypted = xorEncrypt(data: data)
         let padding = UInt8.random(in: 0...255)
@@ -232,7 +245,7 @@ class WCHFlashing {
 
 // MARK: - Errors
 
-enum WCHFlashingError: Error {
+enum WCHFlashingError: Error, LocalizedError {
     case identificationFailed
     case configReadFailed
     case configWriteFailed
@@ -241,11 +254,25 @@ enum WCHFlashingError: Error {
     case ispKeyFailed
     case programFailed
     case verifyFailed
+    case verifyMismatch(count: Int, positions: String, expectedSize: Int, actualSize: Int)
+    case dumpFailed
     case dataProgramFailed
     case invalidChipUID
     case chipNotSupported
     case eepromNotSupported
     case readEEPROMFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .verifyMismatch(let count, let positions, let expectedSize, let actualSize):
+            let sizeNote = expectedSize != actualSize
+                ? " (size mismatch: expected \(expectedSize) bytes, chip has \(actualSize))"
+                : ""
+            return "Firmware mismatch: \(count) byte(s) differ\(sizeNote). First: \(positions)"
+        default:
+            return "\(self)"
+        }
+    }
 }
 
 // MARK: - Intel HEX Parser

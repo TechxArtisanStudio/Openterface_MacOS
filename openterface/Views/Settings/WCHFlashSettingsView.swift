@@ -6,13 +6,28 @@ struct WCHFlashSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("WCH Firmware Flash")
+            Text("Keyboard & Mouse Chip Firmware Flash")
                 .font(.title2)
                 .bold()
 
-            Text("Flash firmware to WCH chips (CH32F103 / CH32V20x series) via USB ISP mode.\nConnect the device in ISP/bootloader mode before scanning.")
+            Text("Flash firmware to compatible chips via USB ISP mode.")
                 .font(.callout)
                 .foregroundColor(.secondary)
+
+            if !ispManager.isConnected {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("⚠️ Important: Entering Bootloader Mode")
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                    Text("1. Disconnect the Target USB port from your host computer\n2. Press and hold the on-board BOOT button\n3. While holding BOOT, connect Target USB to your host\n4. Release BOOT after USB connection is established")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+            }
 
             // MARK: - Device
             GroupBox("Device") {
@@ -150,15 +165,6 @@ struct WCHFlashSettingsView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .disabled(!canOperate)
-
-                        // Dump button
-                        Button {
-                            Task { await ispManager.dumpFirmware() }
-                        } label: {
-                            Label("Dump", systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .disabled(!ispManager.isConnected || ispManager.isOperationInProgress)
                     }
 
                     let flashWarning = "⚠ Flashing will erase and overwrite the chip firmware."
@@ -184,7 +190,7 @@ struct WCHFlashSettingsView: View {
                         }
                     }
 
-                    HStack(spacing: 6) {
+                    HStack(alignment: .top, spacing: 6) {
                         if ispManager.isError {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.red)
@@ -195,11 +201,23 @@ struct WCHFlashSettingsView: View {
                         } else if ispManager.operationProgress >= 1.0 && !ispManager.statusMessage.contains("failed") {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
+                        } else if !ispManager.isConnected {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
                         }
                         Text(ispManager.statusMessage)
                             .font(.system(.body, design: .monospaced))
                             .foregroundColor(ispManager.isError ? .red : .primary)
                             .lineLimit(3)
+                            .textSelection(.enabled)
+                        if ispManager.isError {
+                            Button(action: copyStatusToClipboard) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy error message to clipboard")
+                        }
                     }
                 }
                 .padding(6)
@@ -216,6 +234,12 @@ struct WCHFlashSettingsView: View {
         ispManager.isConnected &&
         !ispManager.isOperationInProgress &&
         ispManager.selectedFirmwareURL != nil
+    }
+
+    private func copyStatusToClipboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(ispManager.statusMessage, forType: .string)
     }
 
     private var deviceStatusIndicator: some View {

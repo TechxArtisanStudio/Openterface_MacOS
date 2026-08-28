@@ -134,8 +134,13 @@ class WCHISPManager: ObservableObject {
             try f.verifyCode(data: binary) { p in
                 Task { @MainActor in
                     self.statusMessage = "Verifying… \(Int(p * 100))%"
-                    self.operationProgress = 0.6 + p * 0.3
+                    self.operationProgress = 0.6 + p * 0.25
                 }
+            }
+
+            if f.chip.supportsCodeFlashProtect {
+                await self.updateStatus("Enabling flash protection…", progress: 0.88)
+                try f.protect()
             }
 
             await self.updateStatus("Resetting device…", progress: 0.95)
@@ -171,30 +176,6 @@ class WCHISPManager: ObservableObject {
                 Task { @MainActor in
                     self.statusMessage = "Verifying… \(Int(p * 100))%"
                     self.operationProgress = p
-                }
-            }
-        }
-    }
-
-    // MARK: - Dump firmware
-
-    func dumpFirmware() async {
-        guard let f = flashing else {
-            statusMessage = "Not connected"; isError = true; return
-        }
-        await performOperation("Dumping firmware") {
-            let dumpedData = try f.transport.dumpFirmware(flashSize: f.chip.flashSize) { p in
-                Task { @MainActor in
-                    self.statusMessage = "Dumping… \(Int(p * 100))%"
-                    self.operationProgress = p
-                }
-            }
-            let saveData = Data(dumpedData)
-            DispatchQueue.main.async {
-                let panel = NSSavePanel()
-                panel.nameFieldStringValue = "\(f.chip.name)_firmware.bin"
-                if panel.runModal() == .OK, let saveURL = panel.url {
-                    try? saveData.write(to: saveURL)
                 }
             }
         }

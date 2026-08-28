@@ -31,15 +31,15 @@ and picks the matching backend.
 | CH9329   | ❌        | No flashable control firmware on this device |
 | Unknown  | ❌        | Not detected                                 |
 
-The availability check is performed at render time by reading
-`AppStatus.controlChipsetType`. When the connected control chip is **not**
-`.ch32v208`, the *Keyboard & Mouse* tab shows an availability notice instead of
-the `WCHFlashSettingsView`:
+The *Keyboard & Mouse* tab always renders `WCHFlashSettingsView`. The WCH ISP
+flow itself identifies the connected chip on **Connect** via `WCHChipDB`; if the
+chip isn't recognized, `WCHFlashing.init` throws `identificationFailed` and the
+status view reports the error. The legacy availability check based on
+`AppStatus.controlChipsetType` has been removed — users can attempt a scan +
+connect regardless of what the app currently thinks the control chip is.
 
-> The connected control chip is not a WCH CH32 device, so upgrading the keyboard
-> and mouse firmware is not available in this device.
-
-This check lives in `FirmwareUpdateView.wchFirmwareContent`.
+A `wchNotAvailableView` fallback still exists in `FirmwareUpdateView` but is
+currently not referenced (commented out).
 
 ## Video Firmware Tab
 
@@ -97,9 +97,29 @@ It goes through `FirmwareUpdateView.performFirmwareFlash(from:)` which:
 
 ## Keyboard & Mouse (WCH) Firmware Tab
 
+> ⚠️ **IMPORTANT: Entering Bootloader Mode**
+>
+> Before flashing the WCH chip, you must put it into ISP bootloader mode:
+>
+> 1. **Disconnect** the Target USB port from your host computer
+> 2. **Press and hold** the on-board BOOT button on the Openterface device
+> 3. **While holding the BOOT button**, connect the Target USB port to your host computer
+> 4. **Release** the BOOT button after the USB connection is established
+>
+> The Target USB port is the port that normally connects to the computer/server you're
+> controlling (not the host computer running this app). The device must be powered through
+> this port for the WCH chip to be detected in bootloader mode.
+>
+> If you don't follow this sequence, the chip will boot normally and cannot be detected
+> for flashing.
+
 This tab is driven by `WCHFlashSettingsView` and backed by `WCHISPManager`. It
 uses the WCH USB ISP protocol (via `WCHLibusbTransport` + `WCHFlashing`) rather
 than the in-band HID protocol used by the video firmware path.
+
+The tab is always rendered — `FirmwareUpdateView.wchFirmwareContent` returns
+`WCHFlashSettingsView` unconditionally. Device presence is shown via the
+connection status indicator, not by swapping the view.
 
 ### Supported File Formats
 
@@ -107,27 +127,79 @@ than the in-band HID protocol used by the video firmware path.
 - **Intel HEX** `.hex` — parsed by `WCHHexFileParser`; auto-detected if the
   first byte is `:` or the extension is `.hex`
 
+### Multi-Device Support
+
+`WCHISPManager.scanDevices()` may find more than one WCH ISP device on the bus.
+When `scannedDevices.count > 1`, a `Picker` appears in the Device group box so
+the user can choose which one to connect to. The picker is disabled while an
+operation is in progress or while already connected.
+
 ### Workflow
 
-1. **Scan** — `WCHISPManager.scanDevices()` enumerates WCH ISP devices. The
-   device must already be in ISP / bootloader mode.
-2. **Connect** — `WCHISPManager.connect()` identifies the chip (CH32F103 /
-   CH32V20x), reads its UID and bootloader version, and reports flash
-   protection status.
-3. **Choose file** — `WCHISPManager.selectFirmwareFile()` opens an NSOpenPanel.
-4. **Operate** (pick one):
-   - **Flash Firmware** — unprotects the code flash if needed, erases it, writes
-     the new image, verifies it byte-for-byte, and resets the device.
-   - **Verify** — compares the selected file against the live chip contents.
-   - **Dump** — reads the live flash contents and saves them via NSSavePanel.
-5. Progress is reported through `@Published operationProgress` with a status
+1. **Enter bootloader mode** — See the warning box above. Disconnect the Target
+   USB port, hold the BOOT button, reconnect the Target USB port to your host
+   computer, then release the BOOT button.
+2. **Scan** — `WCHISPManager.scanDevices()` enumerates WCH ISP devices via
+   `WCHLibusbTransport.scanDevices()`. The device must be in ISP / bootloader
+   mode (see above).
+3. **Connect** — `WCHISPManager.connect(deviceIndex:)` identifies the chip
+   (CH32F103 / CH32V20x etc. via `WCHChipDB`), reads its UID and bootloader
+   version, and reports flash protection status. The chip info string is shown
+   below the connection status.
+4. **Choose file** — `WCHISPManager.selectFirmwareFile()` opens an NSOpenPanel
+   for `.bin` or `.hex` files.
+5. **Operate** (pick one):
+   - **Flash Firmware** — full flow: unprotects the code flash if needed,
+     erases it, writes the new image, **verifies via the device-side `.verify`
+     ISP command** (the bootloader compares internally against code flash),
+     re-enables flash protection if supported, and resets the device. After
+     reset, `flashing` is released and `isConnected` is set to false (the chip
+     is now running the new firmware, no longer in bootloader mode).
+   - **Verify** — compares the selected file against the live chip contents
+     using the device-side `.verify` command. This sends XOR-encrypted chunks
+     to the bootloader, which compares them against what's actually in code
+     flash and returns OK/fail. This is the *only* way to verify code flash on
+     WCH chips — `dataRead` (0xab) targets data flash/EEPROM, a different
+     memory region, and there is no `codeRead` command (security feature).
+6. Progress is reported through `@Published operationProgress` with a status
    message in the `Status` group.
+
+### Error Copy to Clipboard
+
+When an operation fails (`isError == true`), a `doc.on.doc` icon button appears
+next to the status message in the `Status` group. Clicking it copies the full
+`statusMessage` (including error details) to the system clipboard via
+`NSPasteboard.general`. The status `Text` also has `.textSelection(.enabled)`
+so users can manually select and copy if preferred.
 
 ### Flash Protection
 
 If the chip reports `supportsCodeFlashProtect` and the protection bit is set,
-the flasher calls `f.unprotect(skipReset: true)` before erasing. This step is
-automatic and logged in the status view.
+the flasher calls `f.unprotect(skipReset: true)` before erasing. After the
+write + verify, `f.protect()` re-enables protection. Both steps are automatic
+and logged in the status view.
+
+### Verification Details
+
+The verify path uses the WCH ISP `.verify` command (0xa6), which works as
+follows:
+
+1. ISP key exchange (same as flash) — establishes the XOR key derived from the
+   chip UID.
+2. Firmware binary is chunked into 56-byte pieces. Each chunk is XOR-encrypted
+   with the derived key and sent to the bootloader with the target address.
+3. The bootloader decrypts, reads code flash at that address, and compares
+   internally. Returns OK or fail.
+4. A final empty chunk signals end-of-verify (matches the flash terminator).
+
+If the bootloader reports fail at any chunk, `verifyCode` throws
+`WCHFlashingError.verifyFailed`. The status view surfaces this with the
+copy-to-clipboard button for easy bug reports.
+
+Note: because verification is device-side, the app cannot report *which* bytes
+differ — only that verification failed. For read-back of data flash / EEPROM,
+`readEEPROM` uses `.dataRead` (0xab), which *does* return data; code flash
+remains unreadable from the host.
 
 ## Pre-Update Checklist
 
@@ -148,8 +220,13 @@ For both tabs, the on-screen instructions recommend:
 | WCH tab inner UI                 | `openterface/Views/Settings/WCHFlashSettingsView.swift` |
 | Video firmware backend           | `openterface/Managers/FirmwareManager.swift`        |
 | MS2130S external flash backend   | `openterface/Managers/MS2130SFlashManager.swift`    |
-| WCH ISP backend                  | `openterface/Managers/WCH/WCHISPManager.swift`      |
-| WCH low-level protocol           | `openterface/Managers/WCH/WCHFlashing.swift`        |
+| WCH ISP backend (high-level)     | `openterface/Managers/WCH/WCHISPManager.swift`      |
+| WCH flash / verify logic         | `openterface/Managers/WCH/WCHFlashing.swift`        |
+| WCH ISP protocol (commands, responses, constants) | `openterface/Managers/WCH/WCHProtocol.swift` |
+| WCH transport protocol           | `openterface/Managers/WCH/WCHTransport.swift`       |
 | WCH transport (libusb)           | `openterface/Managers/WCH/WCHLibusbTransport.swift` |
+| WCH transport (IOKit)            | `openterface/Managers/WCH/WCHUSBTransport.swift`    |
+| WCH chip database                | `openterface/Managers/WCH/WCHChipDB.swift`          |
+| WCH Intel HEX parser             | `openterface/Managers/WCH/WCHFlashing.swift` (`WCHHexFileParser`) |
 | Chipset / device state           | `openterface/Settings/AppStatus.swift`              |
 | Window entry point               | `openterfaceApp.showFirmwareUpdateWindow()`         |

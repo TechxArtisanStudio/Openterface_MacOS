@@ -295,14 +295,12 @@ class WCHLibusbTransport: WCHTransport {
     func transfer(command: WCHCommand) throws -> WCHResponse {
         try sendRaw(command.toRawBytes())
         let bytes = try receiveRaw(timeout: TimeInterval(Self.usbTimeoutMs) / 1_000.0)
-        logReceive(bytes)
         return try WCHResponse.fromRawBytes(bytes)
     }
 
     func transfer(command: WCHCommand, timeout: TimeInterval) throws -> WCHResponse {
         try sendRaw(command.toRawBytes())
         let bytes = try receiveRaw(timeout: timeout)
-        logReceive(bytes)
         return try WCHResponse.fromRawBytes(bytes)
     }
 
@@ -312,18 +310,22 @@ class WCHLibusbTransport: WCHTransport {
         let chunkSize = 56
         var address: UInt32 = 0
 
-        while address < flashSize {
-            let toRead    = Int(min(UInt32(chunkSize), flashSize - address))
+        while firmware.count < Int(flashSize) {
+            let remaining = Int(flashSize) - firmware.count
+            let toRead    = min(chunkSize, remaining)
             let response  = try transfer(command: .dataRead(address: address, length: UInt16(toRead)))
-            guard case .ok(let payload) = response, !payload.isEmpty else {
+            guard case .ok(let payload) = response else {
                 print("[WCHLibusbTransport] Bad read response at 0x\(String(address, radix: 16))")
                 throw WCHTransportError.readFailed
             }
+            // Bootloader may return fewer bytes than requested (or empty at end-of-readable).
+            // Advance by actual bytes received so address tracks firmware.count.
+            if payload.isEmpty { break }
             firmware.append(contentsOf: payload)
-            address += UInt32(toRead)
-            progressCallback?(Double(address) / Double(flashSize))
+            address += UInt32(payload.count)
+            progressCallback?(Double(firmware.count) / Double(flashSize))
         }
-        print("[WCHLibusbTransport] Dump complete: \(firmware.count) bytes")
+        print("[WCHLibusbTransport] Dump complete: \(firmware.count) bytes (requested \(flashSize))")
         return firmware
     }
 
