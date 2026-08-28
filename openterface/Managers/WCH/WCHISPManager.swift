@@ -147,7 +147,7 @@ class WCHISPManager: ObservableObject {
 
                 // Reconnect to device
                 statusMessage = "Reconnecting..."
-                try await Task.sleep(nanoseconds: 500_000_000)  // Brief pause
+                try await Task.sleep(nanoseconds: 1_000_000_000)  // Wait 1 second for device to stabilize
                 let transport = try WCHLibusbTransport(deviceIndex: 0)
                 f = try WCHFlashing(transport: transport)
                 flashing = f
@@ -161,6 +161,8 @@ class WCHISPManager: ObservableObject {
                     return
                 }
                 print("[WCH] Device successfully unprotected and reconnected")
+                // Add a delay before flash operations to ensure device is ready
+                try await Task.sleep(nanoseconds: 500_000_000)  // Wait 0.5 seconds
             } catch {
                 isError = true
                 statusMessage = "Unprotect failed: \(error)"

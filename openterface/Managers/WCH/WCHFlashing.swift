@@ -148,9 +148,13 @@ class WCHFlashing {
 
     func eraseCodeFlash(firmwareSize: UInt32? = nil) throws {
         let sectors = calculateSectors(dataSize: firmwareSize)
+        print("[WCH] Erasing \(sectors) sectors...")
         let response = try transport.transfer(command: .erase(sectors: sectors))
-        guard response.isOK else { throw WCHFlashingError.eraseFailed }
-        print("[WCH] Erased \(sectors) sectors")
+        guard response.isOK else {
+            print("[WCH] Erase failed: response not OK")
+            throw WCHFlashingError.eraseFailed
+        }
+        print("[WCH] Erased \(sectors) sectors successfully")
         // No delay - proceed immediately to flash
     }
 
@@ -216,7 +220,10 @@ class WCHFlashing {
         let encrypted = xorEncrypt(data: data)
         let padding = UInt8.random(in: 0...255)
         let response = try transport.transfer(command: .verify(address: address, padding: padding, data: encrypted))
-        guard response.isOK else { throw WCHFlashingError.verifyFailed }
+        guard response.isOK else {
+            print("[WCH] verifyChunk failed at address 0x\(String(format: "%08X", address))")
+            throw WCHFlashingError.verifyFailed
+        }
     }
 
     /// Read the chip's code flash back as plaintext bytes.
@@ -278,7 +285,10 @@ class WCHFlashing {
         let encrypted = xorEncrypt(data: data)
         let padding = UInt8.random(in: 0...255)
         let response = try transport.transfer(command: .program(address: address, padding: padding, data: encrypted))
-        guard response.isOK else { throw WCHFlashingError.programFailed }
+        guard response.isOK else {
+            print("[WCH] flashChunk failed at address 0x\(String(format: "%08X", address))")
+            throw WCHFlashingError.programFailed
+        }
     }
 
     private func writeDataChunk(address: UInt32, data: [UInt8]) throws {
