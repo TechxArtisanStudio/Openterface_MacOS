@@ -99,12 +99,17 @@ It goes through `FirmwareUpdateView.performFirmwareFlash(from:)` which:
 
 > ⚠️ **IMPORTANT: Entering Bootloader Mode**
 >
-> Before flashing the WCH chip, you must put it into ISP bootloader mode:
+> **First time or after device is disconnected:**
 >
 > 1. **Disconnect** the Target USB port from your host computer
 > 2. **Press and hold** the on-board BOOT button on the Openterface device
 > 3. **While holding the BOOT button**, connect the Target USB port to your host computer
 > 4. **Release** the BOOT button after the USB connection is established
+>
+> **After unprotect (when prompted by the tool):**
+>
+> Simply **press the BOOT button once** (no need to disconnect). The device will
+> reset and enter bootloader mode automatically.
 >
 > The Target USB port is the port that normally connects to the computer/server you're
 > controlling (not the host computer running this app). The device must be powered through
@@ -149,12 +154,24 @@ operation is in progress or while already connected.
 4. **Choose file** — `WCHISPManager.selectFirmwareFile()` opens an NSOpenPanel
    for `.bin` or `.hex` files.
 5. **Operate** (pick one):
-   - **Flash Firmware** — full flow: unprotects the code flash if needed,
-     erases it, writes the new image, **verifies via the device-side `.verify`
-     ISP command** (the bootloader compares internally against code flash),
-     re-enables flash protection if supported, and resets the device. After
-     reset, `flashing` is released and `isConnected` is set to false (the chip
+   - **Flash Firmware** — full flow:
+     1. If flash is protected, automatically unprotects it (sets RDPR=0xA5)
+     2. Device resets and boots firmware
+     3. **User must press BOOT button** to enter bootloader mode again
+     4. Tool automatically detects device and reconnects
+     5. Erases the code flash
+     6. Writes the new firmware image with XOR encryption
+     7. **Verifies via the device-side `.verify` ISP command** (the bootloader compares internally against code flash)
+     8. Enables flash protection (sets RDPR=0xFF) if supported
+     9. Resets the device to boot the new firmware
+
+     After reset, `flashing` is released and `isConnected` is set to false (the chip
      is now running the new firmware, no longer in bootloader mode).
+
+     **Note:** If the chip was protected, after unprotect you'll see a message
+     asking you to press the BOOT button. The tool waits up to 30 seconds for
+     you to press BOOT, then automatically continues with the flash.
+
    - **Verify** — compares the selected file against the live chip contents
      using the device-side `.verify` command. This sends XOR-encrypted chunks
      to the bootloader, which compares them against what's actually in code
@@ -174,10 +191,34 @@ so users can manually select and copy if preferred.
 
 ### Flash Protection
 
-If the chip reports `supportsCodeFlashProtect` and the protection bit is set,
-the flasher calls `f.unprotect(skipReset: true)` before erasing. After the
-write + verify, `f.protect()` re-enables protection. Both steps are automatic
-and logged in the status view.
+Flash protection is enabled automatically after successful flashing. The protection
+mechanism uses RDPR (Read Protection Register):
+
+- **Unprotected state:** RDPR = 0xA5 (complement 0x5A)
+- **Protected state:** RDPR = 0xFF (complement 0x00)
+
+**Unprotect flow:**
+If the chip is protected when you start flashing:
+1. Tool automatically unprotects by setting RDPR=0xA5
+2. Device resets and boots the existing firmware
+3. **You must press the BOOT button** on the device to enter bootloader mode again
+4. Tool detects the device and reconnects automatically (waits up to 30 seconds)
+5. Flash continues normally
+
+**Protect flow:**
+After successful flash and verify:
+1. Tool enables protection by setting RDPR=0xFF
+2. Device resets and boots the new firmware
+3. The flash is now protected from reading/modification
+
+**Important notes:**
+- When flashing a protected chip, you need to press BOOT after unprotect
+- When flashing an unprotected chip, the process is fully automatic
+- If the chip reports `supportsCodeFlashProtect` and the protection bit is already
+  set (from a previous flash), the flasher calls `f.unprotect(skipReset: false)`
+  before erasing
+- After the write + verify, `f.protect()` re-enables protection
+- Both steps are logged in the status view with config dumps
 
 ### Verification Details
 

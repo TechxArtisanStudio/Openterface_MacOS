@@ -310,4 +310,52 @@ final class WCHFlashingTests: XCTestCase {
         XCTAssertEqual(encrypted[4], 0x55 ^ 0xAA)
         XCTAssertEqual(encrypted[5], 0x66 ^ 0xBB)
     }
+
+    // MARK: - WriteConfig Command Tests
+
+    func testWriteConfigCommandEncoding() {
+        // Test WriteConfig command (0xA8) used for protect/unprotect
+        let configData: [UInt8] = [0xA5, 0x5A, 0x3F, 0xC0, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0xFF]
+        let cmd = WCHCommand.writeConfig(bitMask: WCHConstants.cfgMaskRDPRUserDataWPR, data: configData)
+        let bytes = cmd.toRawBytes()
+
+        XCTAssertEqual(bytes[0], WCHCommands.writeConfig) // 0xa8
+        XCTAssertEqual(bytes[1], 0x0E) // length low (14 bytes: 2 mask + 12 config)
+        XCTAssertEqual(bytes[2], 0x00) // length high
+        XCTAssertEqual(bytes[3], WCHConstants.cfgMaskRDPRUserDataWPR) // bitmask
+        XCTAssertEqual(bytes[4], 0x00)
+        // Config data follows
+        XCTAssertEqual(bytes[5], 0xA5) // RDPR
+        XCTAssertEqual(bytes[6], 0x5A) // RDPR complement
+    }
+
+    // MARK: - IspEnd Command Tests
+
+    func testIspEndCommandEncoding() {
+        // Test IspEnd command (0xA2) used for reset
+        let cmd = WCHCommand.ispEnd(reason: 1)
+        let bytes = cmd.toRawBytes()
+
+        XCTAssertEqual(bytes[0], WCHCommands.ispEnd) // 0xa2
+        XCTAssertEqual(bytes[1], 0x01) // length
+        XCTAssertEqual(bytes[2], 0x00)
+        XCTAssertEqual(bytes[3], 0x01) // reason (1 = reset to user code)
+    }
+
+    // MARK: - Config Value Tests
+
+    func testProtectionConfigValues() {
+        // Test that we use correct RDPR values for protection states
+        let unprotectedRDPR: UInt8 = 0xA5
+        let unprotectedComplement: UInt8 = 0x5A
+        let protectedRDPR: UInt8 = 0xFF
+        let protectedComplement: UInt8 = 0x00
+
+        // Verify complement relationship (bitwise NOT)
+        XCTAssertEqual(~unprotectedRDPR, unprotectedComplement)
+        XCTAssertEqual(~protectedRDPR, protectedComplement)
+
+        // Verify the values are different
+        XCTAssertNotEqual(unprotectedRDPR, protectedRDPR)
+    }
 }

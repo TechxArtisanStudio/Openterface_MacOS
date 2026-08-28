@@ -49,6 +49,9 @@ class WCHFlashing {
         guard chipUID.count >= chip.uidSize else {
             throw WCHFlashingError.invalidChipUID
         }
+        print("[WCH] UID: \(chipUID.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        print("[WCH] UID checksum: 0x\(String(format: "%02X", uidChecksum))")
+        print("[WCH] XOR key: \(xorKey.map { String(format: "%02X", $0) }.joined(separator: " "))")
         print("[WCH] Init complete. Flash protected: \(codeFlashProtected)")
     }
 
@@ -76,6 +79,34 @@ class WCHFlashing {
 
     // MARK: - Unprotect / Protect
 
+    func printConfig() {
+        do {
+            let configResponse = try transport.transfer(command: .readConfig(bitMask: WCHConstants.cfgMaskAll))
+            guard case .ok(let payload) = configResponse else {
+                print("[WCH] Failed to read config")
+                return
+            }
+            print("[WCH] Config dump (\(payload.count) bytes):")
+            print("[WCH]   Raw: \(payload.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            if payload.count >= 14 {
+                let rdpr = payload[2]
+                let rdprComp = payload[3]
+                print("[WCH]   RDPR: 0x\(String(format: "%02X", rdpr)) (complement: 0x\(String(format: "%02X", rdprComp)))")
+                print("[WCH]   USER: \(payload[4..<8].map { String(format: "%02X", $0) }.joined(separator: " "))")
+                print("[WCH]   DATA: \(payload[8..<12].map { String(format: "%02X", $0) }.joined(separator: " "))")
+                print("[WCH]   WRP:  \(payload[12..<16].map { String(format: "%02X", $0) }.joined(separator: " "))")
+            }
+            if payload.count >= 18 {
+                print("[WCH]   BTVER: \(payload[14..<18].map { String(format: "%02X", $0) }.joined(separator: " "))")
+            }
+            if payload.count >= 26 {
+                print("[WCH]   UID:  \(payload[18..<26].map { String(format: "%02X", $0) }.joined(separator: " "))")
+            }
+        } catch {
+            print("[WCH] Error reading config: \(error)")
+        }
+    }
+
     func unprotect(force: Bool = false, skipReset: Bool = false) throws {
         if !force && !codeFlashProtected { return }
         let configResponse = try transport.transfer(command: .readConfig(bitMask: WCHConstants.cfgMaskRDPRUserDataWPR))
@@ -98,8 +129,8 @@ class WCHFlashing {
             throw WCHFlashingError.configReadFailed
         }
         var config = Array(payload[2..<14])
-        config[0] = 0x00; config[1] = 0x00
-        config[8..<12] = [0x00, 0x00, 0x00, 0x00]
+        // Set RDPR to 0xFF/0x00 for protected state
+        config[0] = 0xFF; config[1] = 0x00  // RDPR: protected
         let writeResponse = try transport.transfer(command: .writeConfig(bitMask: WCHConstants.cfgMaskRDPRUserDataWPR, data: config))
         guard writeResponse.isOK else { throw WCHFlashingError.configWriteFailed }
         codeFlashProtected = true
@@ -120,26 +151,41 @@ class WCHFlashing {
         let response = try transport.transfer(command: .erase(sectors: sectors))
         guard response.isOK else { throw WCHFlashingError.eraseFailed }
         print("[WCH] Erased \(sectors) sectors")
+        // No delay - proceed immediately to flash
     }
 
     // MARK: - Flash / Verify
 
     func flashCode(data: [UInt8], progressCallback: ((Double) -> Void)? = nil) throws {
+        print("[WCH] flashCode: Starting, data size=\(data.count) bytes")
+        // ISP key exchange for code flash: send zeros (30 bytes)
+        // Note: Code flash uses zeros, while data flash (EEPROM) uses xorKey
         let ispKeyBytes = [UInt8](repeating: 0x00, count: 0x1E)
+        print("[WCH] flashCode: Sending ISP key exchange...")
         let ispKeyResponse = try transport.transfer(command: .ispKey(key: ispKeyBytes))
         guard case .ok(let keyPayload) = ispKeyResponse, !keyPayload.isEmpty else {
+            print("[WCH] flashCode: ISP key exchange failed")
             throw WCHFlashingError.ispKeyFailed
         }
         let expected = xorKey.reduce(0 as UInt8) { $0 &+ $1 }
-        guard keyPayload[0] == expected else { throw WCHFlashingError.ispKeyFailed }
+        guard keyPayload[0] == expected else {
+            print("[WCH] flashCode: ISP key verification failed (expected 0x\(String(format: "%02X", expected)), got 0x\(String(format: "%02X", keyPayload[0])))")
+            throw WCHFlashingError.ispKeyFailed
+        }
+        print("[WCH] flashCode: ISP key exchange OK")
 
         var address: UInt32 = 0
-        for chunk in data.wchChunked(into: 56) {
+        let totalChunks = (data.count + 55) / 56
+        print("[WCH] flashCode: Writing \(totalChunks) chunks...")
+        for (i, chunk) in data.wchChunked(into: 56).enumerated() {
+            if i % 500 == 0 || i == totalChunks - 1 {
+                print("[WCH] flashCode: Chunk \(i)/\(totalChunks) @ 0x\(String(format: "%08X", address))")
+            }
             try flashChunk(address: address, data: chunk)
             address += UInt32(chunk.count)
             progressCallback?(Double(address) / Double(data.count))
         }
-        try flashChunk(address: address, data: [])
+        print("[WCH] flashCode: Complete")
         usleep(500_000)
     }
 
@@ -148,6 +194,8 @@ class WCHFlashing {
         // targets data flash/EEPROM, a different memory region). The device-side .verify command
         // is the only way: send the encrypted firmware to the bootloader and let it compare
         // internally against what's actually in code flash.
+
+        // ISP key exchange for code flash: send zeros (30 bytes)
         let ispKeyBytes = [UInt8](repeating: 0x00, count: 0x1E)
         let ispKeyResponse = try transport.transfer(command: .ispKey(key: ispKeyBytes))
         guard case .ok(let keyPayload) = ispKeyResponse, !keyPayload.isEmpty else {
@@ -162,8 +210,6 @@ class WCHFlashing {
             address += UInt32(chunk.count)
             progressCallback?(Double(address) / Double(data.count))
         }
-        // Final empty chunk signals end-of-verify (matches flashCode's terminator)
-        try verifyChunk(address: address, data: [])
     }
 
     private func verifyChunk(address: UInt32, data: [UInt8]) throws {
