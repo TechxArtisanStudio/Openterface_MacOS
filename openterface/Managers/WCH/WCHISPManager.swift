@@ -13,7 +13,7 @@ class WCHISPManager: ObservableObject {
 
     // MARK: - Published state
 
-    @Published var availableDeviceCount: Int = 0
+    @Published var scannedDevices: [ScannedDevice] = []
     @Published var isConnected: Bool = false
     @Published var isOperationInProgress: Bool = false
     @Published var operationProgress: Double = 0.0
@@ -21,6 +21,9 @@ class WCHISPManager: ObservableObject {
     @Published var isError: Bool = false
     @Published var chipInfo: String = ""
     @Published var selectedFirmwareURL: URL?
+
+    /// Backward-compatible count
+    var availableDeviceCount: Int { scannedDevices.count }
 
     // MARK: - Private
 
@@ -31,12 +34,12 @@ class WCHISPManager: ObservableObject {
     // MARK: - Device scanning
 
     func scanDevices() {
-        let count = WCHLibusbTransport.scanDevices()
-        availableDeviceCount = count
-        if count == 0 {
+        let devices = WCHLibusbTransport.scanDevices()
+        scannedDevices = devices
+        if devices.isEmpty {
             statusMessage = "No WCH device found in ISP mode"
         } else {
-            statusMessage = "Found \(count) WCH device(s)"
+            statusMessage = "Found \(devices.count) WCH device(s)"
         }
     }
 
@@ -89,7 +92,7 @@ class WCHISPManager: ObservableObject {
     // MARK: - Flash
 
     func flashFirmware() async {
-        guard let f = flashing else {
+        guard var f = flashing else {
             statusMessage = "Not connected"
             isError = true
             return
@@ -110,11 +113,65 @@ class WCHISPManager: ObservableObject {
             return
         }
 
-        await performOperation("Flashing") {
-            if f.isCodeFlashProtected() {
-                await self.updateStatus("Unprotecting flash…", progress: 0.02)
-                try f.unprotect(skipReset: true)
+        // Handle unprotect before performOperation (needs MainActor access)
+        if f.isCodeFlashProtected() {
+            statusMessage = "Reading config…"
+            f.printConfig()
+            statusMessage = "Unprotecting flash…"
+            do {
+                print("[WCH] Calling unprotect...")
+                try f.unprotect(skipReset: false)  // Must reset after unprotect
+                print("[WCH] Unprotect completed, device will reset")
+                // After unprotect reset, device boots firmware
+                // User needs to press BOOT button to enter bootloader mode
+                statusMessage = "⚠️ Unprotect complete. Please press the BOOT button on the device to enter bootloader mode, and connect again.."
+                flashing = nil
+                isConnected = false
+
+                // Wait for device to re-enumerate in bootloader mode
+                var deviceFound = false
+                for attempt in 1...30 {  // Wait up to 30 seconds
+                    try await Task.sleep(nanoseconds: 1_000_000_000)  // Wait 1 second
+                    let devices = WCHLibusbTransport.scanDevices()
+                    print("[WCH] Waiting for BOOT press... attempt \(attempt)/30, found \(devices.count) devices")
+                    if !devices.isEmpty {
+                        deviceFound = true
+                        break
+                    }
+                }
+                guard deviceFound else {
+                    isError = true
+                    statusMessage = "Device not found after unprotect. Please press BOOT button and try again."
+                    return
+                }
+
+                // Reconnect to device
+                statusMessage = "Reconnecting..."
+                try await Task.sleep(nanoseconds: 500_000_000)  // Brief pause
+                let transport = try WCHLibusbTransport(deviceIndex: 0)
+                f = try WCHFlashing(transport: transport)
+                flashing = f
+                isConnected = true
+                print("[WCH] Reconnected after BOOT press")
+                f.printConfig()
+
+                if f.isCodeFlashProtected() {
+                    isError = true
+                    statusMessage = "Device still protected after unprotect. Try again."
+                    return
+                }
+                print("[WCH] Device successfully unprotected and reconnected")
+            } catch {
+                isError = true
+                statusMessage = "Unprotect failed: \(error)"
+                return
             }
+        }
+
+        await performOperation("Flashing") {
+            // Always dump config before flash
+            await self.updateStatus("Reading config…", progress: 0.01)
+            f.printConfig()
 
             await self.updateStatus("Erasing…", progress: 0.05)
             try f.eraseCodeFlash(firmwareSize: UInt32(binary.count))
@@ -131,8 +188,16 @@ class WCHISPManager: ObservableObject {
             try f.verifyCode(data: binary) { p in
                 Task { @MainActor in
                     self.statusMessage = "Verifying… \(Int(p * 100))%"
-                    self.operationProgress = 0.6 + p * 0.3
+                    self.operationProgress = 0.6 + p * 0.25
                 }
+            }
+
+            if f.chip.supportsCodeFlashProtect {
+                await self.updateStatus("Enabling flash protection…", progress: 0.88)
+                try f.protect()
+                await self.updateStatus("Config after protect:", progress: 0.90)
+                f.printConfig()
+                sleep(2)
             }
 
             await self.updateStatus("Resetting device…", progress: 0.95)
@@ -168,30 +233,6 @@ class WCHISPManager: ObservableObject {
                 Task { @MainActor in
                     self.statusMessage = "Verifying… \(Int(p * 100))%"
                     self.operationProgress = p
-                }
-            }
-        }
-    }
-
-    // MARK: - Dump firmware
-
-    func dumpFirmware() async {
-        guard let f = flashing else {
-            statusMessage = "Not connected"; isError = true; return
-        }
-        await performOperation("Dumping firmware") {
-            let dumpedData = try f.transport.dumpFirmware(flashSize: f.chip.flashSize) { p in
-                Task { @MainActor in
-                    self.statusMessage = "Dumping… \(Int(p * 100))%"
-                    self.operationProgress = p
-                }
-            }
-            let saveData = Data(dumpedData)
-            DispatchQueue.main.async {
-                let panel = NSSavePanel()
-                panel.nameFieldStringValue = "\(f.chip.name)_firmware.bin"
-                if panel.runModal() == .OK, let saveURL = panel.url {
-                    try? saveData.write(to: saveURL)
                 }
             }
         }

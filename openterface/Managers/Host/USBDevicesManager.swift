@@ -55,16 +55,15 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     func update() {
         // get usb devices info
         let _d: [USBDeviceInfo] = getUSBDevices()
-        
-        // 
-        if !_d.isEmpty {
-            AppStatus.USBDevices = _d
-        } else {
-            logger.log(content: "USB device scan completed: No USB devices detected on the system")
-            logger.log(content: "No USB devices found")
-        }
+
+        // Always refresh from the live scan so unplugged devices are removed
+        AppStatus.USBDevices = _d
+
+        // Reset grouped devices before rebuilding
+        AppStatus.groupOpenterfaceDevices = []
+
         groundByOpenterface()
-        
+
         // Update chipset type flag after grouping devices
         updateChipsetTypeFlag()
     }
@@ -524,6 +523,9 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 for (index, group) in groupedDevices.enumerated() {
                     logger.log(content: "Group \(index + 1): \(group.map { $0.productName }.joined(separator: ", "))")
                 }
+            } else {
+                AppStatus.groupOpenterfaceDevices = []
+                logger.log(content: "No supported Openterface devices found in USB device list")
             }
             
             //setting default video and serial device from all groups
