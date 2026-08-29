@@ -160,10 +160,15 @@ operation is in progress or while already connected.
      3. **User must press BOOT button** to enter bootloader mode again
      4. Tool automatically detects device and reconnects
      5. Erases the code flash
-     6. Writes the new firmware image with XOR encryption
-     7. **Verifies via the device-side `.verify` ISP command** (the bootloader compares internally against code flash)
-     8. Enables flash protection (sets RDPR=0xFF) if supported
-     9. Resets the device to boot the new firmware
+     6. Writes the new firmware image with XOR encryption in 56-byte chunks
+     7. **Sends an empty terminator chunk** to signal end of flash (required by bootloader)
+     8. **Verifies via the device-side `.verify` ISP command** (the bootloader compares internally against code flash)
+     9. Enables flash protection (sets RDPR=0xFF) if supported
+     10. Resets the device to boot the new firmware
+
+     **Important:** The empty terminator chunk (step 7) is critical — without it, the
+     bootloader does not finalize the flash operation, and the firmware will not boot
+     even though verify passes. This matches the behavior of the wchisp Rust tool.
 
      After reset, `flashing` is released and `isConnected` is set to false (the chip
      is now running the new firmware, no longer in bootloader mode).

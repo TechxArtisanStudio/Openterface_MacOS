@@ -189,6 +189,9 @@ class WCHFlashing {
             address += UInt32(chunk.count)
             progressCallback?(Double(address) / Double(data.count))
         }
+        // NOTE: require a write action of empty data for success flashing (matches wchisp)
+        print("[WCH] flashCode: Sending empty terminator chunk...")
+        try flashChunk(address: address, data: [])
         print("[WCH] flashCode: Complete")
         usleep(500_000)
     }
@@ -199,14 +202,21 @@ class WCHFlashing {
         // is the only way: send the encrypted firmware to the bootloader and let it compare
         // internally against what's actually in code flash.
 
+        print("[WCH] verifyCode: Starting verification...")
+
         // ISP key exchange for code flash: send zeros (30 bytes)
         let ispKeyBytes = [UInt8](repeating: 0x00, count: 0x1E)
         let ispKeyResponse = try transport.transfer(command: .ispKey(key: ispKeyBytes))
         guard case .ok(let keyPayload) = ispKeyResponse, !keyPayload.isEmpty else {
+            print("[WCH] verifyCode: ISP key exchange failed")
             throw WCHFlashingError.ispKeyFailed
         }
         let expected = xorKey.reduce(0 as UInt8) { $0 &+ $1 }
-        guard keyPayload[0] == expected else { throw WCHFlashingError.ispKeyFailed }
+        guard keyPayload[0] == expected else {
+            print("[WCH] verifyCode: ISP key mismatch")
+            throw WCHFlashingError.ispKeyFailed
+        }
+        print("[WCH] verifyCode: ISP key exchange OK")
 
         var address: UInt32 = 0
         for chunk in data.wchChunked(into: 56) {
@@ -214,6 +224,8 @@ class WCHFlashing {
             address += UInt32(chunk.count)
             progressCallback?(Double(address) / Double(data.count))
         }
+        print("[WCH] verifyCode: Complete")
+        usleep(500_000)
     }
 
     private func verifyChunk(address: UInt32, data: [UInt8]) throws {

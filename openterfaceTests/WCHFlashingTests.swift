@@ -188,6 +188,27 @@ final class WCHFlashingTests: XCTestCase {
         XCTAssertEqual(bytes[10], 0x33)
     }
 
+    func testProgramCommandEmptyData() {
+        // Test empty data encoding (used as flash terminator)
+        let data: [UInt8] = []
+        let cmd = WCHCommand.program(address: 0x08000100, padding: 0xCD, data: data)
+        let bytes = cmd.toRawBytes()
+
+        XCTAssertEqual(bytes[0], WCHCommands.program) // 0xa5
+        // Payload size = 4 (address) + 1 (padding) + 0 (data) = 5
+        XCTAssertEqual(bytes[1], 0x05) // length low
+        XCTAssertEqual(bytes[2], 0x00) // length high
+        // Address in little-endian
+        XCTAssertEqual(bytes[3], 0x00)
+        XCTAssertEqual(bytes[4], 0x01)
+        XCTAssertEqual(bytes[5], 0x00)
+        XCTAssertEqual(bytes[6], 0x08)
+        // Padding
+        XCTAssertEqual(bytes[7], 0xCD)
+        // No data bytes
+        XCTAssertEqual(bytes.count, 8) // 3 header + 5 payload
+    }
+
     func testVerifyCommandEncoding() {
         let data: [UInt8] = [0xAA, 0xBB]
         let cmd = WCHCommand.verify(address: 0x08000200, padding: 0xCD, data: data)
@@ -291,6 +312,19 @@ final class WCHFlashingTests: XCTestCase {
         }
 
         XCTAssertEqual(decrypted, originalData)
+    }
+
+    func testXOREncryptionEmptyData() {
+        // Empty data should produce empty result (used for flash terminator)
+        let emptyData: [UInt8] = []
+        let xorKey: [UInt8] = [0xAA, 0xBB, 0xCC]
+
+        let encrypted = emptyData.enumerated().map { offset, byte in
+            byte ^ xorKey[offset % xorKey.count]
+        }
+
+        XCTAssertEqual(encrypted.count, 0)
+        XCTAssertTrue(encrypted.isEmpty)
     }
 
     func testXOREncryptionWrapping() {
