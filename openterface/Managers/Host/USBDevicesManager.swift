@@ -192,6 +192,9 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     func getVideoChipsetType(vendorId: Int, productId: Int) -> VideoChipsetType {
         if vendorId == MS2019_VID && productId == MS2019_PID {
             return .ms2109
+        } else if vendorId == MS2019S_VID && productId == MS2019S_PID {
+            // MS2109S: Vendor 0x345F, Product 0x2109
+            return .ms2109s
         } else if vendorId == MS2130S_VID && productId == MS2130S_PID {
             return .ms2130s
         } else {

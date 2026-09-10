@@ -92,8 +92,9 @@ class MS2109SVideoChipset: BaseVideoChipset {
 
         // Check if MS2109S device is connected
         for device in AppStatus.USBDevices {
-            if device.vendorID == MS2109SVideoChipset.VENDOR_ID &&
-               device.productID == MS2109SVideoChipset.PRODUCT_ID {
+            if (device.vendorID == MS2109SVideoChipset.VENDOR_ID &&
+                device.productID == MS2109SVideoChipset.PRODUCT_ID) ||
+               device.productName.lowercased().contains("unknown capture card") {
                 logger.log(content: "🔍 MS2109S device detected: \(device.productName)")
                 return true
             }
@@ -103,61 +104,18 @@ class MS2109SVideoChipset: BaseVideoChipset {
     }
 
     override func validateConnection() -> Bool {
-        // Validate MS2109S connection by checking HID communication
-        let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-
-        if let version = hidManager.getVersion() {
-            logger.log(content: "📋 MS2109S version: \(version)")
-            
-            // Read video name from EEPROM once device is connected
-            if let videoName = hidManager.readVideoNameFromEeprom() {
-                logger.log(content: "📝 Video name from EEPROM: \(videoName)")
-                
-                // Only update USBDeviceInfo if video name is valid (not just spaces)
-                let trimmedName = videoName.trimmingCharacters(in: .whitespaces)
-                if !trimmedName.isEmpty {
-                    if var defaultDevice = AppStatus.videoChipDevice {
-                        // Update the matching device in AppStatus.USBDevices array so the tree view reflects the change
-                        if let index = AppStatus.USBDevices.firstIndex(where: { device in
-                            device.vendorID == defaultDevice.vendorID &&
-                            device.productID == defaultDevice.productID &&
-                            device.locationID == defaultDevice.locationID
-                        }) {
-                            let existingDevice = AppStatus.USBDevices[index]
-                            let updatedDevice = USBDeviceInfo(
-                                productName: videoName,
-                                manufacturer: existingDevice.manufacturer,
-                                vendorID: existingDevice.vendorID,
-                                productID: existingDevice.productID,
-                                locationID: existingDevice.locationID,
-                                speed: existingDevice.speed
-                            )
-                            AppStatus.USBDevices[index] = updatedDevice
-                            logger.log(content: "✅ Updated USBDevices array with new product name for tree view")
-                        }
-                        
-                        // Also update videoChipDevice
-                        defaultDevice = USBDeviceInfo(
-                            productName: videoName,
-                            manufacturer: defaultDevice.manufacturer,
-                            vendorID: defaultDevice.vendorID,
-                            productID: defaultDevice.productID,
-                            locationID: defaultDevice.locationID,
-                            speed: defaultDevice.speed
-                        )
-                        AppStatus.videoChipDevice = defaultDevice
-                        logger.log(content: "✅ Updated videoChipDevice productName with EEPROM video name")
-                    }
-                } else {
-                    logger.log(content: "⚠️ Video name is empty or contains only spaces, skipping update")
-                }
-            } else {
-                logger.log(content: "⚠️ Failed to read video name from EEPROM")
+        // Validate MS2109S connection by checking USB device enumeration
+        // since HID communication may not be available yet
+        for device in AppStatus.USBDevices {
+            if (device.vendorID == MS2109SVideoChipset.VENDOR_ID &&
+                device.productID == MS2109SVideoChipset.PRODUCT_ID) ||
+               device.productName.lowercased().contains("unknown capture card") {
+                logger.log(content: "✅ MS2109S device connection validated: \(device.productName)")
+                return true
             }
-            
-            return true
         }
 
+        logger.log(content: "❌ MS2109S device connection validation failed - device not found in USB devices")
         return false
     }
 

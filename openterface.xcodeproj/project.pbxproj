@@ -254,6 +254,7 @@
 		C1A2B3C32F1A000100ABCDEF /* RemoteControlSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteControlSettingsView.swift; sourceTree = "<group>"; };
 		D2A1B3C52F83000100A1B2C3 /* agents */ = {isa = PBXFileReference; lastKnownFileType = folder; name = agents; path = docs/ai/agents; sourceTree = SOURCE_ROOT; };
 		D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WCHFlashSettingsView.swift; sourceTree = "<group>"; };
+		F17AD1E82FF27FFA00505E4E /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
 		F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MS2130SFlashManager.swift; sourceTree = "<group>"; };
 		FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPCredSSPTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -328,6 +329,7 @@
 				53FBE7BE2B3D66D6007785B0 /* openterfaceTests */,
 				53FBE7C82B3D66D6007785B0 /* openterfaceUITests */,
 				53FBE7AB2B3D66D2007785B0 /* Products */,
+				F17AD1E82FF27FFA00505E4E /* AppStatus.swift */,
 			);
 			sourceTree = "<group>";
 		};

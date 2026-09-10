@@ -90,8 +90,9 @@ class MS2130SVideoChipset: BaseVideoChipset {
 
         // Check if MS2130S device is connected
         for device in AppStatus.USBDevices {
-            if device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
-               device.productID == MS2130SVideoChipset.PRODUCT_ID {
+            if (device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
+                device.productID == MS2130SVideoChipset.PRODUCT_ID) ||
+               device.productName.lowercased().contains("unknown capture card") {
                 logger.log(content: "🔍 MS2130S device detected: \(device.productName)")
                 return true
             }
@@ -102,9 +103,17 @@ class MS2130SVideoChipset: BaseVideoChipset {
 
     override func validateConnection() -> Bool {
         // MS2130S validation differs from MS2109
-        // May not have full HID capabilities, so use different validation
-        let videoDevices = getVideoDevices()
-        return !videoDevices.isEmpty
+        // Use USB device detection since MS2130S may not have full HID capabilities
+        for device in AppStatus.USBDevices {
+            if device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
+               device.productID == MS2130SVideoChipset.PRODUCT_ID {
+                logger.log(content: "✅ MS2130S device connection validated: \(device.productName)")
+                return true
+            }
+        }
+
+        logger.log(content: "❌ MS2130S device connection validation failed - device not found in USB devices")
+        return false
     }
 
     override func getSignalStatus() -> VideoSignalStatus {
