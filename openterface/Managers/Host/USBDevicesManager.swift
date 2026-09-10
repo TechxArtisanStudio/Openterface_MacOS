@@ -126,6 +126,12 @@ class USBDevicesManager: USBDevicesManagerProtocol {
             let speedValue = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertySpeed as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.intValue ?? 0
             let speedString = formatUSBSpeed(speedValue)
 
+            // Save USB speed for the Openterface video chipset to enable dynamic frame rate adaptation
+            if isOpenterfaceVideoChipset(vendorId: vendorID, productId: productID) {
+                AppStatus.currentUSBSpeed = speedValue
+                logger.log(content: "🔌 Openterface video chipset USB speed: \(speedString) (value=\(speedValue))")
+            }
+
             let deviceInfo = USBDeviceInfo(productName: productName, manufacturer: manufacturer, vendorID: vendorID, productID: productID, locationID: locationIDString, speed: speedString)
             devices.append(deviceInfo)
         }
