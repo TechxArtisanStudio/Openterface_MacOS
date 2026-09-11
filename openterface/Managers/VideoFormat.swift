@@ -41,12 +41,30 @@ struct VideoFormat: Equatable, Hashable {
             formatName = "420f"
         case String(format: "0x%X", kCVPixelFormatType_422YpCbCr8):
             formatName = "422"
+        case String(format: "0x%X", kCVPixelFormatType_422YpCbCr8_yuvs):
+            formatName = "422 (yuvs)"
         case String(format: "0x%X", kCMVideoCodecType_JPEG):
             formatName = "MJPEG"
         case String(format: "0x%X", kCMVideoCodecType_H264):
             formatName = "H.264"
         default:
-            formatName = "Unknown(\(pixelFormat))"
+            // Try to decode FourCC as ASCII
+            if let codecValue = UInt32(pixelFormat.dropFirst(2), radix: 16) {
+                let bytes: [UInt8] = [
+                    UInt8((codecValue >> 24) & 0xFF),
+                    UInt8((codecValue >> 16) & 0xFF),
+                    UInt8((codecValue >> 8) & 0xFF),
+                    UInt8(codecValue & 0xFF)
+                ]
+                if let ascii = String(bytes: bytes, encoding: .ascii),
+                   ascii.allSatisfy({ $0.isASCII && $0 != "\0" && $0 != "\n" && $0 != "\r" }) {
+                    formatName = ascii
+                } else {
+                    formatName = pixelFormat
+                }
+            } else {
+                formatName = pixelFormat
+            }
         }
         return "\(resolution.width)x\(resolution.height)@\(Int(frameRate))fps \(formatName)"
     }
