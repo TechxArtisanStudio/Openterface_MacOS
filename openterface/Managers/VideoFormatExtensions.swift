@@ -31,20 +31,17 @@ extension AVCaptureDevice.Format {
         let codecType = CMFormatDescriptionGetMediaSubType(self.formatDescription)
         let pixelFormat = String(format: "0x%X", codecType)
 
-        // Get all supported frame rates and filter by device capability
+        // Get stable frame rates (<=60fps) from all supported ranges
+        let stableFrameRates: [Float] = [15, 24, 25, 30, 50, 60]
         let supportedFrameRates = videoSupportedFrameRateRanges
             .flatMap { range -> [Float] in
-                // Generate common frame rates within the supported range
-                var rates: [Float] = []
-                let commonRates: [Float] = [15, 24, 25, 30, 50, 60]
-                for rate in commonRates {
-                    if Float(rate) >= Float(range.minFrameRate) && Float(rate) <= Float(range.maxFrameRate) {
-                        rates.append(rate)
-                    }
+                stableFrameRates.filter { rate in
+                    Float(rate) >= Float(range.minFrameRate) - 0.5 &&
+                    Float(rate) <= Float(range.maxFrameRate) + 0.5
                 }
-                return rates
             }
 
+        // Pick the highest stable frame rate available
         let maxFps = supportedFrameRates.max() ?? 30.0
 
         return VideoFormat(

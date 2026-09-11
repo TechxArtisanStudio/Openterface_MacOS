@@ -646,6 +646,24 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         var formats: [VideoFormat] = []
 
         for device in videoDevices {
+            logger.log(content: "\n=== Device: \(device.localizedName) ===")
+            logger.log(content: "Total formats: \(device.formats.count)")
+
+            for (index, format) in device.formats.enumerated() {
+                let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let codecType = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                let pixelFormat = String(format: "0x%X", codecType)
+
+                // Get frame rate ranges
+                let frameRateRanges = format.videoSupportedFrameRateRanges
+                var frameRateInfo = ""
+                for range in frameRateRanges {
+                    frameRateInfo += "\(range.minFrameRate)-\(range.maxFrameRate)fps "
+                }
+
+                logger.log(content: "Format \(index): \(dimensions.width)x\(dimensions.height) @ \(frameRateInfo)- \(pixelFormat)")
+            }
+
             for format in device.formats {
                 let videoFormat = format.toVideoFormat()
 
