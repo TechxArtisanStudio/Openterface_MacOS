@@ -108,6 +108,9 @@ struct AudioVideoSettingsView: View {
                                     }
                                 }
                                 .frame(width: 150)
+                                .onChange(of: userSettings.selectedVideoResolution) { _ in
+                                    applyVideoFormat()
+                                }
                             }
 
                             // Frame Rate Picker
@@ -123,6 +126,9 @@ struct AudioVideoSettingsView: View {
                                     }
                                 }
                                 .frame(width: 150)
+                                .onChange(of: userSettings.selectedVideoFrameRate) { _ in
+                                    applyVideoFormat()
+                                }
                             }
 
                             // Pixel Format Picker
@@ -138,6 +144,9 @@ struct AudioVideoSettingsView: View {
                                     }
                                 }
                                 .frame(width: 150)
+                                .onChange(of: userSettings.selectedVideoPixelFormat) { _ in
+                                    applyVideoFormat()
+                                }
                             }
 
                             Text("Current: \(videoManager.selectedVideoFormat.description)")
@@ -197,6 +206,16 @@ struct AudioVideoSettingsView: View {
             return "H.264"
         default:
             return format
+        }
+    }
+
+    // MARK: - Actions
+
+    private func applyVideoFormat() {
+        // Restart video session to apply new format
+        videoManager.stopVideoSession()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.videoManager.prepareVideo()
         }
     }
 }
