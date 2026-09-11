@@ -18,7 +18,6 @@ struct SettingsScreen: View {
         case connection = "Device & Connection"
         case remoteControl = "Remote Control"
         case advanced = "Advanced & Debug"
-        case wchFlash = "WCH Firmware Flash"
 
         var icon: String {
             switch self {
@@ -31,7 +30,6 @@ struct SettingsScreen: View {
             case .connection: return "externaldrive.connected.to.line.below"
             case .remoteControl: return "network"
             case .advanced: return "gearshape"
-            case .wchFlash: return "cpu"
             }
         }
     }
@@ -100,8 +98,6 @@ struct SettingsScreen: View {
                         RemoteControlSettingsView()
                     case .advanced:
                         AdvancedDebugSettingsView()
-                    case .wchFlash:
-                        WCHFlashSettingsView()
                     }
                 }
                 .padding()

@@ -241,7 +241,7 @@ final class MacroManager: ObservableObject {
 // MARK: - MacroExecutionEngine
 
 /// Static execution engine — no actor isolation, safe to call from background threads.
-private struct MacroExecutionEngine {
+struct MacroExecutionEngine {
 
     /// Canonicalize tokens to a single form so execution is case-insensitive and
     /// common modifier aliases resolve consistently.

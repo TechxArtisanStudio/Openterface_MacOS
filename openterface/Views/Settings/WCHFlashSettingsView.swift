@@ -2,16 +2,32 @@ import SwiftUI
 
 struct WCHFlashSettingsView: View {
     @StateObject private var ispManager = WCHISPManager.shared
+    @State private var selectedDeviceIndex: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("WCH Firmware Flash")
+            Text("Keyboard & Mouse Chip Firmware Flash")
                 .font(.title2)
                 .bold()
 
-            Text("Flash firmware to WCH chips (CH32F103 / CH32V20x series) via USB ISP mode.\nConnect the device in ISP/bootloader mode before scanning.")
+            Text("Flash firmware to compatible chips via USB ISP mode.")
                 .font(.callout)
                 .foregroundColor(.secondary)
+
+            if !ispManager.isConnected {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("⚠️ Important: Entering Bootloader Mode")
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                    Text("1. Disconnect the Target USB port from your host computer\n2. Press and hold the on-board BOOT button\n3. While holding BOOT, connect Target USB to your host\n4. Release BOOT after USB connection is established")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+            }
 
             // MARK: - Device
             GroupBox("Device") {
@@ -31,14 +47,45 @@ struct WCHFlashSettingsView: View {
                         Spacer()
                     }
 
+                    // Device picker when multiple devices found
+                    if ispManager.scannedDevices.count > 1 {
+                        Picker("Device:", selection: $selectedDeviceIndex) {
+                            ForEach(ispManager.scannedDevices) { device in
+                                Text(device.displayName).tag(device.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .disabled(ispManager.isConnected || ispManager.isOperationInProgress)
+                    }
+
+                    // Show VID/PID and details for scanned devices
+                    if !ispManager.scannedDevices.isEmpty {
+                        let displayDevice: ScannedDevice? = ispManager.scannedDevices.count > 1
+                            ? ispManager.scannedDevices.first(where: { $0.id == selectedDeviceIndex })
+                            : ispManager.scannedDevices.first
+                        if let device = displayDevice {
+                            Text(device.detailedInfo)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .padding(6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
                     HStack(spacing: 10) {
                         Button("Scan") {
                             ispManager.scanDevices()
+                            // Auto-select first device after scan
+                            if !ispManager.scannedDevices.isEmpty {
+                                selectedDeviceIndex = ispManager.scannedDevices[0].id
+                            }
                         }
                         .disabled(ispManager.isOperationInProgress)
 
-                        if ispManager.availableDeviceCount > 0 {
-                            Text("\(ispManager.availableDeviceCount) device(s) found")
+                        if ispManager.scannedDevices.count > 1 {
+                            Text("\(ispManager.scannedDevices.count) devices found")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -46,9 +93,9 @@ struct WCHFlashSettingsView: View {
                         Spacer()
 
                         Button(ispManager.isConnected ? "Disconnect" : "Connect") {
-                            Task { await ispManager.connect() }
+                            Task { await ispManager.connect(deviceIndex: selectedDeviceIndex) }
                         }
-                        .disabled(ispManager.isOperationInProgress || (!ispManager.isConnected && ispManager.availableDeviceCount == 0))
+                        .disabled(ispManager.isOperationInProgress || (!ispManager.isConnected && ispManager.scannedDevices.isEmpty))
                     }
                 }
                 .padding(6)
@@ -118,15 +165,6 @@ struct WCHFlashSettingsView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .disabled(!canOperate)
-
-                        // Dump button
-                        Button {
-                            Task { await ispManager.dumpFirmware() }
-                        } label: {
-                            Label("Dump", systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .disabled(!ispManager.isConnected || ispManager.isOperationInProgress)
                     }
 
                     let flashWarning = "⚠ Flashing will erase and overwrite the chip firmware."
@@ -152,7 +190,7 @@ struct WCHFlashSettingsView: View {
                         }
                     }
 
-                    HStack(spacing: 6) {
+                    HStack(alignment: .top, spacing: 6) {
                         if ispManager.isError {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.red)
@@ -163,11 +201,23 @@ struct WCHFlashSettingsView: View {
                         } else if ispManager.operationProgress >= 1.0 && !ispManager.statusMessage.contains("failed") {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
+                        } else if !ispManager.isConnected {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
                         }
                         Text(ispManager.statusMessage)
                             .font(.system(.body, design: .monospaced))
                             .foregroundColor(ispManager.isError ? .red : .primary)
                             .lineLimit(3)
+                            .textSelection(.enabled)
+                        if ispManager.isError {
+                            Button(action: copyStatusToClipboard) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy error message to clipboard")
+                        }
                     }
                 }
                 .padding(6)
@@ -184,6 +234,12 @@ struct WCHFlashSettingsView: View {
         ispManager.isConnected &&
         !ispManager.isOperationInProgress &&
         ispManager.selectedFirmwareURL != nil
+    }
+
+    private func copyStatusToClipboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(ispManager.statusMessage, forType: .string)
     }
 
     private var deviceStatusIndicator: some View {

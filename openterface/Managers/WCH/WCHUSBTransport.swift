@@ -246,13 +246,15 @@ class WCHUSBTransport: WCHTransport {
     func dumpFirmware(flashSize: UInt32, progressCallback: ((Double) -> Void)? = nil) throws -> [UInt8] {
         var firmware = [UInt8]()
         var address: UInt32 = 0
-        while address < flashSize {
-            let toRead = UInt16(min(56, Int(flashSize - address)))
+        while firmware.count < Int(flashSize) {
+            let remaining = Int(flashSize) - firmware.count
+            let toRead = UInt16(min(56, remaining))
             let response = try transfer(command: .dataRead(address: address, length: toRead))
             guard case .ok(let payload) = response else { throw WCHTransportError.readFailed }
+            if payload.isEmpty { break }
             firmware.append(contentsOf: payload)
-            address += UInt32(toRead)
-            progressCallback?(Double(address) / Double(flashSize))
+            address += UInt32(payload.count)
+            progressCallback?(Double(firmware.count) / Double(flashSize))
         }
         return firmware
     }

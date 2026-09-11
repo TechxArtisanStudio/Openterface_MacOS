@@ -434,7 +434,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         for activeWindow in passThroughCandidateWindows(for: event) {
             if let identifier = activeWindow.identifier?.rawValue,
                (identifier.contains("edidNameWindow") || identifier.contains("firmwareUpdateWindow") ||
-                identifier.contains("resetSerialToolWindow") || identifier.contains("settingsWindow") ||
+                identifier.contains("settingsWindow") ||
                 identifier.contains("macroCreatorDialog") || identifier.contains("macroPanel") ||
                 identifier.contains("macroEditor")) {
                 logEventRouting("pass-through", event: event, details: "matched window identifier on candidate {\(describeWindow(activeWindow))}")
@@ -519,9 +519,11 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     
     // Log modifier changes
     private func logModifierChange(_ modifiers: NSEvent.ModifierFlags) {
-        let modifierDescription = modifierFlagsDescription(modifiers)
-        let physicalKeys = getPhysicalKeyDescription(modifiers.rawValue)
-        logger.log(content: "🎛️ Modifier flags changed: \(modifierDescription), Raw=\(modifiers.rawValue), Physical=[\(physicalKeys)], CapsLock=\(modifiers.contains(.capsLock))")
+        if logger.KeyboardEventPrint {
+            let modifierDescription = modifierFlagsDescription(modifiers)
+            let physicalKeys = getPhysicalKeyDescription(modifiers.rawValue)
+            logger.log(content: "🎛️ Modifier flags changed: \(modifierDescription), Raw=\(modifiers.rawValue), Physical=[\(physicalKeys)], CapsLock=\(modifiers.contains(.capsLock))")
+        }
     }
     
     // Handle shift key press/release (no remapping needed for Shift)
@@ -546,11 +548,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             let rawValue = modifiers.rawValue
             if (rawValue & 0x101) == 0x101 { // Left Control
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 59, sourceModifier: .control, isLeft: true)
-                logger.log(content: "⌃ Left Control pressed: Original=59, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "⌃ Left Control pressed: Original=59, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                }
                 pressAndUpdateModifierKey(keyCode: targetKeyCode, isHeld: &isLeftCtrlHeld, showIndex: true)
             } else if (rawValue & 0x2100) == 0x2100 { // Right Control
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 62, sourceModifier: .control, isLeft: false)
-                logger.log(content: "⌃ Right Control pressed: Original=62, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "⌃ Right Control pressed: Original=62, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                }
                 pressAndUpdateModifierKey(keyCode: targetKeyCode, isHeld: &isRightCtrlHeld, showIndex: true)
             }
         } else {
@@ -572,11 +578,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             let rawValue = modifiers.rawValue
             if (rawValue & 0x120) == 0x120 { // Left Option
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 58, sourceModifier: .option, isLeft: true)
-                logger.log(content: "⌥ Left Option pressed: Original=58, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "⌥ Left Option pressed: Original=58, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                }
                 pressAndUpdateModifierKey(keyCode: targetKeyCode, isHeld: &isLeftAltHeld, showIndex: true)
             } else if (rawValue & 0x140) == 0x140 { // Right Option
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 61, sourceModifier: .option, isLeft: false)
-                logger.log(content: "⌥ Right Option pressed: Original=61, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "⌥ Right Option pressed: Original=61, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                }
                 pressAndUpdateModifierKey(keyCode: targetKeyCode, isHeld: &isRightAltHeld, showIndex: true)
             }
         } else {
@@ -598,12 +608,16 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             let rawValue = modifiers.rawValue
             if (rawValue & 0x108) == 0x108 { // Left Command
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 55, sourceModifier: .command, isLeft: true)
-                logger.log(content: "⌘ Left Command pressed: Original=55, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "⌘ Left Command pressed: Original=55, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                }
                 pressAndUpdateModifierKeyWithoutState(keyCode: targetKeyCode, showIndex: true)
                 isLeftCmdHeld = true
             } else if (rawValue & 0x110) == 0x110 { // Right Command
                 let targetKeyCode = getRemappedKeyCode(sourceKey: 54, sourceModifier: .command, isLeft: false)
-                logger.log(content: "⌘ Right Command pressed: Original=54, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "⌘ Right Command pressed: Original=54, Target=\(targetKeyCode), Layout=\(currentKeyboardLayout.rawValue)")
+                }
                 pressAndUpdateModifierKeyWithoutState(keyCode: targetKeyCode, showIndex: true)
                 isRightCmdHeld = true
             }
@@ -750,7 +764,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     }
 
     func releaseKey(keys: [UInt16]) {
-        kbm.releaseKey(keys: self.pressedKeys)
+        kbm.releaseKey(keys: keys)
     }
 
     func monitorKeyboardEvents() {
@@ -834,12 +848,14 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         let modifierDescription = modifierFlagsDescription(modifiers)
         
         // Log the key press with its keycode and detailed modifier analysis
-        logger.log(content: "⌨️ Key pressed: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
-        logger.log(content: "   Raw modifier flags: \(modifiers.rawValue)")
-        logger.log(content: "   Contains .control: \(modifiers.contains(.control))")
-        logger.log(content: "   Contains .command: \(modifiers.contains(.command))")
-        logger.log(content: "   Contains .option: \(modifiers.contains(.option))")
-        logger.log(content: "   Contains .shift: \(modifiers.contains(.shift))")
+        if logger.KeyboardEventPrint {
+            logger.log(content: "⌨️ Key pressed: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
+            logger.log(content: "   Raw modifier flags: \(modifiers.rawValue)")
+            logger.log(content: "   Contains .control: \(modifiers.contains(.control))")
+            logger.log(content: "   Contains .command: \(modifiers.contains(.command))")
+            logger.log(content: "   Contains .option: \(modifiers.contains(.option))")
+            logger.log(content: "   Contains .shift: \(modifiers.contains(.shift))")
+        }
         
         // Update UI state to show pressed key from host keyboard
         DispatchQueue.main.async {
@@ -863,9 +879,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         if !pressedKeys.contains(event.keyCode) {
             if let index = pressedKeys.firstIndex(of: 255) {
                 pressedKeys[index] = event.keyCode
+                logger.log(content: "🔍 [DEBUG keyDown] Added keyCode=\(event.keyCode) at index=\(index), pressedKeys=\(pressedKeys)")
+            } else {
+                logger.log(content: "🔍 [DEBUG keyDown] NO EMPTY SLOT for keyCode=\(event.keyCode), pressedKeys=\(pressedKeys)")
             }
+        } else {
+            logger.log(content: "🔍 [DEBUG keyDown] keyCode=\(event.keyCode) already in pressedKeys=\(pressedKeys)")
         }
-        
+
+        logger.log(content: "🔍 [DEBUG keyDown] BEFORE pressKey: pressedKeys=\(pressedKeys)")
         kbm.pressKey(keys: pressedKeys, modifiers: adjustedModifiers)
 
         // NumLock (keyCode 71) toggles the target's NumLock LED — query the updated state after a short delay
@@ -887,7 +909,9 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         let modifierDescription = modifierFlagsDescription(modifiers)
         
         // Log the key release with its keycode
-        logger.log(content: "Key released: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
+        if logger.KeyboardEventPrint {
+            logger.log(content: "Key released: keyCode=\(event.keyCode), modifiers=\(modifierDescription)")
+        }
         
         // Remove key from the set of currently pressed keys
         DispatchQueue.main.async {
@@ -895,10 +919,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
         
         // Remove released key
+        logger.log(content: "🔍 [DEBUG keyUp] BEFORE remove: keyCode=\(event.keyCode), pressedKeys=\(pressedKeys)")
         if let index = pressedKeys.firstIndex(of: event.keyCode) {
             pressedKeys[index] = 255
+            logger.log(content: "🔍 [DEBUG keyUp] Cleared index=\(index), pressedKeys=\(pressedKeys)")
+        } else {
+            logger.log(content: "🔍 [DEBUG keyUp] keyCode=\(event.keyCode) NOT FOUND in pressedKeys=\(pressedKeys)")
         }
-        
+
+        logger.log(content: "🔍 [DEBUG keyUp] FINAL pressedKeys=\(pressedKeys)")
         kbm.releaseKey(keys: pressedKeys)
         return nil
     }
@@ -911,11 +940,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
             if modifiers.contains(.command) {
                 adjustedModifiers.remove(.command)
                 adjustedModifiers.insert(.control)
-                logger.log(content: "   🪟 Windows mode: Remapped Cmd → Ctrl for key combination")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "   🪟 Windows mode: Remapped Cmd → Ctrl for key combination")
+                }
             } else if modifiers.contains(.control) {
                 adjustedModifiers.remove(.control)
                 adjustedModifiers.insert(.command)
-                logger.log(content: "   🪟 Windows mode: Remapped Ctrl → Win for key combination")
+                if logger.KeyboardEventPrint {
+                    logger.log(content: "   🪟 Windows mode: Remapped Ctrl → Win for key combination")
+                }
             }
         }
         return adjustedModifiers
@@ -925,7 +958,9 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     private func handleSpecialKeyCombinations(event: NSEvent, modifiers: NSEvent.ModifierFlags) -> Bool {
         // Detect Cmd+V (paste) combination - with layout awareness
         if event.keyCode == 9 && (modifiers.contains(.command) || (currentKeyboardLayout == .windows && modifiers.contains(.control))) { // 'v' key with Command or Ctrl in Windows mode
-            logger.log(content: "📋 Paste key combination detected (Layout: \(currentKeyboardLayout.rawValue))")
+            if logger.KeyboardEventPrint {
+                logger.log(content: "📋 Paste key combination detected (Layout: \(currentKeyboardLayout.rawValue))")
+            }
             let clipboardManager = DependencyContainer.shared.resolve(ClipboardManagerProtocol.self)
             clipboardManager.handlePasteRequest()
             return true // Consume the event to prevent default paste behavior
@@ -1050,7 +1085,9 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     
     /// Releases all currently held modifier keys to ensure clean paste operations
     private func releaseAllModifierKeys() {
-        logger.log(content: "🔓 Releasing all modifier keys before paste operation")
+        if logger.KeyboardEventPrint {
+            logger.log(content: "🔓 Releasing all modifier keys before paste operation")
+        }
         
         // Release all currently held modifier keys
         if isLeftShiftHeld {
@@ -1103,11 +1140,15 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         // Small delay to ensure the release events are processed
         Thread.sleep(forTimeInterval: 0.01)
         
-        logger.log(content: "✅ All modifier keys released, ready for paste operation")
+        if logger.KeyboardEventPrint {
+            logger.log(content: "✅ All modifier keys released, ready for paste operation")
+        }
     }
 
     func sendTextToKeyboard(text:String) {
-        logger.log(content: "Sending text to keyboard: \(text)")
+        if logger.KeyboardEventPrint {
+            logger.log(content: "Sending text to keyboard: \(text)")
+        }
         
         // Update UI state to show pressed character
         DispatchQueue.main.async {

@@ -13,6 +13,8 @@ struct ChatPlanCardView: View {
     let onRerun: () -> Void
     let onTracePlan: () -> Void
     let onTraceTask: (ChatTask) -> Void
+    @ObservedObject private var chatManager = ChatManager.shared
+    @State private var selectedOSOverride: ChatTargetSystem? = nil
 
     private var runningTaskID: UUID? {
         plan.tasks.first(where: { $0.status == .running })?.id
@@ -58,6 +60,11 @@ struct ChatPlanCardView: View {
                     onClear()
                 }
                 .buttonStyle(.bordered)
+            }
+
+            // OS confirmation banner — shown while the agent waits for the user to resolve an OS mismatch
+            if plan.status == .awaitingOSConfirmation {
+                osConfirmationBanner
             }
 
             ScrollViewReader { taskProxy in
@@ -132,12 +139,74 @@ struct ChatPlanCardView: View {
         )
     }
 
+    // MARK: - OS confirmation banner
+
+    private var osConfirmationBanner: some View {
+        let configured = UserSettings.shared.chatTargetSystem
+        let detected = chatManager.pendingPlanDetectedOS
+        let effectiveSelected = selectedOSOverride ?? detected ?? configured
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text("Target OS mismatch")
+                    .font(.subheadline)
+                    .bold()
+            }
+
+            if let detected {
+                Text("Screen shows **\(detected.displayName)** but the configured OS is **\(configured.displayName)**. Choose which OS to use for this task:")
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Confirm the target OS before execution continues.")
+                    .font(.caption)
+            }
+
+            Picker("Target OS", selection: Binding(
+                get: { effectiveSelected },
+                set: { selectedOSOverride = $0 }
+            )) {
+                ForEach(ChatTargetSystem.allCases) { system in
+                    Text(system.displayName).tag(system)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 8) {
+                Button("Continue with \(effectiveSelected.displayName)") {
+                    chatManager.confirmPlanOS(confirmed: true, newSystem: effectiveSelected)
+                    selectedOSOverride = nil
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Cancel Plan") {
+                    chatManager.confirmPlanOS(confirmed: false, newSystem: nil)
+                    selectedOSOverride = nil
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.orange.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.orange.opacity(0.35), lineWidth: 1)
+        )
+    }
+
     private func statusTitle(_ status: ChatPlanStatus) -> String {
         switch status {
         case .draft:
             return "Draft"
         case .awaitingApproval:
             return "Awaiting Approval"
+        case .awaitingOSConfirmation:
+            return "Confirming OS"
         case .approved:
             return "Approved"
         case .running:
@@ -172,6 +241,8 @@ struct ChatPlanCardView: View {
         switch status {
         case .draft, .awaitingApproval, .approved:
             return .orange
+        case .awaitingOSConfirmation:
+            return .orange
         case .running:
             return .blue
         case .completed:
@@ -200,7 +271,7 @@ struct ChatPlanCardView: View {
         switch status {
         case .running, .completed, .failed, .cancelled:
             return true
-        case .draft, .awaitingApproval, .approved:
+        case .draft, .awaitingApproval, .awaitingOSConfirmation, .approved:
             return false
         }
     }

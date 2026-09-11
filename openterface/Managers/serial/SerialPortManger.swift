@@ -64,6 +64,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @objc dynamic var serialPort: ORSSerialPort? {
         didSet {
+            if oldValue === serialPort {
+                serialPort?.delegate = self
+                return
+            }
             oldValue?.close()
             oldValue?.delegate = nil
             serialPort?.delegate = self
@@ -73,12 +77,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     @Published var serialPorts : [ORSSerialPort] = []
     
-    var lastHIDEventTime: Date?
-    var lastSerialData: Date?
-    /// CTS pin state (CH340 data flip pin) used to detect HID activity from the Target Screen.
-    var lastCts: Bool?
-    
-    var timer: Timer?
+    var lastSerialDate: Date?
     
     @Published var baudrate:Int = 0
     
@@ -143,7 +142,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// as it prevents new attempts from being started automatically.
     @ThreadSafe(label: "com.openterface.SerialPortManager.pauseQueue")
     var isPaused: Bool = false
-    
+
     /// Tracks whether an error alert has been shown to the user.
     /// This ensures error alerts are displayed only once to avoid redundant notifications.
     @ThreadSafe(label: "com.openterface.SerialPortManager.errorAlertQueue")
@@ -200,6 +199,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     func tryConnectOpenterface(){
+        // Refresh USB device list so chipset type flags reflect current state.
+        // This is essential for recovery paths that may run before periodic updates.
+        USBDevicesManager.shared.update()
+
         if USBDevicesManager.shared.isOpenterfaceConnected(){
             // Check the control chipset type and use appropriate connection method
             if USBDevicesManager.shared.isCH32V208Connected() {
@@ -223,7 +226,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             // Refresh USB device list so isCH32V208Connected() / isCH9329Connected() reflect
             // the newly connected device before tryConnectOpenterface() reads them.
             USBDevicesManager.shared.update()
-            self.tryConnectOpenterface()
+            // Delay the connection attempt slightly to allow serialPortManager.availablePorts
+            // to be fully populated. At app launch the notification can fire before ORSSerial
+            // has finished discovering ports.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.tryConnectOpenterface()
+            }
         } else if self.isPaused {
             logger.log(content: "Serial port connected but connection attempts are paused")
         }
@@ -232,66 +240,37 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     @objc func serialPortsWereDisconnected(_ notification: Notification) {
         logger.log(content: "Serial port Disconnected")
         self.retryCounter = 0
+
+        // During USB enumeration settling, disconnect events can fire spuriously while the device
+        // is still physically connected. Reconnect if the device is still present.
+        // Refresh device list first to get current state.
+        USBDevicesManager.shared.update()
+        if self.isPaused && USBDevicesManager.shared.isOpenterfaceConnected() {
+            logger.log(content: "Serial port disconnect notification ignored while connection attempts are paused and device is still connected")
+            return
+        }
+
         self.closeSerialPort()
-    }
 
-    func checkCTS() {
-        // CTS monitoring only applies to CH9329 chipset
-        if !USBDevicesManager.shared.isCH9329Connected() {
-            return
-        }
-        
-        if let cts = self.serialPort?.cts {
-            if lastCts == nil {
-                lastCts = cts
-                lastHIDEventTime = Date()
-            }
-            if lastCts != cts {
-                SerialPortStatus.shared.isKeyboardConnected = true
-                SerialPortStatus.shared.isMouseConnected = true
-                lastHIDEventTime = Date()
-                lastCts = cts
-            }
-        }
-        
-        self.checkHIDEventTime()
-    }
-
-    func checkHIDEventTime() {
-        // HID event time checking only applies to CH9329 chipset
-        if !USBDevicesManager.shared.isCH9329Connected() {
-            return
-        }
-
-        if isPaused {
-            return
-        }
-        
-        if let lastTime = lastHIDEventTime {
-            if Date().timeIntervalSince(lastTime) > 5 {
-
-                // 5 seconds pass since last HID event
-                if logger.SerialDataPrint {
-                    logger.log(content: "No hid update more than 5 second, check the HID information")
-                }
-                // Rest the time, to avoide duplicated check
-                lastHIDEventTime = Date()
-                getHidInfo()
+        if USBDevicesManager.shared.isOpenterfaceConnected() {
+            logger.log(content: "Device still connected after disconnect notification, re-opening port")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.tryConnectOpenterface()
             }
         }
     }
 
     func serialPortWasOpened(_ serialPort: ORSSerialPort) {
+        messageParser.reset()
+
         if logger.SerialDataPrint { logger.log(content: "Serial opened") }
-        
-        // Start CTS monitoring for HID event detection (CH9329 only)
-        self.startCTSMonitoring()
         
         // Start SD card direction polling for CH32V208
         self.startSDCardPolling()
     }
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
+        messageParser.reset()
 
         if logger.SerialDataPrint { logger.log(content: "Serial port was closed") }
 
@@ -302,7 +281,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
      */
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
         // Record the timestamp of this serial data reception
-        lastSerialData = Date()
+        lastSerialDate = Date()
         
         let dataString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
         
@@ -401,19 +380,28 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     func serialPort(_ serialPort: ORSSerialPort, didEncounterError error: Error) {
         if logger.SerialDataPrint { logger.log(content: "SerialPort \(serialPort) encountered an error: \(error)") }
-        
-        // Instead of immediately closing, try to recover based on error type
+
+        // Determine if this is a critical error that requires closing and reconnecting
         let errorDescription = error.localizedDescription.lowercased()
-        
-        // Only close for critical errors that can't be recovered
-        if errorDescription.contains("device not configured") || 
-           errorDescription.contains("device disconnected") ||
-           errorDescription.contains("no such device") {
-            logger.log(content: "Critical error detected, closing port and attempting recovery")
+        let isNSError = (error as NSError).code != 0
+        let posixCode = (error as NSError).code
+
+        // Critical errors: device gone, port broken, or unrecoverable state
+        let isCritical = errorDescription.contains("device not configured")
+            || errorDescription.contains("device disconnected")
+            || errorDescription.contains("no such device")
+            || errorDescription.contains("bad file descriptor")          // EBADF — port handle is invalid
+            || posixCode == 9                                           // POSIX EBADF
+            || posixCode == 19                                          // POSIX ENXIO (no such device or address)
+            || posixCode == 6                                           // POSIX ENXIO alternative
+
+        if isCritical {
+            logger.log(content: "Critical error detected (code=\(posixCode)), closing port and attempting recovery")
             self.closeSerialPort()
-            
+            self.retryCounter = 0
+
             // Attempt automatic recovery after a brief delay
-            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 self?.tryConnectOpenterface()
             }
         } else {
@@ -428,12 +416,20 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
 
     private func setCH32V208DeviceReady() {
-        DispatchQueue.main.async { [weak self] in
+        let updateState = { [weak self] in
             guard let self = self else { return }
             self.isDeviceReady = true
             self.errorAlertShown = false
+            AppStatus.isControlChipsetReady = true
+            SerialPortStatus.shared.isControlChipsetReady = true
             SerialPortStatus.shared.isKeyboardConnected = true
             SerialPortStatus.shared.isMouseConnected = true
+        }
+
+        if Thread.isMainThread {
+            updateState()
+        } else {
+            DispatchQueue.main.sync(execute: updateState)
         }
     }
 
@@ -444,27 +440,31 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             logger.log(content: "Connection attempts are paused, returning early")
             return
         }
-        
+
         // Check if already trying to prevent race conditions
         if self.isTrying {
             logger.log(content: "Already trying to connect, returning early")
             return
         }
-        
-        self.isTrying = true
-        
-        // get all available serial ports
+
+        // Ensure availablePorts is populated — USB enumeration may still be in progress
+        // at app startup. If ports aren't ready yet, schedule a retry instead of failing.
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-            logger.log(content: "No available serial ports found")
-            self.isTrying = false
+            logger.log(content: "No available serial ports found yet, scheduling retry")
+            // Schedule a single retry after 1.5s to let USB enumeration settle
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self = self, !self.isTrying, !self.isPaused else { return }
+                self.tryOpenSerialPort(priorityBaudrate: priorityBaudrate)
+            }
             return
         }
-        self.serialPorts = availablePorts // Get the list of available serial ports
-        
+        self.serialPorts = availablePorts
+        self.isTrying = true
+
         let backgroundQueue = DispatchQueue(label: "background", qos: .background)
         backgroundQueue.async { [weak self] in
-            guard let self = self else { 
-                return 
+            guard let self = self else {
+                return
             }
 
             // After a factory reset the device returns to 9600 baud, so we want to try
@@ -479,12 +479,24 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                     logger.log(content: "Connection attempts paused, exiting connection loop")
                     break
                 }
-                
+
                 // Check if we should stop trying (in case of disconnection)
                 if !self.isTrying {
                     break
                 }
-                
+
+                // Refresh the serial port list each iteration — ports may not have been
+                // available when tryOpenSerialPort was first called during app launch,
+                // or the device may have reconnected with a different port path.
+                if let freshPorts = self.serialPortManager.availablePorts as? [ORSSerialPort] {
+                    self.serialPorts = freshPorts
+                }
+                if self.serialPorts.isEmpty {
+                    logger.log(content: "No serial ports available, waiting before retry")
+                    Thread.sleep(forTimeInterval: 1)
+                    continue
+                }
+
                 // Use post-reset priority first, then caller priority, then user preference.
                 let effectivePriority = postResetPriority ?? priorityBaudrate
                 postResetPriority = nil  // consume the one-shot override
@@ -642,7 +654,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             return false
         }
 
-        logger.log(content: "Serial port opened successfully for factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
+        logger.log(content: "Run blocking factory reset at \(CH9329ControlChipset.LOWSPEED_BAUDRATE) baud")
         return runBlockingFactoryReset()
     }
     
@@ -651,8 +663,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         let effectiveBaudrate = baudrate > 0 ? baudrate : UserSettings.shared.preferredBaudrate.rawValue
         
         self.logger.log(content: "Opening serial port at baudrate: \(effectiveBaudrate)")
+        messageParser.reset()
         self.serialPort?.baudRate = NSNumber(value: effectiveBaudrate)
         self.serialPort?.delegate = self
+        self.baudrate = effectiveBaudrate
         
         if let port = self.serialPort {
             if port.isOpen {
@@ -680,16 +694,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         }
 
     }
-
     
     func closeSerialPort() {
         logger.log(content: "Close serial port..")
         self.isDeviceReady = false
+        messageParser.reset()
         self.serialPort?.close()
-
-        // Stop CTS monitoring timer
-        self.timer?.invalidate()
-        self.timer = nil
         
         // Stop SD card polling timer
         self.stopSDCardPolling()
@@ -758,8 +768,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
             // Set device ready to false initially - it will be set to true when proper communication is established
             self.isDeviceReady = false
             
-            // Start CTS monitoring for HID event detection
-            self.startCTSMonitoring()
+            logger.log(content: "Openterface is ready to factory reset now.")
             
             return true
         } else {
@@ -1020,7 +1029,9 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
 
     private func resetHidChipAndReconnect(priorityBaudrate: Int? = nil) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.resetHidChip()
+            guard let self = self else { return }
+
+            self.resetHidChip()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.closeSerialPort()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -1146,10 +1157,15 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         guard let port = serialPort, port.isOpen else {
             logger.log(content: "Serial port not open, attempting to open it first")
             
-            // Try to open the serial port
-            tryOpenSerialPort(priorityBaudrate: nil)
+            // Connection attempts are paused during factory reset, so open the port directly.
+            guard openSerialPortForFactoryReset() else {
+                logger.log(content: "Failed to open serial port for factory reset")
+                resumeConnectionAttempts()
+                completion(false)
+                return
+            }
             
-            // Wait briefly for port to open
+            // Wait briefly for the port to settle before toggling RTS.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self = self, let port = self.serialPort, port.isOpen else {
                     self?.logger.log(content: "Failed to open serial port for factory reset")
@@ -1306,6 +1322,44 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     func tryOpenSerialPortForCH32V208() {
         tryOpenSerialPortForCH32V208WithRetry(attempt: 1)
     }
+
+    /// Synchronously opens the serial port for CH32V208, blocking until the port
+    /// is open and the device is ready, or the timeout elapses.
+    /// Used by CH32V208ControlChipset.establishCommunication() during HAL initialization.
+    func tryOpenSerialPortForCH32V208Sync(timeout: TimeInterval) -> Bool {
+        logger.log(content: "Opening CH32V208 serial port (sync, timeout: \(timeout)s)")
+
+        // Try the async open first
+        tryOpenSerialPortForCH32V208WithRetry(attempt: 1)
+
+        // Poll for port to be open and device ready
+        let waitStart = Date()
+        var initialOpenSucceeded = false
+        while Date().timeIntervalSince(waitStart) < timeout {
+            if serialPort?.isOpen == true && isDeviceReady {
+                logger.log(content: "CH32V208 serial port opened successfully (sync)")
+                initialOpenSucceeded = true
+                // Wait a brief stabilization period — USB enumeration can trigger
+                // spurious disconnect notifications that close the port milliseconds
+                // after it opens. If that happens, re-open once.
+                usleep(200_000) // 200ms stabilization window
+                if serialPort?.isOpen == true && isDeviceReady {
+                    return true
+                }
+                logger.log(content: "Port closed during stabilization, re-opening...")
+                tryOpenSerialPortForCH32V208WithRetry(attempt: 1)
+                usleep(100_000) // 100ms for re-open to settle
+                if serialPort?.isOpen == true && isDeviceReady {
+                    logger.log(content: "CH32V208 serial port re-opened successfully (sync)")
+                    return true
+                }
+            }
+            usleep(50_000) // 50ms between polls
+        }
+
+        logger.log(content: "CH32V208 serial port did not open within timeout")
+        return false
+    }
     
     private func tryOpenSerialPortForCH32V208WithRetry(attempt: Int) {
         logger.log(content: "tryOpenSerialPortForCH32V208 - Direct connection mode (attempt \(attempt))")
@@ -1328,9 +1382,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         
         // get all available serial ports
         guard let availablePorts = serialPortManager.availablePorts as? [ORSSerialPort], !availablePorts.isEmpty else {
-            logger.log(content: "No available serial ports found")
-            if attempt == 1 {
-                self.isTrying = false
+            logger.log(content: "No available serial ports found for CH32V208")
+            // USB enumeration may not be complete yet — retry with delay
+            if attempt < 3 {
+                let delay = Double(attempt) * 0.5
+                logger.log(content: "Retrying CH32V208 port discovery in \(delay) seconds...")
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.tryOpenSerialPortForCH32V208WithRetry(attempt: attempt + 1)
+                }
+            } else {
+                if attempt == 1 {
+                    self.isTrying = false
+                }
             }
             return
         }
@@ -1391,25 +1454,6 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 SerialPortStatus.shared.isKeyboardConnected = true
                 SerialPortStatus.shared.isMouseConnected = true
             }
-        }
-    }
-    
-    /// Start CTS monitoring for HID event detection
-    /// CTS monitoring is only needed for CH9329 chipset
-    /// For CH32V208, HID events are detected through direct serial communication
-    private func startCTSMonitoring() {
-        // Only start CTS monitoring for CH9329 chipset
-        if !USBDevicesManager.shared.isCH9329Connected() {
-            logger.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
-            return
-        }
-        
-        // Start the timer for CTS checking if not already running
-        if self.timer == nil {
-            self.timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                self.checkCTS()
-            }
-            logger.log(content: "Started CTS monitoring for CH9329 HID event detection")
         }
     }
     
@@ -1477,20 +1521,13 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     
     /// Find the best matching serial port for a given USB device
     /// This method attempts to correlate USB device information with available serial ports
-    /// 
-    /// **Note:** The ORSSerial framework doesn't provide direct USB device correlation,
-    /// so this method uses heuristics to find the most likely serial port match.
-    /// The correlation is based on:
-    /// 1. Filtering for "usbserial" devices (USB-to-serial adapters)
-    /// 2. Preferring single matches when only one USB serial port is available
-    /// 3. Providing logging for debugging multiple port scenarios
-    /// 
-    /// **Future Enhancement:** Could be improved with IOKit registry correlation
-    /// to directly match USB device location IDs with serial port device paths.
+    /// Only matches actual USB-to-serial adapters ("usbserial" or "usbmodem" in the path).
+    /// Returns nil if no match found — the caller will retry later rather than connecting
+    /// to a wrong device (which triggers destructive factory reset loops).
     private func findBestMatchingSerialPort(for usbDevice: USBDeviceInfo) -> ORSSerialPort? {
         // Look for serial ports that contain "usbserial" (the typical pattern for USB serial devices)
         let usbSerialPorts = self.serialPorts.filter{ $0.path.contains("usbserial") || $0.path.contains("usbmodem")}
-        
+
         if usbSerialPorts.count == 1 {
             // If there's only one USB serial port, it's likely the one we want
             logger.log(content: "Found single USB serial port: \(usbSerialPorts[0].path)")
@@ -1498,7 +1535,7 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         } else if usbSerialPorts.count > 1 {
             // Multiple USB serial ports - try to find the best match
             logger.log(content: "Found \(usbSerialPorts.count) USB serial ports, attempting to find best match")
-            
+
             // For now, return the first one as we don't have enough correlation info
             // This could be enhanced in the future with more sophisticated matching
             if let firstPort = usbSerialPorts.first {
@@ -1506,9 +1543,11 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
                 return firstPort
             }
         }
-        
-        // If no usbserial ports found, log and return nil
-        logger.log(content: "No USB serial ports found for device: \(usbDevice.productName)")
+
+        // No USB serial ports found — will retry when ports are available.
+        // Do NOT fall back to non-usbserial ports; connecting to the wrong device
+        // (e.g. /dev/cu.debug-console) triggers factory reset loops.
+        logger.log(content: "No USB serial ports found for device: \(usbDevice.productName) (will retry)")
         return nil
     }
 

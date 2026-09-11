@@ -79,6 +79,11 @@ struct ChatBubbleView: View {
 
             renderedMessageContent
 
+            if !message.quickReplies.isEmpty && !chatManager.isSending {
+                QuickReplyChipsView(replies: message.quickReplies)
+                    .padding(.top, 4)
+            }
+
             if isGuideTraceMessage {
                 HStack {
                     Button(action: {
@@ -184,6 +189,53 @@ struct ChatBubbleView: View {
                 .padding(.top, 8)
                 .padding(.all, 8)
                 .background(Color.secondary.opacity(0.08))
+                .cornerRadius(6)
+            }
+
+            // Agent-mode OS confirmation: shown on the last assistant message while the agent
+            // loop is suspended waiting for the user to resolve an OS mismatch (no plan card exists).
+            if shouldShowAgentOSConfirmation {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Select target OS to use:")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+
+                    Picker("", selection: Binding(
+                        get: { selectedOSForConfirmation ?? chatManager.pendingPlanDetectedOS ?? UserSettings.shared.chatTargetSystem },
+                        set: { selectedOSForConfirmation = $0 }
+                    )) {
+                        ForEach(ChatTargetSystem.allCases) { system in
+                            Text(system.displayName).tag(system)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .controlSize(.small)
+
+                    HStack(spacing: 6) {
+                        Button {
+                            let chosen = selectedOSForConfirmation ?? chatManager.pendingPlanDetectedOS ?? UserSettings.shared.chatTargetSystem
+                            selectedOSForConfirmation = nil
+                            ChatManager.shared.confirmPlanOS(confirmed: true, newSystem: chosen)
+                        } label: {
+                            let label = selectedOSForConfirmation?.displayName
+                                ?? chatManager.pendingPlanDetectedOS?.displayName
+                                ?? UserSettings.shared.chatTargetSystem.displayName
+                            Text("Continue with \(label)")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+
+                        Button("Cancel") {
+                            selectedOSForConfirmation = nil
+                            ChatManager.shared.confirmPlanOS(confirmed: false, newSystem: nil)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(.top, 8)
+                .padding(.all, 8)
+                .background(Color.orange.opacity(0.08))
                 .cornerRadius(6)
             }
         }
@@ -306,6 +358,8 @@ struct ChatBubbleView: View {
         guard message.role == .assistant else { return false }
         guard detectedOSForConfirmation != nil else { return false }
         guard !hasActionableGuideAction else { return false }
+        // Don't show the legacy confirmation when the new agent-mode confirmation is active.
+        guard chatManager.pendingPlanDetectedOS == nil else { return false }
 
         let normalized = message.content.lowercased()
         let asksForConfirmation = normalized.contains("please confirm")
@@ -319,6 +373,16 @@ struct ChatBubbleView: View {
             || normalized.contains("matches your configured target system")
         let hasExplicitDetection = normalized.contains("the target os appears to be:")
         return hasExplicitDetection && (asksForConfirmation || referencesTargetProfile)
+    }
+
+    /// True when the agent loop is suspended waiting for OS confirmation and this is the last assistant message.
+    private var shouldShowAgentOSConfirmation: Bool {
+        guard message.role == .assistant else { return false }
+        guard chatManager.pendingPlanDetectedOS != nil else { return false }
+        // Only show on the last assistant message to avoid duplicate controls.
+        guard chatManager.messages.last(where: { $0.role == .assistant })?.id == message.id else { return false }
+        // No plan card — the plan card handles its own UI when a plan exists.
+        return chatManager.currentPlan == nil
     }
 
     private var detectedOSForConfirmation: ChatTargetSystem? {
@@ -711,6 +775,33 @@ private struct GuideStatusIcon: View {
                 Image(systemName: "minus.circle.fill")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+/// Wrapping row of quick-reply chip buttons (macOS 12+ compatible).
+private struct QuickReplyChipsView: View {
+    let replies: [ChatQuickReply]
+
+    var body: some View {
+        // WrappingHStack equivalent: render chips in a VStack of HStacks using
+        // a GeometryReader-free approach — just let chips wrap naturally via
+        // a scrollable horizontal stack capped at max 2 rows implicitly.
+        // For simplicity on macOS 12 we use a single HStack that wraps via
+        // a fixed-size container; most use-cases have ≤4 short chips.
+        VStack(alignment: .leading, spacing: 4) {
+            // Split into rows of up to 3 chips each so they don't overflow.
+            ForEach(Array(stride(from: 0, to: replies.count, by: 3)), id: \.self) { rowStart in
+                HStack(spacing: 6) {
+                    ForEach(replies[rowStart..<min(rowStart + 3, replies.count)]) { reply in
+                        Button(reply.label) {
+                            ChatManager.shared.sendQuickReply(reply)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
             }
         }
     }

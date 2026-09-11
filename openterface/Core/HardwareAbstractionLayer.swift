@@ -217,19 +217,27 @@ class HardwareAbstractionLayer {
     private init() {}
     
     // MARK: - Hardware Detection and Initialization
-    
+
     func detectAndInitializeHardware() -> Bool {
         logger.log(content: "🔍 HAL: Starting hardware detection...")
-        
+
         let videoDetected = detectVideoChipset()
         let controlDetected = detectControlChipset()
-        
+
         if videoDetected || controlDetected {
             logger.log(content: "✅ HAL: Hardware detection completed")
             return true
         } else {
             logger.log(content: "❌ HAL: No supported hardware detected")
             return false
+        }
+    }
+
+    /// Retries control chipset detection. Called periodically when no control chipset
+    /// was found at startup (e.g. USB device not yet enumerated).
+    func detectAndInitializeControlChipset() {
+        if detectControlChipset() {
+            logger.log(content: "✅ HAL: Control chipset detected on retry")
         }
     }
     
@@ -295,8 +303,10 @@ class HardwareAbstractionLayer {
                     return true
                 }
                 // Device detected by VID/PID but initialization failed (serial port not open yet).
-                // Keep the type as .ch32v208 so SerialPortManager uses the right connection path.
+                // Clear the type so mouse/HID events don't route to an unopened port.
                 // Do NOT fall through to CH9329 detection.
+                // The periodic HAL timer will retry detection when the serial port is available.
+                AppStatus.controlChipsetType = .unknown
                 logger.log(content: "CH32V208 detected but initialization deferred (serial port not yet open)")
                 return false
             }

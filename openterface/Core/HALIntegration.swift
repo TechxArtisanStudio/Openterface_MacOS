@@ -610,7 +610,13 @@ class HALIntegrationManager {
     private func performPeriodicHALUpdate() {
         // Perform periodic hardware status updates
         guard isInitialized else { return }
-        
+
+        // Retry control chipset detection if it failed initially (e.g. USB device not ready at startup).
+        // Only retry when no control chipset was found and no CH9329 was detected.
+        if hal.getCurrentControlChipset() == nil && AppStatus.controlChipsetType == .unknown {
+            hal.detectAndInitializeControlChipset()
+        }
+
         // Get chipsets once at the start
         let videoChipset = hal.getCurrentVideoChipset()
         let controlChipset = hal.getCurrentControlChipset()
@@ -725,7 +731,10 @@ class HALIntegrationManager {
         let isReady = controlChipset.isDeviceReady
         if AppStatus.isControlChipsetReady != isReady {
             logger.log(content: "🔧 Control chipset ready status: \(isReady ? "Ready" : "Not Ready")")
-            DispatchQueue.main.async { AppStatus.isControlChipsetReady = isReady }
+            DispatchQueue.main.async {
+                AppStatus.isControlChipsetReady = isReady
+                SerialPortStatus.shared.isControlChipsetReady = isReady
+            }
         }
         
         // Check communication interface status

@@ -52,7 +52,12 @@ struct AdvancedDebugSettingsView: View {
                         .onChange(of: userSettings.isMouseEventPrintEnabled) { enabled in
                             Logger.shared.MouseEventPrint = enabled
                         }
-                    
+
+                    Toggle("Enable keyboard event logging", isOn: $userSettings.isKeyboardEventPrintEnabled)
+                        .onChange(of: userSettings.isKeyboardEventPrintEnabled) { enabled in
+                            Logger.shared.KeyboardEventPrint = enabled
+                        }
+
                     Toggle("Enable HAL print logging", isOn: $userSettings.isHalPrintEnabled)
                         .onChange(of: userSettings.isHalPrintEnabled) { enabled in
                             Logger.shared.HalPrint = enabled
@@ -193,6 +198,7 @@ struct AdvancedDebugSettingsView: View {
             // Load the logging settings from Logger to sync with UI
             Logger.shared.SerialDataPrint = userSettings.isSerialOutput
             Logger.shared.MouseEventPrint = userSettings.isMouseEventPrintEnabled
+            Logger.shared.KeyboardEventPrint = userSettings.isKeyboardEventPrintEnabled
             Logger.shared.HalPrint = userSettings.isHalPrintEnabled
         }
     }
@@ -242,6 +248,7 @@ struct AdvancedDebugSettingsView: View {
         userSettings.edgeThreshold = 5
         userSettings.isSerialOutput = false
         userSettings.isMouseEventPrintEnabled = false
+        userSettings.isKeyboardEventPrintEnabled = false
         userSettings.isHalPrintEnabled = false
         userSettings.mainWindownName = "main_openterface"
         userSettings.viewWidth = 1920.0
@@ -332,6 +339,7 @@ struct AdvancedDebugSettingsView: View {
                 "edgeThreshold": userSettings.edgeThreshold,
                 "isSerialOutput": userSettings.isSerialOutput,
                 "isMouseEventPrintEnabled": userSettings.isMouseEventPrintEnabled,
+                "isKeyboardEventPrintEnabled": userSettings.isKeyboardEventPrintEnabled,
                 "isHalPrintEnabled": userSettings.isHalPrintEnabled,
                 "mainWindowName": userSettings.mainWindownName,
                 "viewWidth": userSettings.viewWidth,
@@ -427,7 +435,12 @@ struct AdvancedDebugSettingsView: View {
         if let isMouseEventPrintEnabled = settings["isMouseEventPrintEnabled"] as? Bool {
             userSettings.isMouseEventPrintEnabled = isMouseEventPrintEnabled
         }
-        
+
+        // Apply keyboard event print setting
+        if let isKeyboardEventPrintEnabled = settings["isKeyboardEventPrintEnabled"] as? Bool {
+            userSettings.isKeyboardEventPrintEnabled = isKeyboardEventPrintEnabled
+        }
+
         // Apply HAL print setting
         if let isHalPrintEnabled = settings["isHalPrintEnabled"] as? Bool {
             userSettings.isHalPrintEnabled = isHalPrintEnabled

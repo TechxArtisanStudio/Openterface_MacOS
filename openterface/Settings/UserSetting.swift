@@ -252,7 +252,10 @@ Schema:
         
         // Load mouse event print logging preference from UserDefaults
         self.isMouseEventPrintEnabled = UserDefaults.standard.object(forKey: "isMouseEventPrintEnabled") as? Bool ?? false
-        
+
+        // Load keyboard event print logging preference from UserDefaults
+        self.isKeyboardEventPrintEnabled = UserDefaults.standard.object(forKey: "isKeyboardEventPrintEnabled") as? Bool ?? false
+
         // Load HAL print logging preference from UserDefaults
         self.isHalPrintEnabled = UserDefaults.standard.object(forKey: "isHalPrintEnabled") as? Bool ?? false
         
@@ -516,7 +519,14 @@ Schema:
             UserDefaults.standard.set(isMouseEventPrintEnabled, forKey: "isMouseEventPrintEnabled")
         }
     }
-    
+
+    // Keyboard event print logging preference persistence
+    @Published var isKeyboardEventPrintEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isKeyboardEventPrintEnabled, forKey: "isKeyboardEventPrintEnabled")
+        }
+    }
+
     // HAL print logging preference persistence
     @Published var isHalPrintEnabled: Bool {
         didSet {

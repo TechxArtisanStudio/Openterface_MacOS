@@ -31,6 +31,8 @@ class CH9329ControlChipset: BaseControlChipset {
 
     private var lastCTSState: Bool?
     private var lastCTSUpdateTime: Date?
+    private var lastHIDInfoCheckTime: Date?
+    private var hasObservedOpenSerialPort = false
     private var ctsMonitoringTimer: Timer?
 
     init?() {
@@ -72,6 +74,7 @@ class CH9329ControlChipset: BaseControlChipset {
     override func establishCommunication() -> Bool {
         // CH9329 requires baudrate detection and validation
         serialManager.tryOpenSerialPort()
+        startCTSMonitoring()
 
 //        // Check if communication was established
 //        currentBaudRate = serialManager.baudrate
@@ -82,7 +85,6 @@ class CH9329ControlChipset: BaseControlChipset {
 //               self.isConnected = status.isKeyboardConnected || status.isMouseConnected
 //           }
 //        }
-        startCTSMonitoring()
         return true
     }
 
@@ -107,7 +109,6 @@ class CH9329ControlChipset: BaseControlChipset {
     }
 
     override func monitorHIDEvents() -> Bool {
-        // CH9329 uses CTS monitoring for HID event detection
         return startCTSMonitoring()
     }
 
@@ -120,44 +121,85 @@ class CH9329ControlChipset: BaseControlChipset {
     // MARK: - CH9329 Specific Methods
 
     private func startCTSMonitoring() -> Bool {
+        guard USBDevicesManager.shared.isCH9329Connected() else {
+            logger.log(content: "Skipping CTS monitoring - only applicable to CH9329 chipset")
+            return false
+        }
+
         guard ctsMonitoringTimer == nil else {
-            return true // Already monitoring
+            return true
         }
 
         ctsMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.checkCTSState()
         }
 
-        logger.log(content: "🔄 Started CTS monitoring for CH9329 HID event detection")
+        logger.log(content: "Started CTS monitoring for CH9329 HID event detection")
         return true
     }
 
     private func stopCTSMonitoring() {
         ctsMonitoringTimer?.invalidate()
         ctsMonitoringTimer = nil
-        logger.log(content: "⏹️ Stopped CTS monitoring for CH9329")
+        lastCTSState = nil
+        lastHIDInfoCheckTime = nil
+        hasObservedOpenSerialPort = false
     }
 
     private func checkCTSState() {
-        guard let serialPort = serialManager.serialPort else { return }
+        guard USBDevicesManager.shared.isCH9329Connected() else {
+            stopCTSMonitoring()
+            return
+        }
+
+        guard let serialPort = serialManager.serialPort, serialPort.isOpen else {
+            if hasObservedOpenSerialPort {
+                stopCTSMonitoring()
+            }
+            return
+        }
+
+        hasObservedOpenSerialPort = true
 
         let currentCTS = serialPort.cts
 
         if lastCTSState == nil {
             lastCTSState = currentCTS
-            isConnected = false
+            lastHIDInfoCheckTime = Date()
+            checkHIDEventTime()
             return
         }
 
         if lastCTSState != currentCTS {
-            // CTS state changed - indicates HID activity
             AppStatus.isKeyboardConnected = true
             AppStatus.isMouseConnected = true
-            self.isConnected=true
+            SerialPortStatus.shared.isKeyboardConnected = true
+            SerialPortStatus.shared.isMouseConnected = true
+            isConnected = true
             lastCTSState = currentCTS
             lastCTSUpdateTime = Date()
+            lastHIDInfoCheckTime = Date()
+        }
 
-           // logger.log(content: "📡 CH9329 HID activity detected via CTS change")
+        checkHIDEventTime()
+    }
+
+    private func checkHIDEventTime() {
+        guard let lastCheckTime = lastHIDInfoCheckTime else { return }
+
+        // Treat any recent CH9329 serial response as healthy activity, even if CTS did not toggle.
+        if let lastSerialDate = serialManager.lastSerialDate,
+           Date().timeIntervalSince(lastSerialDate) <= 5 {
+            lastHIDInfoCheckTime = max(lastCheckTime, lastSerialDate)
+            return
+        }
+
+        if Date().timeIntervalSince(lastCheckTime) > 5 {
+            if logger.SerialDataPrint {
+                logger.log(content: "No hid update more than 5s, do a heartbeat check by requesting hid info")
+            }
+            lastHIDInfoCheckTime = Date()
+            serialManager.getHidInfo()
         }
     }
 
@@ -166,7 +208,6 @@ class CH9329ControlChipset: BaseControlChipset {
 
         var isTargetConnected = baseStatus.isTargetConnected
 
-        // For MS2109, check if CTS was updated within 2 seconds
         if let lastTime = lastCTSUpdateTime, Date().timeIntervalSince(lastTime) <= 2.0 {
             isTargetConnected = true
             isConnected = true
