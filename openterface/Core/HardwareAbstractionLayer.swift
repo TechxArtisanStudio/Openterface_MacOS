@@ -161,7 +161,7 @@ struct ChipsetCapabilities {
 }
 
 /// Video resolution structure
-struct VideoResolution {
+struct VideoResolution: Equatable, Hashable {
     let width: Int
     let height: Int
     let refreshRate: Float

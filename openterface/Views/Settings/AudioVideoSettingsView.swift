@@ -1,8 +1,10 @@
 import SwiftUI
+import CoreMedia
 
 struct AudioVideoSettingsView: View {
     @ObservedObject private var audioManager = AudioManager.shared
     @ObservedObject private var userSettings = UserSettings.shared
+    @ObservedObject private var videoManager = VideoManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -80,8 +82,65 @@ struct AudioVideoSettingsView: View {
                                 }
                                 .frame(width: 120)
                             }
-                            
+
                             Text("Current ratio: \(String(format: "%.3f", userSettings.customAspectRatio.widthToHeightRatio))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    // Video Format Selection
+                    if !videoManager.availableVideoFormats.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Video Capture Format")
+                                .font(.system(size: 14, weight: .medium))
+
+                            // Resolution Picker
+                            HStack {
+                                Text("Resolution:")
+                                    .frame(width: 100, alignment: .leading)
+                                Picker("", selection: Binding(
+                                    get: { userSettings.selectedVideoResolution },
+                                    set: { userSettings.selectedVideoResolution = $0 }
+                                )) {
+                                    ForEach(uniqueResolutions, id: \.self) { resolution in
+                                        Text("\(resolution.width)x\(resolution.height)").tag(resolution)
+                                    }
+                                }
+                                .frame(width: 150)
+                            }
+
+                            // Frame Rate Picker
+                            HStack {
+                                Text("Frame Rate:")
+                                    .frame(width: 100, alignment: .leading)
+                                Picker("", selection: Binding(
+                                    get: { userSettings.selectedVideoFrameRate },
+                                    set: { userSettings.selectedVideoFrameRate = $0 }
+                                )) {
+                                    ForEach(uniqueFrameRates, id: \.self) { rate in
+                                        Text("\(Int(rate)) fps").tag(rate)
+                                    }
+                                }
+                                .frame(width: 150)
+                            }
+
+                            // Pixel Format Picker
+                            HStack {
+                                Text("Pixel Format:")
+                                    .frame(width: 100, alignment: .leading)
+                                Picker("", selection: Binding(
+                                    get: { userSettings.selectedVideoPixelFormat },
+                                    set: { userSettings.selectedVideoPixelFormat = $0 }
+                                )) {
+                                    ForEach(uniquePixelFormats, id: \.self) { format in
+                                        Text(formatDisplayName(format)).tag(format)
+                                    }
+                                }
+                                .frame(width: 150)
+                            }
+
+                            Text("Current: \(videoManager.selectedVideoFormat.description)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -96,5 +155,46 @@ struct AudioVideoSettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: - Helper Properties
+
+    private var uniqueResolutions: [VideoResolution] {
+        let resolutions = Array(Set(videoManager.availableVideoFormats.map { $0.resolution }))
+        return resolutions.sorted {
+            if $0.width != $1.width {
+                return $0.width > $1.width
+            }
+            return $0.height > $1.height
+        }
+    }
+
+    private var uniqueFrameRates: [Float] {
+        let rates = Array(Set(videoManager.availableVideoFormats.map { $0.frameRate }))
+        return rates.sorted(by: >)
+    }
+
+    private var uniquePixelFormats: [String] {
+        let formats = Array(Set(videoManager.availableVideoFormats.map { $0.pixelFormat }))
+        return formats.sorted()
+    }
+
+    private func formatDisplayName(_ format: String) -> String {
+        switch format {
+        case String(format: "0x%X", kCVPixelFormatType_32BGRA):
+            return "BGRA"
+        case String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange):
+            return "420v"
+        case String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarFullRange):
+            return "420f"
+        case String(format: "0x%X", kCVPixelFormatType_422YpCbCr8):
+            return "422"
+        case String(format: "0x%X", kCMVideoCodecType_JPEG):
+            return "MJPEG"
+        case String(format: "0x%X", kCMVideoCodecType_H264):
+            return "H.264"
+        default:
+            return format
+        }
     }
 }

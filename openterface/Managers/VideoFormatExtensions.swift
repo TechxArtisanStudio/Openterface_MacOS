@@ -32,13 +32,12 @@ extension AVCaptureDevice.Format {
         let pixelFormat = String(format: "0x%X", codecType)
 
         let maxFps = videoSupportedFrameRateRanges
-            .compactMap { $0 as? AVFrameRateRange }
             .map { $0.maxFrameRate }
             .max() ?? 0.0
 
         return VideoFormat(
-            resolution: VideoResolution(width: Int(dimensions.width), height: Int(dimensions.height), refreshRate: maxFps),
-            frameRate: maxFps,
+            resolution: VideoResolution(width: Int(dimensions.width), height: Int(dimensions.height), refreshRate: Float(maxFps)),
+            frameRate: Float(maxFps),
             pixelFormat: pixelFormat
         )
     }
@@ -64,17 +63,16 @@ extension AVCaptureDevice.Format {
         case kCMVideoCodecType_H264:
             formatName = "H.264"
         default:
-            var bytes: [UInt8] = [
+            let bytes: [UInt8] = [
                 UInt8((codecType >> 24) & 0xFF),
                 UInt8((codecType >> 16) & 0xFF),
                 UInt8((codecType >> 8) & 0xFF),
                 UInt8(codecType & 0xFF)
             ]
-            formatName = String(bytes: &bytes, encoding: .ascii) ?? "Unknown"
+            formatName = String(bytes: bytes, encoding: .ascii) ?? "Unknown"
         }
 
         let maxFps = videoSupportedFrameRateRanges
-            .compactMap { $0 as? AVFrameRateRange }
             .map { $0.maxFrameRate }
             .max() ?? 0.0
 
