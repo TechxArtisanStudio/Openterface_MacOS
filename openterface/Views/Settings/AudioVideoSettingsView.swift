@@ -101,7 +101,7 @@ struct AudioVideoSettingsView: View {
                                     applyVideoFormat()
                                 }
                             )) {
-                                ForEach(videoManager.availableVideoFormats, id: \.self) { format in
+                                ForEach(sortedVideoFormats, id: \.self) { format in
                                     Text(format.description).tag(format)
                                 }
                             }
@@ -127,6 +127,23 @@ struct AudioVideoSettingsView: View {
         videoManager.stopVideoSession()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.videoManager.prepareVideo()
+        }
+    }
+
+    // MARK: - Helper Properties
+
+    private var sortedVideoFormats: [VideoFormat] {
+        videoManager.availableVideoFormats.sorted {
+            if $0.pixelFormat != $1.pixelFormat {
+                return $0.pixelFormat < $1.pixelFormat
+            }
+            if $0.resolution.width != $1.resolution.width {
+                return $0.resolution.width > $1.resolution.width
+            }
+            if $0.resolution.height != $1.resolution.height {
+                return $0.resolution.height > $1.resolution.height
+            }
+            return $0.frameRate > $1.frameRate
         }
     }
 }
