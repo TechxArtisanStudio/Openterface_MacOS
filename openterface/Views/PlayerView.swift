@@ -104,8 +104,33 @@ class PlayerView: NSView, NSWindowDelegate {
               let maxFps = notification.userInfo?["maxFps"] as? Float else { return }
         let message = "⚠️ Input \(Int(fps))Hz exceeds hardware max (\(Int(maxFps))Hz). Set target display to ≤\(Int(maxFps))Hz for a clear image."
         logger.log(content: message)
+
+        // Show prominent modal alert dialog
         DispatchQueue.main.async {
-            self.tipLayerManager.showTip(text: message, yOffset: 3.0, fontSize: 18.0, window: NSApp.mainWindow)
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "⚠️ Target Frame Rate Too High"
+            alert.informativeText = """
+            Target device is outputting: \(String(format: "%.0f", fps))Hz
+
+            Apple's AVFoundation does not support this device's \(String(format: "%.0f", fps))Hz compressed video format.
+            The maximum supported frame rate is \(Int(maxFps))Hz.
+
+            The system will automatically limit capture to \(Int(maxFps))Hz.
+
+            How to fix:
+            Please lower the target device's output frame rate to \(Int(maxFps))Hz or below:
+
+            1. Open the target computer's display settings
+            2. Change the refresh rate to \(Int(maxFps))Hz or lower
+            3. Openterface will automatically adapt to the new frame rate
+
+            Note: The Openterface device is functioning correctly. This limitation
+            is due to compatibility between the device's video compression and
+            macOS's AVFoundation framework.
+            """
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         }
     }
 

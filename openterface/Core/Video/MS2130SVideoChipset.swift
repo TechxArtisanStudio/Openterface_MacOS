@@ -22,6 +22,7 @@
 
 import Foundation
 import AVFoundation
+import AppKit
 import IOKit
 import IOKit.hid
 
@@ -55,10 +56,13 @@ class MS2130SVideoChipset: BaseVideoChipset {
     }
 
     override var supportedResolutions: [VideoResolution] {
+        // Maximum supported frame rate is 60fps due to AVFoundation limitations
+        let maxFps = AppStatus.maxSupportedFrameRate // Always 60.0
         return [
-            VideoResolution(width: 1920, height: 1080, refreshRate: 60.0),
-            VideoResolution(width: 1920, height: 1080, refreshRate: 30.0),
-            VideoResolution(width: 1280, height: 720, refreshRate: 60.0),
+            VideoResolution(width: 1920, height: 1080, refreshRate: maxFps),  // Primary resolution (1080p60)
+            VideoResolution(width: 1920, height: 1080, refreshRate: 30.0),    // 30fps option
+            VideoResolution(width: 1280, height: 720, refreshRate: maxFps),   // 720p60
+            VideoResolution(width: 1280, height: 720, refreshRate: 60.0),    // 720p60 (duplicate for clarity)
             VideoResolution(width: 1024, height: 768, refreshRate: 60.0),
             VideoResolution(width: 800, height: 600, refreshRate: 60.0),
             VideoResolution(width: 640, height: 480, refreshRate: 60.0)
@@ -66,7 +70,8 @@ class MS2130SVideoChipset: BaseVideoChipset {
     }
 
     override var maxFrameRate: Float {
-        return 60.0
+        // Maximum supported frame rate is 60fps due to AVFoundation limitations
+        return AppStatus.maxSupportedFrameRate
     }
 
     override func initialize() -> Bool {
@@ -78,6 +83,8 @@ class MS2130SVideoChipset: BaseVideoChipset {
         if validateConnection() {
             isConnected = true
             logger.log(content: "✅ MS2130S chipset initialized successfully")
+            logger.log(content: "🔌 USB speed: \(AppStatus.isUSB3Capable ? "3.0+" : "2.0"), max supported frame rate: \(AppStatus.maxSupportedFrameRate)fps")
+
             return true
         }
 
@@ -90,8 +97,9 @@ class MS2130SVideoChipset: BaseVideoChipset {
 
         // Check if MS2130S device is connected
         for device in AppStatus.USBDevices {
-            if device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
-               device.productID == MS2130SVideoChipset.PRODUCT_ID {
+            if (device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
+                device.productID == MS2130SVideoChipset.PRODUCT_ID) ||
+               device.productName.lowercased().contains("unknown capture card") {
                 logger.log(content: "🔍 MS2130S device detected: \(device.productName)")
                 return true
             }
@@ -102,9 +110,17 @@ class MS2130SVideoChipset: BaseVideoChipset {
 
     override func validateConnection() -> Bool {
         // MS2130S validation differs from MS2109
-        // May not have full HID capabilities, so use different validation
-        let videoDevices = getVideoDevices()
-        return !videoDevices.isEmpty
+        // Use USB device detection since MS2130S may not have full HID capabilities
+        for device in AppStatus.USBDevices {
+            if device.vendorID == MS2130SVideoChipset.VENDOR_ID &&
+               device.productID == MS2130SVideoChipset.PRODUCT_ID {
+                logger.log(content: "✅ MS2130S device connection validated: \(device.productName)")
+                return true
+            }
+        }
+
+        logger.log(content: "❌ MS2130S device connection validation failed - device not found in USB devices")
+        return false
     }
 
     override func getSignalStatus() -> VideoSignalStatus {

@@ -453,46 +453,94 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                     }
                     
                     // Find the best matching format for the desired resolution.
-                    // Prefer a format whose frame rate range includes 60fps, since the
-                    // MS2109/MS2130S chipset has a hardware maximum of 60fps at 1920x1080.
-                    // Capturing at higher rates (e.g. 120Hz input) causes garbled output.
+                    // Use dynamic frame rate based on USB speed: USB 3.0+ supports 120fps, USB 2.0 limited to 60fps.
+// Maximum supported frame rate is 60fps due to AVFoundation limitations.
+                    let targetFps = Double(AppStatus.maxSupportedFrameRate)
                     let candidateFormats = device.formats.filter { format in
                         let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
                         return formatDimensions.width == desiredRes.width && formatDimensions.height == desiredRes.height
                     }
-                    let matchingFormat = candidateFormats.first(where: { format in
-                        guard let ranges = format.videoSupportedFrameRateRanges as? [AVFrameRateRange] else { return false }
-                        return ranges.contains(where: { $0.minFrameRate <= 60.0 && $0.maxFrameRate >= 60.0 })
-                    }) ?? candidateFormats.first
+
+                    // Find matching format that supports target fps
+                    var matchingFormat: AVCaptureDevice.Format? = nil
+                    if !candidateFormats.isEmpty {
+                        // Allow 1fps tolerance for floating point precision issues
+                        // e.g., target 60fps vs actual 60.00048fps
+                        let tolerance: Double = 1.0
+                        for format in candidateFormats {
+                            guard let ranges = format.videoSupportedFrameRateRanges as? [AVFrameRateRange] else { continue }
+                            if ranges.contains(where: { $0.minFrameRate <= targetFps + tolerance && $0.maxFrameRate >= targetFps - tolerance }) {
+                                matchingFormat = format
+                                break
+                            }
+                        }
+                    }
+
+                    // Fallback to first candidate if no exact match found
+                    if matchingFormat == nil && !candidateFormats.isEmpty {
+                        matchingFormat = candidateFormats.first
+                    }
+
                     if let matchingFormat = matchingFormat {
                         device.activeFormat = matchingFormat
                         let pixelFormat = CMFormatDescriptionGetMediaSubType(matchingFormat.formatDescription)
                         let formatDescription = pixelFormatDescription(pixelFormat)
                         logger.log(content: "Set video resolution to \(desiredRes.width)x\(desiredRes.height) using format: \(formatDescription)")
-                        
-                        // Cap at 60fps for 1920x1080: the MS2109/MS2130S hardware chipset
-                        // supports a maximum of 60fps at this resolution. Requesting higher
-                        // frame rates when the target sends a 120Hz (or higher) HDMI signal
-                        // causes the chip to lose sync and produce unreadable/garbled frames.
+                        logger.log(content: "Format details: pixelFormat=\(String(format: "0x%X", pixelFormat)), mediaSubType=\(pixelFormat)")
+
+                        // Log format quality indicators
                         if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
-                            logger.log(content: "Available frame rate ranges for 1920x1080: \(frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", "))")
-                            
-                            let targetFps = 60.0
-                            if let fps60Range = frameRateRanges.first(where: { $0.minFrameRate <= targetFps && $0.maxFrameRate >= targetFps }) {
-                                // Lock exactly to 60fps
-                                let frameDuration = CMTimeMake(value: 1, timescale: Int32(targetFps))
-                                device.activeVideoMinFrameDuration = frameDuration
-                                device.activeVideoMaxFrameDuration = frameDuration
-                                logger.log(content: "Set frame rate to 60fps for 1920x1080 (hardware limit)")
+                            let maxFps = frameRateRanges.map { $0.maxFrameRate }.max() ?? 0
+                            logger.log(content: "Selected format supports up to \(Int(maxFps))fps")
+
+                            // Note about quality tradeoffs at high frame rates
+                            if targetFps > 90 {
+                                logger.log(content: "⚠️ High frame rate (\(Int(targetFps))fps) may result in reduced image quality due to hardware limitations")
+                                logger.log(content: "   For best image quality, consider using 60fps or lower")
+                            }
+                        }
+
+                        // Dynamic frame rate cap based on USB speed: USB 3.0+ supports 120fps, USB 2.0 limited to 60fps.
+                        // Requesting higher frame rates than USB bandwidth can support causes garbled output.
+                        if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
+                            logger.log(content: "Available frame rate ranges for \(desiredRes.width)x\(desiredRes.height): \(frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", "))")
+                            //                            logger.log(content: "USB speed: \(AppStatus.isUSB3Capable ? "3.0+" : "2.0"), target frame rate: \(targetFps)fps")
+                            logger.log(content: "Target frame rate: \(targetFps)fps (max supported: \(Int(AppStatus.maxSupportedFrameRate))fps)")
+
+                            // Allow 1fps tolerance for floating point precision issues when locking frame rate
+                            // e.g., target 60fps vs actual 60.00048fps
+                            let tolerance: Double = 1.0
+                            logger.log(content: "DEBUG: Checking frame rate ranges with tolerance=\(tolerance), targetFps=\(targetFps)")
+                            logger.log(content: "DEBUG: frameRateRanges count = \(frameRateRanges.count)")
+                            for (idx, range) in frameRateRanges.enumerated() {
+                                logger.log(content: "DEBUG: Range[\(idx)]: min=\(range.minFrameRate), max=\(range.maxFrameRate)")
+                            }
+                            if let targetRange = frameRateRanges.first(where: { $0.minFrameRate <= targetFps + tolerance && $0.maxFrameRate >= targetFps - tolerance }) {
+                                logger.log(content: "DEBUG: Found matching range: min=\(targetRange.minFrameRate), max=\(targetRange.maxFrameRate)")
+                                // Use the range's actual frame durations to avoid CMTime precision issues
+                                device.activeVideoMinFrameDuration = targetRange.minFrameDuration
+                                device.activeVideoMaxFrameDuration = targetRange.maxFrameDuration
+                                logger.log(content: "Set frame rate to \(Int(targetFps))fps for \(desiredRes.width)x\(desiredRes.height) (max \(Int(AppStatus.maxSupportedFrameRate))fps limit)")
                             } else {
-                                // 60fps range not found — use the highest rate that does not exceed 60fps
-                                let bestRange = frameRateRanges
-                                    .filter { $0.maxFrameRate <= 60.0 }
-                                    .max(by: { $0.maxFrameRate < $1.maxFrameRate })
-                                    ?? frameRateRanges.min(by: { $0.maxFrameRate < $1.maxFrameRate })!
-                                device.activeVideoMinFrameDuration = bestRange.minFrameDuration
-                                device.activeVideoMaxFrameDuration = bestRange.maxFrameDuration
-                                logger.log(content: "60fps range not found, using \(bestRange.maxFrameRate)fps for 1920x1080")
+                                // Target fps range not found — use the highest rate that does not exceed target fps
+                                let validRanges = frameRateRanges.filter { $0.maxFrameRate <= targetFps + tolerance }
+
+                                if let bestRange = validRanges.max(by: { $0.maxFrameRate < $1.maxFrameRate }) {
+                                    device.activeVideoMinFrameDuration = bestRange.minFrameDuration
+                                    device.activeVideoMaxFrameDuration = bestRange.maxFrameDuration
+                                    logger.log(content: "\(targetFps)fps range not found, using \(bestRange.maxFrameRate)fps for \(desiredRes.width)x\(desiredRes.height)")
+                                } else if let fallbackRange = frameRateRanges.min(by: { $0.maxFrameRate < $1.maxFrameRate }) {
+                                    device.activeVideoMinFrameDuration = fallbackRange.minFrameDuration
+                                    device.activeVideoMaxFrameDuration = fallbackRange.maxFrameDuration
+                                    logger.log(content: "No valid fps range found, using \(fallbackRange.maxFrameRate)fps for \(desiredRes.width)x\(desiredRes.height)")
+                                } else {
+                                    // Fallback to first available range
+                                    if let firstRange = frameRateRanges.first {
+                                        device.activeVideoMinFrameDuration = firstRange.minFrameDuration
+                                        device.activeVideoMaxFrameDuration = firstRange.maxFrameDuration
+                                        logger.log(content: "Using first available fps range: \(firstRange.maxFrameRate)fps for \(desiredRes.width)x\(desiredRes.height)")
+                                    }
+                                }
                             }
                         }
                         
