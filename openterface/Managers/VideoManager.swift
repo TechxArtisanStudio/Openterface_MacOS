@@ -734,32 +734,8 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                     logger.log(content: "Updated video output to \(selectedVideoFormat.resolution.width)x\(selectedVideoFormat.resolution.height)")
                 }
             } else {
-                logger.log(content: "Selected format \(selectedVideoFormat.description) not available on device, using first matching resolution")
-
-                // Fallback to first format with matching resolution
-                let fallbackFormat = device.formats.first { format in
-                    let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-                    return Int(dimensions.width) == selectedVideoFormat.resolution.width &&
-                           Int(dimensions.height) == selectedVideoFormat.resolution.height
-                }
-
-                if let fallbackFormat = fallbackFormat {
-                    device.activeFormat = fallbackFormat
-                    let appliedFormat = fallbackFormat.toVideoFormat()
-                    logger.log(content: "Applied fallback format: \(appliedFormat.description)")
-
-                    // Update selection to match what we actually applied
-                    selectedVideoFormat = appliedFormat
-
-                    // Update video data output
-                    if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
-                        videoOutput.videoSettings = [
-                            kCVPixelBufferPixelFormatTypeKey as String: appliedFormat.pixelFormat
-                        ]
-                    }
-                } else {
-                    logger.log(content: "No fallback format found for resolution \(selectedVideoFormat.resolution.width)x\(selectedVideoFormat.resolution.height)")
-                }
+                // Do not silently fallback - the selected combination is not supported
+                logger.log(content: "⚠️ Selected format \(selectedVideoFormat.description) not available on device. Please select a supported combination.")
             }
 
             device.unlockForConfiguration()

@@ -5,13 +5,16 @@ struct AudioVideoSettingsView: View {
     @ObservedObject private var audioManager = AudioManager.shared
     @ObservedObject private var userSettings = UserSettings.shared
     @ObservedObject private var videoManager = VideoManager.shared
-    
+
+    @State private var showFormatMismatchAlert = false
+    @State private var formatMismatchMessage = ""
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Audio & Video Configuration")
                 .font(.title2)
                 .bold()
-            
+
             // Audio Settings
             GroupBox("Audio Control") {
                 VStack(alignment: .leading, spacing: 12) {
@@ -19,12 +22,12 @@ struct AudioVideoSettingsView: View {
                         .onChange(of: userSettings.isAudioEnabled) { enabled in
                             audioManager.setAudioEnabled(enabled)
                         }
-                    
+
 
                         Text("Status: \(audioManager.statusMessage)")
                             .font(.caption)
                             .foregroundColor(audioManager.isAudioDeviceConnected ? .green : .orange)
-                        
+
                         HStack {
                             Text("Available input devices: \(audioManager.availableInputDevices.count)")
                             Spacer()
@@ -33,12 +36,12 @@ struct AudioVideoSettingsView: View {
                             }
                         }
                         .font(.caption)
-                        
+
                         if let selectedDevice = audioManager.selectedInputDevice {
                             Text("Input: \(selectedDevice.name)")
                                 .font(.caption)
                         }
-                        
+
                         if let selectedDevice = audioManager.selectedOutputDevice {
                             Text("Output: \(selectedDevice.name)")
                                 .font(.caption)
@@ -47,29 +50,29 @@ struct AudioVideoSettingsView: View {
                 }
                 .padding(.vertical, 8)
             }
-            
+
             // Video Settings
             GroupBox("Display & Video Settings") {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Full screen mode", isOn: $userSettings.isFullScreen)
-                    
+
                     // Aspect Ratio Mode Selection
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Aspect Ratio Mode")
                             .font(.system(size: 14, weight: .medium))
-                        
+
                         Picker("", selection: $userSettings.aspectRatioMode) {
                             ForEach(AspectRatioMode.allCases, id: \.self) { mode in
                                 Text(mode.displayName).tag(mode)
                             }
                         }
                         .pickerStyle(.segmented)
-                        
+
                         Text(userSettings.aspectRatioMode.description)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     // Custom Aspect Ratio Picker - only show when in custom mode
                     if userSettings.aspectRatioMode == .custom {
                         VStack(alignment: .leading, spacing: 8) {
@@ -101,7 +104,16 @@ struct AudioVideoSettingsView: View {
                                     .frame(width: 100, alignment: .leading)
                                 Picker("", selection: Binding(
                                     get: { userSettings.selectedVideoResolution },
-                                    set: { userSettings.selectedVideoResolution = $0 }
+                                    set: { newValue in
+                                        userSettings.selectedVideoResolution = newValue
+                                        // Reset frame rate and pixel format to valid values for this resolution
+                                        if let firstRate = frameRates(for: newValue).first {
+                                            userSettings.selectedVideoFrameRate = firstRate
+                                            if let firstFormat = pixelFormats(for: newValue, frameRate: firstRate).first {
+                                                userSettings.selectedVideoPixelFormat = firstFormat
+                                            }
+                                        }
+                                    }
                                 )) {
                                     ForEach(uniqueResolutions, id: \.self) { resolution in
                                         Text("\(resolution.width)x\(resolution.height)").tag(resolution)
@@ -113,15 +125,21 @@ struct AudioVideoSettingsView: View {
                                 }
                             }
 
-                            // Frame Rate Picker
+                            // Frame Rate Picker - filtered by selected resolution
                             HStack {
                                 Text("Frame Rate:")
                                     .frame(width: 100, alignment: .leading)
                                 Picker("", selection: Binding(
                                     get: { userSettings.selectedVideoFrameRate },
-                                    set: { userSettings.selectedVideoFrameRate = $0 }
+                                    set: { newValue in
+                                        userSettings.selectedVideoFrameRate = newValue
+                                        // Reset pixel format to valid value for this resolution + frame rate
+                                        if let firstFormat = pixelFormats(for: userSettings.selectedVideoResolution, frameRate: newValue).first {
+                                            userSettings.selectedVideoPixelFormat = firstFormat
+                                        }
+                                    }
                                 )) {
-                                    ForEach(uniqueFrameRates, id: \.self) { rate in
+                                    ForEach(frameRates(for: userSettings.selectedVideoResolution), id: \.self) { rate in
                                         Text("\(Int(rate)) fps").tag(rate)
                                     }
                                 }
@@ -131,7 +149,7 @@ struct AudioVideoSettingsView: View {
                                 }
                             }
 
-                            // Pixel Format Picker
+                            // Pixel Format Picker - filtered by selected resolution + frame rate
                             HStack {
                                 Text("Pixel Format:")
                                     .frame(width: 100, alignment: .leading)
@@ -139,7 +157,7 @@ struct AudioVideoSettingsView: View {
                                     get: { userSettings.selectedVideoPixelFormat },
                                     set: { userSettings.selectedVideoPixelFormat = $0 }
                                 )) {
-                                    ForEach(uniquePixelFormats, id: \.self) { format in
+                                    ForEach(pixelFormats(for: userSettings.selectedVideoResolution, frameRate: userSettings.selectedVideoFrameRate), id: \.self) { format in
                                         Text(formatDisplayName(format)).tag(format)
                                     }
                                 }
@@ -154,7 +172,7 @@ struct AudioVideoSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     Toggle("Show HID resolution change alerts", isOn: Binding(
                         get: { !userSettings.doNotShowHidResolutionAlert },
                         set: { userSettings.doNotShowHidResolutionAlert = !$0 }
@@ -164,6 +182,11 @@ struct AudioVideoSettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+        .alert("Video Format Not Supported", isPresented: $showFormatMismatchAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(formatMismatchMessage)
+        }
     }
 
     // MARK: - Helper Properties
@@ -178,13 +201,23 @@ struct AudioVideoSettingsView: View {
         }
     }
 
-    private var uniqueFrameRates: [Float] {
-        let rates = Array(Set(videoManager.availableVideoFormats.map { $0.frameRate }))
+    /// Frame rates available for the given resolution
+    private func frameRates(for resolution: VideoResolution) -> [Float] {
+        let rates = Array(Set(
+            videoManager.availableVideoFormats
+                .filter { $0.resolution == resolution }
+                .map { $0.frameRate }
+        ))
         return rates.sorted(by: >)
     }
 
-    private var uniquePixelFormats: [String] {
-        let formats = Array(Set(videoManager.availableVideoFormats.map { $0.pixelFormat }))
+    /// Pixel formats available for the given resolution and frame rate
+    private func pixelFormats(for resolution: VideoResolution, frameRate: Float) -> [String] {
+        let formats = Array(Set(
+            videoManager.availableVideoFormats
+                .filter { $0.resolution == resolution && abs($0.frameRate - frameRate) < 1.0 }
+                .map { $0.pixelFormat }
+        ))
         return formats.sorted()
     }
 
@@ -212,6 +245,25 @@ struct AudioVideoSettingsView: View {
     // MARK: - Actions
 
     private func applyVideoFormat() {
+        let selected = videoManager.selectedVideoFormat
+
+        // Check if the exact combination is supported
+        let isSupported = videoManager.availableVideoFormats.contains { format in
+            format.resolution == selected.resolution &&
+            abs(format.frameRate - selected.frameRate) < 1.0 &&
+            format.pixelFormat == selected.pixelFormat
+        }
+
+        if !isSupported {
+            formatMismatchMessage = "The selected format combination is not supported by the target device.\n\n" +
+                "Resolution: \(selected.resolution.width)x\(selected.resolution.height)\n" +
+                "Frame Rate: \(Int(selected.frameRate)) fps\n" +
+                "Pixel Format: \(formatDisplayName(selected.pixelFormat))\n\n" +
+                "Please select a different combination from the available options."
+            showFormatMismatchAlert = true
+            return
+        }
+
         // Restart video session to apply new format
         videoManager.stopVideoSession()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
