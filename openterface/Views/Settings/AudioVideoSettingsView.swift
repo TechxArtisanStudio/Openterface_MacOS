@@ -189,6 +189,8 @@ struct AudioVideoSettingsView: View {
             return "420f"
         case String(format: "0x%X", kCVPixelFormatType_422YpCbCr8):
             return "422"
+        case String(format: "0x%X", kCVPixelFormatType_422YpCbCr8_yuvs):
+            return "422 (yuvs)"
         case String(format: "0x%X", kCMVideoCodecType_JPEG):
             return "MJPEG"
         case String(format: "0x%X", kCMVideoCodecType_H264):

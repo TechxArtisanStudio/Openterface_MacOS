@@ -31,9 +31,21 @@ extension AVCaptureDevice.Format {
         let codecType = CMFormatDescriptionGetMediaSubType(self.formatDescription)
         let pixelFormat = String(format: "0x%X", codecType)
 
-        let maxFps = videoSupportedFrameRateRanges
-            .map { $0.maxFrameRate }
-            .max() ?? 0.0
+        // Get all supported frame rates and filter by device capability
+        let supportedFrameRates = videoSupportedFrameRateRanges
+            .flatMap { range -> [Float] in
+                // Generate common frame rates within the supported range
+                var rates: [Float] = []
+                let commonRates: [Float] = [15, 24, 25, 30, 50, 60]
+                for rate in commonRates {
+                    if Float(rate) >= Float(range.minFrameRate) && Float(rate) <= Float(range.maxFrameRate) {
+                        rates.append(rate)
+                    }
+                }
+                return rates
+            }
+
+        let maxFps = supportedFrameRates.max() ?? 30.0
 
         return VideoFormat(
             resolution: VideoResolution(width: Int(dimensions.width), height: Int(dimensions.height), refreshRate: Float(maxFps)),
@@ -58,6 +70,8 @@ extension AVCaptureDevice.Format {
             formatName = "420f"
         case kCVPixelFormatType_422YpCbCr8:
             formatName = "422"
+        case kCVPixelFormatType_422YpCbCr8_yuvs:
+            formatName = "422 (yuvs)"
         case kCMVideoCodecType_JPEG:
             formatName = "MJPEG"
         case kCMVideoCodecType_H264:
