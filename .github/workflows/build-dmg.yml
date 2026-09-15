@@ -204,6 +204,7 @@ jobs:
       with:
         name: Openterface-KVM
         path: build/*.dmg
+        retention-days: 30
 
 
     - name: Cache node modules

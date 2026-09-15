@@ -125,6 +125,12 @@ class USBDevicesManager: USBDevicesManagerProtocol {
             let speedValue = (IORegistryEntryCreateCFProperty(usbDevice, kUSBDevicePropertySpeed as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber)?.intValue ?? 0
             let speedString = formatUSBSpeed(speedValue)
 
+            // Save USB speed for the Openterface video chipset to enable dynamic frame rate adaptation
+            if isOpenterfaceVideoChipset(vendorId: vendorID, productId: productID) {
+                AppStatus.currentUSBSpeed = speedValue
+                logger.log(content: "🔌 Openterface video chipset USB speed: \(speedString) (value=\(speedValue))")
+            }
+
             let deviceInfo = USBDeviceInfo(productName: productName, manufacturer: manufacturer, vendorID: vendorID, productID: productID, locationID: locationIDString, speed: speedString)
             devices.append(deviceInfo)
         }
@@ -191,6 +197,9 @@ class USBDevicesManager: USBDevicesManagerProtocol {
     func getVideoChipsetType(vendorId: Int, productId: Int) -> VideoChipsetType {
         if vendorId == MS2019_VID && productId == MS2019_PID {
             return .ms2109
+        } else if vendorId == MS2019S_VID && productId == MS2019S_PID {
+            // MS2109S: Vendor 0x345F, Product 0x2109
+            return .ms2109s
         } else if vendorId == MS2130S_VID && productId == MS2130S_PID {
             return .ms2130s
         } else {

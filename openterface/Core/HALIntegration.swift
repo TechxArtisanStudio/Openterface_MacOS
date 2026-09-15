@@ -213,32 +213,41 @@ class HALIntegrationManager {
             logger.log(content: "⚠️ No control chipset available for integration")
             return
         }
-        
+
         let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-        
+
+        // Reopen HID device now that video chipset has been detected
+        // This is necessary because HIDManager starts before USB device enumeration completes
+        if let hidManagerImpl = hidManager as? HIDManager {
+            if AppStatus.videoChipDevice != nil && !hidManagerImpl.isOpen {
+                logger.log(content: "🔄 Reopening HID device after video chipset detection...")
+                hidManagerImpl.startCommunication()
+            }
+        }
+
         // Initialize HAL-aware HID operations if supported
         if let hidManagerImpl = hidManager as? HIDManager {
             if hidManagerImpl.initializeHALAwareHID() {
                 logger.log(content: "✅ HID HAL integration: HAL-aware HID initialized")
-                
+
                 // Log HAL system information
                 let systemInfo = hidManagerImpl.getHALSystemInfo()
                 logger.log(content: "📊 \(systemInfo)")
-                
+
                 // Get and log HID capabilities
                 let hidCapabilities = hidManagerImpl.getHALHIDCapabilities()
                 logger.log(content: "🔧 HID Capabilities: \(hidCapabilities.joined(separator: ", "))")
-                
+
             } else {
                 logger.log(content: "⚠️ HAL-aware HID initialization failed")
             }
         }
-        
+
         // Configure HID operations based on chipset capabilities
         if controlChipset.capabilities.supportsHID {
             logger.log(content: "✅ HID HAL integration: HID support enabled")
         }
-        
+
         if controlChipset.capabilities.supportsEEPROM {
             logger.log(content: "✅ HID HAL integration: EEPROM operations enabled")
         }

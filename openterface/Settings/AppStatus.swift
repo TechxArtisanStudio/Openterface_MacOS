@@ -133,7 +133,23 @@ struct AppStatus {
     static var groupOpenterfaceDevices: [[USBDeviceInfo]] = []
     static var isMatchVideoDevice: Bool = false
     static var isHIDOpen: Bool?
-    
+
+    // USB speed tracking for dynamic frame rate adaptation
+    static var currentUSBSpeed: Int = 2  // Default to USB 2.0 (High Speed)
+
+    // Computed properties for USB capability detection
+    static var isUSB3Capable: Bool {
+        return currentUSBSpeed >= 3  // 3 = SuperSpeed (USB 3.0), 4-5 = SuperSpeed+
+    }
+
+    // Dynamic max frame rate based on USB speed
+    static var maxSupportedFrameRate: Float {
+        return 60.0
+    }
+
+    // Threshold for high frame rate detection (used for bandwidth mismatch warning)
+    static let highFrameRateThreshold: Float = 65.0
+
     // Video and Control Chip USB Device Info
     static var videoChipDevice: USBDeviceInfo?
     static var controlChipDevice: USBDeviceInfo?
