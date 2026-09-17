@@ -21,6 +21,7 @@
 */
 
 import SwiftUI
+import Darwin
 
 class StatusBarManager: NSObject, StatusBarManagerProtocol {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
@@ -28,6 +29,19 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
 
     var statusBarItem: NSStatusItem!
     private var parallelModeMenuItem: NSMenuItem!
+    private var cpuTimer: Timer?
+    private var previousCPUTicks: CPUCPUTicks?
+
+    private struct CPUCPUTicks {
+        var user: UInt64
+        var system: UInt64
+        var idle: UInt64
+        var nice: UInt64
+
+        var total: UInt64 {
+            return user + system + idle + nice
+        }
+    }
 
     override init() {
         super.init()
@@ -37,6 +51,7 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        stopCPUMonitor()
     }
     
     func initBar() {
@@ -98,6 +113,11 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
         exitItem.target = self
         menu.addItem(exitItem)
         statusBarItem.menu = menu
+
+        // Start CPU monitoring after a short delay to ensure all initialization is complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.startCPUMonitor()
+        }
     }
     
     @objc func exitApp() {
@@ -191,6 +211,62 @@ class StatusBarManager: NSObject, StatusBarManagerProtocol {
     }
     
     func removeStatusBar() {
+        stopCPUMonitor()
         NSStatusBar.system.removeStatusItem(statusBarItem)
+    }
+
+    private func getCPUUsage() -> Double {
+        var hostInfo: host_cpu_load_info_data_t = host_cpu_load_info_data_t()
+        var size: mach_msg_type_number_t = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
+
+        let result = withUnsafeMutablePointer(to: &hostInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(size)) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &size)
+            }
+        }
+
+        if result != KERN_SUCCESS {
+            return -1.0
+        }
+
+        let usage = hostInfo
+        let totalTicks: UInt64 = (UInt64(usage.cpu_ticks.0) + UInt64(usage.cpu_ticks.1) + UInt64(usage.cpu_ticks.2) + UInt64(usage.cpu_ticks.3))
+        let idleTicks = UInt64(usage.cpu_ticks.2)
+
+        if let prevTicks = previousCPUTicks {
+            let totalDiff = totalTicks - prevTicks.total
+            let idleDiff = idleTicks - prevTicks.idle
+
+            if totalDiff > 0 {
+                let usagePercent = 100.0 * (1.0 - Double(idleDiff) / Double(totalDiff))
+                previousCPUTicks = CPUCPUTicks(user: UInt64(usage.cpu_ticks.0), system: UInt64(usage.cpu_ticks.1), idle: idleTicks, nice: UInt64(usage.cpu_ticks.3))
+                return usagePercent
+            }
+        } else {
+            previousCPUTicks = CPUCPUTicks(user: UInt64(usage.cpu_ticks.0), system: UInt64(usage.cpu_ticks.1), idle: idleTicks, nice: UInt64(usage.cpu_ticks.3))
+            return 0.0
+        }
+
+        return 0.0
+    }
+
+    private func updateCPUDisplay() {
+        let usage = getCPUUsage()
+        if usage >= 0.0 {
+            if let button = statusBarItem.button {
+                button.title = String(format: "%.0f%%", usage)
+            }
+        }
+    }
+
+    private func startCPUMonitor() {
+        cpuTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateCPUDisplay()
+        }
+    }
+
+    private func stopCPUMonitor() {
+        cpuTimer?.invalidate()
+        cpuTimer = nil
     }
 }

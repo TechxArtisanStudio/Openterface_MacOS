@@ -398,6 +398,31 @@ Schema:
         self.guidePrompt = initialProfile.guidePrompt
         let savedChatImageUploadLimit = UserDefaults.standard.string(forKey: "chatImageUploadLimit")
         self.chatImageUploadLimit = ChatImageUploadLimit(rawValue: savedChatImageUploadLimit ?? "") ?? .original
+
+        // Load persisted video format selection from UserDefaults
+        if let resolutionStr = UserDefaults.standard.string(forKey: "selectedVideoResolution") {
+            let parts = resolutionStr.split(separator: "@")
+            if parts.count == 2 {
+                let resolutionParts = parts[0].split(separator: "x")
+                if resolutionParts.count == 2,
+                   let width = Int(resolutionParts[0]),
+                   let height = Int(resolutionParts[1]),
+                   let fps = Float(parts[1]) {
+                    self.selectedVideoResolution = VideoResolution(width: width, height: height, refreshRate: fps)
+                } else {
+                    self.selectedVideoResolution = VideoResolution(width: 1920, height: 1080, refreshRate: 60.0)
+                }
+            } else {
+                self.selectedVideoResolution = VideoResolution(width: 1920, height: 1080, refreshRate: 60.0)
+            }
+        } else {
+            self.selectedVideoResolution = VideoResolution(width: 1920, height: 1080, refreshRate: 60.0)
+        }
+
+        let savedFrameRate = UserDefaults.standard.float(forKey: "selectedVideoFrameRate")
+        self.selectedVideoFrameRate = savedFrameRate == 0.0 ? 60.0 : savedFrameRate
+
+        self.selectedVideoPixelFormat = UserDefaults.standard.string(forKey: "selectedVideoPixelFormat") ?? String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
     }
 
     private static func defaultPromptProfile() -> ChatPromptProfile {
@@ -586,6 +611,26 @@ Schema:
     @Published var isAudioEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isAudioEnabled, forKey: "isAudioEnabled")
+        }
+    }
+
+    // Video Format Selection - User-selected video capture format
+    @Published var selectedVideoResolution: VideoResolution {
+        didSet {
+            let value = "\(selectedVideoResolution.width)x\(selectedVideoResolution.height)@\(selectedVideoResolution.refreshRate)"
+            UserDefaults.standard.set(value, forKey: "selectedVideoResolution")
+        }
+    }
+
+    @Published var selectedVideoFrameRate: Float {
+        didSet {
+            UserDefaults.standard.set(selectedVideoFrameRate, forKey: "selectedVideoFrameRate")
+        }
+    }
+
+    @Published var selectedVideoPixelFormat: String {
+        didSet {
+            UserDefaults.standard.set(selectedVideoPixelFormat, forKey: "selectedVideoPixelFormat")
         }
     }
     

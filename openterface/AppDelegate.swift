@@ -249,6 +249,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Initialize Hardware Abstraction Layer
         initializeHAL()
 
+        // Enumerate available video formats for settings UI
+        DispatchQueue.main.async {
+            VideoManager.shared.enumerateAvailableVideoFormats()
+        }
+
         // Initialize HID Manager after USB device manager is updated
         _ = hidManager
         

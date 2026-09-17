@@ -59,10 +59,29 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Session for capturing video
     var captureSession: AVCaptureSession!
-    
+
     /// Set of cancellables for managing publishers
     private var cancellables = Set<AnyCancellable>()
-    
+
+    /// Cached list of available video formats from the current device
+    @Published private(set) var availableVideoFormats: [VideoFormat] = []
+
+    /// Selected video format from UserSettings (computed for easier access)
+    var selectedVideoFormat: VideoFormat {
+        get {
+            VideoFormat(
+                resolution: UserSettings.shared.selectedVideoResolution,
+                frameRate: UserSettings.shared.selectedVideoFrameRate,
+                pixelFormat: UserSettings.shared.selectedVideoPixelFormat
+            )
+        }
+        set {
+            UserSettings.shared.selectedVideoResolution = newValue.resolution
+            UserSettings.shared.selectedVideoFrameRate = newValue.frameRate
+            UserSettings.shared.selectedVideoPixelFormat = newValue.pixelFormat
+        }
+    }
+
     /// Audio property listener ID for observing audio device changes
     private var audioPropertyListenerID: AudioObjectPropertyListenerBlock?
     
@@ -354,11 +373,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         // If devices found, set up video capture
         if !videoDevices.isEmpty {
             let device = videoDevices[0]
-            
-            // Set to 1920x1080 resolution capped at 60fps (hardware chipset max)
-            setVideoResolution(width: 1920, height: 1080)
-            logger.log(content: "Setting video to 1920x1080 resolution at 60fps (hardware limit)")
-            
+
+            // Enumerate available formats first
+            enumerateAvailableVideoFormats()
+
+            // Apply user-selected format if available
+            applySelectedVideoFormat(to: device)
+
             setupVideoCapture(with: device)
         } else {
             logger.log(content: "No matching video devices found")
@@ -601,7 +622,128 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 //            print("Supported pixel format: \(formatDescription)")
 //        }
     }
-    
+
+    // MARK: - Video Format Enumeration
+
+    /// Enumerates and caches all available video formats from detected video devices
+    func enumerateAvailableVideoFormats() {
+        logger.log(content: "Enumerating available video formats...")
+
+        // Get available video devices
+        let videoDeviceTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInWideAngleCamera,
+            .externalUnknown
+        ]
+
+        let videoDiscoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: videoDeviceTypes,
+            mediaType: .video,
+            position: .unspecified
+        )
+
+        let videoDevices = findMatchingVideoDevices(from: videoDiscoverySession.devices)
+
+        var formats: [VideoFormat] = []
+
+        for device in videoDevices {
+            logger.log(content: "\n=== Device: \(device.localizedName) ===")
+            logger.log(content: "Total formats: \(device.formats.count)")
+
+            for (index, format) in device.formats.enumerated() {
+                let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let codecType = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                let pixelFormat = String(format: "0x%X", codecType)
+
+                // Get frame rate ranges
+                let frameRateRanges = format.videoSupportedFrameRateRanges
+                var frameRateInfo = ""
+                for range in frameRateRanges {
+                    frameRateInfo += "\(range.minFrameRate)-\(range.maxFrameRate)fps "
+                }
+
+                logger.log(content: "Format \(index): \(dimensions.width)x\(dimensions.height) @ \(frameRateInfo)- \(pixelFormat)")
+            }
+
+            for format in device.formats {
+                let videoFormat = format.toVideoFormat()
+
+                // Avoid duplicates (same resolution, fps, and pixel format)
+                if !formats.contains(where: { $0.resolution == videoFormat.resolution &&
+                                           abs($0.frameRate - videoFormat.frameRate) < 1.0 &&
+                                           $0.pixelFormat == videoFormat.pixelFormat }) {
+                    formats.append(videoFormat)
+                }
+            }
+
+            logger.log(content: "Found \(device.formats.count) formats from device: \(device.localizedName)")
+        }
+
+        // Sort by resolution (desc), then frame rate (desc), then pixel format
+        availableVideoFormats = formats.sorted {
+            if $0.resolution.width != $1.resolution.width {
+                return $0.resolution.width > $1.resolution.width
+            }
+            if $0.resolution.height != $1.resolution.height {
+                return $0.resolution.height > $1.resolution.height
+            }
+            if abs($0.frameRate - $1.frameRate) > 0.1 {
+                return $0.frameRate > $1.frameRate
+            }
+            return $0.pixelFormat < $1.pixelFormat
+        }
+
+        logger.log(content: "Found \(availableVideoFormats.count) unique video formats")
+
+        // If current selection is not in available formats, find closest match
+        if !availableVideoFormats.contains(where: { $0 == selectedVideoFormat }) {
+            let closest = availableVideoFormats.first { format in
+                format.resolution.width == selectedVideoFormat.resolution.width &&
+                format.resolution.height == selectedVideoFormat.resolution.height
+            } ?? availableVideoFormats.first
+
+            if let closest = closest {
+                logger.log(content: "Selected format not available, using closest match: \(closest.description)")
+                selectedVideoFormat = closest
+            }
+        }
+    }
+
+    /// Applies the user-selected video format to the device if available
+    private func applySelectedVideoFormat(to device: AVCaptureDevice) {
+        do {
+            try device.lockForConfiguration()
+
+            // Find matching format in device's supported formats
+            let matchingFormat = device.formats.first { format in
+                let videoFormat = format.toVideoFormat()
+                return videoFormat.resolution.width == selectedVideoFormat.resolution.width &&
+                       videoFormat.resolution.height == selectedVideoFormat.resolution.height &&
+                       abs(videoFormat.frameRate - selectedVideoFormat.frameRate) < 1.0 &&
+                       videoFormat.pixelFormat == selectedVideoFormat.pixelFormat
+            }
+
+            if let matchingFormat = matchingFormat {
+                device.activeFormat = matchingFormat
+                logger.log(content: "Applied user-selected video format: \(selectedVideoFormat.description)")
+
+                // Update video data output to capture at the selected resolution
+                if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
+                    videoOutput.videoSettings = [
+                        kCVPixelBufferPixelFormatTypeKey as String: matchingFormat.toVideoFormat().pixelFormat
+                    ]
+                    logger.log(content: "Updated video output to \(selectedVideoFormat.resolution.width)x\(selectedVideoFormat.resolution.height)")
+                }
+            } else {
+                // Do not silently fallback - the selected combination is not supported
+                logger.log(content: "⚠️ Selected format \(selectedVideoFormat.description) not available on device. Please select a supported combination.")
+            }
+
+            device.unlockForConfiguration()
+        } catch {
+            logger.log(content: "Failed to apply video format: \(error.localizedDescription)")
+        }
+    }
+
     /// Starts video capture session
     func startVideoSession() {
         // Avoid HID/video bus conflicts during firmware flashing

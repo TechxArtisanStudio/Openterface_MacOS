@@ -12,6 +12,8 @@
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
 		295DCFB62D76A8A20034BB1E /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295DCFB52D76A8A20034BB1E /* AudioManager.swift */; };
 		296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */; };
+		296A1B3E2A7F8E2F00AB1235 /* VideoFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A1B3F2A7F8E2F00AB1236 /* VideoFormat.swift */; };
+		296A1B402A7F8E2F00AB1237 /* VideoFormatExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A1B412A7F8E2F00AB1238 /* VideoFormatExtensions.swift */; };
 		2DB6867F9B354EF28DC91239 /* ChatManager+MacroGeneration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AA8AA3DA144422A6556825 /* ChatManager+MacroGeneration.swift */; };
 		3B3174F090DE414885F69380 /* AIInputRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33ABECB0381143E69F16304F /* AIInputRouter.swift */; };
 		40748BED16F44FDE8F17E497 /* ChatManager+PlanExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F7606ABB46427BB3D6F6A2 /* ChatManager+PlanExecution.swift */; };
@@ -171,6 +173,8 @@
 		295DCFB52D76A8A20034BB1E /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		296989F2E80D4C75802E6CD5 /* ChatContext.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatContext.swift; sourceTree = "<group>"; };
 		296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoManager.swift; sourceTree = "<group>"; };
+		296A1B3F2A7F8E2F00AB1236 /* VideoFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFormat.swift; sourceTree = "<group>"; };
+		296A1B412A7F8E2F00AB1238 /* VideoFormatExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFormatExtensions.swift; sourceTree = "<group>"; };
 		2D1BC5295F65417C89F5F046 /* ChatManager+OSVerification.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatManager+OSVerification.swift"; sourceTree = "<group>"; };
 		33ABECB0381143E69F16304F /* AIInputRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AIInputRouter.swift; sourceTree = "<group>"; };
 		3DD8EF43D4643AD20AFB4336 /* ChatAttachmentViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatAttachmentViewer.swift; sourceTree = "<group>"; };
@@ -475,6 +479,8 @@
 				295DCFB52D76A8A20034BB1E /* AudioManager.swift */,
 				F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */,
 				296A1B3C2A7F8E2F00AB1234 /* VideoManager.swift */,
+				296A1B3F2A7F8E2F00AB1236 /* VideoFormat.swift */,
+				296A1B412A7F8E2F00AB1238 /* VideoFormatExtensions.swift */,
 				AA002MG01FAB00000073CE01 /* MacroManager.swift */,
 			);
 			path = Managers;
@@ -892,6 +898,8 @@
 				B2C58F3E6D0A4G1C0298E66B /* ChatToolExecutionService.swift in Sources */,
 				295DCFB62D76A8A20034BB1E /* AudioManager.swift in Sources */,
 				296A1B3D2A7F8E2F00AB1234 /* VideoManager.swift in Sources */,
+				296A1B3E2A7F8E2F00AB1235 /* VideoFormat.swift in Sources */,
+				296A1B402A7F8E2F00AB1237 /* VideoFormatExtensions.swift in Sources */,
 				537F65D22B4E561200825B4F /* AppStatus.swift in Sources */,
 				BFD4EA932E35EE970029BFC2 /* ManagerProtocols.swift in Sources */,
 				BFA4457A2F017659005D2937 /* AdvancedDebugSettingsView.swift in Sources */,
