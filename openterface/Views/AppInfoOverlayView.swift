@@ -62,7 +62,9 @@ struct AppInfoOverlayView: View {
                         ("Size", "\(AppStatus.hidReadResolusion.width) x \(AppStatus.hidReadResolusion.height)"),
                         ("FPS", String(format: "%.1f", AppStatus.hidReadFps)),
                         ("Pixel Clock", "\(AppStatus.hidReadPixelClock) MHz"),
-                        ("Display", "\(Int(AppStatus.videoDimensions.width)) x \(Int(AppStatus.videoDimensions.height))")
+                        ("Display", AppStatus.videoDimensions.width > 0 && AppStatus.videoDimensions.height > 0
+                            ? "\(Int(AppStatus.videoDimensions.width)) x \(Int(AppStatus.videoDimensions.height))"
+                            : "N/A")
                     ])
                     
                     Divider()

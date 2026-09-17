@@ -222,7 +222,7 @@ struct ToolbarContentView: ToolbarContent {
                 fps: fps,
                 helpText: connectionMode == .kvm
                     ? "Input Resolution: \(resolutionWidth)x\(resolutionHeight)\n" +
-                        "Capture Resolution: 1920x1080\n" +
+                        "Capture Resolution: \(Int(AppStatus.videoDimensions.width))x\(Int(AppStatus.videoDimensions.height))\n" +
                         "Refresh Rate: \(fps) Hz\n" +
                         "Pixel Clock: \(pixelClock) MHz\n" +
                         "HTotal: \(AppStatus.hidInputHTotal)\n" +

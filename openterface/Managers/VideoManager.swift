@@ -729,7 +729,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                 // Update video data output to capture at the selected resolution
                 if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
                     videoOutput.videoSettings = [
-                        kCVPixelBufferPixelFormatTypeKey as String: matchingFormat.toVideoFormat().pixelFormat
+                        kCVPixelBufferPixelFormatTypeKey as String: matchingFormat.toVideoFormat().pixelFormat,
+                        kCVPixelBufferWidthKey as String: selectedVideoFormat.resolution.width,
+                        kCVPixelBufferHeightKey as String: selectedVideoFormat.resolution.height
                     ]
                     logger.log(content: "Updated video output to \(selectedVideoFormat.resolution.width)x\(selectedVideoFormat.resolution.height)")
                 }

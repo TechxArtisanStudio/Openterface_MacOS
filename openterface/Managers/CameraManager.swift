@@ -661,19 +661,19 @@ class CameraManager: NSObject, ObservableObject, CameraManagerProtocol {
     private func activeRecordingDimensions() -> (width: Int, height: Int) {
         switch UserSettings.shared.connectionProtocolMode {
         case .kvm:
-            let width = videoManager.dimensions.width > 0 ? Int(videoManager.dimensions.width) : 1920
-            let height = videoManager.dimensions.height > 0 ? Int(videoManager.dimensions.height) : 1080
+            let width = videoManager.dimensions.width > 0 ? Int(videoManager.dimensions.width) : 640
+            let height = videoManager.dimensions.height > 0 ? Int(videoManager.dimensions.height) : 480
             return (max(width, 1), max(height, 1))
         case .vnc:
             if let currentFrame = vncClientManager.currentFrame {
                 return (max(currentFrame.width, 1), max(currentFrame.height, 1))
             }
-            return (1920, 1080)
+            return (640, 480)  // Default fallback instead of hardcoded 1920x1080
         case .rdp:
             if let currentFrame = rdpClientManager.currentFrame {
                 return (max(currentFrame.width, 1), max(currentFrame.height, 1))
             }
-            return (1920, 1080)
+            return (640, 480)  // Default fallback instead of hardcoded 1920x1080
         }
     }
 

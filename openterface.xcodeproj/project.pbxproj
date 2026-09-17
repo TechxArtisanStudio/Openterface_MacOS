@@ -296,11 +296,11 @@
 		C7E7655AAD3043FD99583208 /* ChatManager+GuideMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatManager+GuideMode.swift"; sourceTree = "<group>"; };
 		D2A1B3C52F83000100A1B2C3 /* agents */ = {isa = PBXFileReference; lastKnownFileType = folder; name = agents; path = docs/ai/agents; sourceTree = SOURCE_ROOT; };
 		D415A188754B4F319CB0D915 /* WCHFlashSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WCHFlashSettingsView.swift; sourceTree = "<group>"; };
-			D47ADAE72A154F7AA1B2A67C /* ChatManager+ChatRouting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatManager+ChatRouting.swift"; sourceTree = "<group>"; };
-			D4F28A61E3C54B7FA8920B5E /* ChatRoutingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRoutingService.swift; sourceTree = "<group>"; };
-			D6E93A2F1B8C4D0E9176C33E /* ChatGuideModeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatGuideModeService.swift; sourceTree = "<group>"; };
-			ECB595F5C88B43E394E3E653 /* ChatTracingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatTracingService.swift; sourceTree = "<group>"; };
-			F17AD1E82FF27FFA00505E4E /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
+		D47ADAE72A154F7AA1B2A67C /* ChatManager+ChatRouting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatManager+ChatRouting.swift"; sourceTree = "<group>"; };
+		D4F28A61E3C54B7FA8920B5E /* ChatRoutingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRoutingService.swift; sourceTree = "<group>"; };
+		D6E93A2F1B8C4D0E9176C33E /* ChatGuideModeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatGuideModeService.swift; sourceTree = "<group>"; };
+		ECB595F5C88B43E394E3E653 /* ChatTracingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatTracingService.swift; sourceTree = "<group>"; };
+		F17AD1E82FF27FFA00505E4E /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
 		F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MS2130SFlashManager.swift; sourceTree = "<group>"; };
 		F2A09B3C4E1D4F7D8B650C2A /* ChatOSVerificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatOSVerificationService.swift; sourceTree = "<group>"; };
 		F3B58D1E2C9A4F1B9188E55A /* ChatPlanExecutionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPlanExecutionService.swift; sourceTree = "<group>"; };
@@ -309,28 +309,8 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		F12FAECD2F6813C000F91607 /* serial */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = serial;
-			sourceTree = "<group>";
-		};
-		FA6E02A5BA2C437D8D0F4DA3 /* WCH */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = WCH;
-			sourceTree = "<group>";
-		};
+		F12FAECD2F6813C000F91607 /* serial */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = serial; sourceTree = "<group>"; };
+		FA6E02A5BA2C437D8D0F4DA3 /* WCH */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WCH; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1175,7 +1155,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 70;
+				CURRENT_PROJECT_VERSION = 74;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
@@ -1202,7 +1182,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/libs",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_CFLAGS = (
 					"-I/opt/homebrew/opt/libusb/include",
 					"-I/opt/homebrew/opt/libusb/include/libusb-1.0",
@@ -1230,7 +1210,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 70;
+				CURRENT_PROJECT_VERSION = 74;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = NXWD68TXUQ;
@@ -1257,7 +1237,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/libs",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_CFLAGS = (
 					"-I/opt/homebrew/opt/libusb/include",
 					"-I/opt/homebrew/opt/libusb/include/libusb-1.0",
