@@ -2,13 +2,14 @@ import AVFoundation
 import CoreVideo
 import VideoToolbox
 import AppKit
+import Metal
 
 /// Delegate for handling video data output
 class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
-    
+
     private var logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private weak var videoManager: VideoManager?
-    
+
     // Store the latest video frame for OCR processing
     private var latestPixelBuffer: CVPixelBuffer?
     // Timestamp of the last processed frame (seconds)
@@ -16,21 +17,42 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     // Timestamp of the last received frame (for health check)
     private(set) var lastFrameTime: Date = Date(timeIntervalSince1970: 0)
     private let bufferQueue = DispatchQueue(label: "VideoOutputDelegate.bufferQueue", qos: .userInitiated)
-    
+
+    // Metal rendering components
+    private var metalTextureManager: MetalTextureManager?
+    private var videoMetalView: VideoMetalView?
+
     /// Initializes the video output delegate with a reference to the video manager
     /// - Parameter videoManager: The VideoManager instance for accessing active display detection
     init(videoManager: VideoManager) {
         self.videoManager = videoManager
         super.init()
     }
+
+    /// Set Metal texture manager for GPU rendering
+    func setMetalTextureManager(_ manager: MetalTextureManager) {
+        self.metalTextureManager = manager
+    }
+
+    /// Set Metal video view for rendering
+    func setVideoMetalView(_ view: VideoMetalView) {
+        self.videoMetalView = view
+    }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+
         // Update last frame time for health check
         lastFrameTime = Date()
         
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }
+
+        // Log the actual pixel buffer dimensions and format on first frame
+        let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
+        let formatStr = String(format: "0x%X", pixelFormat)
 
         // Verify and set attachments for the pixel buffer
         let transferFunctionKey = kCVImageBufferTransferFunction_ITU_R_709_2
@@ -57,6 +79,16 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         // Store the latest frame for OCR processing
         bufferQueue.async { [weak self] in
             self?.latestPixelBuffer = pixelBuffer
+        }
+
+        // Render to Metal view (zero-copy GPU path)
+        // Call updateFrame directly from the capture thread — no main thread dispatch.
+        // updateFrame's texture creation (CVMetalTextureCacheCreateTextureFromImage) is
+        // thread-safe and runs outside the textureUpdateQueue lock, so it won't block
+        // the render loop's draw(). The main-thread dispatch was causing frame queuing
+        // and flicker at high resolution (2560x1440+).
+        if let metalView = videoMetalView {
+            metalView.updateFrame(pixelBuffer)
         }
 
         // Only process pixel buffer when active resolution checking is enabled

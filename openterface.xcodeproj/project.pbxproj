@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3FADFEC68BDCE022BD63C86D /* VideoMetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23B56FB5FFAB15F16DE9EAF /* VideoMetalView.swift */; };
+		E6BB6C72A07BAA6B58427FB5 /* YUVToRGBShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = 9DE73DF20E9B699461C6DE9A /* YUVToRGBShader.metal */; };
+		668607829090B314E704FE4C /* MetalTextureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 266097269231D624750735AF /* MetalTextureManager.swift */; };
+		096BC0DC3EF26CF775476321 /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6321752D533F2C3F5DACEC0F /* MetalRenderer.swift */; };
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* ObjCExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* ObjCExceptionCatcher.m */; };
 		1E0D3999BD765807EBBCC856 /* TaskStepTraceDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD664382B7A4996C4BF55CEE /* TaskStepTraceDialog.swift */; };
 		289B999F2375451B976CE92C /* ChatPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023D501708EB44B8968F968B /* ChatPersistenceService.swift */; };
 		2950CB512CE33C8D00888267 /* USBDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2950CB502CE33C8D00888267 /* USBDevicesView.swift */; };
@@ -183,6 +188,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F23B56FB5FFAB15F16DE9EAF /* VideoMetalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoMetalView.swift; sourceTree = "<group>"; };
+		9DE73DF20E9B699461C6DE9A /* YUVToRGBShader.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metalshadervalue; path = YUVToRGBShader.metal; sourceTree = "<group>"; };
+		266097269231D624750735AF /* MetalTextureManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetalTextureManager.swift; sourceTree = "<group>"; };
+		6321752D533F2C3F5DACEC0F /* MetalRenderer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
 		00B217919CE6400D9C877650 /* ChatManagerTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatManagerTypes.swift; sourceTree = "<group>"; };
 		023D501708EB44B8968F968B /* ChatPersistenceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPersistenceService.swift; sourceTree = "<group>"; };
 		0855F0E55FCEA43A3D3C57BE /* ChatBubbleView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
@@ -209,6 +218,8 @@
 		53A6E1BE2B3E943300B652A5 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		53CC66092B8EDB390081F927 /* LoggerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerManager.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* ObjCExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjCExceptionCatcher.h; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F3 /* ObjCExceptionCatcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ObjCExceptionCatcher.m; sourceTree = "<group>"; };
 		53CC660E2B8EE70C0081F927 /* LogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTests.swift; sourceTree = "<group>"; };
 		A11CE0012F00000100000001 /* LocalPasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPasteTests.swift; sourceTree = "<group>"; };
 		A11CE0022F00000200000001 /* SerialPortSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortSelectionTests.swift; sourceTree = "<group>"; };
@@ -481,6 +492,8 @@
 		53FBE7D82B3D676A007785B0 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* ObjCExceptionCatcher.h */,
+				A1B2C3D4E5F6A7B8C9D0E1F3 /* ObjCExceptionCatcher.m */,
 				F12FAECD2F6813C000F91607 /* serial */,
 				FA6E02A5BA2C437D8D0F4DA3 /* WCH */,
 				6B8B06402F04C7500040BEBF /* SwitchableUSBManager.swift */,
@@ -557,9 +570,13 @@
 			sourceTree = "<group>";
 		};
 		6B99F5932E9A6C650073CDA2 /* Video */ = {
-			isa = PBXGroup;
-			children = (
-				6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */,
+				isa = PBXGroup;
+				children = (
+					F23B56FB5FFAB15F16DE9EAF /* VideoMetalView.swift */,
+					9DE73DF20E9B699461C6DE9A /* YUVToRGBShader.metal */,
+					6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */,266097269231D624750735AF /* MetalTextureManager.swift */,
+					6321752D533F2C3F5DACEC0F /* MetalRenderer.swift */,
+					6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */,
 				6B99F5972E9A6C650073CDA2 /* MS2109VideoChipset.swift */,
 				6B99F5982E9A6C650073CDA2 /* MS2130SVideoChipset.swift */,
 			);
@@ -935,7 +952,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1B2C3D42F12345600ABCDEF /* ChatManager.swift in Sources */,
+								3FADFEC68BDCE022BD63C86D /* VideoMetalView.swift in Sources */,
+				E6BB6C72A07BAA6B58427FB5 /* YUVToRGBShader.metal in Sources */,
+668607829090B314E704FE4C /* MetalTextureManager.swift in Sources */,
+				096BC0DC3EF26CF775476321 /* MetalRenderer.swift in Sources */,
+A1B2C3D42F12345600ABCDEF /* ChatManager.swift in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* ObjCExceptionCatcher.m in Sources */,
 				3B3174F090DE414885F69380 /* AIInputRouter.swift in Sources */,
 				A2A7C32DAC59417DB5996D74 /* ChatManagerTypes.swift in Sources */,
 				867A42D961B449168A68B56B /* ChatAgentTypes.swift in Sources */,

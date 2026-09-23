@@ -24,6 +24,7 @@ import SwiftUI
 import AVFoundation
 import Combine
 import CoreAudio
+import Metal
 
 /// Manager for handling video capture and device management
 class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
@@ -118,13 +119,47 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Tracks whether aspect ratio has been initialized on first detection
     private var isAspectRatioInitialized: Bool = false
-    
+
     /// Delegate for handling video output
     private var videoOutputDelegate: VideoOutputDelegate?
-    
+
     /// Public access to video output delegate for OCR processing
     var outputDelegate: VideoOutputDelegate? {
         return videoOutputDelegate
+    }
+
+    // MARK: - Metal Rendering
+
+    /// Metal texture manager for zero-copy texture creation
+    private var metalTextureManager: MetalTextureManager?
+
+    /// Metal video view for GPU-accelerated rendering
+    private var videoMetalView: VideoMetalView?
+
+    /// Get the Metal video view for display
+    func getVideoMetalView() -> VideoMetalView? {
+        return videoMetalView
+    }
+
+    /// Initialize Metal rendering components
+    private func initializeMetalRendering() {
+        guard metalTextureManager == nil else { return }
+
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            logger.log(content: "❌ Failed to create Metal device for video rendering")
+            return
+        }
+
+        metalTextureManager = MetalTextureManager(device: device)
+        videoMetalView = VideoMetalView(frame: .zero, device: device)
+
+        if let textureManager = metalTextureManager, let metalView = videoMetalView {
+            videoOutputDelegate?.setMetalTextureManager(textureManager)
+            videoOutputDelegate?.setVideoMetalView(metalView)
+            logger.log(content: "✅ Metal rendering components initialized successfully")
+        } else {
+            logger.log(content: "❌ Failed to initialize Metal rendering components")
+        }
     }
     
     // MARK: - Initialization
@@ -132,13 +167,14 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     override init() {
         captureSession = AVCaptureSession()
         super.init()
-        
+
         self.setupBindings()
         setupSession()
+        initializeMetalRendering()
         // Listen for first-frame resolution analysis from VideoOutputDelegate
         NotificationCenter.default.addObserver(self, selector: #selector(handleFrameResolution(_:)),
                 name: Notification.Name("checkActiveResolution"), object: nil)
-        
+
 
         // Add device notification observers
         self.observeDeviceNotifications()
@@ -153,6 +189,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// Sets up the capture session with outputs
     func setupSession() {
         let videoDataOutput = AVCaptureVideoDataOutput()
+        // Force NV12 (bi-planar YUV 4:2:0) output for Metal rendering.
+        // MetalTextureManager and the YUV→RGB shader only support NV12.
+        // Without this, AVFoundation may output the device's native format
+        // (e.g. 4:2:2 single-plane), causing silent texture creation failure.
         videoDataOutput.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
         ]
@@ -163,6 +203,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         if captureSession.canAddOutput(videoDataOutput) {
             captureSession.addOutput(videoDataOutput)
+            logger.log(content: "✅ Video data output added to capture session")
+        } else {
+            logger.log(content: "❌ Cannot add video data output to capture session - this will cause black screen!")
         }
     }
     
@@ -390,8 +433,10 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         updateUSBDevices()
         
         // Configure capture session quality
-        captureSession.sessionPreset = .high
-        
+        // NOTE: Do NOT set sessionPreset to .high - it limits resolution to 1080p
+        // Let the device's activeFormat determine the resolution instead
+        // captureSession.sessionPreset = .high
+
         // Get available video devices
         let videoDeviceTypes: [AVCaptureDevice.DeviceType] = [
             .builtInWideAngleCamera,
@@ -414,9 +459,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             // Enumerate available formats first
             enumerateAvailableVideoFormats()
 
-            // Apply user-selected format if available
-            applySelectedVideoFormat(to: device)
+            // Set desired resolution from user-selected format
+            // This ensures setupVideoCapture applies the correct resolution
+            let selectedRes = selectedVideoFormat.resolution
+            desiredResolution = CMVideoDimensions(width: Int32(selectedRes.width), height: Int32(selectedRes.height))
+            logger.log(content: "Set desired resolution to \(selectedRes.width)x\(selectedRes.height) from selected format")
 
+            // Setup video capture (format will be applied inside the configuration block)
             setupVideoCapture(with: device)
         } else {
             logger.log(content: "No matching video devices found")
@@ -484,180 +533,55 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             }
             
             captureSession.addInput(input)
-            
+
+            // Apply user-selected format (inside configuration block)
+            applySelectedVideoFormat(to: device)
+
             // Set desired resolution if specified
+            // NOTE: Format matching is handled by applySelectedVideoFormat() called earlier in prepareVideo()
+            // This section is kept for backward compatibility but does nothing if desiredResolution is set
             if let desiredRes = desiredResolution {
-                do {
-                    try device.lockForConfiguration()
-                    
-                    // List all supported formats before matching
-                    logger.log(content: "Listing all supported video formats for device: \(device.localizedName)")
-                    for (index, format) in device.formats.enumerated() {
-                        let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-                        let pixelFormat = CMFormatDescriptionGetMediaSubType(format.formatDescription)
-                        let formatDescription = pixelFormatDescription(pixelFormat)
-                        logger.log(content: "Format \(index): \(formatDimensions.width)x\(formatDimensions.height) - \(formatDescription)")
-                    }
-                    
-                    // Print supported resolutions with frame rates
-                    logger.log(content: "Supported video resolutions and frame rates:")
-                    for (index, format) in device.formats.enumerated() {
-                        let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-                        let pixelFormat = CMFormatDescriptionGetMediaSubType(format.formatDescription)
-                        let formatDescription = pixelFormatDescription(pixelFormat)
-                        
-                        // Get frame rate ranges for this format
-                        var frameRateInfo = "N/A"
-                        if let frameRateRanges = format.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
-                            let frameRates = frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", ")
-                            frameRateInfo = frameRates
-                        }
-                        
-                        logger.log(content: "Format \(index): \(formatDimensions.width)x\(formatDimensions.height) @ \(frameRateInfo) - \(formatDescription)")
-                    }
-                    
-                    // Find the best matching format for the desired resolution.
-                    // Use dynamic frame rate based on USB speed: USB 3.0+ supports 120fps, USB 2.0 limited to 60fps.
-// Maximum supported frame rate is 60fps due to AVFoundation limitations.
-                    let targetFps = Double(AppStatus.maxSupportedFrameRate)
-                    let candidateFormats = device.formats.filter { format in
-                        let formatDimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-                        return formatDimensions.width == desiredRes.width && formatDimensions.height == desiredRes.height
-                    }
-
-                    // Find matching format that supports target fps
-                    var matchingFormat: AVCaptureDevice.Format? = nil
-                    if !candidateFormats.isEmpty {
-                        // Allow 1fps tolerance for floating point precision issues
-                        // e.g., target 60fps vs actual 60.00048fps
-                        let tolerance: Double = 1.0
-                        for format in candidateFormats {
-                            guard let ranges = format.videoSupportedFrameRateRanges as? [AVFrameRateRange] else { continue }
-                            if ranges.contains(where: { $0.minFrameRate <= targetFps + tolerance && $0.maxFrameRate >= targetFps - tolerance }) {
-                                matchingFormat = format
-                                break
-                            }
-                        }
-                    }
-
-                    // Fallback to first candidate if no exact match found
-                    if matchingFormat == nil && !candidateFormats.isEmpty {
-                        matchingFormat = candidateFormats.first
-                    }
-
-                    if let matchingFormat = matchingFormat {
-                        device.activeFormat = matchingFormat
-                        let pixelFormat = CMFormatDescriptionGetMediaSubType(matchingFormat.formatDescription)
-                        let formatDescription = pixelFormatDescription(pixelFormat)
-                        logger.log(content: "Set video resolution to \(desiredRes.width)x\(desiredRes.height) using format: \(formatDescription)")
-                        logger.log(content: "Format details: pixelFormat=\(String(format: "0x%X", pixelFormat)), mediaSubType=\(pixelFormat)")
-
-                        // Log format quality indicators
-                        if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
-                            let maxFps = frameRateRanges.map { $0.maxFrameRate }.max() ?? 0
-                            logger.log(content: "Selected format supports up to \(Int(maxFps))fps")
-
-                            // Note about quality tradeoffs at high frame rates
-                            if targetFps > 90 {
-                                logger.log(content: "⚠️ High frame rate (\(Int(targetFps))fps) may result in reduced image quality due to hardware limitations")
-                                logger.log(content: "   For best image quality, consider using 60fps or lower")
-                            }
-                        }
-
-                        // Dynamic frame rate cap based on USB speed: USB 3.0+ supports 120fps, USB 2.0 limited to 60fps.
-                        // Requesting higher frame rates than USB bandwidth can support causes garbled output.
-                        if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
-                            logger.log(content: "Available frame rate ranges for \(desiredRes.width)x\(desiredRes.height): \(frameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)fps" }.joined(separator: ", "))")
-                            //                            logger.log(content: "USB speed: \(AppStatus.isUSB3Capable ? "3.0+" : "2.0"), target frame rate: \(targetFps)fps")
-                            logger.log(content: "Target frame rate: \(targetFps)fps (max supported: \(Int(AppStatus.maxSupportedFrameRate))fps)")
-
-                            // Allow 1fps tolerance for floating point precision issues when locking frame rate
-                            // e.g., target 60fps vs actual 60.00048fps
-                            let tolerance: Double = 1.0
-                            logger.log(content: "DEBUG: Checking frame rate ranges with tolerance=\(tolerance), targetFps=\(targetFps)")
-                            logger.log(content: "DEBUG: frameRateRanges count = \(frameRateRanges.count)")
-                            for (idx, range) in frameRateRanges.enumerated() {
-                                logger.log(content: "DEBUG: Range[\(idx)]: min=\(range.minFrameRate), max=\(range.maxFrameRate)")
-                            }
-                            if let targetRange = frameRateRanges.first(where: { $0.minFrameRate <= targetFps + tolerance && $0.maxFrameRate >= targetFps - tolerance }) {
-                                logger.log(content: "DEBUG: Found matching range: min=\(targetRange.minFrameRate), max=\(targetRange.maxFrameRate)")
-                                // Use the range's actual frame durations to avoid CMTime precision issues
-                                device.activeVideoMinFrameDuration = targetRange.minFrameDuration
-                                device.activeVideoMaxFrameDuration = targetRange.maxFrameDuration
-                                logger.log(content: "Set frame rate to \(Int(targetFps))fps for \(desiredRes.width)x\(desiredRes.height) (max \(Int(AppStatus.maxSupportedFrameRate))fps limit)")
-                            } else {
-                                // Target fps range not found — use the highest rate that does not exceed target fps
-                                let validRanges = frameRateRanges.filter { $0.maxFrameRate <= targetFps + tolerance }
-
-                                if let bestRange = validRanges.max(by: { $0.maxFrameRate < $1.maxFrameRate }) {
-                                    device.activeVideoMinFrameDuration = bestRange.minFrameDuration
-                                    device.activeVideoMaxFrameDuration = bestRange.maxFrameDuration
-                                    logger.log(content: "\(targetFps)fps range not found, using \(bestRange.maxFrameRate)fps for \(desiredRes.width)x\(desiredRes.height)")
-                                } else if let fallbackRange = frameRateRanges.min(by: { $0.maxFrameRate < $1.maxFrameRate }) {
-                                    device.activeVideoMinFrameDuration = fallbackRange.minFrameDuration
-                                    device.activeVideoMaxFrameDuration = fallbackRange.maxFrameDuration
-                                    logger.log(content: "No valid fps range found, using \(fallbackRange.maxFrameRate)fps for \(desiredRes.width)x\(desiredRes.height)")
-                                } else {
-                                    // Fallback to first available range
-                                    if let firstRange = frameRateRanges.first {
-                                        device.activeVideoMinFrameDuration = firstRange.minFrameDuration
-                                        device.activeVideoMaxFrameDuration = firstRange.maxFrameDuration
-                                        logger.log(content: "Using first available fps range: \(firstRange.maxFrameRate)fps for \(desiredRes.width)x\(desiredRes.height)")
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Update video data output to capture at the full resolution
-                        if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
-                            // Configure output to capture at the device's active resolution
-                            videoOutput.videoSettings = [
-                                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-                                kCVPixelBufferWidthKey as String: desiredRes.width,
-                                kCVPixelBufferHeightKey as String: desiredRes.height
-                            ]
-                            logger.log(content: "Updated video output to capture at \(desiredRes.width)x\(desiredRes.height)")
-                        }
-                    } else {
-                        logger.log(content: "Desired resolution \(desiredRes.width)x\(desiredRes.height) not supported, using default")
-                    }
-                    
-                    device.unlockForConfiguration()
-                } catch {
-                    logger.log(content: "Failed to configure device resolution: \(error.localizedDescription)")
-                }
+                logger.log(content: "Desired resolution set to \(desiredRes.width)x\(desiredRes.height) - format matching handled by applySelectedVideoFormat")
+                // Skip format matching here to avoid conflicts with applySelectedVideoFormat
+                // The device.activeFormat and videoSettings were already set by applySelectedVideoFormat
             }
-            
+
             // Commit configuration changes
+            logger.log(content: "🔬 [TRACE] About to commitConfiguration...")
             captureSession.commitConfiguration()
-            
+            logger.log(content: "🔬 [TRACE] commitConfiguration done")
+
             // Get camera video resolution
             if let formatDescription = device.activeFormat.formatDescription as CMFormatDescription? {
                 dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
                 AppStatus.videoDimensions.width = CGFloat(dimensions.width)
                 AppStatus.videoDimensions.height = CGFloat(dimensions.height)
             }
- 
+
             // Start video session
+            logger.log(content: "🔬 [TRACE] About to call startVideoSession...")
             logger.log(content: "Video device setup successful, starting session...")
             startVideoSession()
+            logger.log(content: "🔬 [TRACE] startVideoSession returned")
             AppStatus.isHDMIConnected = true
             DispatchQueue.main.async {
                 self.isVideoConnected = true
             }
         } catch {
+            logger.log(content: "🔬 [TRACE] EXCEPTION in setupVideoCapture: \(error)")
             logger.log(content: "Failed to set up video capture: \(error.localizedDescription)")
             // Reset start flag when error occurs
             isVideoSessionStarting = false
         }
         
-//        print("Supported pixel format--------")
-//        for format in device.formats {
-//            let description = format.formatDescription
-//            let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
-//            let formatDescription = pixelFormatDescription(pixelFormat)
-//            print("Supported pixel format: \(formatDescription)")
-//        }
+// Removed verbose format enumeration for cleaner logs
+        // print("Supported pixel format--------")
+        // for format in device.formats {
+        //     let description = format.formatDescription
+        //     let pixelFormat = CMFormatDescriptionGetMediaSubType(description)
+        //     let formatDescription = pixelFormatDescription(pixelFormat)
+        //     print("Supported pixel format: \(formatDescription)")
+        // }
     }
 
     // MARK: - Video Format Enumeration
@@ -694,11 +618,46 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             
             // Group formats by resolution and find max fps for each
             var resolutionMap: [String: Double] = [:]
+            var formatDetails: [String] = []
             for format in device.formats {
                 let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
                 let key = "\(dimensions.width)x\(dimensions.height)"
                 let maxFps = format.videoSupportedFrameRateRanges.map { $0.maxFrameRate }.max() ?? 0
                 resolutionMap[key] = max(resolutionMap[key] ?? 0, maxFps)
+
+                // Detailed format info (local enhancement)
+                let codecType = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                let pixelFormatHex = String(format: "0x%X", codecType)
+                let pixelFormatName = fourCCToString(codecType)
+
+                // Determine if this is a compressed format (MJPEG, H.264, etc.)
+                let isCompressed: Bool
+                let compressionType: String
+                switch codecType {
+                case kCMVideoCodecType_JPEG:
+                    isCompressed = true
+                    compressionType = "MJPEG/JPEG"
+                case kCMVideoCodecType_H264:
+                    isCompressed = true
+                    compressionType = "H.264"
+                case kCMVideoCodecType_HEVC:
+                    isCompressed = true
+                    compressionType = "HEVC"
+                default:
+                    isCompressed = false
+                    compressionType = "Uncompressed"
+                }
+
+                // Get frame rate ranges
+                let frameRateRanges = format.videoSupportedFrameRateRanges
+                var frameRateInfo = ""
+                for range in frameRateRanges {
+                    frameRateInfo += "\(Int(range.minFrameRate))-\(Int(range.maxFrameRate))fps "
+                }
+
+                let detail = "Format \(formatDetails.count): \(dimensions.width)x\(dimensions.height) @ \(frameRateInfo)format=\(pixelFormatHex) (\(pixelFormatName)) [\(compressionType)]"
+                formatDetails.append(detail)
+                logger.log(content: detail)
             }
             
             // Sort by resolution (width desc) and show compact summary
@@ -738,16 +697,104 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         // If current selection is not in available formats, find closest match
         if !availableVideoFormats.contains(where: { $0 == selectedVideoFormat }) {
-            let closest = availableVideoFormats.first { format in
-                format.resolution.width == selectedVideoFormat.resolution.width &&
-                format.resolution.height == selectedVideoFormat.resolution.height
-            } ?? availableVideoFormats.first
+            // Prefer 420v (NV12) format since video output is configured for NV12
+            let nv12PixelFormat = String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+            let closest = availableVideoFormats
+                .filter { format in
+                    format.resolution.width == selectedVideoFormat.resolution.width &&
+                    format.resolution.height == selectedVideoFormat.resolution.height
+                }
+                .sorted { a, b in
+                    // Prefer 420v format
+                    let aIsNV12 = a.pixelFormat == nv12PixelFormat
+                    let bIsNV12 = b.pixelFormat == nv12PixelFormat
+                    if aIsNV12 != bIsNV12 { return aIsNV12 }
+                    return (a.frameRate) > (b.frameRate)
+                }
+                .first ?? availableVideoFormats.first
 
             if let closest = closest {
                 logger.log(content: "Selected format not available, using closest match: \(closest.description)")
                 selectedVideoFormat = closest
             }
         }
+
+        // Print a nice summary of all available formats
+        printAvailableFormatsSummary()
+    }
+
+    /// Converts a FourCC pixel format code to a human-readable string
+    /// - Parameter code: FourCC code as UInt32
+    /// - Returns: String representation of the FourCC
+    private func fourCCToString(_ code: FourCharCode) -> String {
+        switch code {
+        case kCVPixelFormatType_32BGRA:
+            return "BGRA (Uncompressed 32-bit)"
+        case kCVPixelFormatType_32ARGB:
+            return "ARGB (Uncompressed 32-bit)"
+        case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+            return "420v (Bi-planar YUV 8-bit, Video Range)"
+        case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+            return "420f (Bi-planar YUV 8-bit, Full Range)"
+        case kCVPixelFormatType_422YpCbCr8:
+            return "422v (YUV 4:2:2, Uncompressed 8-bit)"
+        case kCVPixelFormatType_422YpCbCr8_yuvs:
+            return "422v_yuvs (YUV 4:2:2, Uncompressed 8-bit)"
+        case kCMVideoCodecType_JPEG:
+            return "JPEG/MJPEG (Compressed)"
+        case kCMVideoCodecType_H264:
+            return "H.264 (Compressed)"
+        case kCMVideoCodecType_HEVC:
+            return "HEVC/H.265 (Compressed)"
+        default:
+            // Convert to FourCC characters
+            let bytes: [UInt8] = [
+                UInt8((code >> 24) & 0xFF),
+                UInt8((code >> 16) & 0xFF),
+                UInt8((code >> 8) & 0xFF),
+                UInt8(code & 0xFF)
+            ]
+            if let str = String(bytes: bytes, encoding: .ascii) {
+                return str.trimmingCharacters(in: .controlCharacters)
+            }
+            return "Unknown"
+        }
+    }
+
+    /// Returns all available video formats from the connected device
+    /// - Returns: Array of VideoFormat objects
+    func getAvailableVideoFormats() -> [VideoFormat] {
+        return availableVideoFormats
+    }
+
+    /// Prints a summary of all available resolutions and formats to the console
+    /// Useful for debugging format selection issues
+    func printAvailableFormatsSummary() {
+        logger.log(content: "\n========== AVAILABLE VIDEO FORMATS SUMMARY ==========")
+        logger.log(content: "Total unique formats: \(availableVideoFormats.count)")
+        logger.log(content: "Currently selected: \(selectedVideoFormat.description)")
+        logger.log(content: "Actual device format: \(dimensions.width)x\(dimensions.height)")
+        logger.log(content: "")
+
+        // Group by resolution
+        let grouped = Dictionary(grouping: availableVideoFormats) { "\($0.resolution.width)x\($0.resolution.height)" }
+        let sortedResolutions = grouped.keys.sorted { a, b in
+            let aParts = a.split(separator: "x").compactMap { Int($0) }
+            let bParts = b.split(separator: "x").compactMap { Int($0) }
+            guard aParts.count == 2, bParts.count == 2 else { return false }
+            if aParts[0] != bParts[0] { return aParts[0] > bParts[0] }
+            return aParts[1] > bParts[1]
+        }
+
+        for resolution in sortedResolutions {
+            let formats = grouped[resolution] ?? []
+            logger.log(content: "📺 \(resolution) (\(formats.count) formats):")
+            for format in formats {
+                let formatName = fourCCToString(UInt32(format.pixelFormat.dropFirst(2), radix: 16) ?? 0)
+                logger.log(content: "   - \(format.frameRate)fps, format=\(format.pixelFormat) [\(formatName)]")
+            }
+        }
+        logger.log(content: "=====================================================\n")
     }
 
     /// Applies the user-selected video format to the device if available
@@ -755,8 +802,29 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         do {
             try device.lockForConfiguration()
 
-            // Find matching format in device's supported formats
-            let matchingFormat = device.formats.first { format in
+            // Log current active format BEFORE change
+            let beforeDims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+            let beforePixelFormat = CMFormatDescriptionGetMediaSubType(device.activeFormat.formatDescription)
+            logger.log(content: "📍 Device active format BEFORE change: \(beforeDims.width)x\(beforeDims.height), pixel format: \(String(format: "0x%X", beforePixelFormat))")
+
+            // Log all available formats for debugging
+            logger.log(content: "🔍 Available device formats:")
+            for (index, format) in device.formats.enumerated() {
+                let videoFormat = format.toVideoFormat()
+                logger.log(content: "  Format \(index): \(videoFormat.description)")
+            }
+
+            logger.log(content: "🎯 Selected format: \(selectedVideoFormat.description)")
+
+            // Cascading format matching strategy:
+            // 1. Try exact match (resolution + fps + pixel format)
+            // 2. Relax pixel format requirement (resolution + fps only)
+            // 3. Relax frame rate requirement (resolution only, pick best fps)
+            var matchingFormat: AVCaptureDevice.Format?
+
+            // Strategy 1: Exact match (resolution + fps + pixel format)
+// Pick the one with highest maxFrameRate among matches
+            let exactMatches = device.formats.filter { format in
                 let videoFormat = format.toVideoFormat()
                 return videoFormat.resolution.width == selectedVideoFormat.resolution.width &&
                        videoFormat.resolution.height == selectedVideoFormat.resolution.height &&
@@ -764,34 +832,322 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                        videoFormat.pixelFormat == selectedVideoFormat.pixelFormat
             }
 
-            if let matchingFormat = matchingFormat {
-                device.activeFormat = matchingFormat
-                logger.log(content: "Applied user-selected video format: \(selectedVideoFormat.description)")
-
-                // Update video data output to capture at the selected resolution
-                if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
-                    videoOutput.videoSettings = [
-                        kCVPixelBufferPixelFormatTypeKey as String: matchingFormat.toVideoFormat().pixelFormat,
-                        kCVPixelBufferWidthKey as String: selectedVideoFormat.resolution.width,
-                        kCVPixelBufferHeightKey as String: selectedVideoFormat.resolution.height
-                    ]
-                    logger.log(content: "Updated video output to \(selectedVideoFormat.resolution.width)x\(selectedVideoFormat.resolution.height)")
+            if !exactMatches.isEmpty {
+                // For MS2130S: Select format with max frame rate closest to 60fps
+                // This prevents selecting high-fps formats (e.g., 240fps) when user wants 60fps
+                matchingFormat = exactMatches.min { a, b in
+                    // Get the maximum frame rate from all ranges
+                    let maxFpsA = (a.videoSupportedFrameRateRanges as? [AVFrameRateRange])?.map { $0.maxFrameRate }.max() ?? 0
+                    let maxFpsB = (b.videoSupportedFrameRateRanges as? [AVFrameRateRange])?.map { $0.maxFrameRate }.max() ?? 0
+                    // Prefer format with max fps closest to 60
+                    let diffA = abs(maxFpsA - 60.0)
+                    let diffB = abs(maxFpsB - 60.0)
+                    return diffA < diffB
                 }
-            } else {
-                // Do not silently fallback - the selected combination is not supported
-                logger.log(content: "⚠️ Selected format \(selectedVideoFormat.description) not available on device. Please select a supported combination.")
+                let selectedMaxFps = (matchingFormat?.videoSupportedFrameRateRanges as? [AVFrameRateRange])?.map { $0.maxFrameRate }.max() ?? 0
+                logger.log(content: "✅ Strategy 1: Exact format match found (selected format with max fps closest to 60: \(selectedMaxFps)fps)")
             }
 
+            // Strategy 2: Match resolution + frame rate, prefer 420v (NV12) pixel format
+            if matchingFormat == nil {
+                let nv12PixelFormat = String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+                let matches = device.formats.filter { format in
+                    let videoFormat = format.toVideoFormat()
+                    return videoFormat.resolution.width == selectedVideoFormat.resolution.width &&
+                           videoFormat.resolution.height == selectedVideoFormat.resolution.height &&
+                           abs(videoFormat.frameRate - selectedVideoFormat.frameRate) < 1.0
+                }
+                // Prefer 420v format for NV12 video output compatibility
+                matchingFormat = matches.first { format in
+                    let codecType = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                    return String(format: "0x%X", codecType) == nv12PixelFormat
+                } ?? matches.first
+                if matchingFormat != nil {
+                    logger.log(content: "✅ Strategy 2: Resolution+FPS match found (preferred 420v)")
+                }
+            }
+
+            // Strategy 3: Match resolution only, prefer 420v, pick format with highest max frame rate
+            if matchingFormat == nil {
+                let nv12PixelFormat = String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+                let resolutionFormats = device.formats.filter { format in
+                    let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                    return dims.width == selectedVideoFormat.resolution.width &&
+                           dims.height == selectedVideoFormat.resolution.height
+                }
+                // Sort: prefer 420v, then highest maximum frame rate
+                let sorted = resolutionFormats.sorted { a, b in
+                    let codecA = String(format: "0x%X", CMFormatDescriptionGetMediaSubType(a.formatDescription))
+                    let codecB = String(format: "0x%X", CMFormatDescriptionGetMediaSubType(b.formatDescription))
+                    let aIsNV12 = codecA == nv12PixelFormat
+                    let bIsNV12 = codecB == nv12PixelFormat
+                    if aIsNV12 != bIsNV12 { return aIsNV12 }
+                    let maxFpsA = (a.videoSupportedFrameRateRanges as? [AVFrameRateRange])?.map { $0.maxFrameRate }.max() ?? 0
+                    let maxFpsB = (b.videoSupportedFrameRateRanges as? [AVFrameRateRange])?.map { $0.maxFrameRate }.max() ?? 0
+                    return maxFpsA > maxFpsB
+                }
+                matchingFormat = sorted.first
+                let selectedMaxFps = (matchingFormat?.videoSupportedFrameRateRanges as? [AVFrameRateRange])?.map { $0.maxFrameRate }.max() ?? 0
+                logger.log(content: "✅ Strategy 3: Resolution-only match found (preferred 420v, highest max fps: \(selectedMaxFps))")
+            }
+
+            if let matchingFormat = matchingFormat {
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // Frame Rate Locking (60fps) - MUST be set BEFORE activeFormat
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // On MS2130S chipset, setting frame duration may throw NSException.
+                // We use ObjCExceptionCatcher to safely attempt this.
+                // IMPORTANT: Set frame duration BEFORE activeFormat for MS2130S compatibility
+                var frameDurationSuccess = false
+                let exceptionCaught = ObjCExceptionCatcher.catchException({
+                    // Use the exact maximum frame rate from the format's first range
+                    if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange],
+                       let maxFpsRange = frameRateRanges.first(where: { $0.maxFrameRate >= 59.9 && $0.maxFrameRate <= 60.1 }) ?? frameRateRanges.first {
+                        // Try multiple approaches to set frame duration
+                        var durationSet = false
+
+                        // Approach 1: Use CMTimeMakeWithSeconds with high timescale
+                        let frameDurationSeconds = 1.0 / maxFpsRange.maxFrameRate
+                        let duration1 = CMTimeMakeWithSeconds(frameDurationSeconds, preferredTimescale: 6000)
+                        do {
+                            try device.lockForConfiguration()
+                            device.activeVideoMinFrameDuration = duration1
+                            device.activeVideoMaxFrameDuration = duration1
+                            device.unlockForConfiguration()
+                            durationSet = true
+                            self.logger.log(content: "🔒 Attempting frame rate lock to \(maxFpsRange.maxFrameRate)fps via CMTimeMakeWithSeconds (timescale: 6000)")
+                        } catch {
+                            self.logger.log(content: "⚠️ Approach 1 failed: \(error.localizedDescription)")
+                        }
+
+                        // Approach 2: Use CMTimeMake with integer timescale (if approach 1 failed)
+                        if !durationSet {
+                            let timescale = Int64(maxFpsRange.maxFrameRate * 1000) // Scale by 1000 for precision
+                            let duration2 = CMTimeMake(value: timescale, timescale: Int32(maxFpsRange.maxFrameRate * 1000 * 1000))
+                            do {
+                                try device.lockForConfiguration()
+                                device.activeVideoMinFrameDuration = duration2
+                                device.activeVideoMaxFrameDuration = duration2
+                                device.unlockForConfiguration()
+                                durationSet = true
+                                self.logger.log(content: "🔒 Attempting frame rate lock to \(maxFpsRange.maxFrameRate)fps via CMTimeMake (scaled)")
+                            } catch {
+                                self.logger.log(content: "⚠️ Approach 2 failed: \(error.localizedDescription)")
+                            }
+                        }
+
+                        // Approach 3: Try exact 60fps as fallback
+                        if !durationSet {
+                            let duration3 = CMTimeMake(value: 1, timescale: 60)
+                            do {
+                                try device.lockForConfiguration()
+                                device.activeVideoMinFrameDuration = duration3
+                                device.activeVideoMaxFrameDuration = duration3
+                                device.unlockForConfiguration()
+                                durationSet = true
+                                self.logger.log(content: "🔒 Attempting frame rate lock to 60.0fps via CMTimeMake(1,60)")
+                            } catch {
+                                self.logger.log(content: "⚠️ Approach 3 failed: \(error.localizedDescription)")
+                            }
+                        }
+
+                        frameDurationSuccess = durationSet
+                        if !durationSet {
+                            self.logger.log(content: "⚠️ All frame rate lock approaches failed")
+                        }
+                    } else {
+                        // Fallback to 60fps
+                        let duration = CMTimeMake(value: 1, timescale: 60)
+                        do {
+                            try device.lockForConfiguration()
+                            device.activeVideoMinFrameDuration = duration
+                            device.activeVideoMaxFrameDuration = duration
+                            device.unlockForConfiguration()
+                            frameDurationSuccess = true
+                        } catch {
+                            self.logger.log(content: "⚠️ Fallback frame rate lock failed: \(error.localizedDescription)")
+                        }
+                    }
+                })
+
+                if !exceptionCaught {
+                    frameDurationSuccess = false
+                }
+
+                if frameDurationSuccess {
+                    logger.log(content: "🔒 Frame rate locked (before activeFormat)")
+                } else {
+                    logger.log(content: "⚠️ Frame rate lock failed before activeFormat. Will retry after.")
+                }
+
+                device.activeFormat = matchingFormat
+                let actualDimensions = CMVideoFormatDescriptionGetDimensions(matchingFormat.formatDescription)
+                let actualPixelFormat = CMFormatDescriptionGetMediaSubType(matchingFormat.formatDescription)
+                logger.log(content: "✅ Applied video format: \(actualDimensions.width)x\(actualDimensions.height), pixel format: \(String(format: "0x%X", actualPixelFormat))")
+
+                // Diagnostic: Log frame rate ranges for selected format
+                if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange] {
+                    let rangeDescriptions = frameRateRanges.map { range in
+                        "\(range.minFrameRate)-\(range.maxFrameRate)fps"
+                    }.joined(separator: ", ")
+                    logger.log(content: "📊 Selected format frame rate ranges: \(rangeDescriptions)")
+                    let maxSupportedFps = frameRateRanges.map { $0.maxFrameRate }.max() ?? 0
+                    logger.log(content: "📊 Maximum supported FPS: \(maxSupportedFps)")
+                }
+
+                let requestedFps = Double(selectedVideoFormat.frameRate)
+
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // USB Bandwidth Diagnostic
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // Calculate and log USB bandwidth requirements for the selected format.
+                //
+                // Bandwidth formula (NV12 = 1.5 bytes/pixel):
+                //   width × height × 1.5 bytes/pixel × fps
+                // USB 3.0 practical bandwidth: ~400 MB/s
+                let bytesPerPixelNV12 = 1.5
+                let maxUsbBandwidthBytesPerSec = 400_000_000.0
+                let pixelCount = Double(actualDimensions.width) * Double(actualDimensions.height)
+                let bandwidthPerFps = pixelCount * bytesPerPixelNV12
+                let bandwidthAtRequestedFps = bandwidthPerFps * requestedFps / 1_000_000.0
+                let safeMaxFps = maxUsbBandwidthBytesPerSec / bandwidthPerFps
+
+                if requestedFps > safeMaxFps {
+                    logger.log(content: "⚠️ USB bandwidth: \(actualDimensions.width)x\(actualDimensions.height)@\(Int(requestedFps))fps needs \(String(format: "%.0f", bandwidthAtRequestedFps))MB/s > \(String(format: "%.0f", maxUsbBandwidthBytesPerSec / 1_000_000.0))MB/s limit (safe max: \(String(format: "%.0f", safeMaxFps))fps)")
+                    logger.log(content: "💡 To reduce flickering, select a lower frame rate (e.g., 30fps) in video settings")
+                } else {
+                    logger.log(content: "✅ Bandwidth OK: \(String(format: "%.0f", bandwidthAtRequestedFps))MB/s at \(Int(requestedFps))fps (limit: \(String(format: "%.0f", maxUsbBandwidthBytesPerSec / 1_000_000.0))MB/s)")
+                }
+
+                // Verify the format was actually set on the device
+                let verifyDims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                let verifyPixelFormat = CMFormatDescriptionGetMediaSubType(device.activeFormat.formatDescription)
+                logger.log(content: "📍 Device active format AFTER change: \(verifyDims.width)x\(verifyDims.height), pixel format: \(String(format: "0x%X", verifyPixelFormat))")
+
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // Frame Rate Locking Retry (after activeFormat)
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // If frame duration setting failed before, retry after activeFormat is set
+                if !frameDurationSuccess {
+                    var retrySuccess = false
+                    let retryExceptionCaught = ObjCExceptionCatcher.catchException({
+                        // Use the exact maximum frame rate from the format's first range
+                        if let frameRateRanges = matchingFormat.videoSupportedFrameRateRanges as? [AVFrameRateRange],
+                           let maxFpsRange = frameRateRanges.first(where: { $0.maxFrameRate >= 59.9 && $0.maxFrameRate <= 60.1 }) ?? frameRateRanges.first {
+                            // Try multiple approaches to set frame duration
+                            var durationSet = false
+
+                            // Approach 1: Use CMTimeMakeWithSeconds with high timescale
+                            let frameDurationSeconds = 1.0 / maxFpsRange.maxFrameRate
+                            let duration1 = CMTimeMakeWithSeconds(frameDurationSeconds, preferredTimescale: 6000)
+                            do {
+                                try device.lockForConfiguration()
+                                device.activeVideoMinFrameDuration = duration1
+                                device.activeVideoMaxFrameDuration = duration1
+                                device.unlockForConfiguration()
+                                durationSet = true
+                                self.logger.log(content: "🔒 Retrying frame rate lock to \(maxFpsRange.maxFrameRate)fps via CMTimeMakeWithSeconds (timescale: 6000)")
+                            } catch {
+                                self.logger.log(content: "⚠️ Retry Approach 1 failed: \(error.localizedDescription)")
+                            }
+
+                            // Approach 2: Use CMTimeMake with integer timescale
+                            if !durationSet {
+                                let timescale = Int64(maxFpsRange.maxFrameRate * 1000)
+                                let duration2 = CMTimeMake(value: timescale, timescale: Int32(maxFpsRange.maxFrameRate * 1000 * 1000))
+                                do {
+                                    try device.lockForConfiguration()
+                                    device.activeVideoMinFrameDuration = duration2
+                                    device.activeVideoMaxFrameDuration = duration2
+                                    device.unlockForConfiguration()
+                                    durationSet = true
+                                    self.logger.log(content: "🔒 Retrying frame rate lock to \(maxFpsRange.maxFrameRate)fps via CMTimeMake (scaled)")
+                                } catch {
+                                    self.logger.log(content: "⚠️ Retry Approach 2 failed: \(error.localizedDescription)")
+                                }
+                            }
+
+                            // Approach 3: Try exact 60fps as fallback
+                            if !durationSet {
+                                let duration3 = CMTimeMake(value: 1, timescale: 60)
+                                do {
+                                    try device.lockForConfiguration()
+                                    device.activeVideoMinFrameDuration = duration3
+                                    device.activeVideoMaxFrameDuration = duration3
+                                    device.unlockForConfiguration()
+                                    durationSet = true
+                                    self.logger.log(content: "🔒 Retrying frame rate lock to 60.0fps via CMTimeMake(1,60)")
+                                } catch {
+                                    self.logger.log(content: "⚠️ Retry Approach 3 failed: \(error.localizedDescription)")
+                                }
+                            }
+
+                            retrySuccess = durationSet
+                        } else {
+                            // Fallback to 60fps
+                            let duration = CMTimeMake(value: 1, timescale: 60)
+                            do {
+                                try device.lockForConfiguration()
+                                device.activeVideoMinFrameDuration = duration
+                                device.activeVideoMaxFrameDuration = duration
+                                device.unlockForConfiguration()
+                                retrySuccess = true
+                            } catch {
+                                self.logger.log(content: "⚠️ Retry fallback frame rate lock failed: \(error.localizedDescription)")
+                            }
+                        }
+                    })
+
+                    if !retryExceptionCaught {
+                        retrySuccess = false
+                    }
+
+                    if retrySuccess {
+                        logger.log(content: "🔒 Frame rate locked (after activeFormat retry)")
+                    } else {
+                        logger.log(content: "⚠️ Frame rate lock failed completely. Device defaults to 25fps (MS2130S limitation).")
+                    }
+                }
+
+                // Update video data output pixel format
+                // IMPORTANT: Force NV12 bi-planar format for Metal rendering, regardless of device native format
+                // AVFoundation will handle any necessary format conversion
+                // This ensures MetalTextureManager can always create Y and UV plane textures
+                if let videoOutput = captureSession.outputs.first(where: { $0 is AVCaptureVideoDataOutput }) as? AVCaptureVideoDataOutput {
+                    videoOutput.videoSettings = [
+                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                    ]
+                    logger.log(content: "Updated video output pixel format to NV12 (420v) for Metal rendering (device native: 0x\(String(format: "%X", actualPixelFormat)))")
+                }
+            } else {
+                logger.log(content: "⚠️ No format found matching resolution \(selectedVideoFormat.resolution.width)x\(selectedVideoFormat.resolution.height) on device.")
+                logger.log(content: "⚠️ Available formats:")
+                for format in device.formats {
+                    let videoFormat = format.toVideoFormat()
+                    logger.log(content: "  - \(videoFormat.description)")
+                }
+            }
+
+            // Log what format is actually active on the device after our selection attempt
+            let finalDims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+            let finalPixelFormat = CMFormatDescriptionGetMediaSubType(device.activeFormat.formatDescription)
+            logger.log(content: "🎯 FINAL ACTIVE FORMAT: \(finalDims.width)x\(finalDims.height), pixel format: 0x\(String(format: "%X", finalPixelFormat))")
+
             device.unlockForConfiguration()
+            logger.log(content: "🔬 [TRACE] applySelectedVideoFormat completed successfully")
         } catch {
+            logger.log(content: "🔬 [TRACE] EXCEPTION in applySelectedVideoFormat: \(error)")
             logger.log(content: "Failed to apply video format: \(error.localizedDescription)")
         }
     }
 
     /// Starts video capture session
     func startVideoSession() {
+        logger.log(content: "🔬 [TRACE] startVideoSession() called, isFirmwareFlashing=\(AppStatus.isFirmwareFlashing), isRunning=\(captureSession.isRunning)")
+
         // Avoid HID/video bus conflicts during firmware flashing
         if AppStatus.isFirmwareFlashing {
+            logger.log(content: "🔬 [TRACE] startVideoSession: blocked by firmware flashing")
             logger.log(content: "Firmware flash in progress: skipping video session start")
             isVideoSessionStarting = false
             return
@@ -799,23 +1155,54 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         // Status check: if session is already running, return directly
         if captureSession.isRunning {
+            logger.log(content: "🔬 [TRACE] startVideoSession: already running, skip")
             logger.log(content: "Video session already running, skipping start...")
             isVideoSessionStarting = false
             return
         }
-        
+
+        logger.log(content: "🔬 [TRACE] startVideoSession: scheduling startRunning with 1s delay")
         logger.log(content: "Starting video session...")
-        
+
         // Delay capture session start by 1 second to avoid crash
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self = self else { return }
-            
+
+            logger.log(content: "🔬 [TRACE] 1s delay fired, about to startRunning, inputs=\(self.captureSession.inputs.count)")
+
+            // Log device active format BEFORE starting session
+            if let device = self.captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
+                let preStartDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
+                let preStartPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
+                self.logger.log(content: "📍 Device active format BEFORE session start: \(preStartDims.width)x\(preStartDims.height), pixel format: \(String(format: "0x%X", preStartPixelFormat))")
+            }
+
             // Start session directly in current thread, avoiding extra asynchronous operations
             self.captureSession.startRunning()
-            
+            logger.log(content: "🔬 [TRACE] startRunning() completed, isRunning=\(self.captureSession.isRunning)")
+
+            // Log device active format AFTER starting session
+            if let device = self.captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
+                let postStartDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
+                let postStartPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
+                self.logger.log(content: "📍 Device active format AFTER session start: \(postStartDims.width)x\(postStartDims.height), pixel format: \(String(format: "0x%X", postStartPixelFormat))")
+
+                // If the format was reset by startRunning(), re-apply it
+                let desiredDims = self.selectedVideoFormat.resolution
+                if Int(postStartDims.width) != desiredDims.width || Int(postStartDims.height) != desiredDims.height {
+                    self.logger.log(content: "⚠️ Format was reset by session start, re-applying format...")
+                    self.applySelectedVideoFormat(to: device.device)
+
+                    // Verify the format was re-applied
+                    let reapplyDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
+                    let reapplyPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
+                    self.logger.log(content: "📍 Device active format AFTER re-apply: \(reapplyDims.width)x\(reapplyDims.height), pixel format: \(String(format: "0x%X", reapplyPixelFormat))")
+                }
+            }
+
             // Log record
             self.logger.log(content: "Video session started successfully")
-            
+
             // Reset start flag
             self.isVideoSessionStarting = false
         }

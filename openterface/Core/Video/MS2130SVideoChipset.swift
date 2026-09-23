@@ -59,10 +59,14 @@ class MS2130SVideoChipset: BaseVideoChipset {
         // Maximum supported frame rate is 60fps due to AVFoundation limitations
         let maxFps = AppStatus.maxSupportedFrameRate // Always 60.0
         return [
-            VideoResolution(width: 1920, height: 1080, refreshRate: maxFps),  // Primary resolution (1080p60)
-            VideoResolution(width: 1920, height: 1080, refreshRate: 30.0),    // 30fps option
-            VideoResolution(width: 1280, height: 720, refreshRate: maxFps),   // 720p60
-            VideoResolution(width: 1280, height: 720, refreshRate: 60.0),    // 720p60 (duplicate for clarity)
+            VideoResolution(width: 3840, height: 2160, refreshRate: 30.0),   // 4K UHD (30fps)
+            VideoResolution(width: 3840, height: 2160, refreshRate: maxFps), // 4K UHD (60fps if supported)
+            VideoResolution(width: 2560, height: 1440, refreshRate: maxFps), // 1440p60
+            VideoResolution(width: 2560, height: 1440, refreshRate: 30.0),   // 1440p30
+            VideoResolution(width: 1920, height: 1080, refreshRate: maxFps), // Primary resolution (1080p60)
+            VideoResolution(width: 1920, height: 1080, refreshRate: 30.0),   // 30fps option
+            VideoResolution(width: 1280, height: 720, refreshRate: maxFps),  // 720p60
+            VideoResolution(width: 1280, height: 720, refreshRate: 30.0),    // 720p30
             VideoResolution(width: 1024, height: 768, refreshRate: 60.0),
             VideoResolution(width: 800, height: 600, refreshRate: 60.0),
             VideoResolution(width: 640, height: 480, refreshRate: 60.0)

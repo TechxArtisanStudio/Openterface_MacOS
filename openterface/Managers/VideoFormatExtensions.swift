@@ -41,8 +41,15 @@ extension AVCaptureDevice.Format {
                 }
             }
 
-        // Pick the highest stable frame rate available
-        let maxFps = supportedFrameRates.max() ?? 30.0
+        // Also include the actual maximum frame rate from the ranges, capped at 60fps
+        // This ensures formats with high frame rates (e.g., 60fps in 25-60 range) are not filtered out
+        // Cap at 60fps to avoid selecting unrealistic rates like 240fps that some devices report
+        let actualMaxFps = min(videoSupportedFrameRateRanges
+            .map { Float($0.maxFrameRate) }
+            .max() ?? 30.0, 60.0)
+
+        // Pick the highest frame rate available (from stable list or actual max)
+        let maxFps = max(supportedFrameRates.max() ?? 0, actualMaxFps)
 
         return VideoFormat(
             resolution: VideoResolution(width: Int(dimensions.width), height: Int(dimensions.height), refreshRate: Float(maxFps)),

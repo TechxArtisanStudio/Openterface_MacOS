@@ -24,13 +24,14 @@ import SwiftUI
 import AVFoundation
 import KeyboardShortcuts
 import QuartzCore
+import Metal
 
 class PlayerView: NSView, NSWindowDelegate {
     private let tipLayerManager = DependencyContainer.shared.resolve(TipLayerManagerProtocol.self)
     private var  logger = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var  hostManager = DependencyContainer.shared.resolve(HostManagerProtocol.self)
     private var  inputMonitorManager = InputMonitorManager.shared
-    var previewLayer: AVCaptureVideoPreviewLayer?
+    var videoMetalView: VideoMetalView?
     let playerBackgorundWarringLayer = CATextLayer()
     let playerBackgroundImage = CALayer()
     
@@ -40,33 +41,34 @@ class PlayerView: NSView, NSWindowDelegate {
     
     init(captureSession: AVCaptureSession) {
         super.init(frame: .zero)
-        self.previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
+
+        // Get VideoMetalView from VideoManager
+        let videoManager = DependencyContainer.shared.resolve(VideoManagerProtocol.self) as? VideoManager
+        self.videoMetalView = videoManager?.getVideoMetalView()
+
         setupLayer()
         observe()
-        
+
         // Add notification listener to update view when session starts/stops
         NotificationCenter.default.addObserver(
-            self, 
-            selector: #selector(captureSessionDidStartRunning), 
-            name: .AVCaptureSessionDidStartRunning, 
+            self,
+            selector: #selector(captureSessionDidStartRunning),
+            name: .AVCaptureSessionDidStartRunning,
             object: captureSession
         )
         NotificationCenter.default.addObserver(
-            self, 
-            selector: #selector(captureSessionDidStopRunning), 
-            name: .AVCaptureSessionDidStopRunning, 
+            self,
+            selector: #selector(captureSessionDidStopRunning),
+            name: .AVCaptureSessionDidStopRunning,
             object: captureSession
         )
     }
 
-    func setupLayer() {    
-        self.previewLayer?.frame = self.frame
-        // self.previewLayer?.contentsGravity = .resizeAspectFill
-        // self.previewLayer?.videoGravity = .resizeAspectFill
-        self.previewLayer?.contentsGravity = UserSettings.shared.gravity.contentsGravity
-        self.previewLayer?.videoGravity = UserSettings.shared.gravity.videoGravity
-        self.previewLayer?.connection?.automaticallyAdjustsVideoMirroring = false
-        
+    func setupLayer() {
+        // Set up background layer
+        self.wantsLayer = true
+        self.layer?.backgroundColor = NSColor.black.cgColor
+
         if let image = NSImage(named: "content_dark_eng"), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             playerBackgroundImage.contents = cgImage
             playerBackgroundImage.contentsGravity = UserSettings.shared.gravity.contentsGravity
@@ -75,12 +77,16 @@ class PlayerView: NSView, NSWindowDelegate {
             // Ensure background color is red when using an image (fallback overlay)
             self.playerBackgroundImage.backgroundColor = NSColor(white: 0.15, alpha: 1.0).cgColor
         }
-        self.previewLayer?.addSublayer(self.playerBackgroundImage)
+        self.layer?.addSublayer(self.playerBackgroundImage)
 
-        // Set preview layer background to red (replace default black)
-        self.previewLayer?.backgroundColor = NSColor.black.cgColor
-        self.previewLayer?.masksToBounds = true
-        layer = self.previewLayer
+        // Embed VideoMetalView as subview
+        if let metalView = videoMetalView {
+            metalView.frame = self.bounds
+            metalView.autoresizingMask = [.width, .height]
+            self.addSubview(metalView)
+        }
+
+        self.layer?.masksToBounds = true
     }
     
     func observe() {
@@ -175,14 +181,14 @@ class PlayerView: NSView, NSWindowDelegate {
 
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.2)
-        
-        // Get the bounds of the preview layer
-        guard let previewLayer = self.previewLayer else {
+
+        // Get the bounds of the Metal view
+        guard let metalView = self.videoMetalView else {
             CATransaction.commit()
             return
         }
-        
-        let bounds = previewLayer.bounds
+
+        let bounds = metalView.bounds
         let centerX = bounds.midX
         let centerY = bounds.midY
 
@@ -192,13 +198,11 @@ class PlayerView: NSView, NSWindowDelegate {
         // 3. Translate back to center
         var transform = CGAffineTransform.identity
         transform = transform.translatedBy(x: centerX, y: centerY)
-
         transform = transform.scaledBy(x: zoomLevel, y: zoomLevel)
-
         transform = transform.translatedBy(x: -centerX, y: -centerY)
 
-        previewLayer.setAffineTransform(transform)
-        
+        metalView.layer?.setAffineTransform(transform)
+
         // Fade playerBackgroundImage opacity when zooming to prevent sublayer visibility at edges
         // This is done in the same transaction as the zoom transform for smooth animation
         if zoomLevel > 1.0 {
@@ -266,7 +270,7 @@ class PlayerView: NSView, NSWindowDelegate {
         
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        self.previewLayer?.frame = self.bounds
+        self.videoMetalView?.frame = self.bounds
         self.playerBackgroundImage.frame = self.bounds
         CATransaction.commit()
     }
@@ -519,8 +523,8 @@ class PlayerView: NSView, NSWindowDelegate {
             }
         }
         
-        if let viewFrame = self.previewLayer {
-            AppStatus.currentView = viewFrame.frame
+        if let metalView = self.videoMetalView {
+            AppStatus.currentView = metalView.frame
         }
         DispatchQueue.main.async {
             if let window = NSApplication.shared.mainWindow {
