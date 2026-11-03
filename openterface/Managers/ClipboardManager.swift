@@ -210,9 +210,13 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     // MARK: - Paste Detection and Confirmation
     
     func handlePasteRequest() {
-        let pasteboard = NSPasteboard.general
+        handlePasteRequest(from: .general)
+    }
+
+    func handlePasteRequest(from pasteboard: NSPasteboard) {
         guard let content = pasteboard.string(forType: .string), !content.isEmpty else {
-            logger.log(content: "📋 No content to paste from clipboard")
+            logger.log(content: "📋 Host clipboard has no pasteable text; defaulting to Local Paste")
+            performLocalPaste()
             return
         }
         
@@ -220,6 +224,12 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     }
     
     func handlePasteRequest(with content: String) {
+        guard !content.isEmpty else {
+            logger.log(content: "📋 Host clipboard text is empty; defaulting to Local Paste")
+            performLocalPaste()
+            return
+        }
+
         logger.log(content: "📋 Paste request detected with content: \(content.prefix(50))...")
         
         // Check user's paste behavior preference

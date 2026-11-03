@@ -73,6 +73,31 @@ final class LocalPasteTests: XCTestCase {
         XCTAssertTrue(keyboardManager.sentTexts.isEmpty)
     }
 
+    func testEmptyHostClipboardDefaultsToLocalPaste() {
+        UserSettings.shared.pasteBehavior = .alwaysPasteToTarget
+        UserSettings.shared.keyboardLayout = .mac
+        let pasteboard = makePasteboard()
+
+        ClipboardManager.shared.handlePasteRequest(from: pasteboard)
+
+        assertSinglePasteInput(keyCode: 9, modifier: .command)
+        XCTAssertEqual(keyboardManager.modifierReleaseCount, 1)
+        XCTAssertTrue(keyboardManager.sentTexts.isEmpty)
+    }
+
+    func testNonTextHostClipboardDefaultsToLocalPaste() {
+        UserSettings.shared.pasteBehavior = .askEveryTime
+        UserSettings.shared.keyboardLayout = .mac
+        let pasteboard = makePasteboard()
+        pasteboard.setData(Data([0x00]), forType: .png)
+
+        ClipboardManager.shared.handlePasteRequest(from: pasteboard)
+
+        assertSinglePasteInput(keyCode: 9, modifier: .command)
+        XCTAssertEqual(keyboardManager.modifierReleaseCount, 1)
+        XCTAssertTrue(keyboardManager.sentTexts.isEmpty)
+    }
+
     func testAskEveryTimeLocalActionEmitsControlVForWindowsTarget() {
         UserSettings.shared.pasteBehavior = .askEveryTime
         UserSettings.shared.keyboardLayout = .windows
@@ -110,6 +135,13 @@ final class LocalPasteTests: XCTestCase {
         XCTAssertTrue(keyboardManager.inputs.isEmpty)
         XCTAssertTrue(keyboardManager.sentTexts.isEmpty)
         XCTAssertEqual(keyboardManager.modifierReleaseCount, 0)
+    }
+
+    private func makePasteboard() -> NSPasteboard {
+        let name = NSPasteboard.Name("LocalPasteTests.\(UUID().uuidString)")
+        let pasteboard = NSPasteboard(name: name)
+        pasteboard.clearContents()
+        return pasteboard
     }
 
     private func assertSinglePasteInput(
