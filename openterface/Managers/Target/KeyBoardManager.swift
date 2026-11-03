@@ -34,7 +34,7 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     var escKeyDownCounts = 0
     var escKeyDownTimeStart = 0.0
     
-    let kbm = KeyboardMapper()
+    let kbm: KeyboardMapper
     
     // store the currently pressed keys
     var pressedKeys: [UInt16] = [255,255,255,255,255,255]
@@ -205,12 +205,17 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
     }
     
-    init() {
+    init(keyboardMapper: KeyboardMapper = KeyboardMapper(), monitorEvents: Bool = true, pollCapsLock: Bool = true) {
+        self.kbm = keyboardMapper
         logger.log(content: "🎹 KeyboardManager initialized with layout: \(currentKeyboardLayout.rawValue)")
         // Update caps lock state from the system at initialization
         updateInitialCapsLockState()
-        startHostCapsLockPolling()
-        monitorKeyboardEvents()
+        if pollCapsLock {
+            startHostCapsLockPolling()
+        }
+        if monitorEvents {
+            monitorKeyboardEvents()
+        }
     }
 
     /// Read the system modifier flags to determine the current Caps Lock state
@@ -1278,8 +1283,8 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
                 pressedKeys[index] = input.keyCode
                 kbm.pressKey(keys: pressedKeys, modifiers: input.modifiers)
                 Thread.sleep(forTimeInterval: 0.005)
-                kbm.releaseKey(keys: pressedKeys)
                 pressedKeys[index] = 255
+                kbm.releaseKey(keys: pressedKeys)
             }
         }
     }

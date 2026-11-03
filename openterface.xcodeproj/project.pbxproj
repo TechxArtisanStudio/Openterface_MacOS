@@ -31,6 +31,7 @@
 		53B751742B3EBFFF00FCDC2F /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */; };
 		53CC660A2B8EDB390081F927 /* LoggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC66092B8EDB390081F927 /* LoggerManager.swift */; };
 		53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CC660E2B8EE70C0081F927 /* LogTests.swift */; };
+		A11CE0012F00000100000002 /* LocalPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0012F00000100000001 /* LocalPasteTests.swift */; };
 		53FBC5002C7C78A400E77E60 /* HIDManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */; };
 		53FBE7AE2B3D66D2007785B0 /* openterfaceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */; };
 		53FBE7B02B3D66D2007785B0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FBE7AF2B3D66D2007785B0 /* ContentView.swift */; };
@@ -190,6 +191,7 @@
 		53B751732B3EBFFF00FCDC2F /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		53CC66092B8EDB390081F927 /* LoggerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerManager.swift; sourceTree = "<group>"; };
 		53CC660E2B8EE70C0081F927 /* LogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTests.swift; sourceTree = "<group>"; };
+		A11CE0012F00000100000001 /* LocalPasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPasteTests.swift; sourceTree = "<group>"; };
 		53FBC4FF2C7C78A400E77E60 /* HIDManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDManager.swift; sourceTree = "<group>"; };
 		53FBE7AA2B3D66D2007785B0 /* openterface.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = openterface.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = openterfaceApp.swift; sourceTree = "<group>"; };
@@ -416,6 +418,7 @@
 		53FBE7BE2B3D66D6007785B0 /* openterfaceTests */ = {
 			isa = PBXGroup;
 			children = (
+				A11CE0012F00000100000001 /* LocalPasteTests.swift */,
 				6B99F6162E9A860A0073CDA2 /* HIDManagerTests.swift */,
 				AA001VNC2E9A00000073CDA2 /* VNCConnectionTests.swift */,
 				53FBE7BF2B3D66D6007785B0 /* openterfaceTests.swift */,
@@ -982,6 +985,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A11CE0012F00000100000002 /* LocalPasteTests.swift in Sources */,
 				53FBE7C02B3D66D6007785B0 /* openterfaceTests.swift in Sources */,
 				53CC660F2B8EE70C0081F927 /* LogTests.swift in Sources */,
 				6B99F6172E9A860A0073CDA2 /* HIDManagerTests.swift in Sources */,
