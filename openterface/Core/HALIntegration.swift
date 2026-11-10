@@ -141,6 +141,9 @@ class HALIntegrationManager {
         hal.deinitializeHardware()
         isInitialized = false
         
+        // Clear EDID offset cache since device is disconnected
+        FirmwareManager.shared.clearEdidOffsetCache()
+        
         logger.log(content: "✅ HAL Integration deinitialized")
     }
 

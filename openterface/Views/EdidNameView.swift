@@ -107,9 +107,9 @@ struct EdidNameView: View {
                                 }
                             
                             HStack {
-                                Text("\(newEdidName.count)/13 characters")
+                                Text("\(newEdidName.count)/12 characters")
                                     .font(.caption)
-                                    .foregroundColor(newEdidName.count > 13 ? .red : .secondary)
+                                    .foregroundColor(newEdidName.count > 12 ? .red : .secondary)
                                 
                                 Spacer()
                                 
@@ -129,7 +129,7 @@ struct EdidNameView: View {
                             .foregroundColor(.orange)
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Label("Maximum 13 characters allowed", systemImage: "info.circle")
+                            Label("Maximum 12 characters allowed", systemImage: "info.circle")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -254,7 +254,7 @@ struct EdidNameView: View {
     }
     
     private func validateEdidName(_ name: String) {
-        if name.count > 13 {
+        if name.count > 12 {
             isNameValid = false
             validationMessage = "Too long"
         } else if !name.allSatisfy({ $0.isASCII && $0.asciiValue! >= 32 && $0.asciiValue! <= 126 }) {
