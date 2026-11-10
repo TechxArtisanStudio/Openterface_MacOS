@@ -1214,7 +1214,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func handleStopAllOperationsBeforeFirmwareUpdate(_ notification: Notification) {
         logger.log(content: "Stopping all operations for firmware update...")
         
-        // Stop serial port connections
+        // Stop serial port connections (non-blocking)
         serialPortManager.closeSerialPort()
         
         // Stop audio operations  
@@ -1226,14 +1226,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Pause HAL periodic updates to avoid concurrent HID access during flash
         HALIntegrationManager.shared.pausePeriodicHALUpdates()
 
-        // Stop video session by posting notification for PlayerViewModel to handle
+        // Stop video session asynchronously to avoid blocking
         logger.log(content: "Posting StopVideoSession notification for firmware update")
         NotificationCenter.default.post(name: NSNotification.Name("StopVideoSession"), object: nil)
         logger.log(content: "Video session stop requested for firmware update")
-
-        // Note: Keep the main window open during firmware update
-        // The firmware update dialog runs in its own separate window
-        logger.log(content: "Main window remains open during firmware update")
 
         logger.log(content: "All operations stopped for firmware update")
     }

@@ -122,14 +122,14 @@ class FirmwareManager: ObservableObject {
         // Pause HAL periodic updates to avoid I/O conflict with direct flash access
         HALIntegrationManager.shared.pausePeriodicHALUpdates()
         
-        // Post notification to stop any other operations
-        NotificationCenter.default.post(
-            name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"),
-            object: nil
-        )
-        
-        // Close main window
+        // Post notification asynchronously to avoid blocking
         DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("StopAllOperationsBeforeFirmwareUpdate"),
+                object: nil
+            )
+            
+            // Close main window
             let windows = NSApplication.shared.windows
             for window in windows {
                 // Close/hide main content windows, but not auxiliary tool windows
@@ -1019,6 +1019,8 @@ class FirmwareManager: ObservableObject {
 
         if stopAllOperations {
             self.stopAllOperations()
+            // Wait for async cleanup to complete
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
         }
 
         await MainActor.run {

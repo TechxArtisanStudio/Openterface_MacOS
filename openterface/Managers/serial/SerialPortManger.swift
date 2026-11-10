@@ -699,17 +699,27 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         logger.log(content: "Close serial port..")
         self.isDeviceReady = false
         messageParser.reset()
-        self.serialPort?.close()
         
-        // Stop SD card polling timer
+        // Stop SD card polling FIRST to prevent timer from sending data during close
+        logger.log(content: "Stopping SD card polling...")
         self.stopSDCardPolling()
-
-        DispatchQueue.main.async {
-            SerialPortStatus.shared.isTargetConnected = false
-            SerialPortStatus.shared.isKeyboardConnected = false
-            SerialPortStatus.shared.isMouseConnected = false
-            SerialPortStatus.shared.isControlChipsetReady = false
+        logger.log(content: "SD card polling stopped")
+        
+        // Dispatch close to background queue to avoid blocking on CH32 and other slow serial chips
+        let portToClose = self.serialPort
+        logger.log(content: "Dispatching serial port close to background...")
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.logger.log(content: "Background: closing serial port...")
+            portToClose?.close()
+            self?.logger.log(content: "Background: serial port closed")
+            DispatchQueue.main.async {
+                SerialPortStatus.shared.isTargetConnected = false
+                SerialPortStatus.shared.isKeyboardConnected = false
+                SerialPortStatus.shared.isMouseConnected = false
+                SerialPortStatus.shared.isControlChipsetReady = false
+            }
         }
+        logger.log(content: "closeSerialPort() returning")
     }
     
     /// Pause all connection attempts
@@ -1468,9 +1478,16 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         // First query after 1 second so the port is fully settled, then every 3 seconds.
         timer.schedule(deadline: .now() + 1.0, repeating: 3.0, leeway: .milliseconds(200))
         timer.setEventHandler { [weak self] in
-            guard let self = self,
-                  self.isDeviceReady,
-                  AppStatus.controlChipsetType == .ch32v208 else { return }
+            guard let self = self else { return }
+            guard self.isDeviceReady else {
+                self.logger.log(content: "SD polling: skipped (isDeviceReady=false)")
+                return
+            }
+            guard AppStatus.controlChipsetType == .ch32v208 else {
+                self.logger.log(content: "SD polling: skipped (not CH32V208)")
+                return
+            }
+            self.logger.log(content: "SD polling: sending query command")
             var cmd = SerialProtocolCommands.CH32V208.SD_SWITCH_PREFIX
             cmd.append(SerialProtocolCommands.CH32V208.SDCardDirection.QUERY)
             self.sendAsyncCommand(command: cmd, force: true)
@@ -1481,8 +1498,10 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     }
     
     private func stopSDCardPolling() {
+        logger.log(content: "stopSDCardPolling: cancelling timer...")
         sdPollingTimer?.cancel()
         sdPollingTimer = nil
+        logger.log(content: "stopSDCardPolling: timer cancelled")
     }
     
     /// Get the preferred serial port path from USB device manager
