@@ -74,6 +74,20 @@ class FirmwareManager: ObservableObject {
     /// Cached EDID block offset, discovered by scanning the firmware image.
     /// Avoids re-reading the entire firmware on every EDID query.
     private var cachedEdidOffset: Int?
+
+    /// Returns the default EDID block offset for known chip types.
+    /// This allows skipping the full firmware scan on first access.
+    private func defaultEdidOffset() -> Int? {
+        let chipType = AppStatus.videoChipsetType
+        switch chipType {
+        case .ms2109:
+            return 0x326
+        case .ms2109s:
+            return 0x2F4
+        default:
+            return nil
+        }
+    }
     
     private init() {}
     
@@ -887,49 +901,56 @@ class FirmwareManager: ObservableObject {
     }
 
     /// Read and parse the EDID identity from the device.
-    /// Uses cached EDID offset when available to avoid reading the entire firmware.
+    /// Uses chip-type preset or cached EDID offset to read only 128 bytes.
     /// - Returns: Parsed identity, or nil if the read or parse failed
     func readEdidIdentity() async -> EdidIdentity? {
         logger.log(content: "Reading EDID identity from device")
 
-        // Fast path: use cached offset to read only the EDID block (128 bytes)
-        if let offset = cachedEdidOffset {
+        // Determine EDID offset: cached > chip preset > full scan
+        let offset: Int
+        if let cached = cachedEdidOffset {
+            offset = cached
             logger.log(content: "Using cached EDID offset 0x\(String(format: "%04X", offset))")
-            guard let blockData = hidManager.readEeprom(address: UInt16(offset), length: 128) else {
-                logger.log(content: "Failed to read EDID block at cached offset")
-                cachedEdidOffset = nil // Invalidate cache on read failure
+        } else if let preset = defaultEdidOffset() {
+            offset = preset
+            logger.log(content: "Using chip-preset EDID offset 0x\(String(format: "%04X", offset))")
+        } else {
+            // Unknown chip type: must scan entire firmware
+            guard let image = await readFirmwareImage() else {
+                logger.log(content: "Failed to read firmware image for EDID info")
                 return nil
             }
-            // Construct a minimal image with just the EDID block at the correct offset
-            var minimalImage = Data(count: offset)
-            minimalImage.append(blockData)
-            // Pad to ensure we have at least offset + 128 bytes
-            while minimalImage.count < offset + 128 {
-                minimalImage.append(0)
-            }
-            guard let identity = EdidCodec.identity(from: minimalImage) else {
-                logger.log(content: "No valid EDID block found at cached offset")
-                cachedEdidOffset = nil // Invalidate cache on parse failure
+            guard let identity = EdidCodec.identity(from: image) else {
+                logger.log(content: "No valid EDID block found in firmware image")
                 return nil
             }
+            cachedEdidOffset = identity.edidOffset
+            logger.log(content: "Cached EDID offset 0x\(String(format: "%04X", identity.edidOffset))")
             logger.log(content: "EDID identity: \(identity.summary)")
             return identity
         }
 
-        // Slow path: read entire firmware to discover EDID offset
-        guard let image = await readFirmwareImage() else {
-            logger.log(content: "Failed to read firmware image for EDID info")
+        // Fast path: read only the EDID block (128 bytes)
+        guard let blockData = hidManager.readEeprom(address: UInt16(offset), length: 128) else {
+            logger.log(content: "Failed to read EDID block at offset 0x\(String(format: "%04X", offset))")
+            cachedEdidOffset = nil
             return nil
         }
 
-        guard let identity = EdidCodec.identity(from: image) else {
-            logger.log(content: "No valid EDID block found in firmware image")
+        // Construct a minimal image with just the EDID block at the correct offset
+        var minimalImage = Data(count: offset)
+        minimalImage.append(blockData)
+        while minimalImage.count < offset + 128 {
+            minimalImage.append(0)
+        }
+
+        guard let identity = EdidCodec.identity(from: minimalImage) else {
+            logger.log(content: "No valid EDID block found at offset 0x\(String(format: "%04X", offset))")
+            cachedEdidOffset = nil
             return nil
         }
 
-        // Cache the discovered offset for future reads
-        cachedEdidOffset = identity.edidOffset
-        logger.log(content: "Cached EDID offset 0x\(String(format: "%04X", identity.edidOffset))")
+        cachedEdidOffset = offset
         logger.log(content: "EDID identity: \(identity.summary)")
         return identity
     }
@@ -985,9 +1006,8 @@ class FirmwareManager: ObservableObject {
     }
     
     /// Set the EDID monitor name and update checksums
-    /// Patches the 0xFC descriptor inside the EDID block found in the image,
-    /// recomputes the EDID block checksum and the firmware-level checksums,
-    /// then reads the block back to verify the change.
+    /// Uses differential checksum update: only writes the modified EDID block (128 bytes)
+    /// and updated code checksum (2 bytes), instead of the entire firmware image.
     /// - Parameters:
     ///   - name: The new EDID monitor name (max 12 ASCII characters)
     ///   - stopAllOperations: Stops video/audio and hides windows for a clean update.
@@ -995,10 +1015,9 @@ class FirmwareManager: ObservableObject {
     ///     pauses HAL polling) pass false so the app is not terminated by hiding
     ///     its last window.
     func setEdidName(_ name: String, stopAllOperations: Bool = true) async {
-        logger.log(content: "Starting EDID name update process")
+        logger.log(content: "Starting EDID name update process (differential write)")
 
         if stopAllOperations {
-            // Stop all operations and close main window for clean EDID patching
             self.stopAllOperations()
         }
 
@@ -1020,80 +1039,143 @@ class FirmwareManager: ObservableObject {
 
         await MainActor.run {
             edidUpdateProgress = 0.1
-            edidUpdateStatus = "Reading current firmware image..."
+            edidUpdateStatus = "Reading firmware header and EDID block..."
         }
 
-        guard let original = await readFirmwareImage() else {
-            finishEdidUpdate(success: false, message: "Failed to read firmware from device EEPROM")
+        // Step 1: Read firmware header to get total size
+        guard let headerData = hidManager.readEeprom(address: 0x0000, length: 16),
+              let header = parseFirmwareHeader(headerData) else {
+            finishEdidUpdate(success: false, message: "Failed to read firmware header")
             return
         }
 
-        guard let identity = EdidCodec.identity(from: original) else {
-            finishEdidUpdate(success: false, message: "No valid EDID block found in firmware image. Aborting write.")
+        let firmwareSize = header.totalSize
+        let checksumOffset = firmwareSize - 4
+        logger.log(content: "Firmware size: \(firmwareSize) bytes, checksum at offset 0x\(String(format: "%04X", checksumOffset))")
+
+        // Step 2: Read EDID block (128 bytes) using cached/preset offset or full scan
+        let edidOffset: Int
+        if let cached = cachedEdidOffset {
+            edidOffset = cached
+            logger.log(content: "Using cached EDID offset 0x\(String(format: "%04X", edidOffset))")
+        } else if let preset = defaultEdidOffset() {
+            edidOffset = preset
+            cachedEdidOffset = edidOffset
+            logger.log(content: "Using chip-preset EDID offset 0x\(String(format: "%04X", edidOffset))")
+        } else {
+            // Unknown chip type: must scan entire firmware
+            guard let fullImage = await readFirmwareImage(),
+                  let identity = EdidCodec.identity(from: fullImage) else {
+                finishEdidUpdate(success: false, message: "Failed to locate EDID block in firmware")
+                return
+            }
+            edidOffset = identity.edidOffset
+            cachedEdidOffset = edidOffset
+        }
+
+        logger.log(content: "Reading EDID block at offset 0x\(String(format: "%04X", edidOffset))")
+        guard let originalEdidBlock = hidManager.readEeprom(address: UInt16(edidOffset), length: 128) else {
+            finishEdidUpdate(success: false, message: "Failed to read EDID block from device")
             return
         }
 
-        // A corrupt read would otherwise be written back as a valid-looking block
-        guard identity.checksumValid else {
-            finishEdidUpdate(success: false, message: "EDID block read back with an invalid checksum. Aborting write to protect the device; please retry.")
+        // Verify EDID block checksum
+        let edidChecksum = originalEdidBlock.reduce(0) { ($0 + Int($1)) & 0xFF }
+        guard edidChecksum == 0 else {
+            finishEdidUpdate(success: false, message: "EDID block has invalid checksum. Aborting write to protect the device; please retry.")
             return
         }
 
-        let previousName = identity.displayName ?? "(not set)"
+        // Step 3: Read original code checksum (last 2 bytes of firmware)
+        guard let checksumData = hidManager.readEeprom(address: UInt16(checksumOffset), length: 4) else {
+            finishEdidUpdate(success: false, message: "Failed to read firmware checksums")
+            return
+        }
 
-        // Save a pre-write backup to the temp directory
+        // Extract original code checksum (bytes 2-3, big-endian)
+        let originalCodeChecksum = (UInt16(checksumData[2]) << 8) | UInt16(checksumData[3])
+        logger.log(content: "Original code checksum: 0x\(String(format: "%04X", originalCodeChecksum))")
+
+        // Save backup
         let backupName = "edid_backup_\(Int(Date().timeIntervalSince1970)).bin"
         let backupURL = FileManager.default.temporaryDirectory.appendingPathComponent(backupName)
         do {
-            try original.write(to: backupURL)
-            logger.log(content: "Saved EDID pre-write backup to \(backupURL.path)")
+            try originalEdidBlock.write(to: backupURL)
+            logger.log(content: "Saved EDID block backup to \(backupURL.path)")
         } catch {
             logger.log(content: "⚠ Failed to save EDID backup: \(error.localizedDescription)")
         }
 
-        var patched = original
-        guard EdidCodec.patchDisplayName(in: &patched, blockOffset: identity.edidOffset, name: name) else {
+        // Step 4: Patch EDID block in memory
+        var patchedEdidBlock = originalEdidBlock
+        guard EdidCodec.patchDisplayName(in: &patchedEdidBlock, blockOffset: 0, name: name) else {
             finishEdidUpdate(success: false, message: "Failed to patch EDID display name descriptor")
             return
         }
 
-        if patched == original {
+        if patchedEdidBlock == originalEdidBlock {
             finishEdidUpdate(success: true, message: "EDID display name is already '\(name)'. No write needed.")
             return
         }
 
-        // Recompute firmware-level checksums over the patched image
-        let (headerChecksum, codeChecksum) = calculateMS2109Checksums(firmwareData: patched)
-        let checksumOffset = patched.count - 4
-        patched[checksumOffset] = UInt8((headerChecksum >> 8) & 0xFF)
-        patched[checksumOffset + 1] = UInt8(headerChecksum & 0xFF)
-        patched[checksumOffset + 2] = UInt8((codeChecksum >> 8) & 0xFF)
-        patched[checksumOffset + 3] = UInt8(codeChecksum & 0xFF)
+        let previousName = EdidCodec.extractDisplayName(from: originalEdidBlock) ?? "(not set)"
+
+        // Step 5: Calculate differential checksum
+        // diff = Σ(modified[i] - original[i]) for all bytes in EDID block
+        var diff: Int32 = 0
+        for i in 0..<128 {
+            diff += Int32(patchedEdidBlock[i]) - Int32(originalEdidBlock[i])
+        }
+
+        // New code checksum = original + diff (mod 65536)
+        let newCodeChecksum = UInt16((Int32(originalCodeChecksum) + diff) & 0xFFFF)
+        logger.log(content: "EDID byte difference: \(diff), new code checksum: 0x\(String(format: "%04X", newCodeChecksum))")
+
+        // Prepare checksum update data (only code checksum, bytes 2-3)
+        var newChecksumData = Data(count: 2)
+        newChecksumData[0] = UInt8((newCodeChecksum >> 8) & 0xFF)
+        newChecksumData[1] = UInt8(newCodeChecksum & 0xFF)
 
         await MainActor.run {
             edidUpdateProgress = 0.3
-            edidUpdateStatus = "Writing firmware image..."
+            edidUpdateStatus = "Writing EDID block and checksum..."
         }
 
-        // Write the entire patched firmware image (matches QT's write strategy)
-        // This ensures EEPROM consistency rather than partial writes
-        guard hidManager.writeEeprom(address: 0x0000, data: patched) else {
-            finishEdidUpdate(success: false, message: "Failed to write firmware image to device EEPROM")
+        // Step 6: Write only the modified EDID block (128 bytes)
+        guard hidManager.writeEeprom(address: UInt16(edidOffset), data: patchedEdidBlock) else {
+            finishEdidUpdate(success: false, message: "Failed to write EDID block to device EEPROM")
+            return
+        }
+
+        // Step 7: Write only the updated code checksum (2 bytes)
+        guard hidManager.writeEeprom(address: UInt16(checksumOffset + 2), data: newChecksumData) else {
+            finishEdidUpdate(success: false, message: "EDID block written but checksum update failed")
             return
         }
 
         await MainActor.run {
             edidUpdateProgress = 0.9
-            edidUpdateStatus = "Verifying written firmware..."
+            edidUpdateStatus = "Verifying written data..."
         }
 
-        // Verify the entire firmware image (matches QT's verification strategy)
-        let readBack = await readFirmwareImage()
-        let verified = (readBack == patched)
+        // Step 8: Verify by reading back EDID block
+        guard let readBackEdid = hidManager.readEeprom(address: UInt16(edidOffset), length: 128) else {
+            finishEdidUpdate(success: false, message: "Failed to read back EDID block for verification")
+            return
+        }
 
-        if verified {
-            // Update cached EDID offset (it doesn't change, but ensure it's cached)
-            cachedEdidOffset = identity.edidOffset
+        let edidVerified = (readBackEdid == patchedEdidBlock)
+
+        // Also verify checksum was written correctly
+        guard let readBackChecksum = hidManager.readEeprom(address: UInt16(checksumOffset + 2), length: 2) else {
+            finishEdidUpdate(success: false, message: "Failed to read back checksum for verification")
+            return
+        }
+
+        let checksumVerified = (readBackChecksum == newChecksumData)
+
+        if edidVerified && checksumVerified {
+            cachedEdidOffset = edidOffset
             finishEdidUpdate(
                 success: true,
                 message: """
@@ -1112,10 +1194,11 @@ class FirmwareManager: ObservableObject {
                 The new monitor name will be visible after reconnection.
                 """
             )
-            logger.log(content: "EDID name update completed and verified (full firmware image written)")
+            logger.log(content: "EDID name update completed and verified (differential write: 130 bytes)")
         } else {
-            finishEdidUpdate(success: false, message: "Firmware write completed but read-back verification failed. Backup: \(backupURL.lastPathComponent)")
-            logger.log(content: "EDID name update failed verification")
+            let failReason = edidVerified ? "checksum" : "EDID block"
+            finishEdidUpdate(success: false, message: "Write completed but \(failReason) verification failed. Backup: \(backupURL.lastPathComponent)")
+            logger.log(content: "EDID name update failed verification: edid=\(edidVerified), checksum=\(checksumVerified)")
         }
     }
 
@@ -1219,6 +1302,12 @@ enum EdidCodec {
             return trimmed.isEmpty ? nil : trimmed
         }
         return nil
+    }
+
+    /// Extracts the display name from a raw 128-byte EDID block
+    static func extractDisplayName(from block: Data) -> String? {
+        guard block.count >= 128 else { return nil }
+        return descriptorText(in: [UInt8](block), tag: 0xFC)
     }
 
     /// Patches the 0xFC display name descriptor in-place and fixes the block checksum.
