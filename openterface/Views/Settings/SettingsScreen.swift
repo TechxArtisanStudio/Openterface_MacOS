@@ -17,6 +17,7 @@ struct SettingsScreen: View {
         case ai = "AI Integration"
         case connection = "Device & Connection"
         case remoteControl = "Remote Control"
+        case mcp = "MCP Server"
         case advanced = "Advanced & Debug"
 
         var icon: String {
@@ -29,6 +30,7 @@ struct SettingsScreen: View {
             case .ai: return "sparkles"
             case .connection: return "externaldrive.connected.to.line.below"
             case .remoteControl: return "network"
+            case .mcp: return "server.rack"
             case .advanced: return "gearshape"
             }
         }
@@ -96,6 +98,8 @@ struct SettingsScreen: View {
                         DeviceConnectionSettingsView()
                     case .remoteControl:
                         RemoteControlSettingsView()
+                    case .mcp:
+                        MCPSettingsView()
                     case .advanced:
                         AdvancedDebugSettingsView()
                     }

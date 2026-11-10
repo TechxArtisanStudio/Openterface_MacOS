@@ -423,6 +423,14 @@ Schema:
         self.selectedVideoFrameRate = savedFrameRate == 0.0 ? 60.0 : savedFrameRate
 
         self.selectedVideoPixelFormat = UserDefaults.standard.string(forKey: "selectedVideoPixelFormat") ?? String(format: "0x%X", kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+
+        // Load MCP server settings
+        self.mcpServerEnabled = UserDefaults.standard.object(forKey: "mcpServerEnabled") as? Bool ?? false
+        self.mcpServerPort = UserDefaults.standard.object(forKey: "mcpServerPort") as? Int ?? 8765
+        self.mcpBindLocalhostOnly = UserDefaults.standard.object(forKey: "mcpBindLocalhostOnly") as? Bool ?? true
+        if MCPKeychainStore.loadToken().isEmpty {
+            MCPKeychainStore.saveToken(UUID().uuidString)
+        }
     }
 
     private static func defaultPromptProfile() -> ChatPromptProfile {
@@ -1325,6 +1333,27 @@ Loaded from: \(agentFolderURL.path)
     // Convenience computed rect
     var activeVideoRect: CGRect {
         return CGRect(x: activeVideoX, y: activeVideoY, width: activeVideoWidth, height: activeVideoHeight)
+    }
+
+    // MARK: - MCP Server Settings
+
+    @Published var mcpServerEnabled: Bool {
+        didSet { UserDefaults.standard.set(mcpServerEnabled, forKey: "mcpServerEnabled") }
+    }
+    @Published var mcpServerPort: Int {
+        didSet { UserDefaults.standard.set(mcpServerPort, forKey: "mcpServerPort") }
+    }
+    @Published var mcpBindLocalhostOnly: Bool {
+        didSet { UserDefaults.standard.set(mcpBindLocalhostOnly, forKey: "mcpBindLocalhostOnly") }
+    }
+
+    var mcpAuthToken: String {
+        get { MCPKeychainStore.loadToken() }
+        set { MCPKeychainStore.saveToken(newValue) }
+    }
+
+    func regenerateMCPAuthToken() {
+        mcpAuthToken = UUID().uuidString
     }
 }
 

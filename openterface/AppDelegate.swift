@@ -292,6 +292,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
         // Apply protocol mode at launch so KVM/VNC startup behavior is explicit.
         applyConnectionProtocolMode(UserSettings.shared.connectionProtocolMode, reason: "app launch")
+
+        // Start MCP server if enabled in settings
+        if UserSettings.shared.mcpServerEnabled {
+            MCPServer.shared.start(
+                port: UserSettings.shared.mcpServerPort,
+                authToken: UserSettings.shared.mcpAuthToken,
+                bindLocalhostOnly: UserSettings.shared.mcpBindLocalhostOnly
+            )
+        }
     }
 
     @objc private func handleConnectionProtocolModeChanged(_ notification: Notification) {
@@ -1056,6 +1065,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Stop MCP server
+        MCPServer.shared.stop()
+
         // Stop audio operations
         audioManager.stopAudioSession()
         chatWindowManager.closeChatWindow()

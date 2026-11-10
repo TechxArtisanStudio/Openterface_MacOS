@@ -143,6 +143,23 @@
 		E7B3291FA6D54E0CB1C8543D /* ChatOSVerificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A09B3C4E1D4F7D8B650C2A /* ChatOSVerificationService.swift */; };
 		EE1AC6F723744764A76282E8 /* ChatManager+Tracing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C1C11FABAB4943B6EF52C9 /* ChatManager+Tracing.swift */; };
 		F1FEEE262F7515A900811C27 /* MS2130SFlashManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FEEE252F7515A900811C27 /* MS2130SFlashManager.swift */; };
+		656970010E344A13839BB141 /* MCPMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15114FFA76164C24B18C63BA /* MCPMessage.swift */; };
+		4342DC51BED7461887E50EF9 /* MCPSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506D2A38E1B44C62A40091FC /* MCPSession.swift */; };
+		A8820AA789C84529A0EAA8CC /* MCPToolRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C5FAFC8597499096091940 /* MCPToolRegistry.swift */; };
+		710FCDC130184B4490D1DF42 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F8AD4EFDE148678336C480 /* MCPServer.swift */; };
+		11316E1CAAD443E1A189A7C4 /* MCPHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223EF7DD91074506A3FB0CA7 /* MCPHTTPServer.swift */; };
+		42F7336D9D4541DD932D2102 /* MCPHTTPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5450A89D7B849A5801965C1 /* MCPHTTPConnection.swift */; };
+		A4D0558B69A34744A72898BC /* MCPSSEWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0392A297994D559BDA152A /* MCPSSEWriter.swift */; };
+		F9C03323560D457695BB456C /* MCPKeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5688427369D40F3A351037C /* MCPKeychainStore.swift */; };
+		6BB5A6E125514BF7ACF1C48D /* MCPCaptureScreenTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5483D22117E949C0A6ADBA34 /* MCPCaptureScreenTool.swift */; };
+		921E79800D2248C6AB5A1F21 /* MCPMouseTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10446E09EEC94475AE179A4D /* MCPMouseTools.swift */; };
+		15DE9FE948584686A792C435 /* MCPKeyboardTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1306FE5A70BC4418B9D09903 /* MCPKeyboardTools.swift */; };
+		1F1AA16D878B484BBDE75537 /* MCPOCRTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD810CB9C83E43698F6E106B /* MCPOCRTool.swift */; };
+		6EFD47063BD44FC59901B8DD /* MCPDeviceStatusTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EACB8855DDC4E5C8F36F462 /* MCPDeviceStatusTool.swift */; };
+		5E448A47DCB5428784D0F964 /* MCPSwitchUSBTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF3D21290194903AAED7EDE /* MCPSwitchUSBTool.swift */; };
+		DF103AAA3A0A40819F7E58BF /* MCPSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A5AC9720ED4741B9A10FA2 /* MCPSettingsView.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* MCPEDIDInfoTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6D /* MCPEDIDInfoTool.swift */; };
+		C3D4E5F60718293A4B5C6D7E /* MCPEDIDSetTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* MCPEDIDSetTool.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -306,6 +323,23 @@
 		F3B58D1E2C9A4F1B9188E55A /* ChatPlanExecutionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPlanExecutionService.swift; sourceTree = "<group>"; };
 		F6C1C11FABAB4943B6EF52C9 /* ChatManager+Tracing.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatManager+Tracing.swift"; sourceTree = "<group>"; };
 		FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPCredSSPTests.swift; sourceTree = "<group>"; };
+		15114FFA76164C24B18C63BA /* MCPMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPMessage.swift; sourceTree = "<group>"; };
+		506D2A38E1B44C62A40091FC /* MCPSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSession.swift; sourceTree = "<group>"; };
+		C6C5FAFC8597499096091940 /* MCPToolRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolRegistry.swift; sourceTree = "<group>"; };
+		06F8AD4EFDE148678336C480 /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
+		223EF7DD91074506A3FB0CA7 /* MCPHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPHTTPServer.swift; sourceTree = "<group>"; };
+		F5450A89D7B849A5801965C1 /* MCPHTTPConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPHTTPConnection.swift; sourceTree = "<group>"; };
+		9C0392A297994D559BDA152A /* MCPSSEWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSSEWriter.swift; sourceTree = "<group>"; };
+		B5688427369D40F3A351037C /* MCPKeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPKeychainStore.swift; sourceTree = "<group>"; };
+		5483D22117E949C0A6ADBA34 /* MCPCaptureScreenTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPCaptureScreenTool.swift; sourceTree = "<group>"; };
+		10446E09EEC94475AE179A4D /* MCPMouseTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPMouseTools.swift; sourceTree = "<group>"; };
+		1306FE5A70BC4418B9D09903 /* MCPKeyboardTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPKeyboardTools.swift; sourceTree = "<group>"; };
+		CD810CB9C83E43698F6E106B /* MCPOCRTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPOCRTool.swift; sourceTree = "<group>"; };
+		3EACB8855DDC4E5C8F36F462 /* MCPDeviceStatusTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPDeviceStatusTool.swift; sourceTree = "<group>"; };
+		8FF3D21290194903AAED7EDE /* MCPSwitchUSBTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSwitchUSBTool.swift; sourceTree = "<group>"; };
+		73A5AC9720ED4741B9A10FA2 /* MCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSettingsView.swift; sourceTree = "<group>"; };
+		B2C3D4E5F60718293A4B5C6D /* MCPEDIDInfoTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPEDIDInfoTool.swift; sourceTree = "<group>"; };
+		D4E5F60718293A4B5C6D7E8F /* MCPEDIDSetTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPEDIDSetTool.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -399,6 +433,7 @@
 				BFD4EA902E35EE970029BFC2 /* Protocols */,
 				BF98F73B2E35A1EA002EACD7 /* Core */,
 				53FEBE822B3EA3AC0027DDD6 /* AppDelegate.swift */,
+				F3AEEBAEB3BB4EF7A553E4C8 /* MCP */,
 				53FBE7AD2B3D66D2007785B0 /* openterfaceApp.swift */,
 				53FBE7AF2B3D66D2007785B0 /* ContentView.swift */,
 				53FBE7D82B3D676A007785B0 /* Managers */,
@@ -691,6 +726,46 @@
 			path = AI;
 			sourceTree = "<group>";
 		};
+		F3AEEBAEB3BB4EF7A553E4C8 /* MCP */ = {
+			isa = PBXGroup;
+			children = (
+				15114FFA76164C24B18C63BA /* MCPMessage.swift */,
+				506D2A38E1B44C62A40091FC /* MCPSession.swift */,
+				C6C5FAFC8597499096091940 /* MCPToolRegistry.swift */,
+				06F8AD4EFDE148678336C480 /* MCPServer.swift */,
+				223EF7DD91074506A3FB0CA7 /* MCPHTTPServer.swift */,
+				F5450A89D7B849A5801965C1 /* MCPHTTPConnection.swift */,
+				9C0392A297994D559BDA152A /* MCPSSEWriter.swift */,
+				B5688427369D40F3A351037C /* MCPKeychainStore.swift */,
+				4C4C6681FA844A7FB388D121 /* Tools */,
+				5320615125AE426D81DE25BA /* Views */,
+			);
+			path = MCP;
+			sourceTree = "<group>";
+		};
+		4C4C6681FA844A7FB388D121 /* Tools */ = {
+			isa = PBXGroup;
+			children = (
+				5483D22117E949C0A6ADBA34 /* MCPCaptureScreenTool.swift */,
+				10446E09EEC94475AE179A4D /* MCPMouseTools.swift */,
+				1306FE5A70BC4418B9D09903 /* MCPKeyboardTools.swift */,
+				CD810CB9C83E43698F6E106B /* MCPOCRTool.swift */,
+				3EACB8855DDC4E5C8F36F462 /* MCPDeviceStatusTool.swift */,
+				8FF3D21290194903AAED7EDE /* MCPSwitchUSBTool.swift */,
+				B2C3D4E5F60718293A4B5C6D /* MCPEDIDInfoTool.swift */,
+				D4E5F60718293A4B5C6D7E8F /* MCPEDIDSetTool.swift */,
+			);
+			path = Tools;
+			sourceTree = "<group>";
+		};
+		5320615125AE426D81DE25BA /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				73A5AC9720ED4741B9A10FA2 /* MCPSettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -897,6 +972,23 @@
 				BFD4EA942E35EE970029BFC2 /* ProtocolExtensions.swift in Sources */,
 				6BAFEFD22E03B8E3004331F6 /* VideoOutputDelegate.swift in Sources */,
 				53FEBE832B3EA3AC0027DDD6 /* AppDelegate.swift in Sources */,
+				656970010E344A13839BB141 /* MCPMessage.swift in Sources */,
+				4342DC51BED7461887E50EF9 /* MCPSession.swift in Sources */,
+				A8820AA789C84529A0EAA8CC /* MCPToolRegistry.swift in Sources */,
+				710FCDC130184B4490D1DF42 /* MCPServer.swift in Sources */,
+				11316E1CAAD443E1A189A7C4 /* MCPHTTPServer.swift in Sources */,
+				42F7336D9D4541DD932D2102 /* MCPHTTPConnection.swift in Sources */,
+				A4D0558B69A34744A72898BC /* MCPSSEWriter.swift in Sources */,
+				F9C03323560D457695BB456C /* MCPKeychainStore.swift in Sources */,
+				6BB5A6E125514BF7ACF1C48D /* MCPCaptureScreenTool.swift in Sources */,
+				921E79800D2248C6AB5A1F21 /* MCPMouseTools.swift in Sources */,
+				15DE9FE948584686A792C435 /* MCPKeyboardTools.swift in Sources */,
+				1F1AA16D878B484BBDE75537 /* MCPOCRTool.swift in Sources */,
+				6EFD47063BD44FC59901B8DD /* MCPDeviceStatusTool.swift in Sources */,
+				5E448A47DCB5428784D0F964 /* MCPSwitchUSBTool.swift in Sources */,
+				DF103AAA3A0A40819F7E58BF /* MCPSettingsView.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* MCPEDIDInfoTool.swift in Sources */,
+				C3D4E5F60718293A4B5C6D7E /* MCPEDIDSetTool.swift in Sources */,
 				BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */,
 				BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,
