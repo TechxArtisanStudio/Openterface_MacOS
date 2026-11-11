@@ -272,8 +272,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 logger.log(content: "Detected video chipset type: \(videoType)")
                 
                 // Open HID device now that video chip is detected
-                let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-                hidManager.startHID()
+                HIDManager.shared.startHID()
                 logger.log(content: "HID device opened for video chipset")
             }
             
@@ -312,8 +311,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 logger.log(content: "Detected video chipset type: \(videoType)")
                 
                 // Open HID device now that video chip is detected
-                let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
-                hidManager.startHID()
+                HIDManager.shared.startHID()
                 logger.log(content: "HID device opened for video chipset")
             }
             
