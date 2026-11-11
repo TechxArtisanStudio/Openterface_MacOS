@@ -48,9 +48,10 @@ final class MCPSession {
             serverInfo: MCPImplementation(name: "openterface", version: "1.0.0"),
             instructions: """
             Openterface MCP Server provides remote control of a target computer via KVM hardware.
-            Tools: capture_screen (screenshot), move_mouse, left_click, right_click, double_click,
-            type_text, press_key, drag, scroll, ocr_screen, get_device_status, switch_usb.
-            Mouse coordinates are normalized 0.0-1.0. Use capture_screen before clicking to see the target screen.
+            Tools: capture_screen, move_mouse, left_click, right_click, double_click,
+            type_text, press_key, drag, scroll, ocr_screen, get_device_status, switch_usb,
+            edid_info, edid_set_name, firmware_upgrade, firmware_flash_local, firmware_verify.
+            Mouse coordinates are normalized 0.0-1.0. Use capture_screen before clicking.
             """
         )
     }

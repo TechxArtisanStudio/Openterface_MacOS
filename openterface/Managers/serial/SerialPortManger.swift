@@ -1507,6 +1507,18 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         logger.log(content: "stopSDCardPolling: timer cancelled")
     }
     
+    /// Pause SD card polling for firmware operations
+    func pauseSDCardPolling() {
+        logger.log(content: "⏸️ Pausing SD card polling for firmware operation")
+        stopSDCardPolling()
+    }
+    
+    /// Resume SD card polling after firmware operations
+    func resumeSDCardPolling() {
+        logger.log(content: "▶️ Resuming SD card polling after firmware operation")
+        startSDCardPolling()
+    }
+    
     /// Get the preferred serial port path from USB device manager
     /// This method tries to find the serial port path based on the detected control chip device
     /// or falls back to the default USB serial device identified during device grouping

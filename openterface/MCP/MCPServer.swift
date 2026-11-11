@@ -336,6 +336,9 @@ final class MCPServer {
         toolRegistry.register(MCPSwitchUSBTool())
         toolRegistry.register(MCPEDIDInfoTool())
         toolRegistry.register(MCPEDIDSetTool())
+        toolRegistry.register(MCPFirmwareUpgradeTool())
+        toolRegistry.register(MCPFirmwareFlashLocalTool())
+        toolRegistry.register(MCPFirmwareVerifyTool())
     }
 
     // MARK: - Encoding Helpers

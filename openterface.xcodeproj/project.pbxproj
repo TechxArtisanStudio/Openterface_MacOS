@@ -160,6 +160,7 @@
 		DF103AAA3A0A40819F7E58BF /* MCPSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A5AC9720ED4741B9A10FA2 /* MCPSettingsView.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* MCPEDIDInfoTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6D /* MCPEDIDInfoTool.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* MCPEDIDSetTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* MCPEDIDSetTool.swift */; };
+		E5F60718293A4B5C6D7E8F01 /* MCPFirmwareTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F0102 /* MCPFirmwareTools.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -340,6 +341,7 @@
 		73A5AC9720ED4741B9A10FA2 /* MCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSettingsView.swift; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* MCPEDIDInfoTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPEDIDInfoTool.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* MCPEDIDSetTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPEDIDSetTool.swift; sourceTree = "<group>"; };
+		F60718293A4B5C6D7E8F0102 /* MCPFirmwareTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPFirmwareTools.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -754,6 +756,7 @@
 				8FF3D21290194903AAED7EDE /* MCPSwitchUSBTool.swift */,
 				B2C3D4E5F60718293A4B5C6D /* MCPEDIDInfoTool.swift */,
 				D4E5F60718293A4B5C6D7E8F /* MCPEDIDSetTool.swift */,
+				F60718293A4B5C6D7E8F0102 /* MCPFirmwareTools.swift */,
 			);
 			path = Tools;
 			sourceTree = "<group>";
@@ -989,6 +992,7 @@
 				DF103AAA3A0A40819F7E58BF /* MCPSettingsView.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* MCPEDIDInfoTool.swift in Sources */,
 				C3D4E5F60718293A4B5C6D7E /* MCPEDIDSetTool.swift in Sources */,
+				E5F60718293A4B5C6D7E8F01 /* MCPFirmwareTools.swift in Sources */,
 				BFB748FE2E35ED7D004F0DAE /* ClipboardManager.swift in Sources */,
 				BFA445762F016F3C005D2937 /* ClipboardOCRSettingsView.swift in Sources */,
 				5316654A2C6F48F000E3F90F /* USBDevicesManager.swift in Sources */,

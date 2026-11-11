@@ -608,7 +608,9 @@ class FirmwareManager: ObservableObject {
 
     /// Determines the actual firmware size by reading the EEPROM header
     /// Based on the MS2109/MS2109S firmware structure documented in the README
-    private func determineFirmwareSize() async -> Int {
+    /// Determines the firmware size by reading the header
+    /// - Returns: Total firmware size in bytes, or default size if header cannot be parsed
+    func determineFirmwareSize() async -> Int {
         // Read the firmware header (first 16 bytes) to check signature and get code size
         guard let headerData = hidManager.readEeprom(address: 0x0000, length: 16) else {
             logger.log(content: "⚠ Failed to read firmware header, using default size: \(defaultFirmwareSize) bytes")
@@ -759,6 +761,14 @@ class FirmwareManager: ObservableObject {
         }
         
         return (headerValid && codeValid, message)
+    }
+    
+    /// Public wrapper for firmware checksum verification
+    /// - Parameter firmwareData: The firmware data to verify
+    /// - Returns: A string describing the verification result
+    func verifyFirmwareChecksumsPublic(firmwareData: Data) async -> String {
+        let result = await verifyFirmwareChecksums(firmwareData: firmwareData)
+        return result.message
     }
     
     /// Calculates MS2109 firmware checksums based on the Python reference implementation

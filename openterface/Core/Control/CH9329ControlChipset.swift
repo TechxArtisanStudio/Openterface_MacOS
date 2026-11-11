@@ -145,6 +145,19 @@ class CH9329ControlChipset: BaseControlChipset {
         lastHIDInfoCheckTime = nil
         hasObservedOpenSerialPort = false
     }
+    
+    /// Pause CTS monitoring for firmware operations
+    func pauseCTSMonitoring() {
+        logger.log(content: "⏸️ Pausing CTS monitoring for firmware operation")
+        ctsMonitoringTimer?.invalidate()
+        ctsMonitoringTimer = nil
+    }
+    
+    /// Resume CTS monitoring after firmware operations
+    func resumeCTSMonitoring() {
+        logger.log(content: "▶️ Resuming CTS monitoring after firmware operation")
+        startCTSMonitoring()
+    }
 
     private func checkCTSState() {
         guard USBDevicesManager.shared.isCH9329Connected() else {
