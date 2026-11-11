@@ -15,8 +15,8 @@ final class MCPDeviceStatusTool: MCPToolHandler {
 
             result["hdmi_connected"] = AppStatus.isHDMIConnected
             result["target_connected"] = AppStatus.isTargetConnected
-            result["keyboard_connected"] = AppStatus.isKeyboardConnected as Any
-            result["mouse_connected"] = AppStatus.isMouseConnected as Any
+            result["keyboard_connected"] = SerialPortStatus.shared.isKeyboardConnected
+            result["mouse_connected"] = SerialPortStatus.shared.isMouseConnected
             result["active_protocol"] = AppStatus.activeConnectionProtocol.rawValue
 
             let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
