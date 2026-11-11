@@ -71,6 +71,10 @@ struct FirmwareUpdateView: View {
     @State private var showingFlashConfirmation: Bool = false
     @State private var showingFlashWarning: Bool = false
     @State private var selectedFlashFile: URL?
+    @State private var isVerifying: Bool = false
+    @State private var showingVerifyResult: Bool = false
+    @State private var verifyResultMessage: String = ""
+    @State private var verifySuccess: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     init() {
@@ -145,24 +149,44 @@ struct FirmwareUpdateView: View {
                             Text(currentVersion)
                                 .foregroundColor(.secondary)
                             
-                            // Backup button next to current version
-                            Button(action: {
-                                backupCurrentFirmware()
-                            }) {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 14))
+                            HStack(spacing: 8) {
+                                // Verify button
+                                Button(action: {
+                                    verifyFirmware()
+                                }) {
+                                    Image(systemName: "checkmark.shield")
+                                        .font(.system(size: 14))
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(currentVersion == "Unknown" || isVerifying || firmwareManager.isBackupInProgress || firmwareManager.isUpdateInProgress)
+                                .help("Verify Firmware Integrity")
+                                .overlay(
+                                    isVerifying ?
+                                    ProgressView()
+                                        .scaleEffect(0.5)
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .green))
+                                    : nil
+                                )
+                                
+                                // Backup button next to current version
+                                Button(action: {
+                                    backupCurrentFirmware()
+                                }) {
+                                    Image(systemName: "square.and.arrow.down")
+                                        .font(.system(size: 14))
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(currentVersion == "Unknown" || firmwareManager.isBackupInProgress)
+                                .help("Backup Current Firmware")
+                                .overlay(
+                                    // Show progress indicator when backup is in progress
+                                    firmwareManager.isBackupInProgress ?
+                                    ProgressView()
+                                        .scaleEffect(0.5)
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                                    : nil
+                                )
                             }
-                            .buttonStyle(.borderless)
-                            .disabled(currentVersion == "Unknown" || firmwareManager.isBackupInProgress)
-                            .help("Backup Current Firmware")
-                            .overlay(
-                                // Show progress indicator when backup is in progress
-                                firmwareManager.isBackupInProgress ?
-                                ProgressView()
-                                    .scaleEffect(0.5)
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-                                : nil
-                            )
                         }
                         
                         HStack {
@@ -402,6 +426,11 @@ struct FirmwareUpdateView: View {
         } message: {
             Text("You have selected firmware file: \(selectedFlashFile?.lastPathComponent ?? "<unknown>")\n\nThis will write directly to the device flash memory. Make sure your device is connected and you have the correct firmware file.")
         }
+        .alert("Firmware Verification Result", isPresented: $showingVerifyResult) {
+            Button("OK") { }
+        } message: {
+            Text(verifyResultMessage)
+        }
     }
     
     private func setupFirmwareManagerObservers() {
@@ -522,6 +551,145 @@ struct FirmwareUpdateView: View {
         
         // Step 2: Use FirmwareManager to handle the backup process
         await firmwareManager.backupFirmware(to: backupURL)
+    }
+    
+    // MARK: - Firmware Verify Functions
+    
+    private func verifyFirmware() {
+        Task {
+            await performFirmwareVerify()
+        }
+    }
+    
+    private func performFirmwareVerify() async {
+        let chipset = await MainActor.run { AppStatus.videoChipsetType }
+        guard chipset != .unknown else {
+            await MainActor.run {
+                verifyResultMessage = "No video chipset detected. Ensure the Openterface device is connected."
+                verifySuccess = false
+                showingVerifyResult = true
+            }
+            return
+        }
+        
+        // MS2130S uses external SPI flash, different verification path
+        guard chipset == .ms2109 || chipset == .ms2109s else {
+            await MainActor.run {
+                verifyResultMessage = "Firmware verification is not yet supported for MS2130S devices."
+                verifySuccess = false
+                showingVerifyResult = true
+            }
+            return
+        }
+        
+        await MainActor.run {
+            isVerifying = true
+        }
+        
+        let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+        
+        // Pause all periodic operations that could interfere with firmware read
+        HALIntegrationManager.shared.pausePeriodicHALUpdates()
+        SerialPortManager.shared.pauseSDCardPolling()
+        
+        let controlChipsetType = await MainActor.run { AppStatus.controlChipsetType }
+        if controlChipsetType == .ch9329 {
+            if let ch9329 = HardwareAbstractionLayer.shared.getCurrentControlChipset() as? CH9329ControlChipset {
+                ch9329.pauseCTSMonitoring()
+            }
+        }
+        
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        // Determine firmware size
+        let firmwareSize = await firmwareManager.determineFirmwareSize()
+        guard firmwareSize > 0 else {
+            // Resume all operations
+            HALIntegrationManager.shared.resumePeriodicHALUpdates()
+            SerialPortManager.shared.resumeSDCardPolling()
+            if controlChipsetType == .ch9329 {
+                if let ch9329 = HardwareAbstractionLayer.shared.getCurrentControlChipset() as? CH9329ControlChipset {
+                    ch9329.resumeCTSMonitoring()
+                }
+            }
+            await MainActor.run {
+                isVerifying = false
+                verifyResultMessage = "Could not determine firmware size."
+                verifySuccess = false
+                showingVerifyResult = true
+            }
+            return
+        }
+        
+        // Read firmware back from device in chunks (max 255 bytes per read)
+        var readBackData = Data()
+        var address: UInt16 = 0
+        
+        while readBackData.count < firmwareSize {
+            let chunkSize = min(255, firmwareSize - readBackData.count)
+            guard let chunk = hidManager.readEeprom(address: address, length: UInt8(chunkSize)) else {
+                // Resume all operations
+                HALIntegrationManager.shared.resumePeriodicHALUpdates()
+                SerialPortManager.shared.resumeSDCardPolling()
+                if controlChipsetType == .ch9329 {
+                    if let ch9329 = HardwareAbstractionLayer.shared.getCurrentControlChipset() as? CH9329ControlChipset {
+                        ch9329.resumeCTSMonitoring()
+                    }
+                }
+                await MainActor.run {
+                    isVerifying = false
+                    verifyResultMessage = "Failed to read firmware at address 0x\(String(format: "%04X", address)). Device may not be responding."
+                    verifySuccess = false
+                    showingVerifyResult = true
+                }
+                return
+            }
+            readBackData.append(chunk)
+            address += UInt16(chunkSize)
+            
+            // Small delay between reads to ensure device stability
+            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        }
+        
+        // Resume all periodic operations
+        HALIntegrationManager.shared.resumePeriodicHALUpdates()
+        SerialPortManager.shared.resumeSDCardPolling()
+        if controlChipsetType == .ch9329 {
+            if let ch9329 = HardwareAbstractionLayer.shared.getCurrentControlChipset() as? CH9329ControlChipset {
+                ch9329.resumeCTSMonitoring()
+            }
+        }
+        
+        // Verify checksums
+        let checksumResult = await firmwareManager.verifyFirmwareChecksumsPublic(firmwareData: readBackData)
+        
+        let chipsetLabel: String
+        switch chipset {
+        case .ms2109: chipsetLabel = "MS2109"
+        case .ms2109s: chipsetLabel = "MS2109S"
+        default: chipsetLabel = "Unknown"
+        }
+        
+        let checksumValid = checksumResult.contains("✓") && !checksumResult.contains("≠")
+        
+        let resultMessage = """
+        Firmware Verification Report
+        ============================
+        Chipset: \(chipsetLabel)
+        Firmware version: \(currentVersion)
+        Firmware size: \(firmwareSize) bytes
+        Data read: \(readBackData.count) bytes
+
+        Checksum Result:
+        \(checksumResult)
+        """
+        
+        await MainActor.run {
+            isVerifying = false
+            verifyResultMessage = resultMessage
+            verifySuccess = checksumValid
+            showingVerifyResult = true
+        }
     }
     
     // MARK: - Firmware Flash Functions
