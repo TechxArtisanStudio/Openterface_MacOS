@@ -19,6 +19,10 @@ final class MCPDeviceStatusTool: MCPToolHandler {
             result["mouse_connected"] = SerialPortStatus.shared.isMouseConnected
             result["active_protocol"] = AppStatus.activeConnectionProtocol.rawValue
 
+            // Serial port info
+            result["serial_port_name"] = SerialPortStatus.shared.serialPortName
+            result["serial_port_baudrate"] = SerialPortStatus.shared.serialPortBaudRate
+
             let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
             if let resolution = hidManager.getResolution() {
                 result["resolution"] = ["width": resolution.width, "height": resolution.height]
