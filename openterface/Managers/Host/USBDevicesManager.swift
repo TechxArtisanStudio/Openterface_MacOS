@@ -270,6 +270,11 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 // Update AppStatus with the video chip device
                 AppStatus.videoChipDevice = videoChipDevice
                 logger.log(content: "Detected video chipset type: \(videoType)")
+                
+                // Open HID device now that video chip is detected
+                let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+                hidManager.startHID()
+                logger.log(content: "HID device opened for video chipset")
             }
             
             // Determine control chipset type with CH32V208 priority
@@ -305,6 +310,11 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 videoChipDevice = device
                 AppStatus.videoChipDevice = videoChipDevice
                 logger.log(content: "Detected video chipset type: \(videoType)")
+                
+                // Open HID device now that video chip is detected
+                let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
+                hidManager.startHID()
+                logger.log(content: "HID device opened for video chipset")
             }
             
             if controlType != .unknown && controlChipDevice == nil {
