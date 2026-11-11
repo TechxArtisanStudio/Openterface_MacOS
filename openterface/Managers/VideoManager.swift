@@ -94,6 +94,9 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// Last video session start time
     private var lastVideoSessionStartTime = Date(timeIntervalSince1970: 0)
     
+    /// Last format enumeration time (to prevent rapid re-enumeration)
+    private var lastFormatEnumerationTime = Date(timeIntervalSince1970: 0)
+    
     /// Minimum interval for video session start (1 second)
     private let videoSessionStartMinInterval: TimeInterval = 1.0
     
@@ -627,6 +630,13 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
     /// Enumerates and caches all available video formats from detected video devices
     func enumerateAvailableVideoFormats() {
+        // Prevent rapid re-enumeration (within 2 seconds)
+        let now = Date()
+        if now.timeIntervalSince(lastFormatEnumerationTime) < 2.0 {
+            return
+        }
+        lastFormatEnumerationTime = now
+        
         logger.log(content: "Enumerating available video formats...")
 
         // Get available video devices
@@ -647,22 +657,21 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         for device in videoDevices {
             logger.log(content: "\n=== Device: \(device.localizedName) ===")
-            logger.log(content: "Total formats: \(device.formats.count)")
-
-            for (index, format) in device.formats.enumerated() {
+            
+            // Group formats by resolution and find max fps for each
+            var resolutionMap: [String: Double] = [:]
+            for format in device.formats {
                 let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-                let codecType = CMFormatDescriptionGetMediaSubType(format.formatDescription)
-                let pixelFormat = String(format: "0x%X", codecType)
-
-                // Get frame rate ranges
-                let frameRateRanges = format.videoSupportedFrameRateRanges
-                var frameRateInfo = ""
-                for range in frameRateRanges {
-                    frameRateInfo += "\(range.minFrameRate)-\(range.maxFrameRate)fps "
-                }
-
-                logger.log(content: "Format \(index): \(dimensions.width)x\(dimensions.height) @ \(frameRateInfo)- \(pixelFormat)")
+                let key = "\(dimensions.width)x\(dimensions.height)"
+                let maxFps = format.videoSupportedFrameRateRanges.map { $0.maxFrameRate }.max() ?? 0
+                resolutionMap[key] = max(resolutionMap[key] ?? 0, maxFps)
             }
+            
+            // Sort by resolution (width desc) and show compact summary
+            let sortedResolutions = resolutionMap.sorted { $0.key > $1.key }
+            let formatSummary = sortedResolutions.map { "\($0.key)@\(Int($0.value))fps" }.joined(separator: ", ")
+            
+            logger.log(content: "Formats: \(device.formats.count) total, \(resolutionMap.count) resolutions: \(formatSummary)")
 
             for format in device.formats {
                 let videoFormat = format.toVideoFormat()
@@ -675,7 +684,6 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                 }
             }
 
-            logger.log(content: "Found \(device.formats.count) formats from device: \(device.localizedName)")
         }
 
         // Sort by resolution (desc), then frame rate (desc), then pixel format
