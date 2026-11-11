@@ -132,6 +132,7 @@ class USBDevicesManager: USBDevicesManagerProtocol {
             }
 
             let deviceInfo = USBDeviceInfo(productName: productName, manufacturer: manufacturer, vendorID: vendorID, productID: productID, locationID: locationIDString, speed: speedString)
+            logger.log(content: "🔍 USB Device: \(productName) (VID: 0x\(String(format: "%04X", vendorID)), PID: 0x\(String(format: "%04X", productID)))")
             devices.append(deviceInfo)
         }
         
@@ -523,10 +524,12 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                 
                 for _d in AppStatus.USBDevices {
                     if _d.locationID.hasPrefix(ex_) {
-
                         // First check if there is already a group with that prefix
                         if let index = groupedDevices.firstIndex(where: { $0.first?.locationID.hasPrefix(ex_) == true }) {
-                            groupedDevices[index].append(_d)
+                            // Only add if not already in the group
+                            if !groupedDevices[index].contains(where: { $0.locationID == _d.locationID }) {
+                                groupedDevices[index].append(_d)
+                            }
                         } else {
                             // Create a new array to add to groups
                             groupedDevices.append([_d])
@@ -557,9 +560,18 @@ class USBDevicesManager: USBDevicesManagerProtocol {
                         defaultVideoDevice = group.first { $0.productName.contains("Openterface") || $0.productName.contains("Unknown Capture")}
                     }
                     
-                    // Look for serial device if not found yet
+                    // Look for serial/control device if not found yet
+                    // Check by product name first, then by chipset type
                     if defaultSerialDevice == nil {
-                        defaultSerialDevice = group.first { $0.productName.contains("Serial") }
+                        defaultSerialDevice = group.first { device in
+                            // Check by product name
+                            if device.productName.contains("Serial") {
+                                return true
+                            }
+                            // Check by chipset type (CH9329 or CH32V208)
+                            let controlType = getControlChipsetType(vendorId: device.vendorID, productId: device.productID)
+                            return controlType != .unknown
+                        }
                     }
                     
                     // If both found, no need to continue searching
