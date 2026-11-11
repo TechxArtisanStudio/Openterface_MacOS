@@ -95,7 +95,6 @@ class MS2109SVideoChipset: BaseVideoChipset {
             if (device.vendorID == MS2109SVideoChipset.VENDOR_ID &&
                 device.productID == MS2109SVideoChipset.PRODUCT_ID) ||
                device.productName.lowercased().contains("unknown capture card") {
-                logger.log(content: "🔍 MS2109S device detected: \(device.productName)")
                 return true
             }
         }

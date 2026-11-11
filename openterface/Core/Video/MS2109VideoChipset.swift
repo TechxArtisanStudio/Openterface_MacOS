@@ -92,7 +92,6 @@ class MS2109VideoChipset: BaseVideoChipset {
         for device in AppStatus.USBDevices {
             if device.vendorID == MS2109VideoChipset.VENDOR_ID &&
                device.productID == MS2109VideoChipset.PRODUCT_ID {
-                logger.log(content: "🔍 MS2109 device detected: \(device.productName)")
                 return true
             }
         }
