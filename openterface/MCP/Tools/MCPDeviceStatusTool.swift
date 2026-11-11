@@ -23,14 +23,25 @@ final class MCPDeviceStatusTool: MCPToolHandler {
             result["serial_port_name"] = SerialPortStatus.shared.serialPortName
             result["serial_port_baudrate"] = SerialPortStatus.shared.serialPortBaudRate
 
+            // Keyboard lock states
+            result["num_lock"] = SerialPortStatus.shared.isNumLockOn
+            result["caps_lock"] = SerialPortStatus.shared.isCapLockOn
+            result["scroll_lock"] = SerialPortStatus.shared.isScrollOn
+
             let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
             if let resolution = hidManager.getResolution() {
-                result["resolution"] = ["width": resolution.width, "height": resolution.height]
+                result["input_resolution"] = ["width": resolution.width, "height": resolution.height]
             }
             if let fps = hidManager.getFps() {
                 result["fps"] = fps
             }
             result["hdmi_signal"] = hidManager.getHDMIStatus()
+
+            // Capture resolution (what the KVM is actually capturing)
+            let captureDims = VideoManager.shared.dimensions
+            if captureDims.width > 0 && captureDims.height > 0 {
+                result["capture_resolution"] = ["width": Int(captureDims.width), "height": Int(captureDims.height)]
+            }
 
             if let version = hidManager.getVersion() {
                 result["firmware_version"] = version

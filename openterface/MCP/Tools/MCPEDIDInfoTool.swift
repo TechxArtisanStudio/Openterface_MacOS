@@ -61,7 +61,7 @@ final class MCPEDIDInfoTool: MCPToolHandler {
 
         let hidManager = DependencyContainer.shared.resolve(HIDManagerProtocol.self)
         if let resolution = hidManager.getResolution() {
-            info["resolution"] = ["width": resolution.width, "height": resolution.height]
+            info["input_resolution"] = ["width": resolution.width, "height": resolution.height]
         }
         if let version = hidManager.getVersion() {
             info["firmware_version"] = version
