@@ -13,6 +13,8 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private var latestPixelBuffer: CVPixelBuffer?
     // Timestamp of the last processed frame (seconds)
     private var lastProcessedTime: TimeInterval? = nil
+    // Timestamp of the last received frame (for health check)
+    private(set) var lastFrameTime: Date = Date(timeIntervalSince1970: 0)
     private let bufferQueue = DispatchQueue(label: "VideoOutputDelegate.bufferQueue", qos: .userInitiated)
     
     /// Initializes the video output delegate with a reference to the video manager
@@ -23,6 +25,9 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // Update last frame time for health check
+        lastFrameTime = Date()
+        
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }

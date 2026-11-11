@@ -331,12 +331,46 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             return
         }
 
-        // If video session is running AND has at least one input, skip — it's already working.
+        // If video session is running AND has at least one input, check if device has changed
         // If it's running but has NO inputs, it was started before hardware was available.
-        // Stop the empty session and re-prepare with the newly detected hardware.
         if captureSession.isRunning && !captureSession.inputs.isEmpty {
-            logger.log(content: "Video already running, skipping preparation")
-            return
+            // Check if we've received frames recently (within 3 seconds)
+            // If not, the session is in a zombie state and needs to be restarted
+            let timeSinceLastFrame = Date().timeIntervalSince(videoOutputDelegate?.lastFrameTime ?? Date(timeIntervalSince1970: 0))
+            if timeSinceLastFrame > 3.0 {
+                logger.log(content: "Video session running but no frames received for \(String(format: "%.1f", timeSinceLastFrame))s, restarting")
+                captureSession.stopRunning()
+            } else {
+                // Get the current input's device unique ID
+                if let currentInput = captureSession.inputs.first as? AVCaptureDeviceInput {
+                    let currentDeviceID = currentInput.device.uniqueID
+                    
+                    // Find the matching video device to compare
+                    let videoDeviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .externalUnknown]
+                    let videoDiscoverySession = AVCaptureDevice.DiscoverySession(
+                        deviceTypes: videoDeviceTypes,
+                        mediaType: .video,
+                        position: .unspecified
+                    )
+                    let videoDevices = findMatchingVideoDevices(from: videoDiscoverySession.devices)
+                    
+                    if let newDevice = videoDevices.first {
+                        if newDevice.uniqueID == currentDeviceID {
+                            logger.log(content: "Video already running with same device, skipping preparation")
+                            return
+                        } else {
+                            logger.log(content: "Video device changed (old: \(currentDeviceID), new: \(newDevice.uniqueID)), restarting session")
+                            captureSession.stopRunning()
+                        }
+                    } else {
+                        logger.log(content: "Video already running, skipping preparation")
+                        return
+                    }
+                } else {
+                    logger.log(content: "Video already running, skipping preparation")
+                    return
+                }
+            }
         }
 
         if captureSession.isRunning && captureSession.inputs.isEmpty {
