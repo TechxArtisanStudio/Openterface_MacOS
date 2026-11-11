@@ -705,9 +705,12 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
         self.stopSDCardPolling()
         logger.log(content: "SD card polling stopped")
         
-        // Dispatch close to background queue to avoid blocking on CH32 and other slow serial chips
+        // Clear serialPort reference immediately to prevent other code from using it
         let portToClose = self.serialPort
+        self.serialPort = nil
         logger.log(content: "Dispatching serial port close to background...")
+        
+        // Dispatch close to background queue to avoid blocking on CH32 and other slow serial chips
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.logger.log(content: "Background: closing serial port...")
             portToClose?.close()
