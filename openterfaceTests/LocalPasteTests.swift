@@ -1,4 +1,5 @@
 import AppKit
+import ORSSerial
 import XCTest
 @testable import openterface
 
@@ -193,5 +194,142 @@ final class KeyboardInputReleaseTests: XCTestCase {
         XCTAssertEqual(mapper.releases.count, 1)
         XCTAssertTrue(mapper.releases[0].allSatisfy { $0 == 255 })
         XCTAssertTrue(manager.pressedKeys.allSatisfy { $0 == 255 })
+    }
+}
+
+/// End-to-end byte-level tests: ClipboardManager -> real KeyboardManager ->
+/// real KeyboardMapper -> captured serial HID reports.
+final class LocalPasteHIDReportTests: XCTestCase {
+    private final class RecordingSerialPortManager: SerialPortManagerProtocol {
+        var commands: [[UInt8]] = []
+        var isDeviceReady: Bool = true
+        var baudrate: Int = 115200
+        var serialPort: ORSSerialPort? { nil }
+        var lastSerialDate: Date? { nil }
+
+        func sendAsyncCommand(command: [UInt8], force: Bool) { commands.append(command) }
+
+        func tryOpenSerialPort(priorityBaudrate: Int?) {}
+        func tryOpenSerialPortForCH32V208() {}
+        func tryOpenSerialPortForCH32V208Sync(timeout: TimeInterval) -> Bool { true }
+        func closeSerialPort() {}
+        func openSerialPort(baudrate: Int) {}
+        func pauseConnectionAttempts() {}
+        func resumeConnectionAttempts() {}
+        func getChipParameterCfg() {}
+        func resetHidChip() {}
+        func resetHidChipToFactory(completion: @escaping (Bool) -> Void) { completion(true) }
+        func getHidInfo() {}
+        func setSdToHost(force: Bool, completion: @escaping (Bool) -> Void) { completion(true) }
+        func setSdToTarget(force: Bool, completion: @escaping (Bool) -> Void) { completion(true) }
+        func querySdDirection(force: Bool, completion: @escaping (SDCardDirection?) -> Void) { completion(nil) }
+        func querySdDirectionSync(timeout: TimeInterval, force: Bool) -> SDCardDirection? { nil }
+        func setDTR(_ enabled: Bool) {}
+        func lowerDTR() {}
+        func raiseDTR() {}
+        func setRTS(_ enabled: Bool) -> Bool { true }
+        func lowerRTS() -> Bool { true }
+        func raiseRTS() -> Bool { true }
+    }
+
+    private var serial: RecordingSerialPortManager!
+    private var previousSerial: SerialPortManagerProtocol?
+    private var previousKeyboardManager: KeyboardManagerProtocol?
+    private var previousPasteBehavior: PasteBehavior!
+    private var previousKeyboardLayout: KeyboardLayout!
+
+    override func setUp() {
+        super.setUp()
+
+        let container = DependencyContainer.shared
+        if container.isRegistered(SerialPortManagerProtocol.self) {
+            previousSerial = container.resolve(SerialPortManagerProtocol.self)
+        }
+        serial = RecordingSerialPortManager()
+        container.register(SerialPortManagerProtocol.self, instance: serial as SerialPortManagerProtocol)
+
+        if container.isRegistered(KeyboardManagerProtocol.self) {
+            previousKeyboardManager = container.resolve(KeyboardManagerProtocol.self)
+        }
+        let manager = KeyboardManager(monitorEvents: false, pollCapsLock: false)
+        container.register(KeyboardManagerProtocol.self, instance: manager as KeyboardManagerProtocol)
+        serial.commands.removeAll()
+
+        previousPasteBehavior = UserSettings.shared.pasteBehavior
+        previousKeyboardLayout = UserSettings.shared.keyboardLayout
+        UserSettings.shared.pasteBehavior = .alwaysPassToTarget
+    }
+
+    override func tearDown() {
+        UserSettings.shared.pasteBehavior = previousPasteBehavior
+        UserSettings.shared.keyboardLayout = previousKeyboardLayout
+
+        let container = DependencyContainer.shared
+        if let previousKeyboardManager {
+            container.register(KeyboardManagerProtocol.self, instance: previousKeyboardManager)
+        } else {
+            container.unregister(KeyboardManagerProtocol.self)
+        }
+        if let previousSerial {
+            container.register(SerialPortManagerProtocol.self, instance: previousSerial)
+        } else {
+            container.unregister(SerialPortManagerProtocol.self)
+        }
+
+        serial = nil
+        previousSerial = nil
+        previousKeyboardManager = nil
+        super.tearDown()
+    }
+
+    func testMacLocalPasteEmitsGuiPlusVHIDReport() {
+        UserSettings.shared.keyboardLayout = .mac
+
+        ClipboardManager.shared.handlePasteRequest(with: "host clipboard text")
+
+        assertPasteReports(modifierByte: 0x08)
+    }
+
+    func testWindowsLocalPasteEmitsControlPlusVHIDReport() {
+        UserSettings.shared.keyboardLayout = .windows
+
+        ClipboardManager.shared.handlePasteRequest(with: "host clipboard text")
+
+        assertPasteReports(modifierByte: 0x01)
+    }
+
+    func testEmptyClipboardTextSkipsDialogAndEmitsLocalPaste() {
+        UserSettings.shared.keyboardLayout = .mac
+        UserSettings.shared.pasteBehavior = .askEveryTime
+
+        ClipboardManager.shared.handlePasteRequest(with: "")
+
+        assertPasteReports(modifierByte: 0x08)
+    }
+
+    private func assertPasteReports(
+        modifierByte: UInt8,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(serial.commands.count, 3, "expected pre-release, press and release reports", file: file, line: line)
+        guard serial.commands.count == 3 else { return }
+        let preRelease = serial.commands[0]
+        let press = serial.commands[1]
+        let release = serial.commands[2]
+
+        for report in [preRelease, press, release] {
+            XCTAssertEqual(report.count, 14, file: file, line: line)
+            XCTAssertEqual(Array(report.prefix(5)), [0x57, 0xAB, 0x00, 0x02, 0x08], file: file, line: line)
+            XCTAssertEqual(report[13], UInt8(report.prefix(13).reduce(0) { $0 + Int($1) } & 0xFF), "checksum mismatch", file: file, line: line)
+        }
+
+        XCTAssertEqual(Array(preRelease[5...12]), Array(repeating: 0, count: 8), "pre-release report must clear modifiers and all key slots", file: file, line: line)
+
+        XCTAssertEqual(press[5], modifierByte, "modifier byte", file: file, line: line)
+        XCTAssertEqual(press[7], 0x19, "HID scancode for V", file: file, line: line)
+        XCTAssertEqual(Array(press[6...6]) + Array(press[8...12]), [0, 0, 0, 0, 0, 0], "no extra keys in press report", file: file, line: line)
+
+        XCTAssertEqual(Array(release[5...12]), Array(repeating: 0, count: 8), "release report must clear modifiers and all key slots", file: file, line: line)
     }
 }
