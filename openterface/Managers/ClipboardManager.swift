@@ -210,9 +210,13 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     // MARK: - Paste Detection and Confirmation
     
     func handlePasteRequest() {
-        let pasteboard = NSPasteboard.general
+        handlePasteRequest(from: .general)
+    }
+
+    func handlePasteRequest(from pasteboard: NSPasteboard) {
         guard let content = pasteboard.string(forType: .string), !content.isEmpty else {
-            logger.log(content: "📋 No content to paste from clipboard")
+            logger.log(content: "📋 Host clipboard has no pasteable text; defaulting to Local Paste")
+            performLocalPaste()
             return
         }
         
@@ -220,6 +224,12 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
     }
     
     func handlePasteRequest(with content: String) {
+        guard !content.isEmpty else {
+            logger.log(content: "📋 Host clipboard text is empty; defaulting to Local Paste")
+            performLocalPaste()
+            return
+        }
+
         logger.log(content: "📋 Paste request detected with content: \(content.prefix(50))...")
         
         // Check user's paste behavior preference
@@ -227,7 +237,7 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
         case .alwaysPasteToTarget:
             performPaste(content: content)
         case .alwaysPassToTarget:
-            passThroughToHost()
+            performLocalPaste()
         case .askEveryTime:
             showPasteConfirmation(for: content)
         }
@@ -241,30 +251,40 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
         }
         
         windowController.showConfirmation(for: content) { [weak self] action in
-            switch action {
-            case .pasteToTarget:
-                self?.performPaste(content: content)
-            case .passToHost:
-                self?.passThroughToHost()
-            case .cancel:
-                self?.logger.log(content: "📋 Paste cancelled by user")
-            }
+            self?.handlePasteAction(action, content: content)
         }
     }
-    
-    private func passThroughToHost() {
-        logger.log(content: "📋 Passing paste event to host system")
+
+    func handlePasteAction(_ action: PasteAction, content: String) {
+        switch action {
+        case .pasteToTarget:
+            performPaste(content: content)
+        case .passToHost:
+            performLocalPaste()
+        case .cancel:
+            logger.log(content: "📋 Paste cancelled by user")
+        }
+    }
+
+    private func performLocalPaste() {
+        logger.log(content: "📋 Performing Local Paste on target")
         
-        // Release any held modifier keys before passing through to ensure clean operation
+        // The original host event was consumed when the paste choice was presented,
+        // so send a fresh target-side paste shortcut after clearing held modifiers.
         let keyboardManager = DependencyContainer.shared.resolve(KeyboardManagerProtocol.self)
         keyboardManager.releaseAllModifierKeysForPaste()
-        
-        // Let the system handle the paste normally
-        // This essentially does nothing, allowing the natural paste to occur
-        DispatchQueue.main.async {
-            // We could potentially trigger a normal paste here if needed
-            // For now, just log that we're passing through
+
+        let pasteModifiers: NSEvent.ModifierFlags
+        switch userSettings.keyboardLayout {
+        case .mac:
+            pasteModifiers = .command
+        case .windows, .linux:
+            pasteModifiers = .control
         }
+
+        keyboardManager.sendKeyboardInput(
+            KeyboardInput(keyCode: 9, modifiers: pasteModifiers) // kVK_ANSI_V
+        )
     }
     
     private func performPaste(content: String) {
