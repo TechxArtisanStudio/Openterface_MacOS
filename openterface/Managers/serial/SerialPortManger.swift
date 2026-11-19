@@ -25,6 +25,8 @@ import Foundation
 import ORSSerial
 import os.log
 import Combine
+import IOKit
+import IOKit.usb
 
 @propertyWrapper
 final class ThreadSafe<T> {
@@ -1559,29 +1561,74 @@ class SerialPortManager: NSObject, ORSSerialPortDelegate, SerialPortManagerProto
     /// Returns nil if no match found — the caller will retry later rather than connecting
     /// to a wrong device (which triggers destructive factory reset loops).
     private func findBestMatchingSerialPort(for usbDevice: USBDeviceInfo) -> ORSSerialPort? {
-        // Look for serial ports that contain "usbserial" (the typical pattern for USB serial devices)
         let usbSerialPorts = self.serialPorts.filter{ $0.path.contains("usbserial") || $0.path.contains("usbmodem")}
 
-        if usbSerialPorts.count == 1 {
-            // If there's only one USB serial port, it's likely the one we want
-            logger.log(content: "Found single USB serial port: \(usbSerialPorts[0].path)")
-            return usbSerialPorts.first
-        } else if usbSerialPorts.count > 1 {
-            // Multiple USB serial ports - try to find the best match
-            logger.log(content: "Found \(usbSerialPorts.count) USB serial ports, attempting to find best match")
+        guard !usbSerialPorts.isEmpty else {
+            // Do NOT fall back to non-usbserial ports; connecting to the wrong device
+            // (e.g. /dev/cu.debug-console) triggers factory reset loops.
+            logger.log(content: "No USB serial ports found for device: \(usbDevice.productName) (will retry)")
+            return nil
+        }
 
-            // For now, return the first one as we don't have enough correlation info
-            // This could be enhanced in the future with more sophisticated matching
-            if let firstPort = usbSerialPorts.first {
-                logger.log(content: "Selected first USB serial port: \(firstPort.path)")
-                return firstPort
+        let expectedLocationID = USBDevicesManager.shared.getExpectedSerialDevicePath()
+        let candidates = usbSerialPorts.map { (port: $0, locationID: usbLocationID(forSerialPortPath: $0.path)) }
+
+        if let selected = Self.selectSerialPort(candidates: candidates, expectedLocationID: expectedLocationID) {
+            logger.log(content: "Selected serial port \(selected.path) for \(usbDevice.productName) (expected USB location: \(expectedLocationID ?? "unknown"))")
+            return selected
+        }
+
+        logger.log(content: "No serial port matches expected USB location \(expectedLocationID ?? "unknown") for \(usbDevice.productName); refusing to connect to a wrong device (will retry)")
+        return nil
+    }
+
+    /// Selection policy kept pure so it can be unit tested without IOKit or hardware.
+    /// With a known expected location, only a port whose USB identity matches is accepted;
+    /// if identities could be resolved but none match, returns nil so the caller retries
+    /// instead of guessing. Without identity information, falls back to the first port.
+    static func selectSerialPort<T>(candidates: [(port: T, locationID: String?)], expectedLocationID: String?) -> T? {
+        guard !candidates.isEmpty else { return nil }
+
+        if let expectedLocationID {
+            if let match = candidates.first(where: { $0.locationID == expectedLocationID }) {
+                return match.port
+            }
+            if candidates.contains(where: { $0.locationID != nil }) {
+                return nil
             }
         }
 
-        // No USB serial ports found — will retry when ports are available.
-        // Do NOT fall back to non-usbserial ports; connecting to the wrong device
-        // (e.g. /dev/cu.debug-console) triggers factory reset loops.
-        logger.log(content: "No USB serial ports found for device: \(usbDevice.productName) (will retry)")
+        return candidates.first?.port
+    }
+
+    /// Resolves the USB locationID of the device backing a serial callout path by walking
+    /// the IOService parent chain from IOSerialBSDClient up to its USB device ancestor.
+    private func usbLocationID(forSerialPortPath path: String) -> String? {
+        guard let matching = IOServiceMatching("IOSerialBSDClient") else { return nil }
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return nil }
+        defer { IOObjectRelease(iterator) }
+
+        while case let service = IOIteratorNext(iterator), service != IO_OBJECT_NULL {
+            defer { IOObjectRelease(service) }
+            guard let calloutPath = IORegistryEntryCreateCFProperty(service, "IOCalloutDevice" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String,
+                  calloutPath == path else { continue }
+
+            var entry: io_registry_entry_t = service
+            IOObjectRetain(entry)
+            while entry != IO_OBJECT_NULL {
+                if let location = IORegistryEntryCreateCFProperty(entry, kUSBDevicePropertyLocationID as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber {
+                    IOObjectRelease(entry)
+                    return String(format: "0x%08x", location.uint32Value)
+                }
+                var parent: io_registry_entry_t = IO_OBJECT_NULL
+                let kr = IORegistryEntryGetParentEntry(entry, kIOServicePlane, &parent)
+                IOObjectRelease(entry)
+                guard kr == KERN_SUCCESS else { return nil }
+                entry = parent
+            }
+            return nil
+        }
         return nil
     }
 
