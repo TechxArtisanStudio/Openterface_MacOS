@@ -46,6 +46,8 @@ class MouseMapper {
         command.append(dxByte)
         command.append(dyByte)
         command.append(wheelMovement) // scroll up 0x01-0x7F; scroll down: 0x81-0xFF
+        
+        logger.log(content: "🖱️ Sending relative mouse HID report: dx=\(dx)(0x\(String(format: "%02X", dxByte))), dy=\(dy)(0x\(String(format: "%02X", dyByte))), btn=0x\(String(format: "%02X", mouseEvent)), wheel=0x\(String(format: "%02X", wheelMovement))")
         serialPortManager.sendAsyncCommand(command: command)
     }
     

@@ -48,6 +48,7 @@ class PlayerView: NSView, NSWindowDelegate {
 
         setupLayer()
         observe()
+        startFrameAvailabilityTimer()
 
         // Add notification listener to update view when session starts/stops
         NotificationCenter.default.addObserver(
@@ -86,7 +87,54 @@ class PlayerView: NSView, NSWindowDelegate {
             self.addSubview(metalView)
         }
 
+        // The Metal view is opaque and covers the background sublayer. Keep it
+        // hidden until a live frame arrives so the placeholder image is shown
+        // at launch (no device) and after the device is unplugged.
+        applyFrameAvailability(isLive: videoMetalView?.hasLiveFrame ?? false)
+
         self.layer?.masksToBounds = true
+    }
+
+    /// Shows the Metal view only while live frames are arriving; otherwise
+    /// reveals the placeholder image underneath.
+    /// `VideoMetalView.hasLiveFrame` is the single source of truth, sampled by
+    /// a 4 Hz timer — notifications alone proved unreliable during startup
+    /// (a frame can land before this view exists, or a transition can be
+    /// missed), which left the Metal view hidden forever.
+    private var frameAvailabilityTimer: Timer?
+    private var lastAppliedLiveState: Bool = false
+    private var hasAppliedFrameAvailability = false
+
+    private func startFrameAvailabilityTimer() {
+        guard frameAvailabilityTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            self?.syncFrameAvailability()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        frameAvailabilityTimer = timer
+    }
+
+    private func syncFrameAvailability() {
+        applyFrameAvailability(isLive: videoMetalView?.hasLiveFrame ?? false)
+    }
+
+    private func applyFrameAvailability(isLive: Bool) {
+        if hasAppliedFrameAvailability && isLive == lastAppliedLiveState { return }
+        hasAppliedFrameAvailability = true
+        lastAppliedLiveState = isLive
+        logger.log(content: isLive
+                   ? "🎬 Live frames detected — showing Metal video output"
+                   : "🖼️ No live frames — showing placeholder image")
+        videoMetalView?.isHidden = !isLive
+        playerBackgroundImage.opacity = 1.0
+        playerBackgroundImage.isHidden = isLive
+    }
+
+    @objc func handleVideoFrameAvailabilityChanged(_ notification: Notification) {
+        guard (notification.object as? VideoMetalView) === videoMetalView else { return }
+        DispatchQueue.main.async {
+            self.syncFrameAvailability()
+        }
     }
     
     func observe() {
@@ -103,6 +151,8 @@ class PlayerView: NSView, NSWindowDelegate {
         playViewNtf.addObserver(self, selector: #selector(handleToolbarVisibilityChanged(_:)), name: .toolbarVisibilityChanged, object: nil)
         // Show a warning tip when the detected HDMI input fps exceeds the chipset hardware max.
         playViewNtf.addObserver(self, selector: #selector(handleUnsupportedFrameRate(_:)), name: Notification.Name("UnsupportedInputFrameRate"), object: nil)
+        // Toggle between live Metal output and the placeholder image.
+        playViewNtf.addObserver(self, selector: #selector(handleVideoFrameAvailabilityChanged(_:)), name: .videoFrameAvailabilityChanged, object: nil)
     }
     
         @objc func handleUnsupportedFrameRate(_ notification: Notification) {
@@ -243,6 +293,7 @@ class PlayerView: NSView, NSWindowDelegate {
     }
     
     deinit {
+        frameAvailabilityTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -258,6 +309,9 @@ class PlayerView: NSView, NSWindowDelegate {
     // When the capture session stops running, call this method
     @objc func captureSessionDidStopRunning(_ notification: Notification) {
         logger.log(content: "Capture session stopped running, updating view")
+        // Drop the cached frame; otherwise the view keeps repainting the last
+        // frame received before the session stopped.
+        videoMetalView?.clearFrame()
         DispatchQueue.main.async {
             self.needsLayout = true
             self.needsDisplay = true
@@ -574,7 +628,7 @@ class PlayerView: NSView, NSWindowDelegate {
     override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
 
-        playerBackgroundImage.isHidden = false
+        playerBackgroundImage.isHidden = videoMetalView?.hasLiveFrame ?? false
         playerBackgroundImage.frame = self.bounds
         
         // Post notification that window resize has ended
@@ -586,7 +640,11 @@ class PlayerView: NSView, NSWindowDelegate {
     
     override func viewWillStartLiveResize() {
         super.viewWillStartLiveResize()
-        playerBackgroundImage.isHidden = true
+        // During a live resize the zoomed Metal layer can expose the placeholder
+        // edges, so hide it — but keep it visible if there is no live video.
+        if videoMetalView?.hasLiveFrame == true {
+            playerBackgroundImage.isHidden = true
+        }
     }
     
     /// Handles auto-zooming based on active video rect and blank areas after window resize

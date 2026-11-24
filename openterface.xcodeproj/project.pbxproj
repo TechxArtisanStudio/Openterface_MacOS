@@ -11,6 +11,8 @@
 		E6BB6C72A07BAA6B58427FB5 /* YUVToRGBShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = 9DE73DF20E9B699461C6DE9A /* YUVToRGBShader.metal */; };
 		668607829090B314E704FE4C /* MetalTextureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 266097269231D624750735AF /* MetalTextureManager.swift */; };
 		096BC0DC3EF26CF775476321 /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6321752D533F2C3F5DACEC0F /* MetalRenderer.swift */; };
+		7A1B2C3D4E5F60718293A4B5 /* VideoRecoveryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F60718293A4B6 /* VideoRecoveryPolicy.swift */; };
+		7A1B2C3D4E5F60718293A4B7 /* VideoHotplugRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F60718293A4B8 /* VideoHotplugRecoveryTests.swift */; };
 		B1C2D3E4F5A6B7C8D9E0F1A2 /* ObjCExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* ObjCExceptionCatcher.m */; };
 		1E0D3999BD765807EBBCC856 /* TaskStepTraceDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD664382B7A4996C4BF55CEE /* TaskStepTraceDialog.swift */; };
 		289B999F2375451B976CE92C /* ChatPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023D501708EB44B8968F968B /* ChatPersistenceService.swift */; };
@@ -192,6 +194,8 @@
 		9DE73DF20E9B699461C6DE9A /* YUVToRGBShader.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metalshadervalue; path = YUVToRGBShader.metal; sourceTree = "<group>"; };
 		266097269231D624750735AF /* MetalTextureManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetalTextureManager.swift; sourceTree = "<group>"; };
 		6321752D533F2C3F5DACEC0F /* MetalRenderer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
+		7A1B2C3D4E5F60718293A4B6 /* VideoRecoveryPolicy.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoRecoveryPolicy.swift; sourceTree = "<group>"; };
+		7A1B2C3D4E5F60718293A4B8 /* VideoHotplugRecoveryTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoHotplugRecoveryTests.swift; sourceTree = "<group>"; };
 		00B217919CE6400D9C877650 /* ChatManagerTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatManagerTypes.swift; sourceTree = "<group>"; };
 		023D501708EB44B8968F968B /* ChatPersistenceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPersistenceService.swift; sourceTree = "<group>"; };
 		0855F0E55FCEA43A3D3C57BE /* ChatBubbleView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
@@ -476,6 +480,7 @@
 				53CC660E2B8EE70C0081F927 /* LogTests.swift */,
 				FAAB9889728E4A41A0B83F2C /* RDPCredSSPTests.swift */,
 				BB001RDP2F000000DEADBEEF /* RDPConnectionTests.swift */,
+				7A1B2C3D4E5F60718293A4B8 /* VideoHotplugRecoveryTests.swift */,
 			);
 			path = openterfaceTests;
 			sourceTree = "<group>";
@@ -573,6 +578,7 @@
 				isa = PBXGroup;
 				children = (
 					F23B56FB5FFAB15F16DE9EAF /* VideoMetalView.swift */,
+				7A1B2C3D4E5F60718293A4B6 /* VideoRecoveryPolicy.swift */,
 					9DE73DF20E9B699461C6DE9A /* YUVToRGBShader.metal */,
 					6B99F5962E9A6C650073CDA2 /* MS2109SVideoChipset.swift */,266097269231D624750735AF /* MetalTextureManager.swift */,
 					6321752D533F2C3F5DACEC0F /* MetalRenderer.swift */,
@@ -953,6 +959,7 @@
 			buildActionMask = 2147483647;
 			files = (
 								3FADFEC68BDCE022BD63C86D /* VideoMetalView.swift in Sources */,
+				7A1B2C3D4E5F60718293A4B5 /* VideoRecoveryPolicy.swift in Sources */,
 				E6BB6C72A07BAA6B58427FB5 /* YUVToRGBShader.metal in Sources */,
 668607829090B314E704FE4C /* MetalTextureManager.swift in Sources */,
 				096BC0DC3EF26CF775476321 /* MetalRenderer.swift in Sources */,
@@ -1114,6 +1121,7 @@ A1B2C3D42F12345600ABCDEF /* ChatManager.swift in Sources */,
 				AA001VNC2E9B00000073CDA2 /* VNCConnectionTests.swift in Sources */,
 				61450E4925F748AEBDC842BD /* RDPCredSSPTests.swift in Sources */,
 				BB001RDP2F000001DEADBEEF /* RDPConnectionTests.swift in Sources */,
+				7A1B2C3D4E5F60718293A4B7 /* VideoHotplugRecoveryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

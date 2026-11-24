@@ -100,6 +100,11 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Minimum interval for video session start (1 second)
     private let videoSessionStartMinInterval: TimeInterval = 1.0
+
+    /// Watchdog that detects zombie capture sessions (reports "running" but
+    /// delivers no frames, e.g. after the KVM device was unplugged mid-stream).
+    private var videoWatchdogTimer: DispatchSourceTimer?
+    private let videoWatchdogQueue = DispatchQueue(label: "com.openterface.videomanager.watchdog", qos: .utility)
     
     /// Previous activeRect result for stability check
     private var previousActiveRect: CGRect?
@@ -178,9 +183,57 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         // Add device notification observers
         self.observeDeviceNotifications()
+
+        // Detect capture sessions that die silently (no disconnect notification)
+        startVideoWatchdog()
+
+        // If a supported device is already connected at launch,
+        // AVCaptureDeviceWasConnected won't fire — probe once.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.probeAlreadyConnectedDevice()
+        }
+    }
+
+    /// Called once at startup to kick off capture when the device was already
+    /// plugged in before the app launched. Without this, nothing triggers
+    /// prepareVideo() for the already-connected case because
+    /// AVCaptureDeviceWasConnected only fires on hot-plug.
+    /// We wait for HAL detection to finish (AppStatus.videoChipDevice set) then probe.
+    private func probeAlreadyConnectedDevice() {
+        // Wait for HAL to finish its initial detection. It sets videoChipDevice
+        // on the main queue; poll for a few seconds.
+        var attempts = 0
+        func checkAndStart() {
+            guard !captureSession.isRunning else { return }
+            updateUSBDevices()
+            
+            let hasChip = AppStatus.videoChipDevice != nil
+            let avDevices = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInWideAngleCamera, .externalUnknown],
+                mediaType: .video,
+                position: .unspecified
+            ).devices
+            
+            logger.log(content: "🔍 Startup probe attempt \(attempts): videoChipDevice=\(hasChip ? "set" : "nil"), AVFoundation devices=\(avDevices.count)")
+            
+            let matched = findMatchingVideoDevices(from: avDevices)
+            if matched.isEmpty {
+                if attempts < 20 { // up to 2 seconds
+                    attempts += 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { checkAndStart() }
+                } else {
+                    logger.log(content: "⚠️ Startup probe gave up: no matching video device after 2s")
+                }
+                return
+            }
+            logger.log(content: "🔌 Supported device already connected at launch — starting capture")
+            prepareVideoWithHAL()
+        }
+        checkAndStart()
     }
     
     deinit {
+        stopVideoWatchdog()
         cleanupObservers()
     }
     
@@ -374,21 +427,22 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             return
         }
 
-        // If video session is running AND has at least one input, check if device has changed
-        // If it's running but has NO inputs, it was started before hardware was available.
+// If the session is running, only skip when it is genuinely healthy.
+        // A session can report "running" while delivering no frames (device
+        // unplugged without a disconnect notification) — restarting is the
+        // only way back to a live picture.
         if captureSession.isRunning && !captureSession.inputs.isEmpty {
-            // Check if we've received frames recently (within 3 seconds)
-            // If not, the session is in a zombie state and needs to be restarted
-            let timeSinceLastFrame = Date().timeIntervalSince(videoOutputDelegate?.lastFrameTime ?? Date(timeIntervalSince1970: 0))
-            if timeSinceLastFrame > 3.0 {
-                logger.log(content: "Video session running but no frames received for \(String(format: "%.1f", timeSinceLastFrame))s, restarting")
+            // Check staleness via VideoMetalView's frame timestamp
+            let staleSeconds = videoMetalView?.secondsSinceLastFrame() ?? .infinity
+            let needsRestart = sessionNeedsRestart(secondsSinceLastFrame: staleSeconds)
+            if needsRestart {
+                logger.log(content: "Video session zombie detected (no live frame for \(String(format: "%.1f", staleSeconds))s, inputs=\(captureSession.inputs.count)) — restarting")
                 captureSession.stopRunning()
+                videoMetalView?.clearFrame()
             } else {
-                // Get the current input's device unique ID
+                // Session is fresh — also check if the video device has changed
                 if let currentInput = captureSession.inputs.first as? AVCaptureDeviceInput {
                     let currentDeviceID = currentInput.device.uniqueID
-                    
-                    // Find the matching video device to compare
                     let videoDeviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .externalUnknown]
                     let videoDiscoverySession = AVCaptureDevice.DiscoverySession(
                         deviceTypes: videoDeviceTypes,
@@ -396,7 +450,6 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                         position: .unspecified
                     )
                     let videoDevices = findMatchingVideoDevices(from: videoDiscoverySession.devices)
-                    
                     if let newDevice = videoDevices.first {
                         if newDevice.uniqueID == currentDeviceID {
                             logger.log(content: "Video already running with same device, skipping preparation")
@@ -473,6 +526,73 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         }
     }
     
+    // MARK: - Zombie Session Detection
+
+    /// Decides whether a running capture session must be torn down.
+    /// A session is healthy only while it has inputs and recent frames.
+    /// See VideoRecoveryPolicy (pure, unit-verified).
+    private func sessionNeedsRestart(secondsSinceLastFrame: TimeInterval) -> Bool {
+        VideoRecoveryPolicy.sessionNeedsRestart(
+            isRunning: captureSession.isRunning,
+            hasInputs: !captureSession.inputs.isEmpty,
+            secondsSinceLastFrame: secondsSinceLastFrame
+        )
+    }
+
+    private func startVideoWatchdog() {
+        guard videoWatchdogTimer == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: videoWatchdogQueue)
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0, leeway: .milliseconds(500))
+        timer.setEventHandler { [weak self] in
+            DispatchQueue.main.async {
+                self?.checkVideoSessionHealth()
+            }
+        }
+        timer.resume()
+        videoWatchdogTimer = timer
+    }
+
+    private func stopVideoWatchdog() {
+        videoWatchdogTimer?.cancel()
+        videoWatchdogTimer = nil
+    }
+
+    /// Recovers sessions that report "running" but stop delivering frames.
+    /// Restarts capture when the KVM device is present; otherwise stops the
+    /// zombie session so the placeholder/cleared frame is shown.
+    private func checkVideoSessionHealth() {
+        guard captureSession.isRunning, !isVideoSessionStarting else { return }
+
+        // startVideoSession() intentionally delays startRunning by 1s; give
+        // it extra slack before treating the session as dead.
+        guard Date().timeIntervalSince(lastVideoSessionStartTime) > VideoRecoveryPolicy.frameStaleTimeout + 2.0 else { return }
+
+        let staleSeconds = videoMetalView?.secondsSinceLastFrame() ?? .infinity
+        guard sessionNeedsRestart(secondsSinceLastFrame: staleSeconds) else { return }
+
+        logger.log(content: "⚠️ Video watchdog: session running but no live frame for \(String(format: "%.1f", staleSeconds))s — checking hardware")
+        videoMetalView?.clearFrame()
+
+        let videoDevices = findMatchingVideoDevices(from: AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .externalUnknown],
+            mediaType: .video,
+            position: .unspecified
+        ).devices)
+
+        if videoDevices.isEmpty {
+            logger.log(content: "Video watchdog: no matching video device present — stopping zombie session")
+            stopVideoSession()
+            captureSession.beginConfiguration()
+            captureSession.inputs
+                .filter { $0 is AVCaptureDeviceInput }
+                .forEach { captureSession.removeInput($0) }
+            captureSession.commitConfiguration()
+        } else {
+            logger.log(content: "Video watchdog: matching video device present — restarting capture")
+            prepareVideo()
+        }
+    }
+
     /// Updates USB device manager if available on macOS 12.0+
     private func updateUSBDevices() {
         if #available(macOS 12.0, *) {
@@ -1210,9 +1330,12 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
     /// Stops video capture session
     func stopVideoSession() {
-        guard captureSession.isRunning else { return }
-        captureSession.stopRunning()
+        if captureSession.isRunning {
+            captureSession.stopRunning()
+        }
         AppStatus.isHDMIConnected = false
+        // Never leave the last frame cached — it would be repainted forever.
+        videoMetalView?.clearFrame()
         DispatchQueue.main.async {
             self.isVideoConnected = false
         }
@@ -1426,10 +1549,20 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     /// Handles when a video device is disconnected
     @objc func videoWasDisconnected(notification: NSNotification) {
-        if let defaultDevice = AppStatus.videoChipDevice, 
-           let device = notification.object as? AVCaptureDevice, 
-           matchesLocalID(device.uniqueID, defaultDevice.locationID) {
-            
+        // Match against the device actually used by the session first: the
+        // chip reference in AppStatus may already be gone by the time this
+        // notification runs, which used to leave a zombie session behind.
+        let disconnectedDevice = notification.object as? AVCaptureDevice
+        let isCurrentInput = disconnectedDevice.map { device in
+            captureSession.inputs.contains { input in
+                (input as? AVCaptureDeviceInput)?.device.uniqueID == device.uniqueID
+            }
+        } ?? false
+        let isTrackedChip = disconnectedDevice.map { device in
+            AppStatus.videoChipDevice.map { matchesLocalID(device.uniqueID, $0.locationID) } ?? false
+        } ?? false
+
+        if isCurrentInput || isTrackedChip {
             logger.log(content: "Matching video device disconnected, stopping session")
             
             // Reset flag to ensure we can restart

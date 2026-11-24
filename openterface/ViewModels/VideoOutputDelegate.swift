@@ -22,6 +22,12 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private var metalTextureManager: MetalTextureManager?
     private var videoMetalView: VideoMetalView?
 
+    // MARK: - Buffer Reuse Monitoring (方案 B)
+    private var lastBufferAddr: UnsafeMutableRawPointer? = nil
+    private var lastBufferTimestamp: CMTime = .invalid
+    private var bufferReuseAnomalyCount: Int = 0
+    private let bufferReuseAnomalyThreshold: Int = 3  // Consecutive fast reuses before alert
+
     /// Initializes the video output delegate with a reference to the video manager
     /// - Parameter videoManager: The VideoManager instance for accessing active display detection
     init(videoManager: VideoManager) {
@@ -47,6 +53,32 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }
+
+        // MARK: - Buffer Reuse Monitoring (方案 B)
+        // Track pixel buffer address and timestamp to detect fast reuse
+        let bufferAddr = CVPixelBufferGetBaseAddress(pixelBuffer)
+        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+
+        if let lastAddr = lastBufferAddr, lastAddr == bufferAddr {
+            let timeDiff = CMTimeSubtract(timestamp, lastBufferTimestamp)
+            let minExpectedInterval = CMTime(value: 1, timescale: 120)  // 8.33ms (120fps upper limit)
+
+            if CMTimeCompare(timeDiff, minExpectedInterval) < 0 {
+                bufferReuseAnomalyCount += 1
+                if bufferReuseAnomalyCount >= bufferReuseAnomalyThreshold {
+                    logger.log(content: "⚠️ Pixel buffer 过快重用: \(bufferReuseAnomalyCount) 次，可能导致花屏")
+                    NotificationCenter.default.post(name: .frameAnomalyDetected, object: nil)
+                    bufferReuseAnomalyCount = 0
+                }
+            } else {
+                bufferReuseAnomalyCount = 0
+            }
+        } else {
+            bufferReuseAnomalyCount = 0
+        }
+
+        lastBufferAddr = bufferAddr
+        lastBufferTimestamp = timestamp
 
         // Log the actual pixel buffer dimensions and format on first frame
         let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
@@ -89,6 +121,12 @@ class VideoOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         // and flicker at high resolution (2560x1440+).
         if let metalView = videoMetalView {
             metalView.updateFrame(pixelBuffer)
+
+            // Frame timestamp anomaly detection - temporarily disabled
+            // The detection expects 60fps but actual capture rate varies (e.g., 75fps),
+            // causing excessive false positives. Can be re-enabled with dynamic FPS detection.
+            // let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            // metalView.detectTimestampAnomaly(timestamp: timestamp)
         }
 
         // Only process pixel buffer when active resolution checking is enabled

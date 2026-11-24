@@ -121,7 +121,17 @@ class MetalRenderer {
         commandBuffer.present(drawable)
 
         // Schedule cleanup after GPU completes
-        commandBuffer.addCompletedHandler { _ in
+        commandBuffer.addCompletedHandler { [weak self] buffer in
+            // MARK: - Metal Device Error Monitoring (方案 D)
+            // Check for GPU errors via command buffer status
+            if buffer.status == .error {
+                self?.logger.log(content: "🔴 Metal command buffer error: \(buffer.error?.localizedDescription ?? "unknown")")
+                NotificationCenter.default.post(
+                    name: .metalDeviceError,
+                    object: nil,
+                    userInfo: ["error": buffer.error?.localizedDescription ?? "unknown"]
+                )
+            }
             onComplete()
         }
 
