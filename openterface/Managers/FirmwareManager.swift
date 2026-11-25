@@ -102,12 +102,7 @@ class FirmwareManager: ObservableObject {
         // Stop video operations with complete session teardown
         let videoManager = DependencyContainer.shared.resolve(VideoManagerProtocol.self)
         videoManager.stopVideoSession()
-        
-        // Remove all video inputs to ensure complete disconnection
-        videoManager.captureSession.beginConfiguration()
-        let videoInputs = videoManager.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
-        videoInputs.forEach { videoManager.captureSession.removeInput($0) }
-        videoManager.captureSession.commitConfiguration()
+        videoManager.tearDownSessionForFirmware()
         logger.log(content: "✓ Video operations stopped and session cleared")
         
         // Stop audio operations

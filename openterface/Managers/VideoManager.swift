@@ -105,6 +105,14 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// delivers no frames, e.g. after the KVM device was unplugged mid-stream).
     private var videoWatchdogTimer: DispatchSourceTimer?
     private let videoWatchdogQueue = DispatchQueue(label: "com.openterface.videomanager.watchdog", qos: .utility)
+
+    /// Serial queue that owns every AVCaptureSession start/stop/configuration.
+    /// `startRunning()`/`stopRunning()` block for seconds and must never run on main.
+    let sessionQueue = DispatchQueue(label: "com.openterface.video.session")
+
+    private let watchdogRecoveryMinInterval: TimeInterval = 15.0
+    private var lastWatchdogRecoveryTime = Date(timeIntervalSince1970: 0)
+    private let watchdogRecoveryLock = NSLock()
     
     /// Previous activeRect result for stability check
     private var previousActiveRect: CGRect?
@@ -171,6 +179,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     
     override init() {
         captureSession = AVCaptureSession()
+        sessionQueue.setSpecific(key: VideoManager.sessionQueueKey, value: 1)
         super.init()
 
         self.setupBindings()
@@ -431,13 +440,14 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         // A session can report "running" while delivering no frames (device
         // unplugged without a disconnect notification) — restarting is the
         // only way back to a live picture.
+        var mustStopSession = false
         if captureSession.isRunning && !captureSession.inputs.isEmpty {
             // Check staleness via VideoMetalView's frame timestamp
             let staleSeconds = videoMetalView?.secondsSinceLastFrame() ?? .infinity
             let needsRestart = sessionNeedsRestart(secondsSinceLastFrame: staleSeconds)
             if needsRestart {
                 logger.log(content: "Video session zombie detected (no live frame for \(String(format: "%.1f", staleSeconds))s, inputs=\(captureSession.inputs.count)) — restarting")
-                captureSession.stopRunning()
+                mustStopSession = true
                 videoMetalView?.clearFrame()
             } else {
                 // Session is fresh — also check if the video device has changed
@@ -456,7 +466,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
                             return
                         } else {
                             logger.log(content: "Video device changed (old: \(currentDeviceID), new: \(newDevice.uniqueID)), restarting session")
-                            captureSession.stopRunning()
+                            mustStopSession = true
                         }
                     } else {
                         logger.log(content: "Video already running, skipping preparation")
@@ -471,7 +481,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         if captureSession.isRunning && captureSession.inputs.isEmpty {
             logger.log(content: "Video session running but empty (no hardware at startup) — restarting with detected hardware")
-            captureSession.stopRunning()
+            mustStopSession = true
         }
         
         // Update last start time
@@ -513,16 +523,30 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             enumerateAvailableVideoFormats()
 
             // Set desired resolution from user-selected format
-            // This ensures setupVideoCapture applies the correct resolution
             let selectedRes = selectedVideoFormat.resolution
             desiredResolution = CMVideoDimensions(width: Int32(selectedRes.width), height: Int32(selectedRes.height))
             logger.log(content: "Set desired resolution to \(selectedRes.width)x\(selectedRes.height) from selected format")
 
-            // Setup video capture (format will be applied inside the configuration block)
-            setupVideoCapture(with: device)
+            // Apply the user-selected format on main (reads @Published state),
+            // then hand the blocking session start/stop to sessionQueue.
+            applySelectedVideoFormat(to: device)
+
+            sessionQueue.async { [weak self] in
+                guard let self = self else { return }
+                if mustStopSession || self.captureSession.isRunning {
+                    self.captureSession.stopRunning()
+                }
+                self.setupVideoCapture(with: device)
+            }
         } else {
             logger.log(content: "No matching video devices found")
             isVideoSessionStarting = false
+            if mustStopSession {
+                sessionQueue.async { [weak self] in
+                    guard let self = self, self.captureSession.isRunning else { return }
+                    self.captureSession.stopRunning()
+                }
+            }
         }
     }
     
@@ -560,6 +584,8 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
     /// Recovers sessions that report "running" but stop delivering frames.
     /// Restarts capture when the KVM device is present; otherwise stops the
     /// zombie session so the placeholder/cleared frame is shown.
+    /// Recovery itself is throttled: a bus-starved stream (e.g. during a long
+    /// paste) must not trigger a session restart storm.
     private func checkVideoSessionHealth() {
         guard captureSession.isRunning, !isVideoSessionStarting else { return }
 
@@ -569,6 +595,16 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         let staleSeconds = videoMetalView?.secondsSinceLastFrame() ?? .infinity
         guard sessionNeedsRestart(secondsSinceLastFrame: staleSeconds) else { return }
+
+        watchdogRecoveryLock.lock()
+        let elapsed = Date().timeIntervalSince(lastWatchdogRecoveryTime)
+        let shouldRecover = elapsed >= watchdogRecoveryMinInterval
+        if shouldRecover { lastWatchdogRecoveryTime = Date() }
+        watchdogRecoveryLock.unlock()
+        guard shouldRecover else {
+            logger.log(content: "Video watchdog: recovery throttled (\(String(format: "%.0f", elapsed))s since last attempt)")
+            return
+        }
 
         logger.log(content: "⚠️ Video watchdog: session running but no live frame for \(String(format: "%.1f", staleSeconds))s — checking hardware")
         videoMetalView?.clearFrame()
@@ -582,11 +618,14 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         if videoDevices.isEmpty {
             logger.log(content: "Video watchdog: no matching video device present — stopping zombie session")
             stopVideoSession()
-            captureSession.beginConfiguration()
-            captureSession.inputs
-                .filter { $0 is AVCaptureDeviceInput }
-                .forEach { captureSession.removeInput($0) }
-            captureSession.commitConfiguration()
+            sessionQueue.async { [weak self] in
+                guard let self = self else { return }
+                self.captureSession.beginConfiguration()
+                self.captureSession.inputs
+                    .filter { $0 is AVCaptureDeviceInput }
+                    .forEach { self.captureSession.removeInput($0) }
+                self.captureSession.commitConfiguration()
+            }
         } else {
             logger.log(content: "Video watchdog: matching video device present — restarting capture")
             prepareVideo()
@@ -618,19 +657,19 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         return matchingDevices
     }
     
-    /// Sets up video capture with the specified device
+    /// Sets up video capture with the specified device. Runs on `sessionQueue`.
     private func setupVideoCapture(with device: AVCaptureDevice) {
         // Check session status again
         if captureSession.isRunning {
             logger.log(content: "Video session already running, skipping setup")
-            isVideoSessionStarting = false
+            DispatchQueue.main.async { self.isVideoSessionStarting = false }
             return
         }
         
         // Prevent device from being empty or invalid
         guard device.hasMediaType(.video) else {
             logger.log(content: "Invalid video device provided")
-            isVideoSessionStarting = false
+            DispatchQueue.main.async { self.isVideoSessionStarting = false }
             return
         }
         
@@ -648,22 +687,16 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             guard captureSession.canAddInput(input) else {
                 logger.log(content: "Cannot add input to capture session")
                 captureSession.commitConfiguration()
-                isVideoSessionStarting = false
+                DispatchQueue.main.async { self.isVideoSessionStarting = false }
                 return
             }
             
             captureSession.addInput(input)
 
-            // Apply user-selected format (inside configuration block)
-            applySelectedVideoFormat(to: device)
-
+            // Format was already applied on main in prepareVideo().
             // Set desired resolution if specified
-            // NOTE: Format matching is handled by applySelectedVideoFormat() called earlier in prepareVideo()
-            // This section is kept for backward compatibility but does nothing if desiredResolution is set
             if let desiredRes = desiredResolution {
                 logger.log(content: "Desired resolution set to \(desiredRes.width)x\(desiredRes.height) - format matching handled by applySelectedVideoFormat")
-                // Skip format matching here to avoid conflicts with applySelectedVideoFormat
-                // The device.activeFormat and videoSettings were already set by applySelectedVideoFormat
             }
 
             // Commit configuration changes
@@ -673,9 +706,12 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
             // Get camera video resolution
             if let formatDescription = device.activeFormat.formatDescription as CMFormatDescription? {
-                dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
-                AppStatus.videoDimensions.width = CGFloat(dimensions.width)
-                AppStatus.videoDimensions.height = CGFloat(dimensions.height)
+                let newDimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
+                DispatchQueue.main.async {
+                    self.dimensions = newDimensions
+                    AppStatus.videoDimensions.width = CGFloat(newDimensions.width)
+                    AppStatus.videoDimensions.height = CGFloat(newDimensions.height)
+                }
             }
 
             // Start video session
@@ -691,7 +727,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
             logger.log(content: "🔬 [TRACE] EXCEPTION in setupVideoCapture: \(error)")
             logger.log(content: "Failed to set up video capture: \(error.localizedDescription)")
             // Reset start flag when error occurs
-            isVideoSessionStarting = false
+            DispatchQueue.main.async { self.isVideoSessionStarting = false }
         }
         
 // Removed verbose format enumeration for cleaner logs
@@ -1261,7 +1297,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         }
     }
 
-    /// Starts video capture session
+    /// Starts video capture session. `startRunning()` blocks, so it runs on `sessionQueue`.
     func startVideoSession() {
         logger.log(content: "🔬 [TRACE] startVideoSession() called, isFirmwareFlashing=\(AppStatus.isFirmwareFlashing), isRunning=\(captureSession.isRunning)")
 
@@ -1269,111 +1305,171 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         if AppStatus.isFirmwareFlashing {
             logger.log(content: "🔬 [TRACE] startVideoSession: blocked by firmware flashing")
             logger.log(content: "Firmware flash in progress: skipping video session start")
-            isVideoSessionStarting = false
+            DispatchQueue.main.async { self.isVideoSessionStarting = false }
             return
         }
 
-        // Status check: if session is already running, return directly
-        if captureSession.isRunning {
-            logger.log(content: "🔬 [TRACE] startVideoSession: already running, skip")
-            logger.log(content: "Video session already running, skipping start...")
-            isVideoSessionStarting = false
-            return
-        }
-
-        logger.log(content: "🔬 [TRACE] startVideoSession: scheduling startRunning with 1s delay")
-        logger.log(content: "Starting video session...")
-
-        // Delay capture session start by 1 second to avoid crash
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        sessionQueue.async { [weak self] in
             guard let self = self else { return }
 
-            logger.log(content: "🔬 [TRACE] 1s delay fired, about to startRunning, inputs=\(self.captureSession.inputs.count)")
-
-            // Log device active format BEFORE starting session
-            if let device = self.captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
-                let preStartDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
-                let preStartPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
-                self.logger.log(content: "📍 Device active format BEFORE session start: \(preStartDims.width)x\(preStartDims.height), pixel format: \(String(format: "0x%X", preStartPixelFormat))")
+            // Status check: if session is already running, return directly
+            if self.captureSession.isRunning {
+                self.logger.log(content: "🔬 [TRACE] startVideoSession: already running, skip")
+                self.logger.log(content: "Video session already running, skipping start...")
+                DispatchQueue.main.async { self.isVideoSessionStarting = false }
+                return
             }
 
-            // Start session directly in current thread, avoiding extra asynchronous operations
-            self.captureSession.startRunning()
-            logger.log(content: "🔬 [TRACE] startRunning() completed, isRunning=\(self.captureSession.isRunning)")
+            self.logger.log(content: "🔬 [TRACE] startVideoSession: scheduling startRunning with 1s delay")
+            self.logger.log(content: "Starting video session...")
 
-            // Log device active format AFTER starting session
-            if let device = self.captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
-                let postStartDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
-                let postStartPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
-                self.logger.log(content: "📍 Device active format AFTER session start: \(postStartDims.width)x\(postStartDims.height), pixel format: \(String(format: "0x%X", postStartPixelFormat))")
+            // Delay capture session start by 1 second to avoid crash
+            self.sessionQueue.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
 
-                // If the format was reset by startRunning(), re-apply it
-                let desiredDims = self.selectedVideoFormat.resolution
-                if Int(postStartDims.width) != desiredDims.width || Int(postStartDims.height) != desiredDims.height {
-                    self.logger.log(content: "⚠️ Format was reset by session start, re-applying format...")
-                    self.applySelectedVideoFormat(to: device.device)
+                self.logger.log(content: "🔬 [TRACE] 1s delay fired, about to startRunning, inputs=\(self.captureSession.inputs.count)")
 
-                    // Verify the format was re-applied
-                    let reapplyDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
-                    let reapplyPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
-                    self.logger.log(content: "📍 Device active format AFTER re-apply: \(reapplyDims.width)x\(reapplyDims.height), pixel format: \(String(format: "0x%X", reapplyPixelFormat))")
+                // Log device active format BEFORE starting session
+                if let device = self.captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
+                    let preStartDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
+                    let preStartPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
+                    self.logger.log(content: "📍 Device active format BEFORE session start: \(preStartDims.width)x\(preStartDims.height), pixel format: \(String(format: "0x%X", preStartPixelFormat))")
+                }
+
+                if !self.captureSession.isRunning {
+                    self.captureSession.startRunning()
+                }
+                self.logger.log(content: "🔬 [TRACE] startRunning() completed, isRunning=\(self.captureSession.isRunning)")
+
+                // Post-start format check touches @Published state and the device, so do it on main.
+                DispatchQueue.main.async {
+                    // Log device active format AFTER starting session
+                    if let device = self.captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
+                        let postStartDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
+                        let postStartPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
+                        self.logger.log(content: "📍 Device active format AFTER session start: \(postStartDims.width)x\(postStartDims.height), pixel format: \(String(format: "0x%X", postStartPixelFormat))")
+
+                        // If the format was reset by startRunning(), re-apply it
+                        let desiredDims = self.selectedVideoFormat.resolution
+                        if Int(postStartDims.width) != desiredDims.width || Int(postStartDims.height) != desiredDims.height {
+                            self.logger.log(content: "⚠️ Format was reset by session start, re-applying format...")
+                            self.applySelectedVideoFormat(to: device.device)
+
+                            // Verify the format was re-applied
+                            let reapplyDims = CMVideoFormatDescriptionGetDimensions(device.device.activeFormat.formatDescription)
+                            let reapplyPixelFormat = CMFormatDescriptionGetMediaSubType(device.device.activeFormat.formatDescription)
+                            self.logger.log(content: "📍 Device active format AFTER re-apply: \(reapplyDims.width)x\(reapplyDims.height), pixel format: \(String(format: "0x%X", reapplyPixelFormat))")
+                        }
+                    }
+
+                    // Log record
+                    self.logger.log(content: "Video session started successfully")
+
+                    // Reset start flag
+                    self.isVideoSessionStarting = false
                 }
             }
-
-            // Log record
-            self.logger.log(content: "Video session started successfully")
-
-            // Reset start flag
-            self.isVideoSessionStarting = false
         }
     }
 
-    /// Stops video capture session
+    /// Stops video capture session. `stopRunning()` blocks, so it runs on `sessionQueue`.
     func stopVideoSession() {
-        if captureSession.isRunning {
-            captureSession.stopRunning()
+        let stop = { [weak self] in
+            guard let self = self else { return }
+            if self.captureSession.isRunning {
+                self.captureSession.stopRunning()
+            }
         }
-        AppStatus.isHDMIConnected = false
+        if Thread.isMainThread {
+            sessionQueue.async(execute: stop)
+            AppStatus.isHDMIConnected = false
+        } else {
+            sessionQueue.async(execute: stop)
+            DispatchQueue.main.async { AppStatus.isHDMIConnected = false }
+        }
         // Never leave the last frame cached — it would be repainted forever.
         videoMetalView?.clearFrame()
         DispatchQueue.main.async {
             self.isVideoConnected = false
         }
     }
-    
-    /// Adds an input to the capture session if possible
-    func addInput(_ input: AVCaptureInput) {
-        // Ensure checking if session is running before adding input, if running it needs to be stopped
-        let wasRunning = captureSession.isRunning
-        if wasRunning {
-            captureSession.stopRunning()
+
+    /// Stops and restarts the session (e.g. after a format change). The re-prepare is queued
+    /// behind the asynchronous stop on `sessionQueue`, so it always sees a stopped session.
+    func restartVideoSession() {
+        stopVideoSession()
+        sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            DispatchQueue.main.async {
+                self?.prepareVideo()
+            }
         }
-        
-        // Use beginConfiguration and commitConfiguration to ensure atomic operations
-        captureSession.beginConfiguration()
-        
-        // Check if input can be added
-        guard captureSession.canAddInput(input) else {
-            logger.log(content: "Cannot add input to capture session")
-            captureSession.commitConfiguration()
-            
+    }
+
+    /// Fully tears the session down before firmware/EDID work. The caller assumes the
+    /// session is stopped when this returns, so it blocks on `sessionQueue`.
+    func tearDownSessionForFirmware() {
+        let tearDown = { [weak self] in
+            guard let self = self else { return }
+            if self.captureSession.isRunning {
+                self.captureSession.stopRunning()
+            }
+            self.captureSession.beginConfiguration()
+            self.captureSession.inputs
+                .filter { $0 is AVCaptureDeviceInput }
+                .forEach { self.captureSession.removeInput($0) }
+            self.captureSession.commitConfiguration()
+        }
+        if DispatchQueue.getSpecific(key: VideoManager.sessionQueueKey) != nil {
+            tearDown()
+        } else {
+            sessionQueue.sync(execute: tearDown)
+        }
+        videoMetalView?.clearFrame()
+        DispatchQueue.main.async {
+            self.isVideoConnected = false
+            AppStatus.isHDMIConnected = false
+        }
+    }
+
+    private static let sessionQueueKey = DispatchSpecificKey<UInt8>()
+    
+    /// Adds an input to the capture session if possible. Runs on `sessionQueue`.
+    func addInput(_ input: AVCaptureInput) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Ensure checking if session is running before adding input, if running it needs to be stopped
+            let wasRunning = self.captureSession.isRunning
+            if wasRunning {
+                self.captureSession.stopRunning()
+            }
+
+            // Use beginConfiguration and commitConfiguration to ensure atomic operations
+            self.captureSession.beginConfiguration()
+
+            // Check if input can be added
+            guard self.captureSession.canAddInput(input) else {
+                self.logger.log(content: "Cannot add input to capture session")
+                self.captureSession.commitConfiguration()
+
+                // If it was running before, restore running state
+                if wasRunning {
+                    self.captureSession.startRunning()
+                }
+                return
+            }
+
+            // Add input and commit configuration
+            self.captureSession.addInput(input)
+            self.captureSession.commitConfiguration()
+
             // If it was running before, restore running state
             if wasRunning {
-                captureSession.startRunning()
+                self.captureSession.startRunning()
             }
-            return
+
+            self.logger.log(content: "Input added successfully to capture session")
         }
-        
-        // Add input and commit configuration
-        captureSession.addInput(input)
-        captureSession.commitConfiguration()
-        
-        // If it was running before, restore running state
-        if wasRunning {
-            captureSession.startRunning()
-        }
-        
-        logger.log(content: "Input added successfully to capture session")
     }
     
     /// Checks if a device unique ID matches a location ID
@@ -1432,8 +1528,7 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
         // If video is currently running, restart with new resolution
         if captureSession.isRunning {
             logger.log(content: "Restarting video session with new resolution")
-            stopVideoSession()
-            prepareVideo()
+            restartVideoSession()
         }
     }
     
@@ -1564,29 +1659,30 @@ class VideoManager: NSObject, ObservableObject, VideoManagerProtocol {
 
         if isCurrentInput || isTrackedChip {
             logger.log(content: "Matching video device disconnected, stopping session")
-            
+
             // Reset flag to ensure we can restart
-            isVideoSessionStarting = false
-            
-            // Ensure UI-related operations are executed on the main thread
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async { self.isVideoSessionStarting = false }
+
+            // Queue the stop first, then the input cleanup behind it.
+            stopVideoSession()
+
+            sessionQueue.async { [weak self] in
                 guard let self = self else { return }
-                
-                self.stopVideoSession()
-                
                 // Use beginConfiguration and commitConfiguration to ensure atomic operations
                 self.captureSession.beginConfiguration()
-                
+
                 // Remove all existing video inputs
                 let videoInputs = self.captureSession.inputs.filter { $0 is AVCaptureDeviceInput }
                 videoInputs.forEach { self.captureSession.removeInput($0) }
-                
+
                 self.captureSession.commitConfiguration()
-                
-                // Close HID manager
-                self.hidManager.closeHID()
-                
+
                 self.logger.log(content: "Video session and inputs cleaned up")
+            }
+
+            // Close HID manager
+            DispatchQueue.main.async { [weak self] in
+                self?.hidManager.closeHID()
             }
         }
             

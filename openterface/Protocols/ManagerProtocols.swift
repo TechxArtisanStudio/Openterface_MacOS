@@ -54,6 +54,8 @@ protocol VideoManagerProtocol: AnyObject {
     func prepareVideo()
     func startVideoSession()
     func stopVideoSession()
+    func restartVideoSession()
+    func tearDownSessionForFirmware()
     func setupSession()
     func addInput(_ input: AVCaptureInput)
     func matchesLocalID(_ uniqueID: String, _ locationID: String) -> Bool
@@ -231,6 +233,8 @@ protocol KeyboardManagerProtocol: AnyObject {
     func sendSpecialKey(_ key: SpecialKey)
     func executeKeyboardMacro(_ macro: KeyboardMacro)
     func sendTextToKeyboard(text: String)
+    func cancelPaste()
+    func resetPasteResult()
     func releaseAllModifierKeysForPaste()
 }
 

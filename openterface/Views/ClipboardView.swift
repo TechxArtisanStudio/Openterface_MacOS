@@ -27,11 +27,8 @@ struct ClipboardView: View {
     @StateObject private var clipboardManager = ClipboardManager.shared
     @State private var selectedHistoryItem: ClipboardItem?
     @State private var showPasteConfirmationOverlay = false
-    
-    // Add keyboard manager for sending text to target
-    private var keyboardManager: KeyboardManagerProtocol { 
-        DependencyContainer.shared.resolve(KeyboardManagerProtocol.self) 
-    }
+
+    @ObservedObject private var keyboardManager = KeyboardManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -45,31 +42,72 @@ struct ClipboardView: View {
         }
         .frame(width: 400, height: 500)
         .background(Color(NSColor.windowBackgroundColor))
-        .overlay(
-            // Show paste confirmation overlay
-            Group {
-                if showPasteConfirmationOverlay {
-                    VStack {
-                        Image(systemName: "arrow.down.to.line")
-                            .font(.largeTitle)
-                            .foregroundColor(.green)
-                        Text("Sent to Target")
-                            .font(.headline)
-                            .foregroundColor(.green)
-                    }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(12)
-                    .shadow(radius: 8)
-                    .transition(.scale.combined(with: .opacity))
-                }
-            }
-        )
+        .overlay(pasteStatusOverlay)
+        .onChange(of: keyboardManager.isPastingText) { isPasting in
+            handlePasteStateChange(isPasting: isPasting)
+        }
         .onAppear {
             clipboardManager.startMonitoring()
         }
         .onDisappear {
             clipboardManager.stopMonitoring()
+        }
+    }
+
+    // MARK: - Paste Status Overlay
+
+    @ViewBuilder
+    private var pasteStatusOverlay: some View {
+        if keyboardManager.isPastingText {
+            VStack(spacing: 8) {
+                Text("Pasting to Target")
+                    .font(.headline)
+
+                ProgressView(value: keyboardManager.pasteProgress)
+                    .frame(width: 180)
+
+                Text("\(Int((keyboardManager.pasteProgress * 100).rounded()))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+
+                Button("Stop") {
+                    keyboardManager.cancelPaste()
+                }
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+            .shadow(radius: 8)
+            .transition(.scale.combined(with: .opacity))
+        } else if showPasteConfirmationOverlay {
+            VStack(spacing: 6) {
+                Image(systemName: keyboardManager.pasteResult == .cancelled ? "stop.circle" : "checkmark.circle.fill")
+                    .font(.largeTitle)
+                    .foregroundColor(keyboardManager.pasteResult == .cancelled ? .orange : .green)
+
+                Text(keyboardManager.pasteResult == .cancelled ? "Paste Stopped" : "Sent to Target")
+                    .font(.headline)
+                    .foregroundColor(keyboardManager.pasteResult == .cancelled ? .orange : .green)
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+            .shadow(radius: 8)
+            .transition(.scale.combined(with: .opacity))
+        }
+    }
+
+    private func handlePasteStateChange(isPasting: Bool) {
+        guard !isPasting, keyboardManager.pasteResult != nil else { return }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showPasteConfirmationOverlay = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showPasteConfirmationOverlay = false
+            }
         }
     }
     
@@ -86,7 +124,6 @@ struct ClipboardView: View {
                     Button(action: {
                         if let content = clipboardManager.currentClipboardContent {
                             keyboardManager.sendTextToKeyboard(text: content)
-                            showPasteConfirmation(content: content)
                         }
                     }) {
                         Image(systemName: "arrow.down.to.line")
@@ -156,33 +193,14 @@ struct ClipboardView: View {
         }
         .padding()
     }
-    
-    // Function to show visual confirmation when text is sent to target
-    private func showPasteConfirmation(content: String) {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showPasteConfirmationOverlay = true
-        }
-        
-        // Hide the confirmation after 1.5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showPasteConfirmationOverlay = false
-            }
-        }
-    }
 }
 
 struct ClipboardHistoryRow: View {
     let item: ClipboardItem
     let onCopy: () -> Void
-    
-    // Add keyboard manager for sending text to target
-    private var keyboardManager: KeyboardManagerProtocol { 
-        DependencyContainer.shared.resolve(KeyboardManagerProtocol.self) 
-    }
-    
-    @State private var showPasteConfirmation = false
-    
+
+    private let keyboardManager = KeyboardManager.shared
+
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
@@ -207,7 +225,6 @@ struct ClipboardHistoryRow: View {
                 // Host Paste button
                 Button(action: {
                     keyboardManager.sendTextToKeyboard(text: item.content)
-                    showPasteConfirmationFeedback()
                 }) {
                     Image(systemName: "arrow.down.to.line")
                         .foregroundColor(.orange)
@@ -226,42 +243,8 @@ struct ClipboardHistoryRow: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
-        .overlay(
-            // Show paste confirmation
-            Group {
-                if showPasteConfirmation {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.caption)
-                        Text("Sent")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
-                    .padding(4)
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(6)
-                    .shadow(radius: 2)
-                    .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        )
     }
-    
-    private func showPasteConfirmationFeedback() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showPasteConfirmation = true
-        }
-        
-        // Hide the confirmation after 1 second
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showPasteConfirmation = false
-            }
-        }
-    }
-    
+
     private var sourceIcon: some View {
         Group {
             switch item.source {

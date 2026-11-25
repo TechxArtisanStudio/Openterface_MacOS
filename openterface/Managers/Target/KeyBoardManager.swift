@@ -24,6 +24,12 @@ import Cocoa
 import SwiftUI
 import CoreGraphics
 
+/// Result of the most recent Host → Target text paste.
+enum PasteResult: Equatable {
+    case completed
+    case cancelled
+}
+
 class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     private var  logger: LoggerProtocol = DependencyContainer.shared.resolve(LoggerProtocol.self)
     private var hostCapsLockPollTimer: Timer?
@@ -64,6 +70,23 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
     
     // Track the currently pressed text character for UI feedback
     @Published var pressedCharacter: String? = nil
+
+    // MARK: - Paste Session State
+
+    /// True while a Host → Target text paste is running.
+    @Published private(set) var isPastingText: Bool = false
+
+    /// Progress of the current paste, 0...1.
+    @Published private(set) var pasteProgress: Double = 0
+
+    /// Result of the most recent paste; nil before the first paste or after a reset.
+    @Published private(set) var pasteResult: PasteResult? = nil
+
+    /// Text that was not sent because the user stopped the paste. Nil otherwise.
+    @Published private(set) var pasteRemainingText: String? = nil
+
+    private let pasteStateLock = NSLock()
+    private var pasteCancelRequested = false
     
     // Track host keyboard input for visual feedback
     @Published var hostPressedKeyCodes: Set<UInt16> = []
@@ -1150,48 +1173,137 @@ class KeyboardManager: ObservableObject, KeyboardManagerProtocol {
         }
     }
 
+    /// Requests the active paste to stop. The loop checks before each character, so
+    /// cancellation lands within ~60 ms and released keys are cleared.
+    func cancelPaste() {
+        pasteStateLock.lock()
+        pasteCancelRequested = true
+        pasteStateLock.unlock()
+        logger.log(content: "🛑 Paste cancellation requested")
+    }
+
+    /// Clears the previous paste result so a new confirmation window starts idle.
+    func resetPasteResult() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { self.resetPasteResult() }
+            return
+        }
+        guard !isPastingText else { return }
+        pasteResult = nil
+        pasteRemainingText = nil
+        pasteProgress = 0
+    }
+
+    private var isPasteCancellationRequested: Bool {
+        pasteStateLock.lock()
+        defer { pasteStateLock.unlock() }
+        return pasteCancelRequested
+    }
+
     func sendTextToKeyboard(text:String) {
+        // @Published state is main-thread only; hop there if a caller is not.
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { self.sendTextToKeyboard(text: text) }
+            return
+        }
+        guard !isPastingText else {
+            logger.log(content: "⚠️ Paste ignored: another paste is already in progress")
+            return
+        }
+
         if logger.KeyboardEventPrint {
-            logger.log(content: "Sending text to keyboard: \(text)")
+            logger.log(content: "Sending text to keyboard: \(text.prefix(50))...")
         }
-        
-        // Update UI state to show pressed character
-        DispatchQueue.main.async {
-            self.pressedCharacter = text
-        }
-        
+
         // Capture on-screen toggle modifier state BEFORE releasing, so sticky modifier
         // buttons (Ctrl, Alt, Shift) apply to the character being typed.
         let savedCtrl = isLeftCtrlHeld || isRightCtrlHeld
         let savedAlt  = isLeftAltHeld  || isRightAltHeld
         let savedShift = isLeftShiftHeld || isRightShiftHeld
-        
+
+        // Snapshot pressed keys for the background loop; it must not read self.pressedKeys.
+        let pressedKeysSnapshot = pressedKeys
+
         // Release all modifier keys (clears physical key state and toggle flags)
         releaseAllModifierKeys()
-        
-        // Send text to keyboard
-        let textArray = Array(text.utf8) // Convert string to UTF-8 byte array
-        for charString in textArray { // Iterate through each character's UTF-8 encoding
-            let key:UInt16 = UInt16(kbm.fromCharToKeyCode(char: UInt16(charString))) // Convert character to keyboard key code
-            let char = Character(String(UnicodeScalar(charString))) // Convert UTF-8 encoding back to character
-            
-            // Build modifiers from saved on-screen toggle state plus character shift requirements
-            var modifiers = NSEvent.ModifierFlags()
-            if savedCtrl  { modifiers.insert(.control) }
-            if savedAlt   { modifiers.insert(.option) }
-            if savedShift || char.isUppercase || KeyboardManager.SHIFT_KEYS.contains(String(char)) {
-                modifiers.insert(.shift)
-            }
-            
-            kbm.pressKey(keys: [key], modifiers: modifiers) // Press the corresponding key and modifier keys
-            Thread.sleep(forTimeInterval: 0.03) // Wait for 30 milliseconds
-            kbm.releaseKey(keys: self.pressedKeys) // Release all pressed keys
-            Thread.sleep(forTimeInterval: 0.03) // Wait for 30 milliseconds
-        }
-        
-        // Clear pressed character state
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+
+        // Reset the session and publish initial progress
+        pasteStateLock.lock()
+        pasteCancelRequested = false
+        pasteStateLock.unlock()
+        pasteResult = nil
+        pasteRemainingText = nil
+        pasteProgress = 0
+        isPastingText = true
+        self.pressedCharacter = text
+
+        let textArray = Array(text.utf8)
+        guard !textArray.isEmpty else {
+            isPastingText = false
+            pasteResult = .completed
+            pasteProgress = 1
             self.pressedCharacter = nil
+            return
+        }
+
+        let mapper = self.kbm
+        let total = textArray.count
+
+        // The paste loop must never run on the main thread: 300 chars × 2×30ms would
+        // block the UI and video preview for ~18 seconds.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            mapper.releaseKey(keys: pressedKeysSnapshot)
+            usleep(2_000)
+
+            var cancelledAtIndex: Int? = nil
+            var lastProgress: Double = 0
+            for (index, charString) in textArray.enumerated() {
+                if self.isPasteCancellationRequested {
+                    cancelledAtIndex = index
+                    break
+                }
+
+                let key:UInt16 = UInt16(mapper.fromCharToKeyCode(char: UInt16(charString)))
+                let char = Character(String(UnicodeScalar(charString)))
+
+                var modifiers = NSEvent.ModifierFlags()
+                if savedCtrl  { modifiers.insert(.control) }
+                if savedAlt   { modifiers.insert(.option) }
+                if savedShift || char.isUppercase || KeyboardManager.SHIFT_KEYS.contains(String(char)) {
+                    modifiers.insert(.shift)
+                }
+
+                mapper.pressKey(keys: [key], modifiers: modifiers)
+                usleep(30_000)
+                mapper.releaseKey(keys: pressedKeysSnapshot)
+                usleep(30_000)
+
+                lastProgress = Double(index + 1) / Double(total)
+                DispatchQueue.main.async { [weak self] in
+                    self?.pasteProgress = lastProgress
+                }
+            }
+
+            let cancelled = cancelledAtIndex != nil
+            let remaining: String? = cancelledAtIndex.map {
+                String(decoding: textArray[$0...], as: UTF8.self)
+            }
+
+            if cancelled {
+                // Clear any key still held on the target
+                mapper.releaseKey(keys: pressedKeysSnapshot)
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.isPastingText = false
+                self.pasteProgress = cancelled ? lastProgress : 1
+                self.pasteResult = cancelled ? .cancelled : .completed
+                self.pasteRemainingText = remaining
+                self.pressedCharacter = nil
+                self.logger.log(content: cancelled ? "🛑 Paste stopped by user" : "✅ Paste completed")
+            }
         }
     }
 

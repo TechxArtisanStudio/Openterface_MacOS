@@ -257,8 +257,8 @@ class ClipboardManager: ClipboardManagerProtocol, ObservableObject {
 
     func handlePasteAction(_ action: PasteAction, content: String) {
         switch action {
-        case .pasteToTarget:
-            performPaste(content: content)
+        case .pasteToTarget(let text):
+            performPaste(content: text)
         case .passToHost:
             performLocalPaste()
         case .cancel:

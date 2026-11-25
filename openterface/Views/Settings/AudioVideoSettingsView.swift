@@ -124,10 +124,7 @@ struct AudioVideoSettingsView: View {
 
     private func applyVideoFormat() {
         // Restart video session to apply new format
-        videoManager.stopVideoSession()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.videoManager.prepareVideo()
-        }
+        videoManager.restartVideoSession()
     }
 
     // MARK: - Helper Properties

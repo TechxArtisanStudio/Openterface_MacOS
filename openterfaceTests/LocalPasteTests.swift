@@ -20,6 +20,9 @@ final class LocalPasteTests: XCTestCase {
             sentTexts.append(text)
         }
 
+        func cancelPaste() {}
+        func resetPasteResult() {}
+
         func releaseAllModifierKeysForPaste() {
             modifierReleaseCount += 1
         }
